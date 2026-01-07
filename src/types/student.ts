@@ -1,7 +1,19 @@
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled';
+
+export interface SessionHistory {
+  status: SessionStatus;
+  timestamp: string;
+  note?: string;
+}
+
 export interface Session {
   id: string;
   date: string; // YYYY-MM-DD format
   completed: boolean;
+  status: SessionStatus;
+  history: SessionHistory[];
+  cancelledAt?: string;
+  completedAt?: string;
 }
 
 export interface ScheduleDay {
