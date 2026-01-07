@@ -89,7 +89,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     }));
   };
 
-  // Get history stats for selected student - only completed and cancelled sessions
+  // Get history stats for selected student - ALL completed and cancelled sessions
   const getHistoryStats = () => {
     if (!selectedStudent) return { completed: 0, cancelled: 0, total: 0, completionRate: 0 };
     
@@ -99,8 +99,8 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     const semesterStart = parseISO(selectedStudent.semesterStart);
     selectedStudent.sessions.forEach(session => {
       const sessionDate = parseISO(session.date);
-      // Only count sessions from semester start to today
-      if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
+      // Include all completed/cancelled sessions from semester start (no end date restriction)
+      if (!isBefore(sessionDate, semesterStart)) {
         if (session.status === 'completed') completed++;
         else if (session.status === 'cancelled') cancelled++;
       }
@@ -112,7 +112,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     return { completed, cancelled, total, completionRate };
   };
 
-  // Get history sessions for selected student - only completed and cancelled
+  // Get history sessions for selected student - ALL completed and cancelled
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
     
@@ -127,9 +127,8 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     const semesterStart = parseISO(selectedStudent.semesterStart);
     selectedStudent.sessions.forEach(session => {
       const sessionDate = parseISO(session.date);
-      // Only show completed or cancelled sessions from semester start to today
-      const isInHistoryRange = !isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today);
-      if (isInHistoryRange && (session.status === 'completed' || session.status === 'cancelled')) {
+      // Include all completed or cancelled sessions from semester start (no end date restriction)
+      if (!isBefore(sessionDate, semesterStart) && (session.status === 'completed' || session.status === 'cancelled')) {
         sessions.push({
           ...session,
           studentName: selectedStudent.name,
