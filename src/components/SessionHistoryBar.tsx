@@ -66,21 +66,21 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     return { total, completed, pending, cancelled, completionRate };
   };
 
-  // Get next sessions for selected student (only scheduled and cancelled, NOT completed)
-  const getUpcomingSessions = () => {
+  // Get all scheduled and cancelled sessions for selected student (past and future)
+  const getScheduledSessions = () => {
     if (!selectedStudent) return [];
     
-    const futureSessions = selectedStudent.sessions
+    const semesterStart = parseISO(selectedStudent.semesterStart);
+    const scheduledSessions = selectedStudent.sessions
       .filter(session => {
         const sessionDate = parseISO(session.date);
-        // Show only scheduled and cancelled sessions that are today or in the future
+        // Show all scheduled and cancelled sessions from semester start
         // Completed sessions go directly to history
-        return !isBefore(sessionDate, today) && session.status !== 'completed';
+        return !isBefore(sessionDate, semesterStart) && session.status !== 'completed';
       })
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 8);
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-    return futureSessions.map(session => ({
+    return scheduledSessions.map(session => ({
       id: session.id,
       date: session.date,
       status: session.status,
@@ -141,7 +141,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
   };
 
   const todayStats = getTodayStats();
-  const upcomingSessions = getUpcomingSessions();
+  const scheduledSessions = getScheduledSessions();
   const historyStats = getHistoryStats();
   const historySessions = getHistorySessions();
 
@@ -215,7 +215,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
             <TabsList className="w-full grid grid-cols-2">
               <TabsTrigger value="upcoming" className="gap-1.5 text-xs">
                 <CalendarClock className="h-3.5 w-3.5" />
-                Next Sessions
+                Sessions
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-1.5 text-xs">
                 <History className="h-3.5 w-3.5" />
@@ -227,9 +227,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <CalendarClock className="h-3 w-3" />
-                  {selectedStudent.name}'s Upcoming Sessions
+                  {selectedStudent.name}'s Sessions
                   <Badge variant="secondary" className="ml-2 text-[10px]">
-                    {upcomingSessions.length}
+                    {scheduledSessions.length}
                   </Badge>
                 </p>
                 <Popover>
@@ -257,12 +257,12 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
               <div>
                 <ScrollArea className="h-[280px]">
                   <div className="space-y-1.5 pr-2">
-                    {upcomingSessions.length === 0 ? (
+                    {scheduledSessions.length === 0 ? (
                       <p className="text-center text-muted-foreground py-6 text-xs">
-                        No upcoming sessions
+                        No sessions scheduled
                       </p>
                     ) : (
-                      upcomingSessions.map(session => (
+                      scheduledSessions.map(session => (
                         <div
                           key={session.id}
                           className={cn(
