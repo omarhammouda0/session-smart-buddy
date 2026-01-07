@@ -27,10 +27,11 @@ import { cn } from '@/lib/utils';
 interface SessionHistoryBarProps {
   students: Student[];
   onCancelSession?: (studentId: string, sessionId: string) => void;
+  onRestoreSession?: (studentId: string, sessionId: string) => void;
   onRescheduleSession?: (studentId: string, sessionId: string, newDate: string) => void;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSession }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession, onRescheduleSession }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
@@ -62,19 +63,20 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     return { total, completed, pending, cancelled, completionRate };
   };
 
-  // Get next 4 sessions for selected student
+  // Get next sessions for selected student (including cancelled ones that are in the future)
   const getUpcomingSessions = () => {
     if (!selectedStudent) return [];
     
-    const futureScheduled = selectedStudent.sessions
+    const futureSessions = selectedStudent.sessions
       .filter(session => {
         const sessionDate = parseISO(session.date);
-        return session.status === 'scheduled' && !isBefore(sessionDate, today);
+        // Show scheduled and cancelled sessions that are in the future
+        return (session.status === 'scheduled' || session.status === 'cancelled') && !isBefore(sessionDate, today);
       })
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 4);
+      .slice(0, 6); // Show more to account for cancelled ones
 
-    return futureScheduled.map(session => ({
+    return futureSessions.map(session => ({
       id: session.id,
       date: session.date,
       status: session.status,
@@ -142,6 +144,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     onCancelSession?.(studentId, sessionId);
   };
 
+  const handleRestoreSession = (studentId: string, sessionId: string) => {
+    onRestoreSession?.(studentId, sessionId);
+  };
+
   const handleReschedule = (studentId: string, sessionId: string, newDate: Date) => {
     const formattedDate = format(newDate, 'yyyy-MM-dd');
     onRescheduleSession?.(studentId, sessionId, formattedDate);
@@ -206,7 +212,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
               <div>
                 <p className="text-xs text-muted-foreground mb-2 font-medium flex items-center gap-1">
                   <CalendarClock className="h-3 w-3" />
-                  {selectedStudent.name}'s Next 4 Sessions
+                  {selectedStudent.name}'s Upcoming Sessions
                   <Badge variant="secondary" className="ml-auto text-[10px]">
                     {upcomingSessions.length}
                   </Badge>
@@ -221,65 +227,116 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
                       upcomingSessions.map(session => (
                         <div
                           key={session.id}
-                          className="flex items-center justify-between p-2.5 rounded-lg text-xs border bg-card"
+                          className={cn(
+                            "flex items-center justify-between p-2.5 rounded-lg text-xs border",
+                            session.status === 'cancelled' 
+                              ? "bg-destructive/5 border-destructive/20"
+                              : "bg-card"
+                          )}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 bg-primary/20 text-primary">
-                              <Calendar className="h-3 w-3" />
+                            <div className={cn(
+                              "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                              session.status === 'cancelled'
+                                ? "bg-destructive/20 text-destructive"
+                                : "bg-primary/20 text-primary"
+                            )}>
+                              {session.status === 'cancelled' ? (
+                                <Ban className="h-3 w-3" />
+                              ) : (
+                                <Calendar className="h-3 w-3" />
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="font-medium truncate">
+                              <p className={cn(
+                                "font-medium truncate",
+                                session.status === 'cancelled' && "line-through text-muted-foreground"
+                              )}>
                                 {format(parseISO(session.date), 'EEE, MMM d')}
                               </p>
+                              {session.status === 'cancelled' && (
+                                <span className="text-[10px] text-destructive">Cancelled</span>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
-                                  <CalendarClock className="h-3.5 w-3.5" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <CalendarPicker
-                                  mode="single"
-                                  selected={rescheduleDate}
-                                  onSelect={(date) => {
-                                    if (date) {
-                                      handleReschedule(session.studentId, session.id, date);
-                                    }
-                                  }}
-                                  disabled={(date) => date < today}
-                                  initialFocus
-                                  className="pointer-events-auto"
-                                />
-                              </PopoverContent>
-                            </Popover>
+                            {session.status === 'cancelled' ? (
+                              /* Restore button for cancelled sessions */
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-success hover:text-success hover:bg-success/10">
+                                    <Check className="h-3.5 w-3.5 mr-1" />
+                                    Restore
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Restore Session</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Restore the cancelled session on {format(parseISO(session.date), 'EEEE, MMMM d')}? It will be marked as scheduled again.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleRestoreSession(session.studentId, session.id)}
+                                      className="bg-success text-success-foreground hover:bg-success/90"
+                                    >
+                                      Yes, restore
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            ) : (
+                              <>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                                      <CalendarClock className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="end">
+                                    <CalendarPicker
+                                      mode="single"
+                                      selected={rescheduleDate}
+                                      onSelect={(date) => {
+                                        if (date) {
+                                          handleReschedule(session.studentId, session.id, date);
+                                        }
+                                      }}
+                                      disabled={(date) => date < today}
+                                      initialFocus
+                                      className="pointer-events-auto"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
 
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
-                                  <Ban className="h-3.5 w-3.5" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Cancel Session</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to cancel the session on {format(parseISO(session.date), 'EEEE, MMMM d')}?
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>No, keep it</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleCancelSession(session.studentId, session.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Yes, cancel
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                      <Ban className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Cancel Session</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to cancel the session on {format(parseISO(session.date), 'EEEE, MMMM d')}?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>No, keep it</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleCancelSession(session.studentId, session.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Yes, cancel
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))
