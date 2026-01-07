@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { Check, X, CreditCard, Clock, Users } from 'lucide-react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MonthSelector } from './MonthSelector';
 import { Student, StudentPayments, DAY_NAMES_SHORT } from '@/types/student';
 import { formatMonthYear } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
+import { format, subMonths, addMonths } from 'date-fns';
 
 interface PaymentsDashboardProps {
   students: Student[];
@@ -19,6 +19,8 @@ interface PaymentsDashboardProps {
 
 type PaymentFilter = 'all' | 'paid' | 'unpaid';
 
+const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export const PaymentsDashboard = ({
   students,
   payments,
@@ -26,6 +28,7 @@ export const PaymentsDashboard = ({
   selectedYear: initialYear,
   onTogglePayment,
 }: PaymentsDashboardProps) => {
+  const now = new Date();
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [studentFilter, setStudentFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,6 +46,42 @@ export const PaymentsDashboard = ({
 
   const paidCount = students.filter(s => getPaymentStatus(s.id)).length;
   const unpaidCount = students.length - paidCount;
+
+  // Generate last 6 months for quick selection
+  const getRecentMonths = () => {
+    const months = [];
+    for (let i = 2; i >= -3; i--) {
+      const date = subMonths(now, i);
+      months.push({
+        month: date.getMonth(),
+        year: date.getFullYear(),
+        label: MONTH_NAMES_SHORT[date.getMonth()],
+        fullLabel: format(date, 'MMMM yyyy'),
+        isCurrent: date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear(),
+      });
+    }
+    return months;
+  };
+
+  const recentMonths = getRecentMonths();
+
+  const goToPrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
 
   // Apply filters
   const filteredStudents = students.filter(student => {
@@ -75,99 +114,132 @@ export const PaymentsDashboard = ({
 
   return (
     <div className="space-y-4">
-      {/* Month Selector */}
-      <div className="flex justify-center">
-        <MonthSelector
-          month={selectedMonth}
-          year={selectedYear}
-          onChange={(m, y) => {
-            setSelectedMonth(m);
-            setSelectedYear(y);
-          }}
-        />
+      {/* Month Filter */}
+      <div className="space-y-3">
+        {/* Month navigation */}
+        <div className="flex items-center justify-center gap-2">
+          <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="h-8 w-8">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="text-center min-w-[140px]">
+            <p className="font-heading font-semibold text-lg">
+              {formatMonthYear(selectedMonth, selectedYear)}
+            </p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-8 w-8">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Quick month selection */}
+        <div className="flex justify-center gap-1.5 overflow-x-auto pb-1">
+          {recentMonths.map(m => (
+            <button
+              key={`${m.year}-${m.month}`}
+              onClick={() => {
+                setSelectedMonth(m.month);
+                setSelectedYear(m.year);
+              }}
+              className={cn(
+                "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[56px]",
+                selectedMonth === m.month && selectedYear === m.year
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : m.isCurrent
+                    ? "bg-primary/10 border-2 border-primary/30 hover:bg-primary/20"
+                    : "bg-card border border-border hover:border-primary/50"
+              )}
+            >
+              <span className="text-xs font-medium">{m.label}</span>
+              <span className="text-[10px] opacity-70">{m.year}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Filter Bars */}
-      <div className="space-y-3">
-        {/* Payment Status Filter */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPaymentFilter('all')}
-            className={cn(
-              "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
-              paymentFilter === 'all'
-                ? "ring-2 ring-primary bg-card"
-                : "bg-card hover:bg-muted/50"
-            )}
-          >
-            <p className="text-xl font-heading font-bold">{students.length}</p>
-            <p className="text-xs text-muted-foreground">All</p>
-          </button>
-          <button
-            onClick={() => setPaymentFilter('paid')}
-            className={cn(
-              "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
-              paymentFilter === 'paid'
-                ? "ring-2 ring-success bg-success/10"
-                : "bg-success/10 hover:bg-success/20"
-            )}
-          >
-            <p className="text-xl font-heading font-bold text-success">{paidCount}</p>
-            <p className="text-xs text-success/80">Paid</p>
-          </button>
-          <button
-            onClick={() => setPaymentFilter('unpaid')}
-            className={cn(
-              "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
-              paymentFilter === 'unpaid'
-                ? "ring-2 ring-warning bg-warning/10"
-                : "bg-warning/10 hover:bg-warning/20"
-            )}
-          >
-            <p className="text-xl font-heading font-bold text-warning">{unpaidCount}</p>
-            <p className="text-xs text-warning/80">Pending</p>
-          </button>
-        </div>
+      {/* Payment Status Filter */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setPaymentFilter('all')}
+          className={cn(
+            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === 'all'
+              ? "ring-2 ring-primary bg-card"
+              : "bg-card hover:bg-muted/50"
+          )}
+        >
+          <p className="text-xl font-heading font-bold">{students.length}</p>
+          <p className="text-xs text-muted-foreground">All</p>
+        </button>
+        <button
+          onClick={() => setPaymentFilter('paid')}
+          className={cn(
+            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === 'paid'
+              ? "ring-2 ring-success bg-success/10"
+              : "bg-success/10 hover:bg-success/20"
+          )}
+        >
+          <p className="text-xl font-heading font-bold text-success">{paidCount}</p>
+          <p className="text-xs text-success/80">Paid</p>
+        </button>
+        <button
+          onClick={() => setPaymentFilter('unpaid')}
+          className={cn(
+            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === 'unpaid'
+              ? "ring-2 ring-warning bg-warning/10"
+              : "bg-warning/10 hover:bg-warning/20"
+          )}
+        >
+          <p className="text-xl font-heading font-bold text-warning">{unpaidCount}</p>
+          <p className="text-xs text-warning/80">Pending</p>
+        </button>
+      </div>
 
-        {/* Search and Student Filter */}
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <Input
-              placeholder="Search by name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <Select value={studentFilter} onValueChange={setStudentFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="All Students" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Students</SelectItem>
-              {students.map(student => (
-                <SelectItem key={student.id} value={student.id}>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "w-2 h-2 rounded-full",
-                      getPaymentStatus(student.id) ? "bg-success" : "bg-warning"
-                    )} />
-                    <span>{student.name}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Search and Student Filter */}
+      <div className="flex gap-2">
+        <div className="flex-1 relative">
+          <Input
+            placeholder="Search by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full"
+          />
         </div>
+        <Select value={studentFilter} onValueChange={setStudentFilter}>
+          <SelectTrigger className="w-[180px]">
+            <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="All Students" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Students</SelectItem>
+            {students.map(student => (
+              <SelectItem key={student.id} value={student.id}>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "w-2 h-2 rounded-full",
+                    getPaymentStatus(student.id) ? "bg-success" : "bg-warning"
+                  )} />
+                  <span>{student.name}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Payment List */}
       <Card className="card-shadow">
         <CardHeader className="pb-3">
-          <CardTitle className="font-heading text-lg">
-            {formatMonthYear(selectedMonth, selectedYear)}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              {formatMonthYear(selectedMonth, selectedYear)}
+            </CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {paidCount}/{students.length} paid
+            </span>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {filteredStudents.length === 0 ? (
