@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X } from 'lucide-react';
 import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DAY_NAMES_SHORT } from '@/types/student';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +18,7 @@ const Index = () => {
   const now = new Date();
   const [selectedDate, setSelectedDate] = useState(format(now, 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('sessions');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [studentFilter, setStudentFilter] = useState<string>('all');
 
   const {
     students,
@@ -57,10 +57,10 @@ const Index = () => {
 
   const studentsForDate = getStudentsForDate();
 
-  // Filter by search query
-  const filteredStudents = studentsForDate.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter by selected student
+  const filteredStudents = studentFilter === 'all' 
+    ? studentsForDate 
+    : studentsForDate.filter(s => s.id === studentFilter);
 
   // Navigation functions
   const goToPrevDay = () => {
@@ -211,19 +211,29 @@ const Index = () => {
                     ))}
                   </div>
 
-                  {/* Search filter */}
+                  {/* Student filter dropdown */}
                   <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search students..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                    {searchQuery && (
-                      <Button variant="ghost" size="icon" onClick={() => setSearchQuery('')} className="h-10 w-10">
+                    <Select value={studentFilter} onValueChange={setStudentFilter}>
+                      <SelectTrigger className="w-full">
+                        <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <SelectValue placeholder="All Students" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        <SelectItem value="all">All Students</SelectItem>
+                        {students.map(student => (
+                          <SelectItem key={student.id} value={student.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{student.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({student.scheduleDays.map(d => DAY_NAMES_SHORT[d.dayOfWeek]).join(', ')})
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {studentFilter !== 'all' && (
+                      <Button variant="ghost" size="icon" onClick={() => setStudentFilter('all')} className="h-10 w-10 shrink-0">
                         <X className="h-4 w-4" />
                       </Button>
                     )}
@@ -259,8 +269,8 @@ const Index = () => {
                 {/* Students for selected date */}
                 {filteredStudents.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    {searchQuery
-                      ? `No students found matching "${searchQuery}"`
+                    {studentFilter !== 'all'
+                      ? `${students.find(s => s.id === studentFilter)?.name} has no session on ${format(selectedDateObj, 'MMMM d')}`
                       : `No sessions scheduled for ${format(selectedDateObj, 'MMMM d')}`}
                   </div>
                 ) : (
