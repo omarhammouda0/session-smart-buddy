@@ -212,12 +212,22 @@ export const useStudents = () => {
         // Check if session already exists
         if (s.sessions.some(sess => sess.date === date)) return s;
         
+        const now = new Date().toISOString();
+        const today = new Date().toISOString().split('T')[0];
+        const isPastDate = date < today;
+        
+        // Auto-complete past sessions
         const newSession: Session = {
           id: generateId(),
           date,
-          completed: false,
-          status: 'scheduled' as SessionStatus,
-          history: [{ status: 'scheduled' as SessionStatus, timestamp: new Date().toISOString() }],
+          completed: isPastDate,
+          status: isPastDate ? 'completed' as SessionStatus : 'scheduled' as SessionStatus,
+          completedAt: isPastDate ? now : undefined,
+          history: [{ 
+            status: isPastDate ? 'completed' as SessionStatus : 'scheduled' as SessionStatus, 
+            timestamp: now,
+            note: isPastDate ? 'Added as past session' : undefined
+          }],
         };
         
         // Insert in sorted order
