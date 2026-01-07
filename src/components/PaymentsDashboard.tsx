@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Check, X, CreditCard, Clock, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MonthSelector } from './MonthSelector';
 import { Student, StudentPayments, DAY_NAMES_SHORT } from '@/types/student';
 import { formatMonthYear } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
@@ -20,12 +22,15 @@ type PaymentFilter = 'all' | 'paid' | 'unpaid';
 export const PaymentsDashboard = ({
   students,
   payments,
-  selectedMonth,
-  selectedYear,
+  selectedMonth: initialMonth,
+  selectedYear: initialYear,
   onTogglePayment,
 }: PaymentsDashboardProps) => {
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+  const [selectedYear, setSelectedYear] = useState(initialYear);
 
   const getPaymentStatus = (studentId: string): boolean => {
     const studentPayments = payments.find(p => p.studentId === studentId);
@@ -41,6 +46,11 @@ export const PaymentsDashboard = ({
 
   // Apply filters
   const filteredStudents = students.filter(student => {
+    // Search filter
+    if (searchQuery && !student.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
     // Payment status filter
     const isPaid = getPaymentStatus(student.id);
     if (paymentFilter === 'paid' && !isPaid) return false;
@@ -65,6 +75,18 @@ export const PaymentsDashboard = ({
 
   return (
     <div className="space-y-4">
+      {/* Month Selector */}
+      <div className="flex justify-center">
+        <MonthSelector
+          month={selectedMonth}
+          year={selectedYear}
+          onChange={(m, y) => {
+            setSelectedMonth(m);
+            setSelectedYear(y);
+          }}
+        />
+      </div>
+
       {/* Filter Bars */}
       <div className="space-y-3">
         {/* Payment Status Filter */}
@@ -107,27 +129,31 @@ export const PaymentsDashboard = ({
           </button>
         </div>
 
-        {/* Student Filter Dropdown */}
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+        {/* Search and Student Filter */}
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <Input
+              placeholder="Search by name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
+          </div>
           <Select value={studentFilter} onValueChange={setStudentFilter}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Filter by student" />
+            <SelectTrigger className="w-[180px]">
+              <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="All Students" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Students</SelectItem>
               {students.map(student => (
                 <SelectItem key={student.id} value={student.id}>
                   <div className="flex items-center gap-2">
-                    <span>{student.name}</span>
                     <span className={cn(
-                      "text-xs px-1.5 py-0.5 rounded",
-                      getPaymentStatus(student.id)
-                        ? "bg-success/20 text-success"
-                        : "bg-warning/20 text-warning"
-                    )}>
-                      {getPaymentStatus(student.id) ? 'Paid' : 'Unpaid'}
-                    </span>
+                      "w-2 h-2 rounded-full",
+                      getPaymentStatus(student.id) ? "bg-success" : "bg-warning"
+                    )} />
+                    <span>{student.name}</span>
                   </div>
                 </SelectItem>
               ))}
