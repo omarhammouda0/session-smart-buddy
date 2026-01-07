@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, Search, X } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard } from 'lucide-react';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
@@ -9,16 +9,15 @@ import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { DAY_NAMES_SHORT } from '@/types/student';
+import { cn } from '@/lib/utils';
 
 const Index = () => {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [activeTab, setActiveTab] = useState('sessions');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number>(now.getDay()); // Default to today's day
 
   const {
     students,
@@ -37,24 +36,16 @@ const Index = () => {
     togglePaymentStatus,
   } = useStudents();
 
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter students by selected day of week
+  const studentsForDay = students.filter(student =>
+    student.scheduleDays.some(d => d.dayOfWeek === selectedDay)
   );
 
-  const handleSelectStudent = (studentId: string) => {
-    setSelectedStudentId(studentId);
-    setActiveTab('sessions');
-    setSearchQuery('');
-  };
-
-  const clearSelection = () => {
-    setSelectedStudentId(null);
-    setSearchQuery('');
-  };
-
-  const displayedStudents = selectedStudentId
-    ? filteredStudents.filter(s => s.id === selectedStudentId)
-    : filteredStudents;
+  // Get days that have students scheduled
+  const daysWithStudents = DAY_NAMES_SHORT.map((_, index) => ({
+    day: index,
+    count: students.filter(s => s.scheduleDays.some(d => d.dayOfWeek === index)).length,
+  })).filter(d => d.count > 0);
 
   if (!isLoaded) {
     return (
@@ -115,39 +106,6 @@ const Index = () => {
           />
         )}
 
-        {/* Search & Filter */}
-        {students.length > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search students..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            {(selectedStudentId || searchQuery) && (
-              <Button variant="ghost" size="sm" onClick={clearSelection} className="gap-1">
-                <X className="h-4 w-4" />
-                Clear
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Selected student indicator */}
-        {selectedStudentId && (
-          <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 flex items-center justify-between">
-            <span className="text-sm">
-              Viewing: <strong>{students.find(s => s.id === selectedStudentId)?.name}</strong>
-            </span>
-            <Button variant="ghost" size="sm" onClick={clearSelection}>
-              View all students
-            </Button>
-          </div>
-        )}
-
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-2 mb-4">
@@ -161,42 +119,84 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="sessions" className="mt-0">
+          <TabsContent value="sessions" className="mt-0 space-y-4">
             {students.length === 0 ? (
               <EmptyState />
-            ) : displayedStudents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No students found matching "{searchQuery}"
-              </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayedStudents.map(student => (
-                  <StudentCard
-                    key={student.id}
-                    student={student}
-                    selectedMonth={selectedMonth}
-                    selectedYear={selectedYear}
-                    onRemove={() => removeStudent(student.id)}
-                    onUpdateName={(name) => updateStudentName(student.id, name)}
-                    onUpdateTime={(time) => updateStudentTime(student.id, time)}
-                    onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                    onAddSession={(date) => addExtraSession(student.id, date)}
-                    onRemoveSession={(sessionId) => removeSession(student.id, sessionId)}
-                    onToggleSession={(sessionId) => toggleSessionComplete(student.id, sessionId)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Day Filter Bar */}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {DAY_NAMES_SHORT.map((day, index) => {
+                    const dayData = daysWithStudents.find(d => d.day === index);
+                    const hasStudents = dayData && dayData.count > 0;
+                    const isToday = index === now.getDay();
+                    
+                    return (
+                      <button
+                        key={day}
+                        onClick={() => setSelectedDay(index)}
+                        disabled={!hasStudents}
+                        className={cn(
+                          "px-4 py-2 rounded-lg font-medium text-sm transition-all relative",
+                          selectedDay === index
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : hasStudents
+                              ? "bg-card border border-border hover:border-primary/50 hover:bg-muted/50"
+                              : "bg-muted/30 text-muted-foreground/50 cursor-not-allowed",
+                          isToday && selectedDay !== index && hasStudents && "ring-2 ring-primary/30"
+                        )}
+                      >
+                        {day}
+                        {hasStudents && (
+                          <span className={cn(
+                            "ml-1.5 text-xs px-1.5 py-0.5 rounded-full",
+                            selectedDay === index
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          )}>
+                            {dayData.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Students for selected day */}
+                {studentsForDay.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No students scheduled for {DAY_NAMES_SHORT[selectedDay]}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {studentsForDay.map(student => (
+                      <StudentCard
+                        key={student.id}
+                        student={student}
+                        selectedMonth={selectedMonth}
+                        selectedYear={selectedYear}
+                        onRemove={() => removeStudent(student.id)}
+                        onUpdateName={(name) => updateStudentName(student.id, name)}
+                        onUpdateTime={(time) => updateStudentTime(student.id, time)}
+                        onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
+                        onAddSession={(date) => addExtraSession(student.id, date)}
+                        onRemoveSession={(sessionId) => removeSession(student.id, sessionId)}
+                        onToggleSession={(sessionId) => toggleSessionComplete(student.id, sessionId)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
 
           <TabsContent value="payments" className="mt-0">
             <PaymentsDashboard
-              students={selectedStudentId ? students.filter(s => s.id === selectedStudentId) : filteredStudents}
+              students={students}
               payments={payments}
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               onTogglePayment={togglePaymentStatus}
-              onSelectStudent={handleSelectStudent}
             />
           </TabsContent>
         </Tabs>
