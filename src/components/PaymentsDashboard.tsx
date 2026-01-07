@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { Student, StudentPayments, DAY_NAMES_SHORT } from '@/types/student';
 import { formatMonthYear } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { format, subMonths } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 interface PaymentsDashboardProps {
   students: Student[];
@@ -32,18 +36,30 @@ export const PaymentsDashboard = ({
   const [studentFilter, setStudentFilter] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
   const [selectedYear, setSelectedYear] = useState(initialYear);
+  const [selectedStudentHistory, setSelectedStudentHistory] = useState<string | null>(null);
 
-  const getPaymentStatus = (studentId: string): boolean => {
+  const getPaymentStatus = (studentId: string, month?: number, year?: number): boolean => {
     const studentPayments = payments.find(p => p.studentId === studentId);
     if (!studentPayments) return false;
     const payment = studentPayments.payments.find(
-      p => p.month === selectedMonth && p.year === selectedYear
+      p => p.month === (month ?? selectedMonth) && p.year === (year ?? selectedYear)
     );
     return payment?.isPaid || false;
   };
 
+  const getPaymentHistory = (studentId: string) => {
+    const studentPayments = payments.find(p => p.studentId === studentId);
+    if (!studentPayments) return [];
+    return studentPayments.payments
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+  };
+
   const paidCount = students.filter(s => getPaymentStatus(s.id)).length;
   const unpaidCount = students.length - paidCount;
+  const unpaidStudents = students.filter(s => !getPaymentStatus(s.id));
 
   // Generate last 6 months for quick selection
   const getRecentMonths = () => {
@@ -81,18 +97,32 @@ export const PaymentsDashboard = ({
     }
   };
 
+  const sendPaymentReminder = () => {
+    if (unpaidStudents.length === 0) {
+      toast({
+        title: "All Paid!",
+        description: "All students have paid for this month.",
+      });
+      return;
+    }
+
+    toast({
+      title: "Payment Reminders",
+      description: `${unpaidStudents.length} student(s) haven't paid for ${formatMonthYear(selectedMonth, selectedYear)}: ${unpaidStudents.map(s => s.name).join(', ')}`,
+      duration: 8000,
+    });
+  };
+
   // Apply filters
   const filteredStudents = students.filter(student => {
-    // Payment status filter
     const isPaid = getPaymentStatus(student.id);
     if (paymentFilter === 'paid' && !isPaid) return false;
     if (paymentFilter === 'unpaid' && isPaid) return false;
-    
-    // Student filter
     if (studentFilter !== 'all' && student.id !== studentFilter) return false;
-    
     return true;
   });
+
+  const selectedStudent = students.find(s => s.id === selectedStudentHistory);
 
   if (students.length === 0) {
     return (
@@ -189,27 +219,127 @@ export const PaymentsDashboard = ({
         </button>
       </div>
 
-      {/* Student Filter Dropdown Only */}
-      <Select value={studentFilter} onValueChange={setStudentFilter}>
-        <SelectTrigger className="w-full">
-          <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-          <SelectValue placeholder="All Students" />
-        </SelectTrigger>
-        <SelectContent className="bg-popover z-50">
-          <SelectItem value="all">All Students</SelectItem>
-          {students.map(student => (
-            <SelectItem key={student.id} value={student.id}>
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "w-2 h-2 rounded-full",
-                  getPaymentStatus(student.id) ? "bg-success" : "bg-warning"
-                )} />
-                <span>{student.name}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* Payment Reminder Button */}
+      <Button 
+        variant="outline" 
+        className="w-full gap-2 border-warning/50 text-warning hover:bg-warning/10"
+        onClick={sendPaymentReminder}
+      >
+        <Bell className="h-4 w-4" />
+        Send Payment Reminder ({unpaidCount} unpaid)
+      </Button>
+
+      {/* Student Filter with History */}
+      <div className="flex gap-2">
+        <Select value={studentFilter} onValueChange={setStudentFilter}>
+          <SelectTrigger className="flex-1">
+            <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="All Students" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover z-50">
+            <SelectItem value="all">All Students</SelectItem>
+            {students.map(student => (
+              <SelectItem key={student.id} value={student.id}>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "w-2 h-2 rounded-full",
+                    getPaymentStatus(student.id) ? "bg-success" : "bg-warning"
+                  )} />
+                  <span>{student.name}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Payment History Dialog */}
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="icon" className="shrink-0">
+              <History className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Payment History
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Select value={selectedStudentHistory || ''} onValueChange={setSelectedStudentHistory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a student" />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map(student => (
+                    <SelectItem key={student.id} value={student.id}>
+                      {student.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedStudent && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{selectedStudent.name}</span>
+                    <Badge variant="outline">
+                      {getPaymentHistory(selectedStudent.id).filter(p => p.isPaid).length} paid
+                    </Badge>
+                  </div>
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-2 pr-2">
+                      {getPaymentHistory(selectedStudent.id).length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8 text-sm">
+                          No payment history yet
+                        </p>
+                      ) : (
+                        getPaymentHistory(selectedStudent.id).map((payment, idx) => (
+                          <div
+                            key={idx}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-lg border",
+                              payment.isPaid
+                                ? "bg-success/10 border-success/30"
+                                : "bg-warning/10 border-warning/30"
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              {payment.isPaid ? (
+                                <Check className="h-4 w-4 text-success" />
+                              ) : (
+                                <X className="h-4 w-4 text-warning" />
+                              )}
+                              <span className="font-medium">
+                                {formatMonthYear(payment.month, payment.year)}
+                              </span>
+                            </div>
+                            <Badge className={cn(
+                              "text-xs",
+                              payment.isPaid
+                                ? "bg-success/20 text-success border-success/30"
+                                : "bg-warning/20 text-warning border-warning/30"
+                            )}>
+                              {payment.isPaid ? 'Paid' : 'Unpaid'}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {!selectedStudentHistory && (
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  Select a student to view payment history
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       {/* Payment List */}
       <Card className="card-shadow">
@@ -219,9 +349,6 @@ export const PaymentsDashboard = ({
               <Calendar className="h-5 w-5 text-primary" />
               {formatMonthYear(selectedMonth, selectedYear)}
             </CardTitle>
-            <span className="text-sm text-muted-foreground">
-              {paidCount}/{students.length} paid
-            </span>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">

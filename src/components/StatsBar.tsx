@@ -1,6 +1,5 @@
-import { Users, CheckCircle, Clock, CreditCard } from 'lucide-react';
+import { Users, CreditCard, XCircle } from 'lucide-react';
 import { Student, StudentPayments } from '@/types/student';
-import { getSessionsForMonth } from '@/lib/dateUtils';
 
 interface StatsBarProps {
   students: Student[];
@@ -11,18 +10,6 @@ interface StatsBarProps {
 
 export const StatsBar = ({ students, payments, selectedMonth, selectedYear }: StatsBarProps) => {
   const totalStudents = students.length;
-  
-  const sessionStats = students.reduce(
-    (acc, student) => {
-      const monthSessions = getSessionsForMonth(student.sessions, selectedMonth, selectedYear);
-      const completed = monthSessions.filter(s => s.completed).length;
-      return {
-        completedSessions: acc.completedSessions + completed,
-        totalSessions: acc.totalSessions + monthSessions.length,
-      };
-    },
-    { completedSessions: 0, totalSessions: 0 }
-  );
 
   const paidCount = students.reduce((count, student) => {
     const studentPayments = payments.find(p => p.studentId === student.id);
@@ -33,35 +20,31 @@ export const StatsBar = ({ students, payments, selectedMonth, selectedYear }: St
     return count + (payment?.isPaid ? 1 : 0);
   }, 0);
 
+  const unpaidCount = totalStudents - paidCount;
+
   const statItems = [
     {
-      label: 'Students',
+      label: 'Total Students',
       value: totalStudents,
       icon: Users,
       color: 'text-primary bg-primary/10',
     },
     {
-      label: 'Done',
-      value: `${sessionStats.completedSessions}/${sessionStats.totalSessions}`,
-      icon: CheckCircle,
+      label: 'Students Paid',
+      value: paidCount,
+      icon: CreditCard,
       color: 'text-success bg-success/10',
     },
     {
-      label: 'Pending',
-      value: sessionStats.totalSessions - sessionStats.completedSessions,
-      icon: Clock,
+      label: 'Students Unpaid',
+      value: unpaidCount,
+      icon: XCircle,
       color: 'text-warning bg-warning/10',
-    },
-    {
-      label: 'Paid',
-      value: `${paidCount}/${totalStudents}`,
-      icon: CreditCard,
-      color: 'text-accent bg-accent/10',
     },
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-3">
+    <div className="grid grid-cols-3 gap-3">
       {statItems.map((stat, index) => (
         <div
           key={stat.label}
