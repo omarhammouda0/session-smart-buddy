@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { EndOfMonthReminder } from '@/components/EndOfMonthReminder';
 import { SessionHistoryBar } from '@/components/SessionHistoryBar';
+import { BulkEditSessionsDialog } from '@/components/BulkEditSessionsDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -61,6 +62,7 @@ const Index = () => {
     rescheduleSession,
     toggleSessionComplete,
     togglePaymentStatus,
+    bulkUpdateSessionTime,
   } = useStudents();
 
   // Wrapper functions with toast notifications
@@ -273,6 +275,10 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
               
+              <BulkEditSessionsDialog
+                students={students}
+                onBulkUpdateTime={bulkUpdateSessionTime}
+              />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
                 onAdd={addStudent}
