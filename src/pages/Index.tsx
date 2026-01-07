@@ -55,6 +55,7 @@ const Index = () => {
     updateStudentSchedule,
     addExtraSession,
     removeSession,
+    rescheduleSession,
     toggleSessionComplete,
     togglePaymentStatus,
   } = useStudents();
@@ -424,7 +425,11 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="history" className="mt-0">
-            <SessionHistoryBar students={students} />
+            <SessionHistoryBar 
+              students={students} 
+              onCancelSession={removeSession}
+              onRescheduleSession={rescheduleSession}
+            />
           </TabsContent>
 
           <TabsContent value="payments" className="mt-0 space-y-4">
