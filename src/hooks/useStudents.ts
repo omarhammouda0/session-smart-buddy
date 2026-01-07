@@ -119,6 +119,12 @@ export const useStudents = () => {
     );
   };
 
+  const updateStudentSessionType = (studentId: string, sessionType: 'online' | 'onsite') => {
+    setStudents(prev =>
+      prev.map(s => (s.id === studentId ? { ...s, sessionType } : s))
+    );
+  };
+
   const removeStudent = (studentId: string) => {
     setStudents(prev => prev.filter(s => s.id !== studentId));
     setPayments(prev => prev.filter(p => p.studentId !== studentId));
@@ -400,6 +406,7 @@ export const useStudents = () => {
     updateStudentName,
     updateStudentTime,
     updateStudentPhone,
+    updateStudentSessionType,
     updateStudentSchedule,
     addExtraSession,
     removeSession,

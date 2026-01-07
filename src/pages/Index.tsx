@@ -51,6 +51,8 @@ const Index = () => {
     removeStudent,
     updateStudentName,
     updateStudentTime,
+    updateStudentPhone,
+    updateStudentSessionType,
     updateStudentSchedule,
     addExtraSession,
     removeSession,
@@ -432,10 +434,9 @@ const Index = () => {
                         onRemove={() => removeStudent(student.id)}
                         onUpdateName={(name) => updateStudentName(student.id, name)}
                         onUpdateTime={(time) => updateStudentTime(student.id, time)}
+                        onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
+                        onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
                         onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                        onRemoveSession={(sessionId) => handleCancelSession(student.id, sessionId)}
-                        onDeleteSession={(sessionId) => handleDeleteSession(student.id, sessionId)}
-                        onToggleSession={(sessionId) => handleToggleComplete(student.id, sessionId)}
                       />
                     ))}
                   </div>
