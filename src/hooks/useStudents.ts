@@ -365,6 +365,38 @@ export const useStudents = () => {
     );
   };
 
+  // Bulk update session times
+  const bulkUpdateSessionTime = (
+    studentIds: string[],
+    sessionIds: string[],
+    newTime: string
+  ): { success: boolean; updatedCount: number; conflicts: any[] } => {
+    let updatedCount = 0;
+
+    setStudents(prev =>
+      prev.map(student => {
+        if (!studentIds.includes(student.id)) return student;
+
+        const updatedSessions = student.sessions.map(session => {
+          if (!sessionIds.includes(session.id)) return session;
+          updatedCount++;
+          return session; // Session time is stored on student, not session
+        });
+
+        // Update student's session time if any of their sessions were updated
+        const hasUpdatedSession = student.sessions.some(s => sessionIds.includes(s.id));
+        
+        return {
+          ...student,
+          sessionTime: hasUpdatedSession ? newTime : student.sessionTime,
+          sessions: updatedSessions,
+        };
+      })
+    );
+
+    return { success: true, updatedCount, conflicts: [] };
+  };
+
   const togglePaymentStatus = (studentId: string, month: number, year: number) => {
     setPayments(prev =>
       prev.map(p => {
@@ -417,5 +449,6 @@ export const useStudents = () => {
     togglePaymentStatus,
     getStudentPayments,
     isStudentPaidForMonth,
+    bulkUpdateSessionTime,
   };
 };
