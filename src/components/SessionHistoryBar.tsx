@@ -86,29 +86,30 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     }));
   };
 
-  // Get history stats for selected student
+  // Get history stats for selected student - only completed and cancelled sessions
   const getHistoryStats = () => {
-    if (!selectedStudent) return { completed: 0, cancelled: 0, scheduled: 0, total: 0 };
+    if (!selectedStudent) return { completed: 0, cancelled: 0, total: 0, completionRate: 0 };
     
     let completed = 0;
     let cancelled = 0;
-    let scheduled = 0;
 
     const semesterStart = parseISO(selectedStudent.semesterStart);
     selectedStudent.sessions.forEach(session => {
       const sessionDate = parseISO(session.date);
-      if (session.status === 'cancelled') {
-        cancelled++;
-      } else if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
+      // Only count sessions from semester start to today
+      if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
         if (session.status === 'completed') completed++;
-        else if (session.status === 'scheduled') scheduled++;
+        else if (session.status === 'cancelled') cancelled++;
       }
     });
 
-    return { completed, cancelled, scheduled, total: completed + cancelled + scheduled };
+    const total = completed + cancelled;
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return { completed, cancelled, total, completionRate };
   };
 
-  // Get history sessions for selected student
+  // Get history sessions for selected student - only completed and cancelled
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
     
@@ -123,8 +124,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     const semesterStart = parseISO(selectedStudent.semesterStart);
     selectedStudent.sessions.forEach(session => {
       const sessionDate = parseISO(session.date);
+      // Only show completed or cancelled sessions from semester start to today
       const isInHistoryRange = !isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today);
-      if (session.status === 'cancelled' || isInHistoryRange) {
+      if (isInHistoryRange && (session.status === 'completed' || session.status === 'cancelled')) {
         sessions.push({
           ...session,
           studentName: selectedStudent.name,
@@ -379,22 +381,18 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                 <p className="text-xs text-muted-foreground mb-2 font-medium">
                   {selectedStudent.name} - Semester to Date
                 </p>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div className="text-center">
                     <p className="text-lg font-bold">{historyStats.total}</p>
                     <p className="text-[10px] text-muted-foreground">Total</p>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-bold text-success">{historyStats.completed}</p>
-                    <p className="text-[10px] text-success/80">Done</p>
+                    <p className="text-[10px] text-success/80">Completed</p>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-bold text-destructive">{historyStats.cancelled}</p>
                     <p className="text-[10px] text-destructive/80">Cancelled</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-warning">{historyStats.scheduled}</p>
-                    <p className="text-[10px] text-warning/80">Pending</p>
                   </div>
                 </div>
               </div>
@@ -402,7 +400,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
               {historyStats.total > 0 && (
                 <div className="p-2 rounded-lg bg-success/10 border border-success/20 text-center">
                   <p className="text-sm font-medium text-success">
-                    {Math.round((historyStats.completed / historyStats.total) * 100)}% Completion Rate
+                    {historyStats.completionRate}% Completion Rate
                   </p>
                 </div>
               )}
@@ -428,20 +426,17 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                           className={cn(
                             "flex items-center justify-between p-2 rounded text-xs border",
                             session.status === 'completed' && "bg-success/5 border-success/20",
-                            session.status === 'cancelled' && "bg-destructive/5 border-destructive/20",
-                            session.status === 'scheduled' && "bg-warning/5 border-warning/20"
+                            session.status === 'cancelled' && "bg-destructive/5 border-destructive/20"
                           )}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <div className={cn(
                               "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
                               session.status === 'completed' && "bg-success/20 text-success",
-                              session.status === 'cancelled' && "bg-destructive/20 text-destructive",
-                              session.status === 'scheduled' && "bg-warning/20 text-warning"
+                              session.status === 'cancelled' && "bg-destructive/20 text-destructive"
                             )}>
                               {session.status === 'completed' && <Check className="h-3 w-3" />}
                               {session.status === 'cancelled' && <X className="h-3 w-3" />}
-                              {session.status === 'scheduled' && <Calendar className="h-3 w-3" />}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium truncate">
@@ -454,11 +449,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                             className={cn(
                               "shrink-0 text-[10px] capitalize",
                               session.status === 'completed' && "border-success/30 text-success",
-                              session.status === 'cancelled' && "border-destructive/30 text-destructive",
-                              session.status === 'scheduled' && "border-warning/30 text-warning"
+                              session.status === 'cancelled' && "border-destructive/30 text-destructive"
                             )}
                           >
-                            {session.status === 'scheduled' ? 'pending' : session.status}
+                            {session.status}
                           </Badge>
                         </div>
                       ))
