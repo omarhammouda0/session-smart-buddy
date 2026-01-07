@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { format, parseISO, isAfter, startOfToday } from 'date-fns';
-import { History, Users, Check, X, Calendar, ChevronLeft, ChevronRight, Ban, CalendarClock } from 'lucide-react';
-import { Student, DAY_NAMES_SHORT } from '@/types/student';
+import { format, parseISO, isAfter, isBefore, startOfToday, addDays, endOfDay } from 'date-fns';
+import { History, Users, Check, X, Calendar, Ban, CalendarClock } from 'lucide-react';
+import { Student } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,10 +32,8 @@ interface SessionHistoryBarProps {
 export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSession }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
-  const now = new Date();
   const today = startOfToday();
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const nextWeekEnd = endOfDay(addDays(today, 7));
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
 
   // Filter students
@@ -46,7 +44,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
   // Get selected student
   const selectedStudent = students.find(s => s.id === selectedStudentId);
 
-  // Get upcoming sessions (scheduled, future dates)
+  // Get upcoming sessions (next 7 days including today)
   const getUpcomingSessions = () => {
     const sessions: Array<{
       id: string;
@@ -59,7 +57,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     filteredStudents.forEach(student => {
       student.sessions.forEach(session => {
         const sessionDate = parseISO(session.date);
-        if (session.status === 'scheduled' && (isAfter(sessionDate, today) || session.date === format(today, 'yyyy-MM-dd'))) {
+        // Include sessions from today to next 7 days that are scheduled
+        if (session.status === 'scheduled' && 
+            !isBefore(sessionDate, today) && 
+            !isAfter(sessionDate, nextWeekEnd)) {
           sessions.push({
             id: session.id,
             date: session.date,
@@ -74,16 +75,18 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     return sessions.sort((a, b) => a.date.localeCompare(b.date));
   };
 
-  // Calculate stats for filtered students
-  const getMonthlyStats = (month: number, year: number) => {
+  // Get history stats (from semester start until today)
+  const getHistoryStats = () => {
     let completed = 0;
     let cancelled = 0;
     let scheduled = 0;
 
     filteredStudents.forEach(student => {
+      const semesterStart = parseISO(student.semesterStart);
       student.sessions.forEach(session => {
         const sessionDate = parseISO(session.date);
-        if (sessionDate.getMonth() === month && sessionDate.getFullYear() === year) {
+        // Only include sessions from semester start until today
+        if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
           if (session.status === 'completed') completed++;
           else if (session.status === 'cancelled') cancelled++;
           else if (session.status === 'scheduled') scheduled++;
@@ -94,25 +97,8 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     return { completed, cancelled, scheduled, total: completed + cancelled + scheduled };
   };
 
-  // Get all-time stats
-  const getAllTimeStats = () => {
-    let completed = 0;
-    let cancelled = 0;
-    let scheduled = 0;
-
-    filteredStudents.forEach(student => {
-      student.sessions.forEach(session => {
-        if (session.status === 'completed') completed++;
-        else if (session.status === 'cancelled') cancelled++;
-        else if (session.status === 'scheduled') scheduled++;
-      });
-    });
-
-    return { completed, cancelled, scheduled, total: completed + cancelled + scheduled };
-  };
-
-  // Get sessions for the selected month
-  const getSessionsForMonth = () => {
+  // Get history sessions (from semester start until today)
+  const getHistorySessions = () => {
     const sessions: Array<{
       id: string;
       date: string;
@@ -124,9 +110,11 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     }> = [];
 
     filteredStudents.forEach(student => {
+      const semesterStart = parseISO(student.semesterStart);
       student.sessions.forEach(session => {
         const sessionDate = parseISO(session.date);
-        if (sessionDate.getMonth() === selectedMonth && sessionDate.getFullYear() === selectedYear) {
+        // Only include sessions from semester start until today
+        if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
           sessions.push({
             ...session,
             studentName: student.name,
@@ -136,39 +124,13 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
       });
     });
 
-    return sessions.sort((a, b) => a.date.localeCompare(b.date));
+    // Sort by date descending (most recent first)
+    return sessions.sort((a, b) => b.date.localeCompare(a.date));
   };
 
   const upcomingSessions = getUpcomingSessions();
-  const monthlyStats = getMonthlyStats(selectedMonth, selectedYear);
-  const allTimeStats = getAllTimeStats();
-  const monthSessions = getSessionsForMonth();
-
-  // Month navigation
-  const goToPrevMonth = () => {
-    if (selectedMonth === 0) {
-      setSelectedMonth(11);
-      setSelectedYear(y => y - 1);
-    } else {
-      setSelectedMonth(m => m - 1);
-    }
-  };
-
-  const goToNextMonth = () => {
-    if (selectedMonth === 11) {
-      setSelectedMonth(0);
-      setSelectedYear(y => y + 1);
-    } else {
-      setSelectedMonth(m => m + 1);
-    }
-  };
-
-  const goToCurrentMonth = () => {
-    setSelectedMonth(now.getMonth());
-    setSelectedYear(now.getFullYear());
-  };
-
-  const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
+  const historyStats = getHistoryStats();
+  const historySessions = getHistorySessions();
 
   const handleCancelSession = (studentId: string, sessionId: string) => {
     onCancelSession?.(studentId, sessionId);
@@ -222,7 +184,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
           <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="upcoming" className="gap-1.5 text-xs">
               <CalendarClock className="h-3.5 w-3.5" />
-              Upcoming
+              Next 7 Days
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-1.5 text-xs">
               <History className="h-3.5 w-3.5" />
@@ -235,16 +197,16 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
             <div>
               <p className="text-xs text-muted-foreground mb-2 font-medium flex items-center gap-1">
                 <CalendarClock className="h-3 w-3" />
-                {selectedStudent ? `${selectedStudent.name}'s Upcoming Sessions` : 'All Upcoming Sessions'}
+                {selectedStudent ? `${selectedStudent.name}'s Next Week` : 'All Sessions - Next 7 Days'}
                 <Badge variant="secondary" className="ml-auto text-[10px]">
                   {upcomingSessions.length}
                 </Badge>
               </p>
-              <ScrollArea className="h-[280px]">
+              <ScrollArea className="h-[320px]">
                 <div className="space-y-1.5 pr-2">
                   {upcomingSessions.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-xs">
-                      No upcoming sessions
+                      No sessions in the next 7 days
                     </p>
                   ) : (
                     upcomingSessions.map(session => (
@@ -286,6 +248,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
                                 }}
                                 disabled={(date) => date < today}
                                 initialFocus
+                                className="pointer-events-auto"
                               />
                             </PopoverContent>
                           </Popover>
@@ -325,88 +288,64 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
           </TabsContent>
 
           <TabsContent value="history" className="mt-3 space-y-3">
-            {/* All-time stats */}
+            {/* Semester stats */}
             <div className="p-3 rounded-lg bg-muted/50 border">
               <p className="text-xs text-muted-foreground mb-2 font-medium">
-                {selectedStudent ? `${selectedStudent.name} - All Time` : 'All Students - All Time'}
+                {selectedStudent ? `${selectedStudent.name} - Semester to Date` : 'All Students - Semester to Date'}
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="text-center">
-                  <p className="text-xl font-bold">{allTimeStats.total}</p>
+                  <p className="text-lg font-bold">{historyStats.total}</p>
                   <p className="text-[10px] text-muted-foreground">Total</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-success">{allTimeStats.completed}</p>
-                  <p className="text-[10px] text-success/80">Completed</p>
+                  <p className="text-lg font-bold text-success">{historyStats.completed}</p>
+                  <p className="text-[10px] text-success/80">Done</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-destructive">{allTimeStats.cancelled}</p>
+                  <p className="text-lg font-bold text-destructive">{historyStats.cancelled}</p>
                   <p className="text-[10px] text-destructive/80">Cancelled</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-warning">{historyStats.scheduled}</p>
+                  <p className="text-[10px] text-warning/80">Pending</p>
                 </div>
               </div>
             </div>
 
-            {/* Month navigation */}
-            <div className="flex items-center justify-center gap-2">
-              <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="h-8 w-8">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="text-center min-w-[120px]">
-                <p className="text-sm font-medium">
-                  {format(new Date(selectedYear, selectedMonth, 1), 'MMMM yyyy')}
+            {/* Completion rate */}
+            {historyStats.total > 0 && (
+              <div className="p-2 rounded-lg bg-success/10 border border-success/20 text-center">
+                <p className="text-sm font-medium text-success">
+                  {Math.round((historyStats.completed / historyStats.total) * 100)}% Completion Rate
                 </p>
               </div>
-              <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-8 w-8">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              {!isCurrentMonth && (
-                <Button variant="outline" size="sm" onClick={goToCurrentMonth} className="h-8 text-xs">
-                  Today
-                </Button>
-              )}
-            </div>
+            )}
 
-            {/* Monthly stats */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="text-center p-2 rounded-lg bg-card border">
-                <p className="text-lg font-bold">{monthlyStats.total}</p>
-                <p className="text-[10px] text-muted-foreground">Total</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-primary/10">
-                <p className="text-lg font-bold text-primary">{monthlyStats.scheduled}</p>
-                <p className="text-[10px] text-primary/80">Scheduled</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-success/10">
-                <p className="text-lg font-bold text-success">{monthlyStats.completed}</p>
-                <p className="text-[10px] text-success/80">Done</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-destructive/10">
-                <p className="text-lg font-bold text-destructive">{monthlyStats.cancelled}</p>
-                <p className="text-[10px] text-destructive/80">Cancelled</p>
-              </div>
-            </div>
-
-            {/* Session list for month */}
+            {/* Session list */}
             <div>
               <p className="text-xs text-muted-foreground mb-2 font-medium flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                Sessions in {format(new Date(selectedYear, selectedMonth, 1), 'MMMM')}
+                <History className="h-3 w-3" />
+                Session History
+                <Badge variant="secondary" className="ml-auto text-[10px]">
+                  {historySessions.length}
+                </Badge>
               </p>
-              <ScrollArea className="h-[200px]">
+              <ScrollArea className="h-[220px]">
                 <div className="space-y-1.5 pr-2">
-                  {monthSessions.length === 0 ? (
+                  {historySessions.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-xs">
-                      No sessions for this month
+                      No past sessions
                     </p>
                   ) : (
-                    monthSessions.map(session => (
+                    historySessions.map(session => (
                       <div
                         key={session.id}
                         className={cn(
                           "flex items-center justify-between p-2 rounded text-xs border",
                           session.status === 'completed' && "bg-success/5 border-success/20",
                           session.status === 'cancelled' && "bg-destructive/5 border-destructive/20",
-                          session.status === 'scheduled' && "bg-card"
+                          session.status === 'scheduled' && "bg-warning/5 border-warning/20"
                         )}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -414,7 +353,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
                             "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
                             session.status === 'completed' && "bg-success/20 text-success",
                             session.status === 'cancelled' && "bg-destructive/20 text-destructive",
-                            session.status === 'scheduled' && "bg-primary/20 text-primary"
+                            session.status === 'scheduled' && "bg-warning/20 text-warning"
                           )}>
                             {session.status === 'completed' && <Check className="h-3 w-3" />}
                             {session.status === 'cancelled' && <X className="h-3 w-3" />}
@@ -437,10 +376,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
                             "shrink-0 text-[10px] capitalize",
                             session.status === 'completed' && "border-success/30 text-success",
                             session.status === 'cancelled' && "border-destructive/30 text-destructive",
-                            session.status === 'scheduled' && "border-primary/30 text-primary"
+                            session.status === 'scheduled' && "border-warning/30 text-warning"
                           )}
                         >
-                          {session.status}
+                          {session.status === 'scheduled' ? 'pending' : session.status}
                         </Badge>
                       </div>
                     ))
