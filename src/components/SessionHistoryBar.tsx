@@ -77,7 +77,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     return sessions.sort((a, b) => a.date.localeCompare(b.date));
   };
 
-  // Get history stats (from semester start until today)
+  // Get history stats (from semester start until today, plus all cancelled)
   const getHistoryStats = () => {
     let completed = 0;
     let cancelled = 0;
@@ -87,10 +87,12 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
       const semesterStart = parseISO(student.semesterStart);
       student.sessions.forEach(session => {
         const sessionDate = parseISO(session.date);
-        // Only include sessions from semester start until today
-        if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
+        // Include cancelled sessions regardless of date
+        if (session.status === 'cancelled') {
+          cancelled++;
+        } else if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
+          // Only include completed/scheduled from semester start until today
           if (session.status === 'completed') completed++;
-          else if (session.status === 'cancelled') cancelled++;
           else if (session.status === 'scheduled') scheduled++;
         }
       });
@@ -99,7 +101,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     return { completed, cancelled, scheduled, total: completed + cancelled + scheduled };
   };
 
-  // Get history sessions (from semester start until today)
+  // Get history sessions (from semester start until today, plus all cancelled)
   const getHistorySessions = () => {
     const sessions: Array<{
       id: string;
@@ -115,8 +117,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
       const semesterStart = parseISO(student.semesterStart);
       student.sessions.forEach(session => {
         const sessionDate = parseISO(session.date);
-        // Only include sessions from semester start until today
-        if (!isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today)) {
+        // Include cancelled sessions regardless of date, or sessions within semester until today
+        const isInHistoryRange = !isBefore(sessionDate, semesterStart) && !isAfter(sessionDate, today);
+        if (session.status === 'cancelled' || isInHistoryRange) {
           sessions.push({
             ...session,
             studentName: student.name,
