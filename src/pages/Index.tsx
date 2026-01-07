@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, CalendarDays, History } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, CalendarDays } from 'lucide-react';
 import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DAY_NAMES_SHORT, SessionType } from '@/types/student';
+import { DAY_NAMES_SHORT } from '@/types/student';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -41,7 +41,6 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('sessions');
   const [studentFilter, setStudentFilter] = useState<string>('all');
   const [showSessionManager, setShowSessionManager] = useState(false);
-  const [sessionTypeFilter, setSessionTypeFilter] = useState<'all' | SessionType>('all');
 
   const {
     students,
@@ -78,10 +77,9 @@ const Index = () => {
 
   const studentsForDate = getStudentsForDate();
 
-  // Filter by selected student, session type, and sort by session time (ascending)
+  // Filter by selected student and sort by session time (ascending)
   const filteredStudents = studentsForDate
     .filter(s => studentFilter === 'all' || s.id === studentFilter)
-    .filter(s => sessionTypeFilter === 'all' || (s.sessionType || 'onsite') === sessionTypeFilter)
     .sort((a, b) => {
       const timeA = a.sessionTime || '16:00';
       const timeB = b.sessionTime || '16:00';
@@ -336,50 +334,8 @@ const Index = () => {
                     ))}
                   </div>
 
-                  {/* Filters row - stacked on mobile */}
-                  <div className="space-y-2">
-                    {/* Session type filter */}
-                    <div className="flex rounded-lg border border-border overflow-hidden w-full">
-                      <button
-                        onClick={() => setSessionTypeFilter('all')}
-                        className={cn(
-                          "flex-1 px-2 py-2.5 text-xs sm:text-sm font-medium transition-colors",
-                          sessionTypeFilter === 'all'
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card active:bg-muted"
-                        )}
-                      >
-                        All
-                      </button>
-                      <button
-                        onClick={() => setSessionTypeFilter('onsite')}
-                        className={cn(
-                          "flex-1 flex items-center justify-center gap-1 px-2 py-2.5 text-xs sm:text-sm font-medium transition-colors border-l border-border",
-                          sessionTypeFilter === 'onsite'
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card active:bg-muted"
-                        )}
-                      >
-                        <MapPin className="h-3.5 w-3.5" />
-                        <span className="hidden xs:inline">On-site</span>
-                        <span className="xs:hidden">Site</span>
-                      </button>
-                      <button
-                        onClick={() => setSessionTypeFilter('online')}
-                        className={cn(
-                          "flex-1 flex items-center justify-center gap-1 px-2 py-2.5 text-xs sm:text-sm font-medium transition-colors border-l border-border",
-                          sessionTypeFilter === 'online'
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card active:bg-muted"
-                        )}
-                      >
-                        <Monitor className="h-3.5 w-3.5" />
-                        Online
-                      </button>
-                    </div>
-
-                    {/* Student filter dropdown */}
-                    <div className="flex items-center gap-2">
+                  {/* Student filter dropdown */}
+                  <div className="flex items-center gap-2">
                       <Select value={studentFilter} onValueChange={setStudentFilter}>
                         <SelectTrigger className="w-full h-11">
                           <Users className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
@@ -404,7 +360,6 @@ const Index = () => {
                           <X className="h-4 w-4" />
                         </Button>
                       )}
-                    </div>
                   </div>
                 </div>
 

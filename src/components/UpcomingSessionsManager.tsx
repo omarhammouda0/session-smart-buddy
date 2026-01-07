@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, addWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check, Monitor, MapPin } from 'lucide-react';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -209,10 +209,17 @@ export const UpcomingSessionsManager = ({
                             )}
                           >
                             <div className="truncate flex-1">
-                              <span className={cn(
-                                "font-medium truncate block",
-                                session?.status === 'completed' && "line-through opacity-70"
-                              )}>{student.name}</span>
+                              <div className="flex items-center gap-1">
+                                <span className={cn(
+                                  "font-medium truncate",
+                                  session?.status === 'completed' && "line-through opacity-70"
+                                )}>{student.name}</span>
+                                {(student.sessionType || 'onsite') === 'online' ? (
+                                  <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
+                                ) : (
+                                  <MapPin className="h-3 w-3 text-orange-500 shrink-0" />
+                                )}
+                              </div>
                               <span className="text-[10px] text-muted-foreground">{student.sessionTime}</span>
                             </div>
                             

@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock, Monitor, MapPin, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -50,6 +52,7 @@ export const StudentCard = ({
   const [editName, setEditName] = useState(student.name);
   const [editTime, setEditTime] = useState(student.sessionTime || '16:00');
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Find today's session (exclude cancelled)
   const todaySession = student.sessions.find(s => s.date === selectedDate && s.status !== 'cancelled');
@@ -68,6 +71,11 @@ export const StudentCard = ({
   }).length;
   const totalSessions = monthSessions.length;
   const progress = totalSessions > 0 ? (completedCount / totalSessions) * 100 : 0;
+
+  // All-time stats
+  const allTimeCompleted = student.sessions.filter(s => s.status === 'completed').length;
+  const allTimeCancelled = student.sessions.filter(s => s.status === 'cancelled').length;
+  const allTimeTotal = student.sessions.length;
 
   const handleSaveName = () => {
     if (editName.trim()) {
@@ -150,6 +158,18 @@ export const StudentCard = ({
                     <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     {student.sessionTime || '16:00'}
                   </span>
+                  <Badge variant="outline" className={cn(
+                    "text-[10px] gap-1",
+                    (student.sessionType || 'onsite') === 'online' 
+                      ? "border-blue-500/30 text-blue-600 bg-blue-500/10"
+                      : "border-orange-500/30 text-orange-600 bg-orange-500/10"
+                  )}>
+                    {(student.sessionType || 'onsite') === 'online' ? (
+                      <><Monitor className="h-3 w-3" /> Online</>
+                    ) : (
+                      <><MapPin className="h-3 w-3" /> On-site</>
+                    )}
+                  </Badge>
                   {student.scheduleDays.map(d => (
                     <span key={d.dayOfWeek} className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 bg-primary/10 text-primary rounded-full">
                       {DAY_NAMES_SHORT[d.dayOfWeek]}
@@ -274,6 +294,78 @@ export const StudentCard = ({
               <Calendar className="h-3 w-3" />
               {student.semesterStart} → {student.semesterEnd}
             </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Session History collapsible */}
+        <Collapsible open={showHistory} onOpenChange={setShowHistory}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground h-9">
+              <span className="flex items-center gap-1.5">
+                <History className="h-3 w-3" />
+                Session History
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-success">{allTimeCompleted} ✓</span>
+                <span className="text-destructive">{allTimeCancelled} ✗</span>
+                {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </div>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <div className="text-center p-2 rounded-lg bg-muted">
+                <p className="text-sm font-bold">{allTimeTotal}</p>
+                <p className="text-[10px] text-muted-foreground">Total</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-success/10">
+                <p className="text-sm font-bold text-success">{allTimeCompleted}</p>
+                <p className="text-[10px] text-success/80">Completed</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-destructive/10">
+                <p className="text-sm font-bold text-destructive">{allTimeCancelled}</p>
+                <p className="text-[10px] text-destructive/80">Cancelled</p>
+              </div>
+            </div>
+
+            {/* Session list */}
+            <ScrollArea className="h-[200px]">
+              <div className="space-y-1.5 pr-2">
+                {student.sessions
+                  .filter(s => s.status !== 'scheduled')
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map(session => (
+                    <div
+                      key={session.id}
+                      className={cn(
+                        "flex items-center justify-between p-2 rounded text-xs",
+                        session.status === 'completed' && "bg-success/10 text-success",
+                        session.status === 'cancelled' && "bg-destructive/10 text-destructive"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        {session.status === 'completed' ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
+                        <span>{format(parseISO(session.date), 'EEE, MMM d')}</span>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "text-[10px]",
+                        session.status === 'completed' && "border-success/30",
+                        session.status === 'cancelled' && "border-destructive/30"
+                      )}>
+                        {session.status}
+                      </Badge>
+                    </div>
+                  ))}
+                {student.sessions.filter(s => s.status !== 'scheduled').length === 0 && (
+                  <p className="text-center text-muted-foreground py-4 text-xs">No session history yet</p>
+                )}
+              </div>
+            </ScrollArea>
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
