@@ -97,14 +97,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
     let completed = 0;
     let cancelled = 0;
 
-    const semesterStart = parseISO(selectedStudent.semesterStart);
     selectedStudent.sessions.forEach(session => {
-      const sessionDate = parseISO(session.date);
-      // Include all completed/cancelled sessions from semester start (no end date restriction)
-      if (!isBefore(sessionDate, semesterStart)) {
-        if (session.status === 'completed') completed++;
-        else if (session.status === 'cancelled') cancelled++;
-      }
+      if (session.status === 'completed') completed++;
+      else if (session.status === 'cancelled') cancelled++;
     });
 
     const total = completed + cancelled;
@@ -125,11 +120,8 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
       studentId: string;
     }> = [];
 
-    const semesterStart = parseISO(selectedStudent.semesterStart);
     selectedStudent.sessions.forEach(session => {
-      const sessionDate = parseISO(session.date);
-      // Include all completed or cancelled sessions from semester start (no end date restriction)
-      if (!isBefore(sessionDate, semesterStart) && (session.status === 'completed' || session.status === 'cancelled')) {
+      if (session.status === 'completed' || session.status === 'cancelled') {
         sessions.push({
           ...session,
           studentName: selectedStudent.name,
