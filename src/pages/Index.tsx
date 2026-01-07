@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, CalendarDays } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, CalendarDays, History } from 'lucide-react';
 import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -9,7 +9,7 @@ import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { UpcomingSessionsManager } from '@/components/UpcomingSessionsManager';
-import { SessionHistorySheet } from '@/components/SessionHistorySheet';
+import { SessionHistoryBar } from '@/components/SessionHistoryBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -227,7 +227,6 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
               
-              <SessionHistorySheet students={students} />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
                 onAdd={addStudent}
@@ -243,14 +242,18 @@ const Index = () => {
       <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-2 mb-3 sm:mb-4 h-11">
+          <TabsList className="w-full grid grid-cols-3 mb-3 sm:mb-4 h-11">
             <TabsTrigger value="sessions" className="gap-1.5 text-sm">
               <BookOpen className="h-4 w-4" />
-              Sessions
+              <span className="hidden xs:inline">Sessions</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-1.5 text-sm">
+              <History className="h-4 w-4" />
+              <span className="hidden xs:inline">History</span>
             </TabsTrigger>
             <TabsTrigger value="payments" className="gap-1.5 text-sm">
               <CreditCard className="h-4 w-4" />
-              Payments
+              <span className="hidden xs:inline">Payments</span>
             </TabsTrigger>
           </TabsList>
 
@@ -418,6 +421,10 @@ const Index = () => {
                 )}
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-0">
+            <SessionHistoryBar students={students} />
           </TabsContent>
 
           <TabsContent value="payments" className="mt-0 space-y-4">
