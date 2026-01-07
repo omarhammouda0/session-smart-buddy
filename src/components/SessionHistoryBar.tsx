@@ -559,16 +559,41 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                               </p>
                             </div>
                           </div>
-                          <Badge 
-                            variant="outline" 
-                            className={cn(
-                              "shrink-0 text-[10px] capitalize",
-                              session.status === 'completed' && "border-success/30 text-success",
-                              session.status === 'cancelled' && "border-destructive/30 text-destructive"
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {session.status === 'completed' ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-warning hover:text-warning hover:bg-warning/10"
+                                onClick={() => handleToggleComplete(session.studentId, session.id)}
+                              >
+                                <X className="h-3.5 w-3.5 mr-1" />
+                                Undo
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-success hover:text-success hover:bg-success/10"
+                                onClick={() => handleRestoreSession(session.studentId, session.id)}
+                              >
+                                <Check className="h-3.5 w-3.5 mr-1" />
+                                Restore
+                              </Button>
                             )}
-                          >
-                            {session.status}
-                          </Badge>
+
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "shrink-0 text-[10px] capitalize",
+                                session.status === 'completed' && "border-success/30 text-success",
+                                session.status === 'cancelled' && "border-destructive/30 text-destructive"
+                              )}
+                            >
+                              {session.status}
+                            </Badge>
+                          </div>
                         </div>
                       ))
                     )}
