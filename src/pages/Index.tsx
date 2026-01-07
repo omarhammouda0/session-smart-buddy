@@ -112,12 +112,23 @@ const Index = () => {
         (student.scheduleDays.some(d => d.dayOfWeek === dayOfWeek) &&
           dateStr >= student.semesterStart && dateStr <= student.semesterEnd)
       );
+      
+      // Check if selected student has a session on this day
+      const selectedStudentHasSession = studentFilter !== 'all' && students.some(student => 
+        student.id === studentFilter && (
+          student.sessions.some(s => s.date === dateStr && s.status === 'scheduled') ||
+          (student.scheduleDays.some(d => d.dayOfWeek === dayOfWeek) &&
+            dateStr >= student.semesterStart && dateStr <= student.semesterEnd)
+        )
+      );
+      
       days.push({
         date: dateStr,
         dayName: DAY_NAMES_SHORT[dayOfWeek],
         dayNum: format(date, 'd'),
         isToday: isToday(date),
         studentCount: studentsOnDay.length,
+        hasSelectedStudent: selectedStudentHasSession,
       });
     }
     return days;
@@ -293,16 +304,24 @@ const Index = () => {
                     {weekDays.map(day => (
                       <button
                         key={day.date}
-                        onClick={() => setSelectedDate(day.date)}
+                        onClick={() => {
+                          setSelectedDate(day.date);
+                          setStudentFilter('all'); // Reset filter when selecting a day
+                        }}
                         className={cn(
-                          "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[52px] shrink-0",
+                          "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[52px] shrink-0 relative",
                           selectedDate === day.date
                             ? "bg-primary text-primary-foreground shadow-md"
-                            : day.isToday
-                              ? "bg-primary/10 border-2 border-primary/30 active:bg-primary/20"
-                              : "bg-card border border-border active:border-primary/50"
+                            : day.hasSelectedStudent
+                              ? "bg-accent border-2 border-accent-foreground/20 ring-2 ring-primary/40"
+                              : day.isToday
+                                ? "bg-primary/10 border-2 border-primary/30 active:bg-primary/20"
+                                : "bg-card border border-border active:border-primary/50"
                         )}
                       >
+                        {day.hasSelectedStudent && selectedDate !== day.date && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary rounded-full" />
+                        )}
                         <span className="text-sm font-semibold">{day.dayName}</span>
                         {day.studentCount > 0 && (
                           <span className={cn(
