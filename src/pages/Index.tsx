@@ -38,9 +38,10 @@ import {
 
 const Index = () => {
   const now = new Date();
-  const [selectedDate, setSelectedDate] = useState(format(now, 'yyyy-MM-dd'));
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
   const [activeTab, setActiveTab] = useState('sessions');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   
 
   const {
@@ -109,26 +110,20 @@ const Index = () => {
     });
   };
 
-  const selectedDateObj = parseISO(selectedDate);
-  const selectedDayOfWeek = selectedDateObj.getDay();
-  const selectedMonth = selectedDateObj.getMonth();
-  const selectedYear = selectedDateObj.getFullYear();
+  const selectedMonth = now.getMonth();
+  const selectedYear = now.getFullYear();
 
-  // Get students who have a session on the selected date
-  const getStudentsForDate = () => {
+  // Get students who have sessions on the selected day of week
+  const getStudentsForDay = () => {
     return students.filter(student => {
-      const hasSessionOnDate = student.sessions.some(s => s.date === selectedDate);
-      const isInSchedule = student.scheduleDays.some(d => d.dayOfWeek === selectedDayOfWeek) &&
-        selectedDate >= student.semesterStart && selectedDate <= student.semesterEnd;
-      
-      return hasSessionOnDate || isInSchedule;
+      return student.scheduleDays.some(d => d.dayOfWeek === selectedDayOfWeek);
     });
   };
 
-  const studentsForDate = getStudentsForDate();
+  const studentsForDay = getStudentsForDay();
 
   // Filter by selected student and sort by session time (ascending)
-  const filteredStudents = studentsForDate
+  const filteredStudents = studentsForDay
     .filter(s => studentFilter === 'all' || s.id === studentFilter)
     .sort((a, b) => {
       const timeA = a.sessionTime || '16:00';
@@ -138,44 +133,35 @@ const Index = () => {
 
   // Navigation functions
   const goToPrevDay = () => {
-    setSelectedDate(format(addDays(selectedDateObj, -1), 'yyyy-MM-dd'));
+    setSelectedDayOfWeek(prev => prev === 0 ? 6 : prev - 1);
   };
 
   const goToNextDay = () => {
-    setSelectedDate(format(addDays(selectedDateObj, 1), 'yyyy-MM-dd'));
+    setSelectedDayOfWeek(prev => prev === 6 ? 0 : prev + 1);
   };
 
   const goToToday = () => {
-    setSelectedDate(format(now, 'yyyy-MM-dd'));
+    setSelectedDayOfWeek(now.getDay());
   };
 
-  // Quick day navigation (next 7 days)
+  // Fixed 7 days navigation (Sunday to Saturday)
   const getWeekDays = () => {
     const days = [];
-    for (let i = -3; i <= 3; i++) {
-      const date = addDays(now, i);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const dayOfWeek = date.getDay();
+    for (let i = 0; i < 7; i++) {
+      // Count students who have sessions on this day of week
       const studentsOnDay = students.filter(student =>
-        student.sessions.some(s => s.date === dateStr) ||
-        (student.scheduleDays.some(d => d.dayOfWeek === dayOfWeek) &&
-          dateStr >= student.semesterStart && dateStr <= student.semesterEnd)
+        student.scheduleDays.some(d => d.dayOfWeek === i)
       );
       
       // Check if selected student has a session on this day
       const selectedStudentHasSession = studentFilter !== 'all' && students.some(student => 
-        student.id === studentFilter && (
-          student.sessions.some(s => s.date === dateStr && s.status === 'scheduled') ||
-          (student.scheduleDays.some(d => d.dayOfWeek === dayOfWeek) &&
-            dateStr >= student.semesterStart && dateStr <= student.semesterEnd)
-        )
+        student.id === studentFilter && student.scheduleDays.some(d => d.dayOfWeek === i)
       );
       
       days.push({
-        date: dateStr,
-        dayName: DAY_NAMES_SHORT[dayOfWeek],
-        dayNum: format(date, 'd'),
-        isToday: isToday(date),
+        dayOfWeek: i,
+        dayName: DAY_NAMES_SHORT[i],
+        isToday: now.getDay() === i,
         studentCount: studentsOnDay.length,
         hasSelectedStudent: selectedStudentHasSession,
       });
@@ -332,13 +318,13 @@ const Index = () => {
                     </Button>
                     <div className="text-center min-w-[140px] sm:min-w-[180px]">
                       <p className="font-heading font-semibold text-lg sm:text-xl">
-                        {format(selectedDateObj, 'EEEE')}
+                        {DAY_NAMES_FULL[selectedDayOfWeek]}
                       </p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
                       <ChevronRight className="h-5 w-5" />
                     </Button>
-                    {!isToday(selectedDateObj) && (
+                    {selectedDayOfWeek !== now.getDay() && (
                       <Button variant="outline" size="sm" onClick={goToToday} className="ml-1 h-9">
                         Today
                       </Button>
@@ -349,14 +335,14 @@ const Index = () => {
                   <div className="flex justify-start sm:justify-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
                     {weekDays.map(day => (
                       <button
-                        key={day.date}
+                        key={day.dayOfWeek}
                         onClick={() => {
-                          setSelectedDate(day.date);
+                          setSelectedDayOfWeek(day.dayOfWeek);
                           setStudentFilter('all'); // Reset filter when selecting a day
                         }}
                         className={cn(
                           "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[52px] shrink-0 relative",
-                          selectedDate === day.date
+                          selectedDayOfWeek === day.dayOfWeek
                             ? "bg-primary text-primary-foreground shadow-md"
                             : day.hasSelectedStudent
                               ? "bg-accent border-2 border-accent-foreground/20 ring-2 ring-primary/40"
@@ -365,14 +351,14 @@ const Index = () => {
                                 : "bg-card border border-border active:border-primary/50"
                         )}
                       >
-                        {day.hasSelectedStudent && selectedDate !== day.date && (
+                        {day.hasSelectedStudent && selectedDayOfWeek !== day.dayOfWeek && (
                           <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary rounded-full" />
                         )}
                         <span className="text-sm font-semibold">{day.dayName}</span>
                         {day.studentCount > 0 && (
                           <span className={cn(
                             "text-[9px] px-1.5 rounded-full mt-1",
-                            selectedDate === day.date
+                            selectedDayOfWeek === day.dayOfWeek
                               ? "bg-primary-foreground/20"
                               : "bg-muted"
                           )}>
@@ -387,18 +373,11 @@ const Index = () => {
                   <div className="flex items-center gap-2">
                       <Select value={studentFilter} onValueChange={(value) => {
                         setStudentFilter(value);
-                        // Auto-navigate to student's next session day
+                        // Auto-navigate to student's first session day
                         if (value !== 'all') {
                           const student = students.find(s => s.id === value);
-                          if (student) {
-                            // Find next scheduled session for this student
-                            const todayStr = format(now, 'yyyy-MM-dd');
-                            const nextSession = student.sessions
-                              .filter(s => s.date >= todayStr && s.status === 'scheduled')
-                              .sort((a, b) => a.date.localeCompare(b.date))[0];
-                            if (nextSession) {
-                              setSelectedDate(nextSession.date);
-                            }
+                          if (student && student.scheduleDays.length > 0) {
+                            setSelectedDayOfWeek(student.scheduleDays[0].dayOfWeek);
                           }
                         }
                       }}>
@@ -428,38 +407,36 @@ const Index = () => {
                   </div>
                 </div>
 
-                {/* Stats for selected date */}
+                {/* Stats for selected day */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   <div className="bg-card rounded-xl p-2.5 sm:p-3 card-shadow text-center">
                     <p className="text-lg sm:text-xl font-heading font-bold">{filteredStudents.length}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Today</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Students</p>
                   </div>
                   <div className="bg-success/10 rounded-xl p-2.5 sm:p-3 card-shadow text-center">
                     <p className="text-lg sm:text-xl font-heading font-bold text-success">
                       {filteredStudents.reduce((count, s) => {
-                        const session = s.sessions.find(sess => sess.date === selectedDate);
-                        return count + (session?.completed ? 1 : 0);
+                        return count + s.sessions.filter(sess => sess.status === 'completed').length;
                       }, 0)}
                     </p>
-                    <p className="text-[10px] sm:text-xs text-success/80">Done</p>
+                    <p className="text-[10px] sm:text-xs text-success/80">Completed</p>
                   </div>
                   <div className="bg-warning/10 rounded-xl p-2.5 sm:p-3 card-shadow text-center">
                     <p className="text-lg sm:text-xl font-heading font-bold text-warning">
                       {filteredStudents.reduce((count, s) => {
-                        const session = s.sessions.find(sess => sess.date === selectedDate);
-                        return count + (session && !session.completed ? 1 : 0);
+                        return count + s.sessions.filter(sess => sess.status === 'scheduled').length;
                       }, 0)}
                     </p>
-                    <p className="text-[10px] sm:text-xs text-warning/80">Pending</p>
+                    <p className="text-[10px] sm:text-xs text-warning/80">Scheduled</p>
                   </div>
                 </div>
 
-                {/* Students for selected date */}
+                {/* Students for selected day */}
                 {filteredStudents.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     {studentFilter !== 'all'
-                      ? `${students.find(s => s.id === studentFilter)?.name} has no session on ${format(selectedDateObj, 'MMM d')}`
-                      : `No sessions scheduled for ${format(selectedDateObj, 'MMM d')}`}
+                      ? `${students.find(s => s.id === studentFilter)?.name} has no session on ${DAY_NAMES_FULL[selectedDayOfWeek]}`
+                      : `No sessions scheduled for ${DAY_NAMES_FULL[selectedDayOfWeek]}`}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:gap-4">
@@ -467,7 +444,7 @@ const Index = () => {
                       <StudentCard
                         key={student.id}
                         student={student}
-                        selectedDate={selectedDate}
+                        selectedDayOfWeek={selectedDayOfWeek}
                         selectedMonth={selectedMonth}
                         selectedYear={selectedYear}
                         onRemove={() => removeStudent(student.id)}

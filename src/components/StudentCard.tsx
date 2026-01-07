@@ -25,7 +25,7 @@ import {
 
 interface StudentCardProps {
   student: Student;
-  selectedDate: string;
+  selectedDayOfWeek: number;
   selectedMonth: number;
   selectedYear: number;
   onRemove: () => void;
@@ -38,9 +38,11 @@ interface StudentCardProps {
   onToggleSession: (sessionId: string) => void;
 }
 
+const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 export const StudentCard = ({
   student,
-  selectedDate,
+  selectedDayOfWeek,
   selectedMonth,
   selectedYear,
   onRemove,
@@ -58,8 +60,11 @@ export const StudentCard = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Find today's session (exclude cancelled)
-  const todaySession = student.sessions.find(s => s.date === selectedDate && s.status !== 'cancelled');
+  // Sessions on the selected day of week (all instances)
+  const sessionsOnDay = student.sessions.filter(s => {
+    const sessionDate = parseISO(s.date);
+    return sessionDate.getDay() === selectedDayOfWeek && s.status !== 'cancelled';
+  });
   
   // Get month sessions for progress (exclude cancelled)
   const monthSessions = student.sessions.filter(s => {
@@ -101,19 +106,13 @@ export const StudentCard = ({
     }
   };
 
-  const handleToggleTodaySession = () => {
-    if (todaySession) {
-      onToggleSession(todaySession.id);
-    } else {
-      // Create session for today if it doesn't exist
-      onAddSession(selectedDate);
-    }
-  };
+  // Stats for sessions on this day of week
+  const completedOnDay = sessionsOnDay.filter(s => s.status === 'completed').length;
+  const scheduledOnDay = sessionsOnDay.filter(s => s.status === 'scheduled').length;
 
   return (
     <Card className={cn(
-      "card-shadow transition-all duration-300 overflow-hidden",
-      todaySession?.status === 'completed' && "ring-2 ring-success/50"
+      "card-shadow transition-all duration-300 overflow-hidden"
     )}>
       <CardHeader className="p-3 sm:pb-3">
         <div className="flex items-start justify-between gap-3">
@@ -175,7 +174,12 @@ export const StudentCard = ({
                     )}
                   </Badge>
                   {student.scheduleDays.map(d => (
-                    <span key={d.dayOfWeek} className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                    <span key={d.dayOfWeek} className={cn(
+                      "text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full",
+                      d.dayOfWeek === selectedDayOfWeek 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-primary/10 text-primary"
+                    )}>
                       {DAY_NAMES_SHORT[d.dayOfWeek]}
                     </span>
                   ))}
@@ -209,83 +213,33 @@ export const StudentCard = ({
       </CardHeader>
 
       <CardContent className="p-3 pt-0 space-y-3 sm:space-y-4">
-        {/* Today's Session Status */}
+        {/* Day Session Stats */}
         <div className="flex gap-2">
-          {/* Mark Complete Button */}
-          <button
-            onClick={handleToggleTodaySession}
-            className={cn(
-              "flex-1 p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-between",
-              todaySession?.status === 'completed'
-                ? "bg-success/10 border-success text-success"
-                : "bg-card border-dashed border-muted-foreground/30 active:border-primary active:bg-primary/5"
-            )}
-          >
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className={cn(
-                "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all shrink-0",
-                todaySession?.status === 'completed'
-                  ? "bg-success text-success-foreground"
-                  : "border-2 border-muted-foreground/30"
-              )}>
-                {todaySession?.status === 'completed' && <Check className="h-4 w-4 sm:h-5 sm:w-5" />}
+          <div className="flex-1 p-3 sm:p-4 rounded-xl border bg-card">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-primary/10 text-primary shrink-0">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-sm sm:text-base text-foreground">
+                    {DAY_NAMES_FULL[selectedDayOfWeek]} Sessions
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    {sessionsOnDay.length} total sessions
+                  </p>
+                </div>
               </div>
-              <div className="text-left">
-                <p className={cn(
-                  "font-medium text-sm sm:text-base",
-                  todaySession?.status === 'completed' ? "text-success" : "text-foreground"
-                )}>
-                  {todaySession?.status === 'completed' ? 'Completed' : 'Mark Complete'}
-                </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  {format(parseISO(selectedDate), 'EEEE')}
-                </p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 rounded-full bg-success/10 text-success">
+                  {completedOnDay} done
+                </span>
+                <span className="text-xs px-2 py-1 rounded-full bg-warning/10 text-warning">
+                  {scheduledOnDay} pending
+                </span>
               </div>
             </div>
-            <span className={cn(
-              "text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full shrink-0",
-              todaySession?.status === 'completed' 
-                ? "bg-success/20 text-success" 
-                : "bg-muted text-muted-foreground"
-            )}>
-              {todaySession?.status === 'completed' ? 'Done' : 'Tap'}
-            </span>
-          </button>
-
-          {/* Cancel Session Button */}
-          {todaySession && todaySession.status !== 'completed' && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-auto w-14 sm:w-16 rounded-xl border-2 border-dashed border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive shrink-0"
-                >
-                  <div className="flex flex-col items-center gap-1">
-                    <Ban className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="text-[10px]">Cancel</span>
-                  </div>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Session</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Cancel {student.name}'s session on {format(parseISO(selectedDate), 'EEEE')}? This will be tracked in the session history.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep Session</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => onRemoveSession(todaySession.id)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Cancel Session
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+          </div>
         </div>
 
         {/* Month Progress */}
