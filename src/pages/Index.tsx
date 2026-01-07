@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays, subDays, startOfDay, isSameDay } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
@@ -13,7 +13,7 @@ import { SessionHistoryBar } from '@/components/SessionHistoryBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR } from '@/lib/arabicConstants';
+import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR, formatShortDateAr } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -37,7 +37,8 @@ import {
 
 const Index = () => {
   const now = new Date();
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
+  const today = startOfDay(now);
+  const [selectedDate, setSelectedDate] = useState(today);
   const [activeTab, setActiveTab] = useState('sessions');
   const [studentFilter, setStudentFilter] = useState<string>('all');
 
@@ -60,6 +61,9 @@ const Index = () => {
     toggleSessionComplete,
     togglePaymentStatus,
   } = useStudents();
+
+  // Format selected date as YYYY-MM-DD for comparison
+  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
 
   // Wrapper functions with toast notifications
   const handleAddSession = (studentId: string, date: string) => {
@@ -110,17 +114,17 @@ const Index = () => {
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
 
-  // Get students who have sessions on the selected day of week
-  const getStudentsForDay = () => {
+  // Get students who have a session on the selected date
+  const getStudentsForDate = () => {
     return students.filter(student => {
-      return student.scheduleDays.some(d => d.dayOfWeek === selectedDayOfWeek);
+      return student.sessions.some(s => s.date === selectedDateStr);
     });
   };
 
-  const studentsForDay = getStudentsForDay();
+  const studentsForDate = getStudentsForDate();
 
   // Filter by selected student and sort by session time (ascending)
-  const filteredStudents = studentsForDay
+  const filteredStudents = studentsForDate
     .filter(s => studentFilter === 'all' || s.id === studentFilter)
     .sort((a, b) => {
       const timeA = a.sessionTime || '16:00';
@@ -130,36 +134,42 @@ const Index = () => {
 
   // Navigation functions
   const goToPrevDay = () => {
-    setSelectedDayOfWeek(prev => prev === 0 ? 6 : prev - 1);
+    setSelectedDate(prev => subDays(prev, 1));
   };
 
   const goToNextDay = () => {
-    setSelectedDayOfWeek(prev => prev === 6 ? 0 : prev + 1);
+    setSelectedDate(prev => addDays(prev, 1));
   };
 
   const goToToday = () => {
-    setSelectedDayOfWeek(now.getDay());
+    setSelectedDate(today);
   };
 
-  // Fixed 7 days navigation (Sunday to Saturday)
+  // Get week days around the selected date (3 days before, selected, 3 days after)
   const getWeekDays = () => {
     const days = [];
-    for (let i = 0; i < 7; i++) {
-      // Count students who have sessions on this day of week
-      const studentsOnDay = students.filter(student =>
-        student.scheduleDays.some(d => d.dayOfWeek === i)
+    for (let i = -3; i <= 3; i++) {
+      const date = addDays(selectedDate, i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      // Count students who have sessions on this date
+      const studentsOnDate = students.filter(student =>
+        student.sessions.some(s => s.date === dateStr)
       );
       
-      // Check if selected student has a session on this day
+      // Check if selected student has a session on this date
       const selectedStudentHasSession = studentFilter !== 'all' && students.some(student => 
-        student.id === studentFilter && student.scheduleDays.some(d => d.dayOfWeek === i)
+        student.id === studentFilter && student.sessions.some(s => s.date === dateStr)
       );
       
       days.push({
-        dayOfWeek: i,
-        dayName: DAY_NAMES_SHORT_AR[i],
-        isToday: now.getDay() === i,
-        studentCount: studentsOnDay.length,
+        date,
+        dateStr,
+        dayName: DAY_NAMES_SHORT_AR[date.getDay()],
+        dayNumber: date.getDate(),
+        isToday: isSameDay(date, today),
+        isSelected: i === 0,
+        studentCount: studentsOnDate.length,
         hasSelectedStudent: selectedStudentHasSession,
       });
     }
@@ -315,13 +325,16 @@ const Index = () => {
                     </Button>
                     <div className="text-center min-w-[140px] sm:min-w-[180px]">
                       <p className="font-heading font-semibold text-lg sm:text-xl">
-                        {DAY_NAMES_AR[selectedDayOfWeek]}
+                        {formatShortDateAr(format(selectedDate, 'yyyy-MM-dd'))}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {DAY_NAMES_AR[selectedDate.getDay()]}
                       </p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={goToPrevDay} className="h-10 w-10">
                       <ChevronLeft className="h-5 w-5" />
                     </Button>
-                    {selectedDayOfWeek !== now.getDay() && (
+                    {!isSameDay(selectedDate, today) && (
                       <Button variant="outline" size="sm" onClick={goToToday} className="mr-1 h-9">
                         اليوم
                       </Button>
@@ -332,14 +345,14 @@ const Index = () => {
                   <div className="flex justify-start sm:justify-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
                     {weekDays.map(day => (
                       <button
-                        key={day.dayOfWeek}
+                        key={day.dateStr}
                         onClick={() => {
-                          setSelectedDayOfWeek(day.dayOfWeek);
-                          setStudentFilter('all'); // Reset filter when selecting a day
+                          setSelectedDate(day.date);
+                          setStudentFilter('all');
                         }}
                         className={cn(
                           "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[52px] shrink-0 relative",
-                          selectedDayOfWeek === day.dayOfWeek
+                          day.isSelected
                             ? "bg-primary text-primary-foreground shadow-md"
                             : day.hasSelectedStudent
                               ? "bg-accent border-2 border-accent-foreground/20 ring-2 ring-primary/40"
@@ -348,14 +361,15 @@ const Index = () => {
                                 : "bg-card border border-border active:border-primary/50"
                         )}
                       >
-                        {day.hasSelectedStudent && selectedDayOfWeek !== day.dayOfWeek && (
+                        {day.hasSelectedStudent && !day.isSelected && (
                           <span className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-primary rounded-full" />
                         )}
-                        <span className="text-sm font-semibold">{day.dayName}</span>
+                        <span className="text-[10px] opacity-70">{day.dayName}</span>
+                        <span className="text-sm font-semibold">{day.dayNumber}</span>
                         {day.studentCount > 0 && (
                           <span className={cn(
-                            "text-[9px] px-1.5 rounded-full mt-1",
-                            selectedDayOfWeek === day.dayOfWeek
+                            "text-[9px] px-1.5 rounded-full mt-0.5",
+                            day.isSelected
                               ? "bg-primary-foreground/20"
                               : "bg-muted"
                           )}>
@@ -370,13 +384,6 @@ const Index = () => {
                   <div className="flex items-center gap-2">
                       <Select value={studentFilter} onValueChange={(value) => {
                         setStudentFilter(value);
-                        // Auto-navigate to student's first session day
-                        if (value !== 'all') {
-                          const student = students.find(s => s.id === value);
-                          if (student && student.scheduleDays.length > 0) {
-                            setSelectedDayOfWeek(student.scheduleDays[0].dayOfWeek);
-                          }
-                        }
                       }}>
                         <SelectTrigger className="w-full h-11">
                           <Users className="h-4 w-4 ml-2 text-muted-foreground shrink-0" />
@@ -414,12 +421,12 @@ const Index = () => {
                   <div className="text-center py-12 animate-fade-in">
                     <p className="text-muted-foreground">
                       {studentFilter !== 'all' 
-                        ? `لا توجد حصص لهذا الطالب يوم ${DAY_NAMES_AR[selectedDayOfWeek]}`
-                        : `لا توجد حصص مجدولة ليوم ${DAY_NAMES_AR[selectedDayOfWeek]}`
+                        ? `لا توجد حصص لهذا الطالب في ${formatShortDateAr(selectedDateStr)}`
+                        : `لا توجد حصص مجدولة في ${formatShortDateAr(selectedDateStr)}`
                       }
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      اضغط على أيام أخرى لعرض الحصص
+                      اضغط على تواريخ أخرى لعرض الحصص
                     </p>
                   </div>
                 ) : (
@@ -428,9 +435,7 @@ const Index = () => {
                       <StudentCard
                         key={student.id}
                         student={student}
-                        selectedDayOfWeek={selectedDayOfWeek}
-                        selectedMonth={selectedMonth}
-                        selectedYear={selectedYear}
+                        selectedDate={selectedDateStr}
                         onRemove={() => removeStudent(student.id)}
                         onUpdateName={(name) => updateStudentName(student.id, name)}
                         onUpdateTime={(time) => updateStudentTime(student.id, time)}
