@@ -62,6 +62,7 @@ export const useStudents = () => {
     scheduleDays: number[],
     sessionTime: string = '16:00',
     sessionType: 'online' | 'onsite' = 'onsite',
+    phone?: string,
     customSemesterStart?: string,
     customSemesterEnd?: string
   ) => {
@@ -80,6 +81,7 @@ export const useStudents = () => {
     const newStudent: Student = {
       id: generateId(),
       name,
+      phone,
       sessionTime,
       sessionType,
       scheduleDays: scheduleDays.map(d => ({ dayOfWeek: d })),
@@ -102,6 +104,12 @@ export const useStudents = () => {
       })),
     };
     setPayments(prev => [...prev, studentPayments]);
+  };
+
+  const updateStudentPhone = (studentId: string, phone: string) => {
+    setStudents(prev =>
+      prev.map(s => (s.id === studentId ? { ...s, phone } : s))
+    );
   };
 
   const removeStudent = (studentId: string) => {
@@ -339,6 +347,7 @@ export const useStudents = () => {
     removeStudent,
     updateStudentName,
     updateStudentTime,
+    updateStudentPhone,
     updateStudentSchedule,
     addExtraSession,
     removeSession,

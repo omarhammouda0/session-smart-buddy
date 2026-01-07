@@ -8,7 +8,7 @@ import { StudentCard } from '@/components/StudentCard';
 import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
-
+import { EndOfMonthReminder } from '@/components/EndOfMonthReminder';
 import { SessionHistoryBar } from '@/components/SessionHistoryBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -467,6 +467,13 @@ const Index = () => {
             />
           </TabsContent>
         </Tabs>
+
+        {/* End of Month Payment Reminder */}
+        <EndOfMonthReminder
+          students={students}
+          payments={payments}
+          onTogglePayment={togglePaymentStatus}
+        />
       </main>
     </div>
   );
