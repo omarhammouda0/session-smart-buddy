@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, parseISO, isBefore, startOfToday } from 'date-fns';
+import { format, parseISO, isBefore, isAfter, startOfToday } from 'date-fns';
 import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2 } from 'lucide-react';
 import { Student } from '@/types/student';
 import { Button } from '@/components/ui/button';
@@ -209,6 +209,31 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
             </TabsContent>
 
             <TabsContent value="history" className="mt-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground font-medium">إضافة حصة سابقة</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
+                      <Plus className="h-3 w-3" />
+                      إضافة
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+                    <CalendarPicker
+                      mode="single"
+                      selected={addSessionDate}
+                      disabled={(date) => isAfter(date, today)}
+                      onSelect={(date) => date && handleAddSession(selectedStudent.id, date)}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
+                💡 اختر تاريخًا سابقًا لإضافة حصة، وستُسجل تلقائياً كمكتملة وتظهر هنا في السجل.
+              </p>
+
               <div className="p-3 rounded-lg bg-muted/50 border">
                 <p className="text-xs text-muted-foreground mb-2 font-medium">{selectedStudent.name} - إحصائيات الفصل</p>
                 <div className="grid grid-cols-3 gap-2">
