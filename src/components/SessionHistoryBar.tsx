@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO, isAfter, isBefore, startOfToday } from 'date-fns';
-import { History, Users, Check, X, Calendar, Ban, CalendarClock, TrendingUp, Plus } from 'lucide-react';
+import { History, Users, Check, X, Calendar, Ban, CalendarClock, TrendingUp, Plus, Trash2 } from 'lucide-react';
 import { Student } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,13 +27,14 @@ import { cn } from '@/lib/utils';
 interface SessionHistoryBarProps {
   students: Student[];
   onCancelSession?: (studentId: string, sessionId: string) => void;
+  onDeleteSession?: (studentId: string, sessionId: string) => void;
   onRestoreSession?: (studentId: string, sessionId: string) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onRescheduleSession?: (studentId: string, sessionId: string, newDate: string) => void;
   onAddSession?: (studentId: string, date: string) => void;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
@@ -147,6 +148,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
 
   const handleCancelSession = (studentId: string, sessionId: string) => {
     onCancelSession?.(studentId, sessionId);
+  };
+
+  const handleDeleteSession = (studentId: string, sessionId: string) => {
+    onDeleteSession?.(studentId, sessionId);
   };
 
   const handleRestoreSession = (studentId: string, sessionId: string) => {
@@ -300,32 +305,58 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             {session.status === 'cancelled' ? (
-                              /* Restore button for cancelled sessions */
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-success hover:text-success hover:bg-success/10">
-                                    <Check className="h-3.5 w-3.5 mr-1" />
-                                    Restore
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Restore Session</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Restore the cancelled session on {format(parseISO(session.date), 'EEEE, MMMM d')}? It will be marked as scheduled again.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleRestoreSession(session.studentId, session.id)}
-                                      className="bg-success text-success-foreground hover:bg-success/90"
-                                    >
-                                      Yes, restore
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              /* Restore and Delete buttons for cancelled sessions */
+                              <>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-success hover:text-success hover:bg-success/10">
+                                      <Check className="h-3.5 w-3.5 mr-1" />
+                                      Restore
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Restore Session</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Restore the cancelled session on {format(parseISO(session.date), 'EEEE, MMMM d')}? It will be marked as scheduled again.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleRestoreSession(session.studentId, session.id)}
+                                        className="bg-success text-success-foreground hover:bg-success/90"
+                                      >
+                                        Yes, restore
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Session</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Permanently delete this cancelled session? This cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Keep</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteSession(session.studentId, session.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
                             ) : session.status === 'completed' ? (
                               /* Undo completion button */
                               <Button 
@@ -392,6 +423,32 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                       >
                                         Yes, cancel
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+
+                                {/* Delete session permanently */}
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Session</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Permanently delete this session on {format(parseISO(session.date), 'EEEE, MMMM d')}? This cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Keep session</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteSession(session.studentId, session.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>

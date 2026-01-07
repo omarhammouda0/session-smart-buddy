@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DAY_NAMES_SHORT } from '@/types/student';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,11 +56,58 @@ const Index = () => {
     updateStudentSchedule,
     addExtraSession,
     removeSession,
+    deleteSession,
     restoreSession,
     rescheduleSession,
     toggleSessionComplete,
     togglePaymentStatus,
   } = useStudents();
+
+  // Wrapper functions with toast notifications
+  const handleAddSession = (studentId: string, date: string) => {
+    const student = students.find(s => s.id === studentId);
+    addExtraSession(studentId, date);
+    toast({
+      title: "Session Added",
+      description: `New session on ${format(parseISO(date), 'EEE, MMM d')}${student ? ` for ${student.name}` : ''}`,
+    });
+  };
+
+  const handleCancelSession = (studentId: string, sessionId: string) => {
+    removeSession(studentId, sessionId);
+    toast({
+      title: "Session Cancelled",
+      description: "The session has been cancelled",
+      variant: "destructive",
+    });
+  };
+
+  const handleDeleteSession = (studentId: string, sessionId: string) => {
+    deleteSession(studentId, sessionId);
+    toast({
+      title: "Session Deleted",
+      description: "The session has been permanently removed",
+    });
+  };
+
+  const handleRestoreSession = (studentId: string, sessionId: string) => {
+    restoreSession(studentId, sessionId);
+    toast({
+      title: "Session Restored",
+      description: "The session has been restored to scheduled",
+    });
+  };
+
+  const handleToggleComplete = (studentId: string, sessionId: string) => {
+    const student = students.find(s => s.id === studentId);
+    const session = student?.sessions.find(s => s.id === sessionId);
+    const wasCompleted = session?.status === 'completed';
+    toggleSessionComplete(studentId, sessionId);
+    toast({
+      title: wasCompleted ? "Session Unmarked" : "Session Completed",
+      description: wasCompleted ? "Session marked as scheduled" : "Great job! Session marked as complete",
+    });
+  };
 
   const selectedDateObj = parseISO(selectedDate);
   const selectedDayOfWeek = selectedDateObj.getDay();
@@ -429,9 +477,10 @@ const Index = () => {
                         onUpdateName={(name) => updateStudentName(student.id, name)}
                         onUpdateTime={(time) => updateStudentTime(student.id, time)}
                         onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                        onAddSession={(date) => addExtraSession(student.id, date)}
-                        onRemoveSession={(sessionId) => removeSession(student.id, sessionId)}
-                        onToggleSession={(sessionId) => toggleSessionComplete(student.id, sessionId)}
+                        onAddSession={(date) => handleAddSession(student.id, date)}
+                        onRemoveSession={(sessionId) => handleCancelSession(student.id, sessionId)}
+                        onDeleteSession={(sessionId) => handleDeleteSession(student.id, sessionId)}
+                        onToggleSession={(sessionId) => handleToggleComplete(student.id, sessionId)}
                       />
                     ))}
                   </div>
@@ -443,11 +492,12 @@ const Index = () => {
           <TabsContent value="history" className="mt-0">
             <SessionHistoryBar 
               students={students} 
-              onCancelSession={removeSession}
-              onRestoreSession={restoreSession}
-              onToggleComplete={toggleSessionComplete}
+              onCancelSession={handleCancelSession}
+              onDeleteSession={handleDeleteSession}
+              onRestoreSession={handleRestoreSession}
+              onToggleComplete={handleToggleComplete}
               onRescheduleSession={rescheduleSession}
-              onAddSession={addExtraSession}
+              onAddSession={handleAddSession}
             />
           </TabsContent>
 

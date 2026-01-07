@@ -251,6 +251,19 @@ export const useStudents = () => {
     );
   };
 
+  // Permanently delete a session (for accidentally added sessions)
+  const deleteSession = (studentId: string, sessionId: string) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== studentId) return s;
+        return {
+          ...s,
+          sessions: s.sessions.filter(sess => sess.id !== sessionId),
+        };
+      })
+    );
+  };
+
   const restoreSession = (studentId: string, sessionId: string) => {
     setStudents(prev =>
       prev.map(s => {
@@ -373,6 +386,7 @@ export const useStudents = () => {
     updateStudentSchedule,
     addExtraSession,
     removeSession,
+    deleteSession,
     restoreSession,
     rescheduleSession,
     toggleSessionComplete,

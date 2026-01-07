@@ -34,6 +34,7 @@ interface StudentCardProps {
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
   onAddSession: (date: string) => void;
   onRemoveSession: (sessionId: string) => void;
+  onDeleteSession: (sessionId: string) => void;
   onToggleSession: (sessionId: string) => void;
 }
 
@@ -48,6 +49,7 @@ export const StudentCard = ({
   onUpdateSchedule,
   onAddSession,
   onRemoveSession,
+  onDeleteSession,
   onToggleSession,
 }: StudentCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
