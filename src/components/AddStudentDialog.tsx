@@ -3,29 +3,56 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserPlus } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
+import { DAY_NAMES } from '@/types/student';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, sessionsPerMonth: number) => void;
+  onAdd: (name: string, scheduleDays: number[], customStart?: string, customEnd?: string) => void;
+  defaultStart: string;
+  defaultEnd: string;
 }
 
-export const AddStudentDialog = ({ onAdd }: AddStudentDialogProps) => {
+export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  const [sessions, setSessions] = useState('8');
+  const [selectedDays, setSelectedDays] = useState<number[]>([1]); // Monday by default
+  const [showCustomDates, setShowCustomDates] = useState(false);
+  const [customStart, setCustomStart] = useState(defaultStart);
+  const [customEnd, setCustomEnd] = useState(defaultEnd);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onAdd(name.trim(), parseInt(sessions) || 8);
-      setName('');
-      setSessions('8');
+    if (name.trim() && selectedDays.length > 0) {
+      const useCustom = showCustomDates && (customStart !== defaultStart || customEnd !== defaultEnd);
+      onAdd(
+        name.trim(),
+        selectedDays,
+        useCustom ? customStart : undefined,
+        useCustom ? customEnd : undefined
+      );
+      resetForm();
       setOpen(false);
     }
   };
 
+  const resetForm = () => {
+    setName('');
+    setSelectedDays([1]);
+    setShowCustomDates(false);
+    setCustomStart(defaultStart);
+    setCustomEnd(defaultEnd);
+  };
+
+  const toggleDay = (day: number) => {
+    setSelectedDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
       <DialogTrigger asChild>
         <Button className="gradient-primary gap-2 shadow-lg hover:shadow-xl transition-shadow">
           <UserPlus className="h-4 w-4" />
@@ -36,7 +63,7 @@ export const AddStudentDialog = ({ onAdd }: AddStudentDialogProps) => {
         <DialogHeader>
           <DialogTitle className="font-heading text-xl">Add New Student</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        <form onSubmit={handleSubmit} className="space-y-5 pt-4">
           <div className="space-y-2">
             <Label htmlFor="name">Student Name</Label>
             <Input
@@ -47,22 +74,72 @@ export const AddStudentDialog = ({ onAdd }: AddStudentDialogProps) => {
               autoFocus
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="sessions">Sessions per Month</Label>
-            <Input
-              id="sessions"
-              type="number"
-              min="1"
-              max="31"
-              value={sessions}
-              onChange={(e) => setSessions(e.target.value)}
-            />
+
+          <div className="space-y-3">
+            <Label>Session Days (Weekly)</Label>
+            <div className="flex flex-wrap gap-2">
+              {DAY_NAMES.map((day, index) => (
+                <label
+                  key={day}
+                  className={`
+                    flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all
+                    ${selectedDays.includes(index)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card border-border hover:border-primary/50'
+                    }
+                  `}
+                >
+                  <Checkbox
+                    checked={selectedDays.includes(index)}
+                    onCheckedChange={() => toggleDay(index)}
+                    className="sr-only"
+                  />
+                  <span className="text-sm font-medium">{day.slice(0, 3)}</span>
+                </label>
+              ))}
+            </div>
           </div>
+
+          <Collapsible open={showCustomDates} onOpenChange={setShowCustomDates}>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" className="w-full justify-between text-muted-foreground">
+                Custom semester dates
+                {showCustomDates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="customStart">Start Date</Label>
+                  <Input
+                    id="customStart"
+                    type="date"
+                    value={customStart}
+                    onChange={(e) => setCustomStart(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customEnd">End Date</Label>
+                  <Input
+                    id="customEnd"
+                    type="date"
+                    value={customEnd}
+                    onChange={(e) => setCustomEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" className="flex-1 gradient-primary">
+            <Button 
+              type="submit" 
+              className="flex-1 gradient-primary"
+              disabled={!name.trim() || selectedDays.length === 0}
+            >
               Add Student
             </Button>
           </div>

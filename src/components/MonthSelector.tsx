@@ -34,22 +34,29 @@ export const MonthSelector = ({ month, year, onChange }: MonthSelectorProps) => 
     onChange(now.getMonth(), now.getFullYear());
   };
 
+  const isCurrentMonth = () => {
+    const now = new Date();
+    return month === now.getMonth() && year === now.getFullYear();
+  };
+
   return (
-    <div className="flex items-center gap-2">
-      <Button variant="outline" size="icon" onClick={goToPrevMonth} className="h-9 w-9">
+    <div className="flex items-center gap-1">
+      <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="h-8 w-8">
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <div className="min-w-[160px] text-center">
-        <span className="font-heading font-semibold text-lg">
+      <div className="min-w-[140px] text-center">
+        <span className="font-heading font-semibold">
           {MONTH_NAMES[month]} {year}
         </span>
       </div>
-      <Button variant="outline" size="icon" onClick={goToNextMonth} className="h-9 w-9">
+      <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-8 w-8">
         <ChevronRight className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={goToToday} className="ml-2 text-muted-foreground">
-        Today
-      </Button>
+      {!isCurrentMonth() && (
+        <Button variant="ghost" size="sm" onClick={goToToday} className="ml-1 text-xs text-muted-foreground h-7">
+          Today
+        </Button>
+      )}
     </div>
   );
 };
