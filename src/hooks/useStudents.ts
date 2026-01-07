@@ -60,6 +60,7 @@ export const useStudents = () => {
   const addStudent = (
     name: string,
     scheduleDays: number[],
+    sessionTime: string = '16:00',
     customSemesterStart?: string,
     customSemesterEnd?: string
   ) => {
@@ -76,6 +77,7 @@ export const useStudents = () => {
     const newStudent: Student = {
       id: generateId(),
       name,
+      sessionTime,
       scheduleDays: scheduleDays.map(d => ({ dayOfWeek: d })),
       semesterStart,
       semesterEnd,
@@ -106,6 +108,12 @@ export const useStudents = () => {
   const updateStudentName = (studentId: string, name: string) => {
     setStudents(prev =>
       prev.map(s => (s.id === studentId ? { ...s, name } : s))
+    );
+  };
+
+  const updateStudentTime = (studentId: string, sessionTime: string) => {
+    setStudents(prev =>
+      prev.map(s => (s.id === studentId ? { ...s, sessionTime } : s))
     );
   };
 
@@ -262,6 +270,7 @@ export const useStudents = () => {
     addStudent,
     removeStudent,
     updateStudentName,
+    updateStudentTime,
     updateStudentSchedule,
     addExtraSession,
     removeSession,

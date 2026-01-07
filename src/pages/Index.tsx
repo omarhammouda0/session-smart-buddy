@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, Search, X } from 'lucide-react';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
@@ -9,12 +9,16 @@ import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [activeTab, setActiveTab] = useState('sessions');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const {
     students,
@@ -25,12 +29,32 @@ const Index = () => {
     addStudent,
     removeStudent,
     updateStudentName,
+    updateStudentTime,
     updateStudentSchedule,
     addExtraSession,
     removeSession,
     toggleSessionComplete,
     togglePaymentStatus,
   } = useStudents();
+
+  const filteredStudents = students.filter(student =>
+    student.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleSelectStudent = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setActiveTab('sessions');
+    setSearchQuery('');
+  };
+
+  const clearSelection = () => {
+    setSelectedStudentId(null);
+    setSearchQuery('');
+  };
+
+  const displayedStudents = selectedStudentId
+    ? filteredStudents.filter(s => s.id === selectedStudentId)
+    : filteredStudents;
 
   if (!isLoaded) {
     return (
@@ -91,6 +115,39 @@ const Index = () => {
           />
         )}
 
+        {/* Search & Filter */}
+        {students.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search students..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {(selectedStudentId || searchQuery) && (
+              <Button variant="ghost" size="sm" onClick={clearSelection} className="gap-1">
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Selected student indicator */}
+        {selectedStudentId && (
+          <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 flex items-center justify-between">
+            <span className="text-sm">
+              Viewing: <strong>{students.find(s => s.id === selectedStudentId)?.name}</strong>
+            </span>
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              View all students
+            </Button>
+          </div>
+        )}
+
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-2 mb-4">
@@ -107,9 +164,13 @@ const Index = () => {
           <TabsContent value="sessions" className="mt-0">
             {students.length === 0 ? (
               <EmptyState />
+            ) : displayedStudents.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No students found matching "{searchQuery}"
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {students.map(student => (
+                {displayedStudents.map(student => (
                   <StudentCard
                     key={student.id}
                     student={student}
@@ -117,6 +178,7 @@ const Index = () => {
                     selectedYear={selectedYear}
                     onRemove={() => removeStudent(student.id)}
                     onUpdateName={(name) => updateStudentName(student.id, name)}
+                    onUpdateTime={(time) => updateStudentTime(student.id, time)}
                     onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
                     onAddSession={(date) => addExtraSession(student.id, date)}
                     onRemoveSession={(sessionId) => removeSession(student.id, sessionId)}
@@ -129,11 +191,12 @@ const Index = () => {
 
           <TabsContent value="payments" className="mt-0">
             <PaymentsDashboard
-              students={students}
+              students={selectedStudentId ? students.filter(s => s.id === selectedStudentId) : filteredStudents}
               payments={payments}
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               onTogglePayment={togglePaymentStatus}
+              onSelectStudent={handleSelectStudent}
             />
           </TabsContent>
         </Tabs>
