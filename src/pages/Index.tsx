@@ -445,6 +445,7 @@ const Index = () => {
               students={students} 
               onCancelSession={removeSession}
               onRestoreSession={restoreSession}
+              onToggleComplete={toggleSessionComplete}
               onRescheduleSession={rescheduleSession}
             />
           </TabsContent>
