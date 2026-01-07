@@ -447,6 +447,7 @@ const Index = () => {
               onRestoreSession={restoreSession}
               onToggleComplete={toggleSessionComplete}
               onRescheduleSession={rescheduleSession}
+              onAddSession={addExtraSession}
             />
           </TabsContent>
 
