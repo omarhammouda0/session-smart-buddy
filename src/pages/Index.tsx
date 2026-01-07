@@ -331,11 +331,8 @@ const Index = () => {
                       <ChevronLeft className="h-5 w-5" />
                     </Button>
                     <div className="text-center min-w-[140px] sm:min-w-[180px]">
-                      <p className="font-heading font-semibold text-base sm:text-lg">
+                      <p className="font-heading font-semibold text-lg sm:text-xl">
                         {format(selectedDateObj, 'EEEE')}
-                      </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        {format(selectedDateObj, 'MMM d, yyyy')}
                       </p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
