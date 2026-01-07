@@ -55,6 +55,7 @@ const Index = () => {
     updateStudentSchedule,
     addExtraSession,
     removeSession,
+    restoreSession,
     rescheduleSession,
     toggleSessionComplete,
     togglePaymentStatus,
@@ -443,6 +444,7 @@ const Index = () => {
             <SessionHistoryBar 
               students={students} 
               onCancelSession={removeSession}
+              onRestoreSession={restoreSession}
               onRescheduleSession={rescheduleSession}
             />
           </TabsContent>
