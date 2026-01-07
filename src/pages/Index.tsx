@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock } from 'lucide-react';
 import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -11,8 +11,27 @@ import { StatsBar } from '@/components/StatsBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DAY_NAMES_SHORT } from '@/types/student';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 const Index = () => {
   const now = new Date();
@@ -45,9 +64,7 @@ const Index = () => {
   // Get students who have a session on the selected date
   const getStudentsForDate = () => {
     return students.filter(student => {
-      // Check if student has a session on this exact date
       const hasSessionOnDate = student.sessions.some(s => s.date === selectedDate);
-      // Or if their schedule includes this day of week and the date is within their semester
       const isInSchedule = student.scheduleDays.some(d => d.dayOfWeek === selectedDayOfWeek) &&
         selectedDate >= student.semesterStart && selectedDate <= student.semesterEnd;
       
@@ -57,10 +74,15 @@ const Index = () => {
 
   const studentsForDate = getStudentsForDate();
 
-  // Filter by selected student
-  const filteredStudents = studentFilter === 'all' 
+  // Filter by selected student and sort by session time (ascending)
+  const filteredStudents = (studentFilter === 'all' 
     ? studentsForDate 
-    : studentsForDate.filter(s => s.id === studentFilter);
+    : studentsForDate.filter(s => s.id === studentFilter)
+  ).sort((a, b) => {
+    const timeA = a.sessionTime || '16:00';
+    const timeB = b.sessionTime || '16:00';
+    return timeA.localeCompare(timeB);
+  });
 
   // Navigation functions
   const goToPrevDay = () => {
@@ -100,6 +122,13 @@ const Index = () => {
 
   const weekDays = getWeekDays();
 
+  // Sort all students by time for the student list
+  const allStudentsSortedByTime = [...students].sort((a, b) => {
+    const timeA = a.sessionTime || '16:00';
+    const timeB = b.sessionTime || '16:00';
+    return timeA.localeCompare(timeB);
+  });
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -124,6 +153,70 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* All Students Sheet */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Students</span>
+                    <span className="bg-primary/10 text-primary text-xs px-1.5 rounded-full">{students.length}</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle className="font-heading">All Students ({students.length})</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4 space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto">
+                    {allStudentsSortedByTime.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No students added yet</p>
+                    ) : (
+                      allStudentsSortedByTime.map(student => (
+                        <div
+                          key={student.id}
+                          className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{student.name}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {student.sessionTime || '16:00'}
+                              </span>
+                              <span>•</span>
+                              <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT[d.dayOfWeek]).join(', ')}</span>
+                            </div>
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remove Student</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to remove {student.name}? This will delete all their session and payment records.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => removeStudent(student.id)} 
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+              
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
                 onAdd={addStudent}
