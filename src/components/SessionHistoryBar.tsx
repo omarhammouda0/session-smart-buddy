@@ -183,17 +183,20 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                               <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
                                 <Check className="h-3.5 w-3.5 ml-1" />استعادة
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDeleteSession?.(session.studentId, session.id)}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDeleteSession?.(session.studentId, session.id)} title="حذف نهائي">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </>
                           ) : (
                             <>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => onToggleComplete?.(session.studentId, session.id)}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => onToggleComplete?.(session.studentId, session.id)} title="إكمال">
                                 <Check className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)} title="إلغاء">
                                 <Ban className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => onDeleteSession?.(session.studentId, session.id)} title="حذف نهائي">
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </>
                           )}
