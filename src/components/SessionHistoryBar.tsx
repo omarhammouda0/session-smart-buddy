@@ -28,10 +28,11 @@ interface SessionHistoryBarProps {
   students: Student[];
   onCancelSession?: (studentId: string, sessionId: string) => void;
   onRestoreSession?: (studentId: string, sessionId: string) => void;
+  onToggleComplete?: (studentId: string, sessionId: string) => void;
   onRescheduleSession?: (studentId: string, sessionId: string, newDate: string) => void;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession, onRescheduleSession }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession, onToggleComplete, onRescheduleSession }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
@@ -63,18 +64,18 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     return { total, completed, pending, cancelled, completionRate };
   };
 
-  // Get next sessions for selected student (including cancelled ones that are in the future)
+  // Get next sessions for selected student (including cancelled and completed ones that are in the future or today)
   const getUpcomingSessions = () => {
     if (!selectedStudent) return [];
     
     const futureSessions = selectedStudent.sessions
       .filter(session => {
         const sessionDate = parseISO(session.date);
-        // Show scheduled and cancelled sessions that are in the future
-        return (session.status === 'scheduled' || session.status === 'cancelled') && !isBefore(sessionDate, today);
+        // Show all sessions (scheduled, cancelled, completed) that are today or in the future
+        return !isBefore(sessionDate, today);
       })
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 6); // Show more to account for cancelled ones
+      .slice(0, 8); // Show more to account for various statuses
 
     return futureSessions.map(session => ({
       id: session.id,
@@ -146,6 +147,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
 
   const handleRestoreSession = (studentId: string, sessionId: string) => {
     onRestoreSession?.(studentId, sessionId);
+  };
+
+  const handleToggleComplete = (studentId: string, sessionId: string) => {
+    onToggleComplete?.(studentId, sessionId);
   };
 
   const handleReschedule = (studentId: string, sessionId: string, newDate: Date) => {
@@ -229,23 +234,21 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                           key={session.id}
                           className={cn(
                             "flex items-center justify-between p-2.5 rounded-lg text-xs border",
-                            session.status === 'cancelled' 
-                              ? "bg-destructive/5 border-destructive/20"
-                              : "bg-card"
+                            session.status === 'cancelled' && "bg-destructive/5 border-destructive/20",
+                            session.status === 'completed' && "bg-success/5 border-success/20",
+                            session.status === 'scheduled' && "bg-card"
                           )}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <div className={cn(
                               "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                              session.status === 'cancelled'
-                                ? "bg-destructive/20 text-destructive"
-                                : "bg-primary/20 text-primary"
+                              session.status === 'cancelled' && "bg-destructive/20 text-destructive",
+                              session.status === 'completed' && "bg-success/20 text-success",
+                              session.status === 'scheduled' && "bg-primary/20 text-primary"
                             )}>
-                              {session.status === 'cancelled' ? (
-                                <Ban className="h-3 w-3" />
-                              ) : (
-                                <Calendar className="h-3 w-3" />
-                              )}
+                              {session.status === 'cancelled' && <Ban className="h-3 w-3" />}
+                              {session.status === 'completed' && <Check className="h-3 w-3" />}
+                              {session.status === 'scheduled' && <Calendar className="h-3 w-3" />}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className={cn(
@@ -256,6 +259,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                               </p>
                               {session.status === 'cancelled' && (
                                 <span className="text-[10px] text-destructive">Cancelled</span>
+                              )}
+                              {session.status === 'completed' && (
+                                <span className="text-[10px] text-success">Completed</span>
                               )}
                             </div>
                           </div>
@@ -287,8 +293,30 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
+                            ) : session.status === 'completed' ? (
+                              /* Undo completion button */
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 px-2 text-warning hover:text-warning hover:bg-warning/10"
+                                onClick={() => handleToggleComplete(session.studentId, session.id)}
+                              >
+                                <X className="h-3.5 w-3.5 mr-1" />
+                                Undo
+                              </Button>
                             ) : (
+                              /* Actions for scheduled sessions */
                               <>
+                                {/* Mark Complete button */}
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 text-muted-foreground hover:text-success hover:bg-success/10"
+                                  onClick={() => handleToggleComplete(session.studentId, session.id)}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
