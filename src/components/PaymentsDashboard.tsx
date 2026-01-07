@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Student, StudentPayments, DAY_NAMES_SHORT } from '@/types/student';
 import { formatMonthYear } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
-import { format, subMonths, addMonths } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 
 interface PaymentsDashboardProps {
   students: Student[];
@@ -31,7 +30,6 @@ export const PaymentsDashboard = ({
   const now = new Date();
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [studentFilter, setStudentFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
   const [selectedYear, setSelectedYear] = useState(initialYear);
 
@@ -85,11 +83,6 @@ export const PaymentsDashboard = ({
 
   // Apply filters
   const filteredStudents = students.filter(student => {
-    // Search filter
-    if (searchQuery && !student.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    
     // Payment status filter
     const isPaid = getPaymentStatus(student.id);
     if (paymentFilter === 'paid' && !isPaid) return false;
@@ -196,37 +189,27 @@ export const PaymentsDashboard = ({
         </button>
       </div>
 
-      {/* Search and Student Filter */}
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          <Input
-            placeholder="Search by name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
-          />
-        </div>
-        <Select value={studentFilter} onValueChange={setStudentFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="All Students" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Students</SelectItem>
-            {students.map(student => (
-              <SelectItem key={student.id} value={student.id}>
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "w-2 h-2 rounded-full",
-                    getPaymentStatus(student.id) ? "bg-success" : "bg-warning"
-                  )} />
-                  <span>{student.name}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Student Filter Dropdown Only */}
+      <Select value={studentFilter} onValueChange={setStudentFilter}>
+        <SelectTrigger className="w-full">
+          <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+          <SelectValue placeholder="All Students" />
+        </SelectTrigger>
+        <SelectContent className="bg-popover z-50">
+          <SelectItem value="all">All Students</SelectItem>
+          {students.map(student => (
+            <SelectItem key={student.id} value={student.id}>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "w-2 h-2 rounded-full",
+                  getPaymentStatus(student.id) ? "bg-success" : "bg-warning"
+                )} />
+                <span>{student.name}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {/* Payment List */}
       <Card className="card-shadow">
