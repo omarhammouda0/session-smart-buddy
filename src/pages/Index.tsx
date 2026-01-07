@@ -139,27 +139,27 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background safe-bottom">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
-                <GraduationCap className="h-5 w-5 text-primary-foreground" />
+      <header className="bg-card border-b border-border sticky top-0 z-10 safe-top">
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl gradient-primary flex items-center justify-center shrink-0">
+                <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
               </div>
-              <div>
-                <h1 className="font-heading font-bold text-lg leading-tight">Student Tracker</h1>
-                <p className="text-xs text-muted-foreground">Sessions & Payments</p>
+              <div className="min-w-0">
+                <h1 className="font-heading font-bold text-base sm:text-lg leading-tight truncate">Student Tracker</h1>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block">Sessions & Payments</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* All Students Sheet */}
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" size="sm" className="h-9 px-2.5 sm:px-3 gap-1.5">
                     <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">Students</span>
+                    <span className="hidden sm:inline text-sm">Students</span>
                     <span className="bg-primary/10 text-primary text-xs px-1.5 rounded-full">{students.length}</span>
                   </Button>
                 </SheetTrigger>
@@ -238,15 +238,15 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-4 space-y-4">
+      <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-2 mb-4">
-            <TabsTrigger value="sessions" className="gap-2">
+          <TabsList className="w-full grid grid-cols-2 mb-3 sm:mb-4 h-11">
+            <TabsTrigger value="sessions" className="gap-1.5 text-sm">
               <BookOpen className="h-4 w-4" />
               Sessions
             </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2">
+            <TabsTrigger value="payments" className="gap-1.5 text-sm">
               <CreditCard className="h-4 w-4" />
               Payments
             </TabsTrigger>
@@ -258,50 +258,50 @@ const Index = () => {
             ) : (
               <>
                 {/* Date Navigation */}
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {/* Main date display */}
-                  <div className="flex items-center justify-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={goToPrevDay} className="h-8 w-8">
-                      <ChevronLeft className="h-4 w-4" />
+                  <div className="flex items-center justify-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={goToPrevDay} className="h-10 w-10">
+                      <ChevronLeft className="h-5 w-5" />
                     </Button>
-                    <div className="text-center min-w-[180px]">
-                      <p className="font-heading font-semibold text-lg">
+                    <div className="text-center min-w-[140px] sm:min-w-[180px]">
+                      <p className="font-heading font-semibold text-base sm:text-lg">
                         {format(selectedDateObj, 'EEEE')}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(selectedDateObj, 'MMMM d, yyyy')}
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        {format(selectedDateObj, 'MMM d, yyyy')}
                       </p>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-8 w-8">
-                      <ChevronRight className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
+                      <ChevronRight className="h-5 w-5" />
                     </Button>
                     {!isToday(selectedDateObj) && (
-                      <Button variant="outline" size="sm" onClick={goToToday} className="ml-2">
+                      <Button variant="outline" size="sm" onClick={goToToday} className="ml-1 h-9">
                         Today
                       </Button>
                     )}
                   </div>
 
                   {/* Week day quick navigation */}
-                  <div className="flex justify-center gap-1.5 overflow-x-auto pb-1">
+                  <div className="flex justify-start sm:justify-center gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
                     {weekDays.map(day => (
                       <button
                         key={day.date}
                         onClick={() => setSelectedDate(day.date)}
                         className={cn(
-                          "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[52px]",
+                          "flex flex-col items-center px-2.5 py-2 rounded-lg transition-all min-w-[48px] shrink-0",
                           selectedDate === day.date
                             ? "bg-primary text-primary-foreground shadow-md"
                             : day.isToday
-                              ? "bg-primary/10 border-2 border-primary/30 hover:bg-primary/20"
-                              : "bg-card border border-border hover:border-primary/50"
+                              ? "bg-primary/10 border-2 border-primary/30 active:bg-primary/20"
+                              : "bg-card border border-border active:border-primary/50"
                         )}
                       >
-                        <span className="text-xs font-medium">{day.dayName}</span>
-                        <span className="text-lg font-bold">{day.dayNum}</span>
+                        <span className="text-[11px] font-medium">{day.dayName}</span>
+                        <span className="text-base font-bold">{day.dayNum}</span>
                         {day.studentCount > 0 && (
                           <span className={cn(
-                            "text-[10px] px-1.5 rounded-full mt-0.5",
+                            "text-[9px] px-1.5 rounded-full mt-0.5",
                             selectedDate === day.date
                               ? "bg-primary-foreground/20"
                               : "bg-muted"
@@ -313,17 +313,17 @@ const Index = () => {
                     ))}
                   </div>
 
-                  {/* Filters row */}
-                  <div className="flex items-center gap-2">
+                  {/* Filters row - stacked on mobile */}
+                  <div className="space-y-2">
                     {/* Session type filter */}
-                    <div className="flex rounded-lg border border-border overflow-hidden">
+                    <div className="flex rounded-lg border border-border overflow-hidden w-full">
                       <button
                         onClick={() => setSessionTypeFilter('all')}
                         className={cn(
-                          "px-3 py-2 text-sm font-medium transition-colors",
+                          "flex-1 px-2 py-2.5 text-xs sm:text-sm font-medium transition-colors",
                           sessionTypeFilter === 'all'
                             ? "bg-primary text-primary-foreground"
-                            : "bg-card hover:bg-muted"
+                            : "bg-card active:bg-muted"
                         )}
                       >
                         All
@@ -331,94 +331,95 @@ const Index = () => {
                       <button
                         onClick={() => setSessionTypeFilter('onsite')}
                         className={cn(
-                          "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-border",
+                          "flex-1 flex items-center justify-center gap-1 px-2 py-2.5 text-xs sm:text-sm font-medium transition-colors border-l border-border",
                           sessionTypeFilter === 'onsite'
                             ? "bg-primary text-primary-foreground"
-                            : "bg-card hover:bg-muted"
+                            : "bg-card active:bg-muted"
                         )}
                       >
                         <MapPin className="h-3.5 w-3.5" />
-                        On-site
+                        <span className="hidden xs:inline">On-site</span>
+                        <span className="xs:hidden">Site</span>
                       </button>
                       <button
                         onClick={() => setSessionTypeFilter('online')}
                         className={cn(
-                          "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-border",
+                          "flex-1 flex items-center justify-center gap-1 px-2 py-2.5 text-xs sm:text-sm font-medium transition-colors border-l border-border",
                           sessionTypeFilter === 'online'
                             ? "bg-primary text-primary-foreground"
-                            : "bg-card hover:bg-muted"
+                            : "bg-card active:bg-muted"
                         )}
                       >
                         <Monitor className="h-3.5 w-3.5" />
                         Online
                       </button>
                     </div>
-                  </div>
 
-                  {/* Student filter dropdown */}
-                  <div className="flex items-center gap-2">
-                    <Select value={studentFilter} onValueChange={setStudentFilter}>
-                      <SelectTrigger className="w-full">
-                        <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <SelectValue placeholder="All Students" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover z-50">
-                        <SelectItem value="all">All Students</SelectItem>
-                        {students.map(student => (
-                          <SelectItem key={student.id} value={student.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{student.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                ({student.scheduleDays.map(d => DAY_NAMES_SHORT[d.dayOfWeek]).join(', ')})
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {studentFilter !== 'all' && (
-                      <Button variant="ghost" size="icon" onClick={() => setStudentFilter('all')} className="h-10 w-10 shrink-0">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+                    {/* Student filter dropdown */}
+                    <div className="flex items-center gap-2">
+                      <Select value={studentFilter} onValueChange={setStudentFilter}>
+                        <SelectTrigger className="w-full h-11">
+                          <Users className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
+                          <SelectValue placeholder="All Students" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50">
+                          <SelectItem value="all">All Students</SelectItem>
+                          {students.map(student => (
+                            <SelectItem key={student.id} value={student.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{student.name}</span>
+                                <span className="text-xs text-muted-foreground hidden sm:inline">
+                                  ({student.scheduleDays.map(d => DAY_NAMES_SHORT[d.dayOfWeek]).join(', ')})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {studentFilter !== 'all' && (
+                        <Button variant="ghost" size="icon" onClick={() => setStudentFilter('all')} className="h-11 w-11 shrink-0">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Stats for selected date */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-card rounded-xl p-3 card-shadow text-center">
-                    <p className="text-xl font-heading font-bold">{filteredStudents.length}</p>
-                    <p className="text-xs text-muted-foreground">Students Today</p>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="bg-card rounded-xl p-2.5 sm:p-3 card-shadow text-center">
+                    <p className="text-lg sm:text-xl font-heading font-bold">{filteredStudents.length}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Today</p>
                   </div>
-                  <div className="bg-success/10 rounded-xl p-3 card-shadow text-center">
-                    <p className="text-xl font-heading font-bold text-success">
+                  <div className="bg-success/10 rounded-xl p-2.5 sm:p-3 card-shadow text-center">
+                    <p className="text-lg sm:text-xl font-heading font-bold text-success">
                       {filteredStudents.reduce((count, s) => {
                         const session = s.sessions.find(sess => sess.date === selectedDate);
                         return count + (session?.completed ? 1 : 0);
                       }, 0)}
                     </p>
-                    <p className="text-xs text-success/80">Completed</p>
+                    <p className="text-[10px] sm:text-xs text-success/80">Done</p>
                   </div>
-                  <div className="bg-warning/10 rounded-xl p-3 card-shadow text-center">
-                    <p className="text-xl font-heading font-bold text-warning">
+                  <div className="bg-warning/10 rounded-xl p-2.5 sm:p-3 card-shadow text-center">
+                    <p className="text-lg sm:text-xl font-heading font-bold text-warning">
                       {filteredStudents.reduce((count, s) => {
                         const session = s.sessions.find(sess => sess.date === selectedDate);
                         return count + (session && !session.completed ? 1 : 0);
                       }, 0)}
                     </p>
-                    <p className="text-xs text-warning/80">Pending</p>
+                    <p className="text-[10px] sm:text-xs text-warning/80">Pending</p>
                   </div>
                 </div>
 
                 {/* Students for selected date */}
                 {filteredStudents.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-muted-foreground text-sm">
                     {studentFilter !== 'all'
-                      ? `${students.find(s => s.id === studentFilter)?.name} has no session on ${format(selectedDateObj, 'MMMM d')}`
-                      : `No sessions scheduled for ${format(selectedDateObj, 'MMMM d')}`}
+                      ? `${students.find(s => s.id === studentFilter)?.name} has no session on ${format(selectedDateObj, 'MMM d')}`
+                      : `No sessions scheduled for ${format(selectedDateObj, 'MMM d')}`}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:gap-4">
                     {filteredStudents.map(student => (
                       <StudentCard
                         key={student.id}
