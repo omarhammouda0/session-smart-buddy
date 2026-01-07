@@ -100,7 +100,6 @@ export const BulkEditSessionsDialog = ({
   const [dateFrom, setDateFrom] = useState<Date | undefined>(today);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
-  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [currentTimeFilter, setCurrentTimeFilter] = useState<string>('all');
   const [newTime, setNewTime] = useState<string>('');
 
@@ -124,10 +123,6 @@ export const BulkEditSessionsDialog = ({
         if (dateFrom && session.date < format(dateFrom, 'yyyy-MM-dd')) return;
         if (dateTo && session.date > format(dateTo, 'yyyy-MM-dd')) return;
 
-        // Filter by day of week
-        const sessionDate = parseISO(session.date);
-        if (!selectedDays.includes(sessionDate.getDay())) return;
-
         // Filter by current time (if specified)
         if (currentTimeFilter !== 'all' && student.sessionTime !== currentTimeFilter) return;
 
@@ -145,7 +140,7 @@ export const BulkEditSessionsDialog = ({
       if (dateCompare !== 0) return dateCompare;
       return (a.student.sessionTime || '16:00').localeCompare(b.student.sessionTime || '16:00');
     });
-  }, [students, selectedStudentId, dateFrom, dateTo, selectedDays, currentTimeFilter, newTime, today]);
+  }, [students, selectedStudentId, dateFrom, dateTo, currentTimeFilter, newTime, today]);
 
   // Get unique times from students for filter
   const uniqueTimes = useMemo(() => {
@@ -301,16 +296,9 @@ export const BulkEditSessionsDialog = ({
     setDateFrom(today);
     setDateTo(undefined);
     setSelectedStudentId('all');
-    setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
-    setCurrentTimeFilter('');
+    setCurrentTimeFilter('all');
     setNewTime('');
     setConflicts([]);
-  };
-
-  const toggleDay = (day: number) => {
-    setSelectedDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    );
   };
 
   return (
@@ -417,27 +405,6 @@ export const BulkEditSessionsDialog = ({
                 </Select>
               </div>
 
-              {/* Day Filter */}
-              <div className="space-y-2">
-                <Label>تصفية حسب اليوم</Label>
-                <div className="flex flex-wrap gap-2">
-                  {[0, 1, 2, 3, 4, 5, 6].map(day => (
-                    <button
-                      key={day}
-                      onClick={() => toggleDay(day)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg text-sm border transition-colors',
-                        selectedDays.includes(day)
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-card border-border hover:border-primary/50'
-                      )}
-                    >
-                      {DAY_NAMES_SHORT_AR[day]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Current Time Filter */}
               <div className="space-y-2">
                 <Label>الوقت الحالي (اختياري)</Label>
@@ -495,11 +462,14 @@ export const BulkEditSessionsDialog = ({
                               key={session.id}
                               className="flex items-center justify-between text-sm bg-card rounded p-2"
                             >
-                              <div>
+                              <div className="flex items-center gap-2">
                                 <span className="font-medium">{student.name}</span>
-                                <span className="text-muted-foreground mx-1">-</span>
+                                <span className="text-muted-foreground">-</span>
                                 <span className="text-muted-foreground">
                                   {formatShortDateAr(session.date)}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({formatTimeAr(student.sessionTime || '16:00')})
                                 </span>
                               </div>
                               {newTime && (
