@@ -8,10 +8,13 @@ export interface ScheduleDay {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
 }
 
+export type SessionType = 'online' | 'onsite';
+
 export interface Student {
   id: string;
   sessionTime: string; // HH:mm format like "16:30"
   name: string;
+  sessionType: SessionType; // online or on-site
   scheduleDays: ScheduleDay[]; // Which days of the week they have sessions
   semesterStart: string; // YYYY-MM-DD
   semesterEnd: string; // YYYY-MM-DD

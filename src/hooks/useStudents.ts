@@ -61,6 +61,7 @@ export const useStudents = () => {
     name: string,
     scheduleDays: number[],
     sessionTime: string = '16:00',
+    sessionType: 'online' | 'onsite' = 'onsite',
     customSemesterStart?: string,
     customSemesterEnd?: string
   ) => {
@@ -78,6 +79,7 @@ export const useStudents = () => {
       id: generateId(),
       name,
       sessionTime,
+      sessionType,
       scheduleDays: scheduleDays.map(d => ({ dayOfWeek: d })),
       semesterStart,
       semesterEnd,
