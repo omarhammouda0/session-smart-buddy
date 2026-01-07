@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Student, StudentPayments, AppSettings, Session } from '@/types/student';
+import { Student, StudentPayments, AppSettings, Session, SessionStatus } from '@/types/student';
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from '@/lib/dateUtils';
 
 const STUDENTS_KEY = 'teacher-students-v2';
@@ -73,6 +73,8 @@ export const useStudents = () => {
       id: generateId(),
       date,
       completed: false,
+      status: 'scheduled' as SessionStatus,
+      history: [{ status: 'scheduled' as SessionStatus, timestamp: new Date().toISOString() }],
     }));
 
     const newStudent: Student = {
@@ -140,11 +142,19 @@ export const useStudents = () => {
           s.sessions.map(sess => [sess.date, sess.completed])
         );
 
-        const newSessions: Session[] = sessionDates.map(date => ({
-          id: generateId(),
-          date,
-          completed: existingCompletions.get(date) || false,
-        }));
+        const newSessions: Session[] = sessionDates.map(date => {
+          const existing = s.sessions.find(sess => sess.date === date);
+          if (existing) {
+            return existing;
+          }
+          return {
+            id: generateId(),
+            date,
+            completed: false,
+            status: 'scheduled' as SessionStatus,
+            history: [{ status: 'scheduled' as SessionStatus, timestamp: new Date().toISOString() }],
+          };
+        });
 
         return {
           ...s,
@@ -198,6 +208,8 @@ export const useStudents = () => {
           id: generateId(),
           date,
           completed: false,
+          status: 'scheduled' as SessionStatus,
+          history: [{ status: 'scheduled' as SessionStatus, timestamp: new Date().toISOString() }],
         };
         
         // Insert in sorted order
@@ -214,7 +226,19 @@ export const useStudents = () => {
     setStudents(prev =>
       prev.map(s => {
         if (s.id !== studentId) return s;
-        return { ...s, sessions: s.sessions.filter(sess => sess.id !== sessionId) };
+        return {
+          ...s,
+          sessions: s.sessions.map(sess => {
+            if (sess.id !== sessionId) return sess;
+            const now = new Date().toISOString();
+            return {
+              ...sess,
+              status: 'cancelled' as SessionStatus,
+              cancelledAt: now,
+              history: [...(sess.history || []), { status: 'cancelled' as SessionStatus, timestamp: now }],
+            };
+          }),
+        };
       })
     );
   };
@@ -225,9 +249,19 @@ export const useStudents = () => {
         if (s.id !== studentId) return s;
         return {
           ...s,
-          sessions: s.sessions.map(sess =>
-            sess.id === sessionId ? { ...sess, completed: !sess.completed } : sess
-          ),
+          sessions: s.sessions.map(sess => {
+            if (sess.id !== sessionId) return sess;
+            const now = new Date().toISOString();
+            const newCompleted = !sess.completed;
+            const newStatus: SessionStatus = newCompleted ? 'completed' : 'scheduled';
+            return {
+              ...sess,
+              completed: newCompleted,
+              status: newStatus,
+              completedAt: newCompleted ? now : undefined,
+              history: [...(sess.history || []), { status: newStatus, timestamp: now }],
+            };
+          }),
         };
       })
     );

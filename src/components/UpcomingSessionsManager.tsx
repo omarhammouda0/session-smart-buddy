@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { format, addWeeks, startOfWeek, endOfWeek, eachDayOfInterval, parseISO, isSameDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users } from 'lucide-react';
+import { format, addWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check } from 'lucide-react';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,7 +47,13 @@ export const UpcomingSessionsManager = ({
   // Get sessions for a specific student on a specific date
   const getStudentSessionForDate = (student: Student, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return student.sessions.find(s => s.date === dateStr);
+    return student.sessions.find(s => s.date === dateStr && s.status !== 'cancelled');
+  };
+
+  // Get cancelled session for restore
+  const getCancelledSessionForDate = (student: Student, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return student.sessions.find(s => s.date === dateStr && s.status === 'cancelled');
   };
 
   // Check if the student normally has a session on this day of week
@@ -182,13 +188,14 @@ export const UpcomingSessionsManager = ({
                     ) : (
                       sortedStudents.map(student => {
                         const session = getStudentSessionForDate(student, day);
+                        const cancelledSession = getCancelledSessionForDate(student, day);
                         const scheduled = isScheduledDay(student, day);
                         const inSemester = isWithinSemester(student, day);
-                        const hasSession = !!session;
-                        const isCancelled = scheduled && inSemester && !hasSession;
+                        const hasActiveSession = !!session;
+                        const isCancelled = !!cancelledSession;
 
                         // Only show if relevant to this day
-                        if (!hasSession && !scheduled) return null;
+                        if (!hasActiveSession && !scheduled && !isCancelled) return null;
                         if (!inSemester) return null;
 
                         return (
@@ -196,17 +203,20 @@ export const UpcomingSessionsManager = ({
                             key={student.id}
                             className={cn(
                               "flex items-center justify-between gap-1 p-1.5 rounded text-xs",
-                              hasSession && !session?.completed && "bg-primary/10 border border-primary/20",
-                              hasSession && session?.completed && "bg-muted text-muted-foreground line-through",
+                              hasActiveSession && session?.status === 'completed' && "bg-success/10 border border-success/20 text-success",
+                              hasActiveSession && session?.status !== 'completed' && "bg-primary/10 border border-primary/20",
                               isCancelled && "bg-destructive/10 border border-destructive/20 text-destructive"
                             )}
                           >
                             <div className="truncate flex-1">
-                              <span className="font-medium truncate block">{student.name}</span>
+                              <span className={cn(
+                                "font-medium truncate block",
+                                session?.status === 'completed' && "line-through opacity-70"
+                              )}>{student.name}</span>
                               <span className="text-[10px] text-muted-foreground">{student.sessionTime}</span>
                             </div>
                             
-                            {/* Add session button (if cancelled/removed) */}
+                            {/* Re-add cancelled session */}
                             {isCancelled && (
                               <Button
                                 size="icon"
@@ -218,8 +228,8 @@ export const UpcomingSessionsManager = ({
                               </Button>
                             )}
 
-                            {/* Remove session button */}
-                            {hasSession && !session?.completed && (
+                            {/* Cancel session button */}
+                            {hasActiveSession && session?.status !== 'completed' && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
@@ -248,6 +258,11 @@ export const UpcomingSessionsManager = ({
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
+                            )}
+
+                            {/* Completed indicator */}
+                            {hasActiveSession && session?.status === 'completed' && (
+                              <Check className="h-3.5 w-3.5 text-success shrink-0" />
                             )}
                           </div>
                         );

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, CalendarDays } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, CalendarDays, History } from 'lucide-react';
 import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -9,6 +9,7 @@ import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { UpcomingSessionsManager } from '@/components/UpcomingSessionsManager';
+import { SessionHistorySheet } from '@/components/SessionHistorySheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -228,6 +229,7 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
               
+              <SessionHistorySheet students={students} />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
                 onAdd={addStudent}

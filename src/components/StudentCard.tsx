@@ -51,15 +51,21 @@ export const StudentCard = ({
   const [editTime, setEditTime] = useState(student.sessionTime || '16:00');
   const [showSettings, setShowSettings] = useState(false);
 
-  // Find today's session
-  const todaySession = student.sessions.find(s => s.date === selectedDate);
+  // Find today's session (exclude cancelled)
+  const todaySession = student.sessions.find(s => s.date === selectedDate && s.status !== 'cancelled');
   
-  // Get month sessions for progress
+  // Get month sessions for progress (exclude cancelled)
   const monthSessions = student.sessions.filter(s => {
+    if (s.status === 'cancelled') return false;
     const sessionDate = parseISO(s.date);
     return sessionDate.getMonth() === selectedMonth && sessionDate.getFullYear() === selectedYear;
   });
-  const completedCount = monthSessions.filter(s => s.completed).length;
+  const completedCount = monthSessions.filter(s => s.status === 'completed').length;
+  const cancelledCount = student.sessions.filter(s => {
+    if (s.status !== 'cancelled') return false;
+    const sessionDate = parseISO(s.date);
+    return sessionDate.getMonth() === selectedMonth && sessionDate.getFullYear() === selectedYear;
+  }).length;
   const totalSessions = monthSessions.length;
   const progress = totalSessions > 0 ? (completedCount / totalSessions) * 100 : 0;
 
@@ -95,7 +101,7 @@ export const StudentCard = ({
   return (
     <Card className={cn(
       "card-shadow transition-all duration-300 overflow-hidden",
-      todaySession?.completed && "ring-2 ring-success/50"
+      todaySession?.status === 'completed' && "ring-2 ring-success/50"
     )}>
       <CardHeader className="p-3 sm:pb-3">
         <div className="flex items-start justify-between gap-3">
@@ -184,7 +190,7 @@ export const StudentCard = ({
           onClick={handleToggleTodaySession}
           className={cn(
             "w-full p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-between",
-            todaySession?.completed
+            todaySession?.status === 'completed'
               ? "bg-success/10 border-success text-success"
               : "bg-card border-dashed border-muted-foreground/30 active:border-primary active:bg-primary/5"
           )}
@@ -192,18 +198,18 @@ export const StudentCard = ({
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className={cn(
               "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all shrink-0",
-              todaySession?.completed
+              todaySession?.status === 'completed'
                 ? "bg-success text-success-foreground"
                 : "border-2 border-muted-foreground/30"
             )}>
-              {todaySession?.completed && <Check className="h-4 w-4 sm:h-5 sm:w-5" />}
+              {todaySession?.status === 'completed' && <Check className="h-4 w-4 sm:h-5 sm:w-5" />}
             </div>
             <div className="text-left">
               <p className={cn(
                 "font-medium text-sm sm:text-base",
-                todaySession?.completed ? "text-success" : "text-foreground"
+                todaySession?.status === 'completed' ? "text-success" : "text-foreground"
               )}>
-                {todaySession?.completed ? 'Completed' : 'Mark Complete'}
+                {todaySession?.status === 'completed' ? 'Completed' : 'Mark Complete'}
               </p>
               <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {format(parseISO(selectedDate), 'EEE, MMM d')}
@@ -212,11 +218,11 @@ export const StudentCard = ({
           </div>
           <span className={cn(
             "text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full shrink-0",
-            todaySession?.completed 
+            todaySession?.status === 'completed' 
               ? "bg-success/20 text-success" 
               : "bg-muted text-muted-foreground"
           )}>
-            {todaySession?.completed ? 'Done' : 'Tap'}
+            {todaySession?.status === 'completed' ? 'Done' : 'Tap'}
           </span>
         </button>
 
@@ -224,7 +230,12 @@ export const StudentCard = ({
         <div>
           <div className="flex items-center justify-between text-sm mb-1">
             <span className="text-muted-foreground text-[10px] sm:text-xs">This Month</span>
-            <span className="font-semibold text-xs sm:text-sm">{completedCount}/{totalSessions}</span>
+            <div className="flex items-center gap-2">
+              {cancelledCount > 0 && (
+                <span className="text-[10px] text-destructive">-{cancelledCount}</span>
+              )}
+              <span className="font-semibold text-xs sm:text-sm">{completedCount}/{totalSessions}</span>
+            </div>
           </div>
           <div className="h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden">
             <div 
