@@ -239,7 +239,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                       Add Session
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
+                  <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
                     <CalendarPicker
                       mode="single"
                       selected={addSessionDate}
@@ -249,7 +249,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
                         }
                       }}
                       initialFocus
-                      className="pointer-events-auto"
+                      className="p-3 pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
