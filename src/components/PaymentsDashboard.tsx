@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History } from 'lucide-react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Student, StudentPayments } from '@/types/student';
@@ -11,7 +11,7 @@ import { formatMonthYearAr, DAY_NAMES_SHORT_AR, MONTH_NAMES_AR } from '@/lib/ara
 import { cn } from '@/lib/utils';
 import { subMonths } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-
+import { supabase } from '@/integrations/supabase/client';
 interface PaymentsDashboardProps {
   students: Student[];
   payments: StudentPayments[];
@@ -35,6 +35,8 @@ export const PaymentsDashboard = ({
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
   const [selectedYear, setSelectedYear] = useState(initialYear);
   const [selectedStudentHistory, setSelectedStudentHistory] = useState<string | null>(null);
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
+  const [confirmPaymentStudent, setConfirmPaymentStudent] = useState<Student | null>(null);
 
   const getPaymentStatus = (studentId: string, month?: number, year?: number): boolean => {
     const studentPayments = payments.find(p => p.studentId === studentId);
@@ -81,6 +83,35 @@ export const PaymentsDashboard = ({
     else setSelectedMonth(selectedMonth + 1);
   };
 
+  const sendWhatsAppReminder = async (student: Student) => {
+    if (!student.phone) {
+      toast({ title: "خطأ", description: "لا يوجد رقم هاتف لهذا الطالب", variant: "destructive" });
+      return;
+    }
+
+    setSendingReminder(student.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-whatsapp-reminder', {
+        body: {
+          studentName: student.name,
+          phoneNumber: student.phone,
+          month: MONTH_NAMES_AR[selectedMonth],
+          year: selectedYear,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({ title: "تم الإرسال", description: `تم إرسال تذكير WhatsApp إلى ${student.name}` });
+      setConfirmPaymentStudent(student);
+    } catch (error: any) {
+      console.error('WhatsApp error:', error);
+      toast({ title: "خطأ", description: error.message || "فشل إرسال الرسالة", variant: "destructive" });
+    } finally {
+      setSendingReminder(null);
+    }
+  };
+
   const sendPaymentReminder = () => {
     if (unpaidStudents.length === 0) {
       toast({ title: "الكل دفعوا!", description: "جميع الطلاب دفعوا لهذا الشهر." });
@@ -91,6 +122,14 @@ export const PaymentsDashboard = ({
       description: `${unpaidStudents.length} طالب لم يدفعوا لشهر ${formatMonthYearAr(selectedMonth, selectedYear)}: ${unpaidStudents.map(s => s.name).join('، ')}`,
       duration: 8000,
     });
+  };
+
+  const handleConfirmPayment = () => {
+    if (confirmPaymentStudent) {
+      onTogglePayment(confirmPaymentStudent.id, selectedMonth, selectedYear);
+      toast({ title: "تم التأكيد", description: `تم تسجيل دفع ${confirmPaymentStudent.name}` });
+      setConfirmPaymentStudent(null);
+    }
   };
 
   const filteredStudents = students.filter(student => {
@@ -175,6 +214,7 @@ export const PaymentsDashboard = ({
           ) : (
             filteredStudents.map(student => {
               const isPaid = getPaymentStatus(student.id);
+              const isSending = sendingReminder === student.id;
               return (
                 <div key={student.id} className={cn("flex items-center justify-between p-3 rounded-lg border transition-all", isPaid ? "bg-success/10 border-success/30" : "bg-card border-border")}>
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -190,15 +230,49 @@ export const PaymentsDashboard = ({
                       </div>
                     </div>
                   </div>
-                  <Button size="sm" variant={isPaid ? "outline" : "default"} className={cn(!isPaid && "gradient-accent")} onClick={() => onTogglePayment(student.id, selectedMonth, selectedYear)}>
-                    {isPaid ? 'إلغاء الدفع' : 'تسجيل دفع'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {!isPaid && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 border-green-500/50 text-green-600 hover:bg-green-500/10"
+                        onClick={() => sendWhatsAppReminder(student)}
+                        disabled={isSending}
+                      >
+                        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                        تذكير
+                      </Button>
+                    )}
+                    <Button size="sm" variant={isPaid ? "outline" : "default"} className={cn(!isPaid && "gradient-accent")} onClick={() => onTogglePayment(student.id, selectedMonth, selectedYear)}>
+                      {isPaid ? 'إلغاء الدفع' : 'تسجيل دفع'}
+                    </Button>
+                  </div>
                 </div>
               );
             })
           )}
         </CardContent>
       </Card>
+
+      {/* Payment Confirmation Dialog */}
+      <Dialog open={!!confirmPaymentStudent} onOpenChange={(open) => !open && setConfirmPaymentStudent(null)}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تأكيد الدفع</DialogTitle>
+            <DialogDescription>
+              هل تم استلام الدفع من {confirmPaymentStudent?.name} لشهر {formatMonthYearAr(selectedMonth, selectedYear)}؟
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <DialogClose asChild>
+              <Button variant="outline">لا، لاحقاً</Button>
+            </DialogClose>
+            <Button onClick={handleConfirmPayment} className="gradient-accent">
+              نعم، تم الدفع
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
