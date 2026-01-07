@@ -238,7 +238,7 @@ export const StudentCard = ({
                   {todaySession?.status === 'completed' ? 'Completed' : 'Mark Complete'}
                 </p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  {format(parseISO(selectedDate), 'EEE, MMM d')}
+                  {format(parseISO(selectedDate), 'EEEE')}
                 </p>
               </div>
             </div>
@@ -271,7 +271,7 @@ export const StudentCard = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel Session</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cancel {student.name}'s session on {format(parseISO(selectedDate), 'EEEE, MMM d')}? This will be tracked in the session history.
+                    Cancel {student.name}'s session on {format(parseISO(selectedDate), 'EEEE')}? This will be tracked in the session history.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -417,7 +417,7 @@ export const StudentCard = ({
                         ) : (
                           <X className="h-3 w-3" />
                         )}
-                        <span>{format(parseISO(session.date), 'EEE, MMM d')}</span>
+                        <span>{format(parseISO(session.date), 'EEEE')}</span>
                       </div>
                       <Badge variant="outline" className={cn(
                         "text-[10px]",
