@@ -161,7 +161,7 @@ export const PaymentsDashboard = ({
           )}
         >
           <p className="text-xl font-heading font-bold">{students.length}</p>
-          <p className="text-xs text-muted-foreground">All</p>
+          <p className="text-xs text-muted-foreground">Total Students</p>
         </button>
         <button
           onClick={() => setPaymentFilter('paid')}
@@ -173,7 +173,7 @@ export const PaymentsDashboard = ({
           )}
         >
           <p className="text-xl font-heading font-bold text-success">{paidCount}</p>
-          <p className="text-xs text-success/80">Paid</p>
+          <p className="text-xs text-success/80">Students Paid</p>
         </button>
         <button
           onClick={() => setPaymentFilter('unpaid')}
@@ -185,7 +185,7 @@ export const PaymentsDashboard = ({
           )}
         >
           <p className="text-xl font-heading font-bold text-warning">{unpaidCount}</p>
-          <p className="text-xs text-warning/80">Pending</p>
+          <p className="text-xs text-warning/80">Students Unpaid</p>
         </button>
       </div>
 
