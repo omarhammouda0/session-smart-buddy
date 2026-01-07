@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { Trash2, Edit2, Check, X, Calendar, Clock, Monitor, MapPin, Plus } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Calendar, Clock, Monitor, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-import { Student, DAY_NAMES_SHORT } from '@/types/student';
+import { Student } from '@/types/student';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR } from '@/lib/arabicConstants';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,13 +29,10 @@ interface StudentCardProps {
   onUpdateName: (name: string) => void;
   onUpdateTime: (time: string) => void;
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
-  onAddSession: (date: string) => void;
   onRemoveSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
   onToggleSession: (sessionId: string) => void;
 }
-
-const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const StudentCard = ({
   student,
@@ -47,7 +43,6 @@ export const StudentCard = ({
   onUpdateName,
   onUpdateTime,
   onUpdateSchedule,
-  onAddSession,
   onRemoveSession,
   onDeleteSession,
   onToggleSession,
@@ -72,15 +67,13 @@ export const StudentCard = ({
     }
   };
 
-
   // Stats for sessions on this day of week
   const completedOnDay = sessionsOnDay.filter(s => s.status === 'completed').length;
-  
 
   return (
     <Card className={cn(
       "card-shadow transition-all duration-300 overflow-hidden"
-    )}>
+    )} dir="rtl">
       <CardHeader className="p-3 sm:pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -92,7 +85,7 @@ export const StudentCard = ({
                     onChange={(e) => setEditName(e.target.value)}
                     className="h-10"
                     autoFocus
-                    placeholder="Student name"
+                    placeholder="اسم الطالب"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSaveName();
                       if (e.key === 'Escape') { setEditName(student.name); setEditTime(student.sessionTime || '16:00'); setIsEditing(false); }
@@ -135,9 +128,9 @@ export const StudentCard = ({
                       : "border-orange-500/30 text-orange-600 bg-orange-500/10"
                   )}>
                     {(student.sessionType || 'onsite') === 'online' ? (
-                      <><Monitor className="h-3 w-3" /> Online</>
+                      <><Monitor className="h-3 w-3" /> أونلاين</>
                     ) : (
-                      <><MapPin className="h-3 w-3" /> On-site</>
+                      <><MapPin className="h-3 w-3" /> حضوري</>
                     )}
                   </Badge>
                   {student.scheduleDays.map(d => (
@@ -147,7 +140,7 @@ export const StudentCard = ({
                         ? "bg-primary text-primary-foreground" 
                         : "bg-primary/10 text-primary"
                     )}>
-                      {DAY_NAMES_SHORT[d.dayOfWeek]}
+                      {DAY_NAMES_SHORT_AR[d.dayOfWeek]}
                     </span>
                   ))}
                 </div>
@@ -161,17 +154,17 @@ export const StudentCard = ({
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
+            <AlertDialogContent dir="rtl">
               <AlertDialogHeader>
-                <AlertDialogTitle>Remove Student</AlertDialogTitle>
+                <AlertDialogTitle>حذف الطالب</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to remove {student.name}? This will delete all their session records.
+                  هل أنت متأكد من حذف {student.name}؟ سيتم حذف جميع سجلات الحصص والمدفوعات.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogFooter className="flex-row-reverse gap-2">
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={onRemove} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Remove
+                  حذف
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -188,47 +181,20 @@ export const StudentCard = ({
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-primary/10 text-primary shrink-0">
                   <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <div className="text-left">
+                <div className="text-right">
                   <p className="font-medium text-sm sm:text-base text-foreground">
-                    {DAY_NAMES_FULL[selectedDayOfWeek]} Sessions
+                    حصص {DAY_NAMES_AR[selectedDayOfWeek]}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs px-2 py-1 rounded-full bg-success/10 text-success">
-                  {completedOnDay} done
+                  {completedOnDay} مكتملة
                 </span>
               </div>
             </div>
           </div>
         </div>
-
-
-        {/* Add Custom Session & Schedule settings */}
-        <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 px-3 text-xs gap-1.5 flex-1">
-                <Plus className="h-3.5 w-3.5" />
-                Add Session
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarPicker
-                mode="single"
-                selected={undefined}
-                onSelect={(date) => {
-                  if (date) {
-                    onAddSession(format(date, 'yyyy-MM-dd'));
-                  }
-                }}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
       </CardContent>
     </Card>
   );

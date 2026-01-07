@@ -38,18 +38,18 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
           <Settings className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" dir="rtl">
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl">Default Semester Settings</DialogTitle>
+          <DialogTitle className="font-heading text-xl">إعدادات الفصل الدراسي</DialogTitle>
         </DialogHeader>
         <div className="space-y-5 pt-4">
           <p className="text-sm text-muted-foreground">
-            Set the default semester period for new students. Existing students won't be affected.
+            حدد الفترة الافتراضية للفصل الدراسي للطلاب الجدد. الطلاب الحاليون لن يتأثروا.
           </p>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="start">Start Date</Label>
+              <Label htmlFor="start">تاريخ البداية</Label>
               <Input
                 id="start"
                 type="date"
@@ -58,7 +58,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="end">End Date</Label>
+              <Label htmlFor="end">تاريخ النهاية</Label>
               <Input
                 id="end"
                 type="date"
@@ -69,7 +69,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
           </div>
 
           <div className="space-y-2">
-            <Label>Quick Duration</Label>
+            <Label>مدة سريعة</Label>
             <div className="flex gap-2">
               {[3, 4, 6].map(m => (
                 <Button
@@ -79,7 +79,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
                   size="sm"
                   onClick={() => handleMonthsChange(m)}
                 >
-                  {m} months
+                  {m} أشهر
                 </Button>
               ))}
             </div>
@@ -87,10 +87,10 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
 
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
-              Cancel
+              إلغاء
             </Button>
             <Button onClick={handleSave} className="flex-1 gradient-primary">
-              Save Settings
+              حفظ الإعدادات
             </Button>
           </div>
         </div>

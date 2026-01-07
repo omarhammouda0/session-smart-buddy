@@ -24,19 +24,19 @@ export const StatsBar = ({ students, payments, selectedMonth, selectedYear }: St
 
   const statItems = [
     {
-      label: 'Total Students',
+      label: 'إجمالي الطلاب',
       value: totalStudents,
       icon: Users,
       color: 'text-primary bg-primary/10',
     },
     {
-      label: 'Students Paid',
+      label: 'دفعوا',
       value: paidCount,
       icon: CreditCard,
       color: 'text-success bg-success/10',
     },
     {
-      label: 'Students Unpaid',
+      label: 'لم يدفعوا',
       value: unpaidCount,
       icon: XCircle,
       color: 'text-warning bg-warning/10',
@@ -44,7 +44,7 @@ export const StatsBar = ({ students, payments, selectedMonth, selectedYear }: St
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-3 gap-3" dir="rtl">
       {statItems.map((stat, index) => (
         <div
           key={stat.label}

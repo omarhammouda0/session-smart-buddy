@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Student, StudentPayments } from '@/types/student';
-import { formatMonthYear } from '@/lib/dateUtils';
+import { formatMonthYearAr } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
 
 interface EndOfMonthReminderProps {
@@ -65,7 +65,7 @@ export const EndOfMonthReminder = ({
     if (!student.phone) return;
     
     const message = encodeURIComponent(
-      `مرحباً، هذا تذكير بخصوص دفع الأقساط لشهر ${formatMonthYear(currentMonth, currentYear)}. شكراً لك!`
+      `مرحباً، هذا تذكير بخصوص دفع الأقساط لشهر ${formatMonthYearAr(currentMonth, currentYear)}. شكراً لك!`
     );
     
     // Clean phone number (remove spaces and special chars except +)
@@ -101,30 +101,30 @@ export const EndOfMonthReminder = ({
 
       {/* Reminder Dialog */}
       <Dialog open={showReminder} onOpenChange={setShowReminder}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-warning">
               <Bell className="h-5 w-5" />
-              Payment Reminder - {formatMonthYear(currentMonth, currentYear)}
+              تذكير بالدفع - {formatMonthYearAr(currentMonth, currentYear)}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {isDay26
-                ? "It's the 26th! Time to send payment reminders to unpaid students."
-                : "End of month reminder: The following students haven't paid yet."}
+                ? "اليوم 26! حان وقت إرسال تذكيرات الدفع للطلاب."
+                : "تذكير نهاية الشهر: الطلاب التالية أسماؤهم لم يدفعوا بعد."}
             </p>
 
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Unpaid students:</span>
+              <span className="text-muted-foreground">طلاب لم يدفعوا:</span>
               <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
-                {unpaidStudents.length} of {students.length}
+                {unpaidStudents.length} من {students.length}
               </Badge>
             </div>
 
             <ScrollArea className="max-h-[300px]">
-              <div className="space-y-2 pr-2">
+              <div className="space-y-2 pl-2">
                 {unpaidStudents.map(student => (
                   <div
                     key={student.id}
@@ -155,8 +155,8 @@ export const EndOfMonthReminder = ({
                         className="h-8 gradient-primary"
                         onClick={() => handleConfirmPaid(student.id)}
                       >
-                        <Check className="h-4 w-4 mr-1" />
-                        Paid
+                        <Check className="h-4 w-4 ml-1" />
+                        دفع
                       </Button>
                     </div>
                   </div>
@@ -166,7 +166,7 @@ export const EndOfMonthReminder = ({
 
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1" onClick={handleDismiss}>
-                Dismiss
+                إغلاق
               </Button>
               {unpaidStudents.some(s => s.phone) && (
                 <Button
@@ -180,8 +180,8 @@ export const EndOfMonthReminder = ({
                     });
                   }}
                 >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Send All WhatsApp
+                  <MessageCircle className="h-4 w-4 ml-2" />
+                  إرسال للجميع
                 </Button>
               )}
             </div>
