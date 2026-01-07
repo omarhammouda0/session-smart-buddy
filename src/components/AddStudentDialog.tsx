@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserPlus, ChevronDown, ChevronUp, Clock } from 'lucide-react';
-import { DAY_NAMES } from '@/types/student';
+import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin } from 'lucide-react';
+import { DAY_NAMES, SessionType } from '@/types/student';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], sessionTime: string, customStart?: string, customEnd?: string) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, customStart?: string, customEnd?: string) => void;
   defaultStart: string;
   defaultEnd: string;
 }
@@ -19,6 +19,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
   const [name, setName] = useState('');
   const [selectedDays, setSelectedDays] = useState<number[]>([1]); // Monday by default
   const [sessionTime, setSessionTime] = useState('16:00');
+  const [sessionType, setSessionType] = useState<SessionType>('onsite');
   const [showCustomDates, setShowCustomDates] = useState(false);
   const [customStart, setCustomStart] = useState(defaultStart);
   const [customEnd, setCustomEnd] = useState(defaultEnd);
@@ -31,6 +32,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
         name.trim(),
         selectedDays,
         sessionTime,
+        sessionType,
         useCustom ? customStart : undefined,
         useCustom ? customEnd : undefined
       );
@@ -43,6 +45,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
     setName('');
     setSelectedDays([1]);
     setSessionTime('16:00');
+    setSessionType('onsite');
     setShowCustomDates(false);
     setCustomStart(defaultStart);
     setCustomEnd(defaultEnd);
@@ -90,6 +93,39 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
                 value={sessionTime}
                 onChange={(e) => setSessionTime(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Session Type</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSessionType('onsite')}
+                  className={`
+                    flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border transition-all
+                    ${sessionType === 'onsite'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card border-border hover:border-primary/50'
+                    }
+                  `}
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span className="text-sm">On-site</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSessionType('online')}
+                  className={`
+                    flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border transition-all
+                    ${sessionType === 'online'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card border-border hover:border-primary/50'
+                    }
+                  `}
+                >
+                  <Monitor className="h-3.5 w-3.5" />
+                  <span className="text-sm">Online</span>
+                </button>
+              </div>
             </div>
           </div>
 

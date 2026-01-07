@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin } from 'lucide-react';
 import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DAY_NAMES_SHORT } from '@/types/student';
+import { DAY_NAMES_SHORT, SessionType } from '@/types/student';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -38,6 +38,7 @@ const Index = () => {
   const [selectedDate, setSelectedDate] = useState(format(now, 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('sessions');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  const [sessionTypeFilter, setSessionTypeFilter] = useState<'all' | SessionType>('all');
 
   const {
     students,
@@ -74,15 +75,15 @@ const Index = () => {
 
   const studentsForDate = getStudentsForDate();
 
-  // Filter by selected student and sort by session time (ascending)
-  const filteredStudents = (studentFilter === 'all' 
-    ? studentsForDate 
-    : studentsForDate.filter(s => s.id === studentFilter)
-  ).sort((a, b) => {
-    const timeA = a.sessionTime || '16:00';
-    const timeB = b.sessionTime || '16:00';
-    return timeA.localeCompare(timeB);
-  });
+  // Filter by selected student, session type, and sort by session time (ascending)
+  const filteredStudents = studentsForDate
+    .filter(s => studentFilter === 'all' || s.id === studentFilter)
+    .filter(s => sessionTypeFilter === 'all' || (s.sessionType || 'onsite') === sessionTypeFilter)
+    .sort((a, b) => {
+      const timeA = a.sessionTime || '16:00';
+      const timeB = b.sessionTime || '16:00';
+      return timeA.localeCompare(timeB);
+    });
 
   // Navigation functions
   const goToPrevDay = () => {
@@ -181,6 +182,14 @@ const Index = () => {
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
                                 {student.sessionTime || '16:00'}
+                              </span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                {(student.sessionType || 'onsite') === 'online' ? (
+                                  <><Monitor className="h-3 w-3" /> Online</>
+                                ) : (
+                                  <><MapPin className="h-3 w-3" /> On-site</>
+                                )}
                               </span>
                               <span>•</span>
                               <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT[d.dayOfWeek]).join(', ')}</span>
@@ -302,6 +311,48 @@ const Index = () => {
                         )}
                       </button>
                     ))}
+                  </div>
+
+                  {/* Filters row */}
+                  <div className="flex items-center gap-2">
+                    {/* Session type filter */}
+                    <div className="flex rounded-lg border border-border overflow-hidden">
+                      <button
+                        onClick={() => setSessionTypeFilter('all')}
+                        className={cn(
+                          "px-3 py-2 text-sm font-medium transition-colors",
+                          sessionTypeFilter === 'all'
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card hover:bg-muted"
+                        )}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setSessionTypeFilter('onsite')}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-border",
+                          sessionTypeFilter === 'onsite'
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card hover:bg-muted"
+                        )}
+                      >
+                        <MapPin className="h-3.5 w-3.5" />
+                        On-site
+                      </button>
+                      <button
+                        onClick={() => setSessionTypeFilter('online')}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-border",
+                          sessionTypeFilter === 'online'
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card hover:bg-muted"
+                        )}
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                        Online
+                      </button>
+                    </div>
                   </div>
 
                   {/* Student filter dropdown */}
