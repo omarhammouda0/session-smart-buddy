@@ -243,6 +243,38 @@ export const useStudents = () => {
     );
   };
 
+  const rescheduleSession = (studentId: string, sessionId: string, newDate: string) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== studentId) return s;
+        
+        // Check if new date already has a session
+        const existingSession = s.sessions.find(sess => sess.date === newDate);
+        if (existingSession) return s;
+        
+        const now = new Date().toISOString();
+        const updatedSessions = s.sessions.map(sess => {
+          if (sess.id !== sessionId) return sess;
+          return {
+            ...sess,
+            date: newDate,
+            history: [...(sess.history || []), { 
+              status: 'scheduled' as SessionStatus, 
+              timestamp: now,
+              note: `Rescheduled from ${sess.date}`
+            }],
+          };
+        });
+        
+        // Sort sessions by date
+        return { 
+          ...s, 
+          sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)) 
+        };
+      })
+    );
+  };
+
   const toggleSessionComplete = (studentId: string, sessionId: string) => {
     setStudents(prev =>
       prev.map(s => {
@@ -310,6 +342,7 @@ export const useStudents = () => {
     updateStudentSchedule,
     addExtraSession,
     removeSession,
+    rescheduleSession,
     toggleSessionComplete,
     togglePaymentStatus,
     getStudentPayments,
