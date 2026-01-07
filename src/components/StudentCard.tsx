@@ -1,11 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock, Monitor, MapPin, History, Ban, Plus } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Calendar, Clock, Monitor, MapPin, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
@@ -57,8 +55,6 @@ export const StudentCard = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(student.name);
   const [editTime, setEditTime] = useState(student.sessionTime || '16:00');
-  const [showSettings, setShowSettings] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
 
   // Sessions on the selected day of week (all instances)
   const sessionsOnDay = student.sessions.filter(s => {
@@ -286,109 +282,6 @@ export const StudentCard = ({
           </Popover>
         </div>
 
-        {/* Schedule settings collapsible */}
-        <Collapsible open={showSettings} onOpenChange={setShowSettings}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground h-9">
-              Schedule settings
-              {showSettings ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2 space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {DAY_NAMES_SHORT.map((day, index) => (
-                <button
-                  key={day}
-                  onClick={() => toggleScheduleDay(index)}
-                  className={cn(
-                    "px-2.5 py-1.5 rounded text-xs font-medium transition-all min-w-[40px]",
-                    student.scheduleDays.some(d => d.dayOfWeek === index)
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground active:bg-muted/80"
-                  )}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {student.semesterStart} → {student.semesterEnd}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Session History collapsible */}
-        <Collapsible open={showHistory} onOpenChange={setShowHistory}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground h-9">
-              <span className="flex items-center gap-1.5">
-                <History className="h-3 w-3" />
-                Session History
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-success">{allTimeCompleted} ✓</span>
-                <span className="text-destructive">{allTimeCancelled} ✗</span>
-                {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </div>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <div className="text-center p-2 rounded-lg bg-muted">
-                <p className="text-sm font-bold">{allTimeTotal}</p>
-                <p className="text-[10px] text-muted-foreground">Total</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-success/10">
-                <p className="text-sm font-bold text-success">{allTimeCompleted}</p>
-                <p className="text-[10px] text-success/80">Completed</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-destructive/10">
-                <p className="text-sm font-bold text-destructive">{allTimeCancelled}</p>
-                <p className="text-[10px] text-destructive/80">Cancelled</p>
-              </div>
-            </div>
-
-            {/* Session list */}
-            <ScrollArea className="h-[200px]">
-              <div className="space-y-1.5 pr-2">
-                {student.sessions
-                  .filter(s => s.status !== 'scheduled')
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .map(session => (
-                    <div
-                      key={session.id}
-                      className={cn(
-                        "flex items-center justify-between p-2 rounded text-xs",
-                        session.status === 'completed' && "bg-success/10 text-success",
-                        session.status === 'cancelled' && "bg-destructive/10 text-destructive"
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        {session.status === 'completed' ? (
-                          <Check className="h-3 w-3" />
-                        ) : (
-                          <X className="h-3 w-3" />
-                        )}
-                        <span>{format(parseISO(session.date), 'EEE, MMM d')}</span>
-                      </div>
-                      <Badge variant="outline" className={cn(
-                        "text-[10px]",
-                        session.status === 'completed' && "border-success/30",
-                        session.status === 'cancelled' && "border-destructive/30"
-                      )}>
-                        {session.status}
-                      </Badge>
-                    </div>
-                  ))}
-                {student.sessions.filter(s => s.status !== 'scheduled').length === 0 && (
-                  <p className="text-center text-muted-foreground py-4 text-xs">No session history yet</p>
-                )}
-              </div>
-            </ScrollArea>
-          </CollapsibleContent>
-        </Collapsible>
       </CardContent>
     </Card>
   );
