@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, CalendarDays } from 'lucide-react';
 import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -8,6 +8,7 @@ import { StudentCard } from '@/components/StudentCard';
 import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
+import { UpcomingSessionsManager } from '@/components/UpcomingSessionsManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -38,6 +39,7 @@ const Index = () => {
   const [selectedDate, setSelectedDate] = useState(format(now, 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('sessions');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  const [showSessionManager, setShowSessionManager] = useState(false);
   const [sessionTypeFilter, setSessionTypeFilter] = useState<'all' | SessionType>('all');
 
   const {
@@ -257,6 +259,25 @@ const Index = () => {
               <EmptyState />
             ) : (
               <>
+                {/* Toggle for Session Manager */}
+                <Button
+                  variant={showSessionManager ? "default" : "outline"}
+                  size="sm"
+                  className="w-full h-10 gap-2"
+                  onClick={() => setShowSessionManager(!showSessionManager)}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  {showSessionManager ? "Hide" : "Manage"} Upcoming Sessions
+                </Button>
+
+                {/* Upcoming Sessions Manager */}
+                {showSessionManager && (
+                  <UpcomingSessionsManager
+                    students={students}
+                    onAddSession={addExtraSession}
+                    onRemoveSession={removeSession}
+                  />
+                )}
                 {/* Date Navigation */}
                 <div className="space-y-2.5">
                   {/* Main date display */}
