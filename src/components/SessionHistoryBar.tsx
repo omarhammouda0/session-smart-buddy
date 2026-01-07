@@ -293,7 +293,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                 "font-medium truncate",
                                 session.status === 'cancelled' && "line-through text-muted-foreground"
                               )}>
-                                {format(parseISO(session.date), 'EEEE')}
+                                {format(parseISO(session.date), 'EEE, MMM d')}
                               </p>
                               {session.status === 'cancelled' && (
                                 <span className="text-[10px] text-destructive">Cancelled</span>
@@ -318,7 +318,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Restore Session</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Restore the cancelled session on {format(parseISO(session.date), 'EEEE')}? It will be marked as scheduled again.
+                                        Restore the cancelled session on {format(parseISO(session.date), 'EEE, MMM d')}? It will be marked as scheduled again.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -413,7 +413,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Cancel Session</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Are you sure you want to cancel the session on {format(parseISO(session.date), 'EEEE')}?
+                                        Are you sure you want to cancel the session on {format(parseISO(session.date), 'EEE, MMM d')}?
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -439,7 +439,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Delete Session</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Permanently delete this session on {format(parseISO(session.date), 'EEEE')}? This cannot be undone.
+                                        Permanently delete this session on {format(parseISO(session.date), 'EEE, MMM d')}? This cannot be undone.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -555,7 +555,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium truncate">
-                                {format(parseISO(session.date), 'EEEE')}
+                                {format(parseISO(session.date), 'EEE, MMM d')}
                               </p>
                             </div>
                           </div>
