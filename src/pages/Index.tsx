@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History } from 'lucide-react';
-import { format, addDays, parseISO, isToday } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
@@ -13,8 +13,7 @@ import { SessionHistoryBar } from '@/components/SessionHistoryBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DAY_NAMES_SHORT } from '@/types/student';
+import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -41,8 +40,6 @@ const Index = () => {
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
   const [activeTab, setActiveTab] = useState('sessions');
   const [studentFilter, setStudentFilter] = useState<string>('all');
-  const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  
 
   const {
     students,
@@ -69,16 +66,16 @@ const Index = () => {
     const student = students.find(s => s.id === studentId);
     addExtraSession(studentId, date);
     toast({
-      title: "Session Added",
-      description: `New session on ${format(parseISO(date), 'EEE, MMM d')}${student ? ` for ${student.name}` : ''}`,
+      title: "تمت إضافة الحصة",
+      description: `حصة جديدة بتاريخ ${format(parseISO(date), 'dd/MM/yyyy')}${student ? ` لـ ${student.name}` : ''}`,
     });
   };
 
   const handleCancelSession = (studentId: string, sessionId: string) => {
     removeSession(studentId, sessionId);
     toast({
-      title: "Session Cancelled",
-      description: "The session has been cancelled",
+      title: "تم إلغاء الحصة",
+      description: "تم إلغاء الحصة بنجاح",
       variant: "destructive",
     });
   };
@@ -86,16 +83,16 @@ const Index = () => {
   const handleDeleteSession = (studentId: string, sessionId: string) => {
     deleteSession(studentId, sessionId);
     toast({
-      title: "Session Deleted",
-      description: "The session has been permanently removed",
+      title: "تم حذف الحصة",
+      description: "تم حذف الحصة نهائياً",
     });
   };
 
   const handleRestoreSession = (studentId: string, sessionId: string) => {
     restoreSession(studentId, sessionId);
     toast({
-      title: "Session Restored",
-      description: "The session has been restored to scheduled",
+      title: "تم استعادة الحصة",
+      description: "تم استعادة الحصة إلى مجدولة",
     });
   };
 
@@ -105,8 +102,8 @@ const Index = () => {
     const wasCompleted = session?.status === 'completed';
     toggleSessionComplete(studentId, sessionId);
     toast({
-      title: wasCompleted ? "Session Unmarked" : "Session Completed",
-      description: wasCompleted ? "Session marked as scheduled" : "Great job! Session marked as complete",
+      title: wasCompleted ? "تم إلغاء الإكمال" : "تم إكمال الحصة",
+      description: wasCompleted ? "تم إرجاع الحصة إلى مجدولة" : "أحسنت! تم تسجيل الحصة كمكتملة",
     });
   };
 
@@ -160,7 +157,7 @@ const Index = () => {
       
       days.push({
         dayOfWeek: i,
-        dayName: DAY_NAMES_SHORT[i],
+        dayName: DAY_NAMES_SHORT_AR[i],
         isToday: now.getDay() === i,
         studentCount: studentsOnDay.length,
         hasSelectedStudent: selectedStudentHasSession,
@@ -181,13 +178,13 @@ const Index = () => {
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+        <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background safe-bottom">
+    <div className="min-h-screen bg-background safe-bottom" dir="rtl">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-10 safe-top">
         <div className="px-3 py-2.5 sm:px-4 sm:py-3">
@@ -197,8 +194,8 @@ const Index = () => {
                 <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-heading font-bold text-base sm:text-lg leading-tight truncate">Student Tracker</h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block">Sessions & Payments</p>
+                <h1 className="font-heading font-bold text-base sm:text-lg leading-tight truncate">متابعة الطلاب</h1>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block">الحصص والمدفوعات</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -207,17 +204,17 @@ const Index = () => {
                 <SheetTrigger asChild>
                   <Button variant="outline" size="sm" className="h-9 px-2.5 sm:px-3 gap-1.5">
                     <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline text-sm">Students</span>
+                    <span className="hidden sm:inline text-sm">الطلاب</span>
                     <span className="bg-primary/10 text-primary text-xs px-1.5 rounded-full">{students.length}</span>
                   </Button>
                 </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-md">
+                <SheetContent className="w-full sm:max-w-md" side="left">
                   <SheetHeader>
-                    <SheetTitle className="font-heading">All Students ({students.length})</SheetTitle>
+                    <SheetTitle className="font-heading text-right">جميع الطلاب ({students.length})</SheetTitle>
                   </SheetHeader>
-                  <div className="mt-4 space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto">
+                  <div className="mt-4 space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto" dir="rtl">
                     {allStudentsSortedByTime.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">No students added yet</p>
+                      <p className="text-center text-muted-foreground py-8">لا يوجد طلاب حتى الآن</p>
                     ) : (
                       allStudentsSortedByTime.map(student => (
                         <div
@@ -234,13 +231,13 @@ const Index = () => {
                               <span>•</span>
                               <span className="flex items-center gap-1">
                                 {(student.sessionType || 'onsite') === 'online' ? (
-                                  <><Monitor className="h-3 w-3" /> Online</>
+                                  <><Monitor className="h-3 w-3" /> أونلاين</>
                                 ) : (
-                                  <><MapPin className="h-3 w-3" /> On-site</>
+                                  <><MapPin className="h-3 w-3" /> حضوري</>
                                 )}
                               </span>
                               <span>•</span>
-                              <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT[d.dayOfWeek]).join(', ')}</span>
+                              <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join('، ')}</span>
                             </div>
                           </div>
                           <AlertDialog>
@@ -249,20 +246,20 @@ const Index = () => {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent dir="rtl">
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Remove Student</AlertDialogTitle>
+                                <AlertDialogTitle>حذف الطالب</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to remove {student.name}? This will delete all their session and payment records.
+                                  هل أنت متأكد من حذف {student.name}؟ سيتم حذف جميع سجلات الحصص والمدفوعات.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogFooter className="flex-row-reverse gap-2">
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
                                 <AlertDialogAction 
                                   onClick={() => removeStudent(student.id)} 
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
-                                  Remove
+                                  حذف
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -292,15 +289,15 @@ const Index = () => {
           <TabsList className="w-full grid grid-cols-3 mb-3 sm:mb-4 h-11">
             <TabsTrigger value="sessions" className="gap-1.5 text-sm">
               <BookOpen className="h-4 w-4" />
-              <span className="hidden xs:inline">Sessions</span>
+              <span className="hidden xs:inline">الحصص</span>
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-1.5 text-sm">
               <History className="h-4 w-4" />
-              <span className="hidden xs:inline">History</span>
+              <span className="hidden xs:inline">السجل</span>
             </TabsTrigger>
             <TabsTrigger value="payments" className="gap-1.5 text-sm">
               <CreditCard className="h-4 w-4" />
-              <span className="hidden xs:inline">Payments</span>
+              <span className="hidden xs:inline">المدفوعات</span>
             </TabsTrigger>
           </TabsList>
 
@@ -313,20 +310,20 @@ const Index = () => {
                 <div className="space-y-2.5">
                   {/* Main date display */}
                   <div className="flex items-center justify-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={goToPrevDay} className="h-10 w-10">
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <div className="text-center min-w-[140px] sm:min-w-[180px]">
-                      <p className="font-heading font-semibold text-lg sm:text-xl">
-                        {DAY_NAMES_FULL[selectedDayOfWeek]}
-                      </p>
-                    </div>
                     <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
                       <ChevronRight className="h-5 w-5" />
                     </Button>
+                    <div className="text-center min-w-[140px] sm:min-w-[180px]">
+                      <p className="font-heading font-semibold text-lg sm:text-xl">
+                        {DAY_NAMES_AR[selectedDayOfWeek]}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={goToPrevDay} className="h-10 w-10">
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
                     {selectedDayOfWeek !== now.getDay() && (
-                      <Button variant="outline" size="sm" onClick={goToToday} className="ml-1 h-9">
-                        Today
+                      <Button variant="outline" size="sm" onClick={goToToday} className="mr-1 h-9">
+                        اليوم
                       </Button>
                     )}
                   </div>
@@ -352,7 +349,7 @@ const Index = () => {
                         )}
                       >
                         {day.hasSelectedStudent && selectedDayOfWeek !== day.dayOfWeek && (
-                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary rounded-full" />
+                          <span className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-primary rounded-full" />
                         )}
                         <span className="text-sm font-semibold">{day.dayName}</span>
                         {day.studentCount > 0 && (
@@ -382,17 +379,17 @@ const Index = () => {
                         }
                       }}>
                         <SelectTrigger className="w-full h-11">
-                          <Users className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
-                          <SelectValue placeholder="All Students" />
+                          <Users className="h-4 w-4 ml-2 text-muted-foreground shrink-0" />
+                          <SelectValue placeholder="جميع الطلاب" />
                         </SelectTrigger>
                         <SelectContent className="bg-popover z-50">
-                          <SelectItem value="all">All Students</SelectItem>
+                          <SelectItem value="all">جميع الطلاب</SelectItem>
                           {students.map(student => (
                             <SelectItem key={student.id} value={student.id}>
                               <div className="flex items-center gap-2">
                                 <span>{student.name}</span>
                                 <span className="text-xs text-muted-foreground hidden sm:inline">
-                                  ({student.scheduleDays.map(d => DAY_NAMES_SHORT[d.dayOfWeek]).join(', ')})
+                                  ({student.scheduleDays.map(d => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join('، ')})
                                 </span>
                               </div>
                             </SelectItem>
@@ -400,43 +397,30 @@ const Index = () => {
                         </SelectContent>
                       </Select>
                       {studentFilter !== 'all' && (
-                        <Button variant="ghost" size="icon" onClick={() => setStudentFilter('all')} className="h-11 w-11 shrink-0">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-11 w-11 shrink-0" 
+                          onClick={() => setStudentFilter('all')}
+                        >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
                   </div>
                 </div>
 
-                {/* Stats for selected day */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                  <div className="bg-card rounded-xl p-2.5 sm:p-3 card-shadow text-center">
-                    <p className="text-lg sm:text-xl font-heading font-bold">{filteredStudents.length}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Students</p>
-                  </div>
-                  <div className="bg-success/10 rounded-xl p-2.5 sm:p-3 card-shadow text-center">
-                    <p className="text-lg sm:text-xl font-heading font-bold text-success">
-                      {filteredStudents.reduce((count, s) => {
-                        return count + s.sessions.filter(sess => sess.status === 'completed').length;
-                      }, 0)}
-                    </p>
-                    <p className="text-[10px] sm:text-xs text-success/80">Completed</p>
-                  </div>
-                  <div className="bg-warning/10 rounded-xl p-2.5 sm:p-3 card-shadow text-center">
-                    <p className="text-lg sm:text-xl font-heading font-bold text-warning">
-                      {filteredStudents.reduce((count, s) => {
-                        return count + s.sessions.filter(sess => sess.status === 'scheduled').length;
-                      }, 0)}
-                    </p>
-                    <p className="text-[10px] sm:text-xs text-warning/80">Scheduled</p>
-                  </div>
-                </div>
-
-                {/* Students for selected day */}
+                {/* Students List */}
                 {filteredStudents.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    {studentFilter !== 'all'
-                      ? `${students.find(s => s.id === studentFilter)?.name} has no session on ${DAY_NAMES_FULL[selectedDayOfWeek]}`
-                      : `No sessions scheduled for ${DAY_NAMES_FULL[selectedDayOfWeek]}`}
+                  <div className="text-center py-12 animate-fade-in">
+                    <p className="text-muted-foreground">
+                      {studentFilter !== 'all' 
+                        ? `لا توجد حصص لهذا الطالب يوم ${DAY_NAMES_AR[selectedDayOfWeek]}`
+                        : `لا توجد حصص مجدولة ليوم ${DAY_NAMES_AR[selectedDayOfWeek]}`
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      اضغط على أيام أخرى لعرض الحصص
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:gap-4">
@@ -451,7 +435,6 @@ const Index = () => {
                         onUpdateName={(name) => updateStudentName(student.id, name)}
                         onUpdateTime={(time) => updateStudentTime(student.id, time)}
                         onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                        onAddSession={(date) => handleAddSession(student.id, date)}
                         onRemoveSession={(sessionId) => handleCancelSession(student.id, sessionId)}
                         onDeleteSession={(sessionId) => handleDeleteSession(student.id, sessionId)}
                         onToggleSession={(sessionId) => handleToggleComplete(student.id, sessionId)}

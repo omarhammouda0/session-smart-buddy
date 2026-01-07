@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone } from 'lucide-react';
-import { DAY_NAMES, SessionType } from '@/types/student';
+import { SessionType } from '@/types/student';
+import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface AddStudentDialogProps {
@@ -65,36 +66,36 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
       <DialogTrigger asChild>
         <Button className="gradient-primary gap-2 shadow-lg hover:shadow-xl transition-shadow">
           <UserPlus className="h-4 w-4" />
-          Add Student
+          إضافة طالب
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" dir="rtl">
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl">Add New Student</DialogTitle>
+          <DialogTitle className="font-heading text-xl">إضافة طالب جديد</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Student Name</Label>
+              <Label htmlFor="name">اسم الطالب</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter student name"
+                placeholder="أدخل اسم الطالب"
                 autoFocus
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-1.5">
                 <Phone className="h-3.5 w-3.5" />
-                WhatsApp Number
+                رقم الواتساب
               </Label>
               <Input
                 id="phone"
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1234567890"
+                placeholder="+966xxxxxxxxx"
               />
             </div>
           </div>
@@ -103,7 +104,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
             <div className="space-y-2">
               <Label htmlFor="time" className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" />
-                Session Time
+                وقت الحصة
               </Label>
               <Input
                 id="time"
@@ -113,7 +114,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
               />
             </div>
             <div className="space-y-2">
-              <Label>Session Type</Label>
+              <Label>نوع الحصة</Label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -127,7 +128,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
                   `}
                 >
                   <MapPin className="h-3.5 w-3.5" />
-                  <span className="text-sm">On-site</span>
+                  <span className="text-sm">حضوري</span>
                 </button>
                 <button
                   type="button"
@@ -141,16 +142,17 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
                   `}
                 >
                   <Monitor className="h-3.5 w-3.5" />
-                  <span className="text-sm">Online</span>
+                  <span className="text-sm">أونلاين</span>
                 </button>
               </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <Label>Session Days (Weekly)</Label>
+            <Label>أيام الحصص الأسبوعية</Label>
+            <p className="text-xs text-muted-foreground">اختر الأيام التي يحضر فيها الطالب أسبوعياً</p>
             <div className="flex flex-wrap gap-2">
-              {DAY_NAMES.map((day, index) => (
+              {DAY_NAMES_AR.map((day, index) => (
                 <label
                   key={day}
                   className={`
@@ -166,7 +168,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
                     onCheckedChange={() => toggleDay(index)}
                     className="sr-only"
                   />
-                  <span className="text-sm font-medium">{day.slice(0, 3)}</span>
+                  <span className="text-sm font-medium">{day}</span>
                 </label>
               ))}
             </div>
@@ -175,14 +177,15 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
           <Collapsible open={showCustomDates} onOpenChange={setShowCustomDates}>
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" className="w-full justify-between text-muted-foreground">
-                Custom semester dates
+                تواريخ الفصل الدراسي (اختياري)
                 {showCustomDates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-3 pt-2">
+              <p className="text-xs text-muted-foreground">حدد بداية ونهاية الفصل الدراسي للطالب</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="customStart">Start Date</Label>
+                  <Label htmlFor="customStart">تاريخ البداية</Label>
                   <Input
                     id="customStart"
                     type="date"
@@ -191,7 +194,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="customEnd">End Date</Label>
+                  <Label htmlFor="customEnd">تاريخ النهاية</Label>
                   <Input
                     id="customEnd"
                     type="date"
@@ -205,14 +208,14 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
 
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
-              Cancel
+              إلغاء
             </Button>
             <Button 
               type="submit" 
               className="flex-1 gradient-primary"
               disabled={!name.trim() || selectedDays.length === 0}
             >
-              Add Student
+              إضافة الطالب
             </Button>
           </div>
         </form>
