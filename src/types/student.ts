@@ -26,6 +26,7 @@ export interface Student {
   id: string;
   sessionTime: string; // HH:mm format like "16:30"
   name: string;
+  phone?: string; // WhatsApp contact number
   sessionType: SessionType; // online or on-site
   scheduleDays: ScheduleDay[]; // Which days of the week they have sessions
   semesterStart: string; // YYYY-MM-DD
