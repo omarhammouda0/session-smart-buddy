@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, parseISO, isAfter, isBefore, startOfToday, addDays, endOfDay } from 'date-fns';
+import { format, parseISO, isAfter, isBefore, startOfToday } from 'date-fns';
 import { History, Users, Check, X, Calendar, Ban, CalendarClock } from 'lucide-react';
 import { Student } from '@/types/student';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,6 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
-  const nextWeekEnd = endOfDay(addDays(today, 7));
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
 
   // Filter students
@@ -44,7 +43,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
   // Get selected student
   const selectedStudent = students.find(s => s.id === selectedStudentId);
 
-  // Get upcoming sessions (next 7 days including today)
+  // Get next 4 sessions for each student
   const getUpcomingSessions = () => {
     const sessions: Array<{
       id: string;
@@ -55,20 +54,23 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
     }> = [];
 
     filteredStudents.forEach(student => {
-      student.sessions.forEach(session => {
-        const sessionDate = parseISO(session.date);
-        // Include sessions from today to next 7 days that are scheduled
-        if (session.status === 'scheduled' && 
-            !isBefore(sessionDate, today) && 
-            !isAfter(sessionDate, nextWeekEnd)) {
-          sessions.push({
-            id: session.id,
-            date: session.date,
-            status: session.status,
-            studentName: student.name,
-            studentId: student.id,
-          });
-        }
+      // Get all future scheduled sessions for this student
+      const futureScheduled = student.sessions
+        .filter(session => {
+          const sessionDate = parseISO(session.date);
+          return session.status === 'scheduled' && !isBefore(sessionDate, today);
+        })
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(0, 4); // Take only next 4
+
+      futureScheduled.forEach(session => {
+        sessions.push({
+          id: session.id,
+          date: session.date,
+          status: session.status,
+          studentName: student.name,
+          studentId: student.id,
+        });
       });
     });
 
@@ -184,7 +186,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
           <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="upcoming" className="gap-1.5 text-xs">
               <CalendarClock className="h-3.5 w-3.5" />
-              Next 7 Days
+              Next Sessions
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-1.5 text-xs">
               <History className="h-3.5 w-3.5" />
@@ -193,11 +195,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
           </TabsList>
 
           <TabsContent value="upcoming" className="mt-3 space-y-3">
-            {/* Upcoming sessions list */}
             <div>
               <p className="text-xs text-muted-foreground mb-2 font-medium flex items-center gap-1">
                 <CalendarClock className="h-3 w-3" />
-                {selectedStudent ? `${selectedStudent.name}'s Next Week` : 'All Sessions - Next 7 Days'}
+                {selectedStudent ? `${selectedStudent.name}'s Next 4 Sessions` : 'Next 4 Sessions Per Student'}
                 <Badge variant="secondary" className="ml-auto text-[10px]">
                   {upcomingSessions.length}
                 </Badge>
@@ -206,7 +207,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
                 <div className="space-y-1.5 pr-2">
                   {upcomingSessions.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-xs">
-                      No sessions in the next 7 days
+                      No upcoming sessions
                     </p>
                   ) : (
                     upcomingSessions.map(session => (
@@ -230,7 +231,6 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          {/* Reschedule Button */}
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
@@ -253,7 +253,6 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
                             </PopoverContent>
                           </Popover>
 
-                          {/* Cancel Button */}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
@@ -288,7 +287,6 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
           </TabsContent>
 
           <TabsContent value="history" className="mt-3 space-y-3">
-            {/* Semester stats */}
             <div className="p-3 rounded-lg bg-muted/50 border">
               <p className="text-xs text-muted-foreground mb-2 font-medium">
                 {selectedStudent ? `${selectedStudent.name} - Semester to Date` : 'All Students - Semester to Date'}
@@ -313,7 +311,6 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
               </div>
             </div>
 
-            {/* Completion rate */}
             {historyStats.total > 0 && (
               <div className="p-2 rounded-lg bg-success/10 border border-success/20 text-center">
                 <p className="text-sm font-medium text-success">
@@ -322,7 +319,6 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
               </div>
             )}
 
-            {/* Session list */}
             <div>
               <p className="text-xs text-muted-foreground mb-2 font-medium flex items-center gap-1">
                 <History className="h-3 w-3" />
