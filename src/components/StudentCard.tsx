@@ -371,7 +371,7 @@ export const StudentCard = ({
                         ) : (
                           <X className="h-3 w-3" />
                         )}
-                        <span>{format(parseISO(session.date), 'EEEE')}</span>
+                        <span>{format(parseISO(session.date), 'EEE, MMM d')}</span>
                       </div>
                       <Badge variant="outline" className={cn(
                         "text-[10px]",
