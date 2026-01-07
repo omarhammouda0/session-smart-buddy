@@ -465,6 +465,33 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
             </TabsContent>
 
             <TabsContent value="history" className="mt-3 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <History className="h-3 w-3" />
+                  Add Past Session
+                </p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
+                      <Plus className="h-3 w-3" />
+                      Add Session
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+                    <CalendarPicker
+                      mode="single"
+                      selected={addSessionDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          handleAddSession(selectedStudent.id, date);
+                        }
+                      }}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               <div className="p-3 rounded-lg bg-muted/50 border">
                 <p className="text-xs text-muted-foreground mb-2 font-medium">
                   {selectedStudent.name} - Semester to Date
