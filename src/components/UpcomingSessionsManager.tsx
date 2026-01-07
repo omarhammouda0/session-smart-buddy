@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, addWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check, Monitor, MapPin } from 'lucide-react';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
 import { Button } from '@/components/ui/button';
@@ -25,19 +25,34 @@ interface UpcomingSessionsManagerProps {
   onRemoveSession: (studentId: string, sessionId: string) => void;
 }
 
+type ViewMode = 'week' | 'month';
+
 export const UpcomingSessionsManager = ({
   students,
   onAddSession,
   onRemoveSession,
 }: UpcomingSessionsManagerProps) => {
   const now = new Date();
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [weekOffset, setWeekOffset] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
 
-  // Get start and end of the selected week (Monday-based)
+  // Week view dates
   const currentWeekStart = startOfWeek(addWeeks(now, weekOffset), { weekStartsOn: 1 });
   const currentWeekEnd = endOfWeek(addWeeks(now, weekOffset), { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: currentWeekStart, end: currentWeekEnd });
+
+  // Month view dates
+  const currentMonthStart = startOfMonth(addMonths(now, monthOffset));
+  const currentMonthEnd = endOfMonth(addMonths(now, monthOffset));
+  const monthWeeks = eachWeekOfInterval(
+    { start: currentMonthStart, end: currentMonthEnd },
+    { weekStartsOn: 1 }
+  );
+
+  // Get days to display based on view mode
+  const daysToDisplay = viewMode === 'week' ? weekDays : eachDayOfInterval({ start: currentMonthStart, end: currentMonthEnd });
 
   // Filter students
   const filteredStudents = selectedStudentId === 'all'
@@ -68,9 +83,29 @@ export const UpcomingSessionsManager = ({
     return dateStr >= student.semesterStart && dateStr <= student.semesterEnd;
   };
 
-  const goToPrevWeek = () => setWeekOffset(prev => prev - 1);
-  const goToNextWeek = () => setWeekOffset(prev => prev + 1);
-  const goToThisWeek = () => setWeekOffset(0);
+  // Navigation
+  const goToPrev = () => {
+    if (viewMode === 'week') {
+      setWeekOffset(prev => prev - 1);
+    } else {
+      setMonthOffset(prev => prev - 1);
+    }
+  };
+
+  const goToNext = () => {
+    if (viewMode === 'week') {
+      setWeekOffset(prev => prev + 1);
+    } else {
+      setMonthOffset(prev => prev + 1);
+    }
+  };
+
+  const goToToday = () => {
+    setWeekOffset(0);
+    setMonthOffset(0);
+  };
+
+  const isCurrentPeriod = viewMode === 'week' ? weekOffset === 0 : monthOffset === 0;
 
   // Sort students by time
   const sortedStudents = [...filteredStudents].sort((a, b) => {
@@ -90,33 +125,77 @@ export const UpcomingSessionsManager = ({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Week navigation */}
+        {/* View mode toggle */}
+        <div className="flex rounded-lg border border-border overflow-hidden w-full">
+          <button
+            onClick={() => setViewMode('week')}
+            className={cn(
+              "flex-1 px-3 py-2 text-xs sm:text-sm font-medium transition-colors",
+              viewMode === 'week'
+                ? "bg-primary text-primary-foreground"
+                : "bg-card active:bg-muted"
+            )}
+          >
+            Week
+          </button>
+          <button
+            onClick={() => setViewMode('month')}
+            className={cn(
+              "flex-1 px-3 py-2 text-xs sm:text-sm font-medium transition-colors border-l border-border",
+              viewMode === 'month'
+                ? "bg-primary text-primary-foreground"
+                : "bg-card active:bg-muted"
+            )}
+          >
+            Month
+          </button>
+        </div>
+
+        {/* Navigation */}
         <div className="flex items-center justify-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goToPrevWeek} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goToPrev} className="h-9 w-9">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="text-center min-w-[160px]">
-            <p className="text-sm font-medium">
-              {format(currentWeekStart, 'MMM d')} - {format(currentWeekEnd, 'MMM d, yyyy')}
-            </p>
-            {weekOffset === 0 && (
-              <Badge variant="secondary" className="text-[10px] mt-1">This Week</Badge>
-            )}
-            {weekOffset === 1 && (
-              <Badge variant="outline" className="text-[10px] mt-1">Next Week</Badge>
-            )}
-            {weekOffset > 1 && (
-              <Badge variant="outline" className="text-[10px] mt-1">+{weekOffset} weeks</Badge>
-            )}
-            {weekOffset < 0 && (
-              <Badge variant="outline" className="text-[10px] mt-1">{weekOffset} weeks</Badge>
+            {viewMode === 'week' ? (
+              <>
+                <p className="text-sm font-medium">
+                  {format(currentWeekStart, 'MMM d')} - {format(currentWeekEnd, 'MMM d, yyyy')}
+                </p>
+                {weekOffset === 0 && (
+                  <Badge variant="secondary" className="text-[10px] mt-1">This Week</Badge>
+                )}
+                {weekOffset === 1 && (
+                  <Badge variant="outline" className="text-[10px] mt-1">Next Week</Badge>
+                )}
+                {weekOffset > 1 && (
+                  <Badge variant="outline" className="text-[10px] mt-1">+{weekOffset} weeks</Badge>
+                )}
+                {weekOffset < 0 && (
+                  <Badge variant="outline" className="text-[10px] mt-1">{weekOffset} weeks</Badge>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium">
+                  {format(currentMonthStart, 'MMMM yyyy')}
+                </p>
+                {monthOffset === 0 && (
+                  <Badge variant="secondary" className="text-[10px] mt-1">This Month</Badge>
+                )}
+                {monthOffset !== 0 && (
+                  <Badge variant="outline" className="text-[10px] mt-1">
+                    {monthOffset > 0 ? `+${monthOffset}` : monthOffset} months
+                  </Badge>
+                )}
+              </>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={goToNextWeek} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goToNext} className="h-9 w-9">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          {weekOffset !== 0 && (
-            <Button variant="outline" size="sm" onClick={goToThisWeek} className="h-8 text-xs">
+          {!isCurrentPeriod && (
+            <Button variant="outline" size="sm" onClick={goToToday} className="h-8 text-xs">
               Today
             </Button>
           )}
@@ -150,10 +229,23 @@ export const UpcomingSessionsManager = ({
           )}
         </div>
 
-        {/* Week days grid */}
+        {/* Days grid */}
         <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
-          <div className="flex gap-2 min-w-max pb-2">
-            {weekDays.map(day => {
+          <div className={cn(
+            "pb-2",
+            viewMode === 'week' ? "flex gap-2 min-w-max" : "grid grid-cols-7 gap-1"
+          )}>
+            {/* Month view: show day headers */}
+            {viewMode === 'month' && DAY_NAMES_SHORT.map(day => (
+              <div key={day} className="text-center text-[10px] font-medium text-muted-foreground py-1">
+                {day}
+              </div>
+            ))}
+            {/* Month view: add empty cells for days before month starts */}
+            {viewMode === 'month' && Array.from({ length: (currentMonthStart.getDay() + 6) % 7 }).map((_, i) => (
+              <div key={`empty-${i}`} className="min-h-[60px]" />
+            ))}
+            {daysToDisplay.map(day => {
               const isToday = isSameDay(day, now);
               const dayStr = format(day, 'yyyy-MM-dd');
 
@@ -161,20 +253,26 @@ export const UpcomingSessionsManager = ({
                 <div
                   key={dayStr}
                   className={cn(
-                    "flex flex-col min-w-[100px] sm:min-w-[120px] rounded-lg border p-2",
+                    "flex flex-col rounded-lg border p-2",
+                    viewMode === 'week' ? "min-w-[100px] sm:min-w-[120px]" : "min-h-[60px]",
                     isToday ? "border-primary bg-primary/5" : "bg-card"
                   )}
                 >
                   {/* Day header */}
-                  <div className="text-center mb-2 pb-2 border-b">
+                  <div className={cn(
+                    "text-center border-b",
+                    viewMode === 'week' ? "mb-2 pb-2" : "mb-1 pb-1"
+                  )}>
+                    {viewMode === 'week' && (
+                      <p className={cn(
+                        "text-xs font-medium",
+                        isToday && "text-primary"
+                      )}>
+                        {DAY_NAMES_SHORT[day.getDay()]}
+                      </p>
+                    )}
                     <p className={cn(
-                      "text-xs font-medium",
-                      isToday && "text-primary"
-                    )}>
-                      {DAY_NAMES_SHORT[day.getDay()]}
-                    </p>
-                    <p className={cn(
-                      "text-lg font-bold",
+                      viewMode === 'week' ? "text-lg font-bold" : "text-sm font-semibold",
                       isToday && "text-primary"
                     )}>
                       {format(day, 'd')}
@@ -202,25 +300,42 @@ export const UpcomingSessionsManager = ({
                           <div
                             key={student.id}
                             className={cn(
-                              "flex items-center justify-between gap-1 p-1.5 rounded text-xs",
+                              "flex items-center justify-between gap-1 rounded text-xs",
+                              viewMode === 'week' ? "p-1.5" : "p-1",
                               hasActiveSession && session?.status === 'completed' && "bg-success/10 border border-success/20 text-success",
                               hasActiveSession && session?.status !== 'completed' && "bg-primary/10 border border-primary/20",
                               isCancelled && "bg-destructive/10 border border-destructive/20 text-destructive"
                             )}
                           >
-                            <div className="truncate flex-1">
-                              <div className="flex items-center gap-1">
-                                <span className={cn(
-                                  "font-medium truncate",
-                                  session?.status === 'completed' && "line-through opacity-70"
-                                )}>{student.name}</span>
-                                {(student.sessionType || 'onsite') === 'online' ? (
-                                  <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
-                                ) : (
-                                  <MapPin className="h-3 w-3 text-orange-500 shrink-0" />
-                                )}
-                              </div>
-                              <span className="text-[10px] text-muted-foreground">{student.sessionTime}</span>
+                            <div className="truncate flex-1 min-w-0">
+                              {viewMode === 'week' ? (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <span className={cn(
+                                      "font-medium truncate",
+                                      session?.status === 'completed' && "line-through opacity-70"
+                                    )}>{student.name}</span>
+                                    {(student.sessionType || 'onsite') === 'online' ? (
+                                      <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
+                                    ) : (
+                                      <MapPin className="h-3 w-3 text-orange-500 shrink-0" />
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground">{student.sessionTime}</span>
+                                </>
+                              ) : (
+                                <div className="flex items-center gap-0.5">
+                                  <span className={cn(
+                                    "font-medium truncate text-[10px]",
+                                    session?.status === 'completed' && "line-through opacity-70"
+                                  )}>{student.name.split(' ')[0]}</span>
+                                  {(student.sessionType || 'onsite') === 'online' ? (
+                                    <Monitor className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                                  ) : (
+                                    <MapPin className="h-2.5 w-2.5 text-orange-500 shrink-0" />
+                                  )}
+                                </div>
+                              )}
                             </div>
                             
                             {/* Re-add cancelled session */}
@@ -235,8 +350,8 @@ export const UpcomingSessionsManager = ({
                               </Button>
                             )}
 
-                            {/* Cancel session button */}
-                            {hasActiveSession && session?.status !== 'completed' && (
+                            {/* Cancel session button - hide in month view for space */}
+                            {viewMode === 'week' && hasActiveSession && session?.status !== 'completed' && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
@@ -269,7 +384,7 @@ export const UpcomingSessionsManager = ({
 
                             {/* Completed indicator */}
                             {hasActiveSession && session?.status === 'completed' && (
-                              <Check className="h-3.5 w-3.5 text-success shrink-0" />
+                              <Check className={cn("text-success shrink-0", viewMode === 'week' ? "h-3.5 w-3.5" : "h-2.5 w-2.5")} />
                             )}
                           </div>
                         );
