@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
-import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock, Monitor, MapPin, History, Ban } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock, Monitor, MapPin, History, Ban, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -301,6 +303,31 @@ export const StudentCard = ({
               style={{ width: `${progress}%` }}
             />
           </div>
+        </div>
+
+        {/* Add Custom Session & Schedule settings */}
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 px-3 text-xs gap-1.5 flex-1">
+                <Plus className="h-3.5 w-3.5" />
+                Add Session
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarPicker
+                mode="single"
+                selected={undefined}
+                onSelect={(date) => {
+                  if (date) {
+                    onAddSession(format(date, 'yyyy-MM-dd'));
+                  }
+                }}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Schedule settings collapsible */}
