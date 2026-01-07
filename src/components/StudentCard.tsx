@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock, Monitor, MapPin, History } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock, Monitor, MapPin, History, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -205,46 +205,84 @@ export const StudentCard = ({
       </CardHeader>
 
       <CardContent className="p-3 pt-0 space-y-3 sm:space-y-4">
-        {/* Today's Session Status - Main Action */}
-        <button
-          onClick={handleToggleTodaySession}
-          className={cn(
-            "w-full p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-between",
-            todaySession?.status === 'completed'
-              ? "bg-success/10 border-success text-success"
-              : "bg-card border-dashed border-muted-foreground/30 active:border-primary active:bg-primary/5"
-          )}
-        >
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className={cn(
-              "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all shrink-0",
+        {/* Today's Session Status */}
+        <div className="flex gap-2">
+          {/* Mark Complete Button */}
+          <button
+            onClick={handleToggleTodaySession}
+            className={cn(
+              "flex-1 p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-between",
               todaySession?.status === 'completed'
-                ? "bg-success text-success-foreground"
-                : "border-2 border-muted-foreground/30"
-            )}>
-              {todaySession?.status === 'completed' && <Check className="h-4 w-4 sm:h-5 sm:w-5" />}
-            </div>
-            <div className="text-left">
-              <p className={cn(
-                "font-medium text-sm sm:text-base",
-                todaySession?.status === 'completed' ? "text-success" : "text-foreground"
+                ? "bg-success/10 border-success text-success"
+                : "bg-card border-dashed border-muted-foreground/30 active:border-primary active:bg-primary/5"
+            )}
+          >
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className={cn(
+                "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all shrink-0",
+                todaySession?.status === 'completed'
+                  ? "bg-success text-success-foreground"
+                  : "border-2 border-muted-foreground/30"
               )}>
-                {todaySession?.status === 'completed' ? 'Completed' : 'Mark Complete'}
-              </p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                {format(parseISO(selectedDate), 'EEE, MMM d')}
-              </p>
+                {todaySession?.status === 'completed' && <Check className="h-4 w-4 sm:h-5 sm:w-5" />}
+              </div>
+              <div className="text-left">
+                <p className={cn(
+                  "font-medium text-sm sm:text-base",
+                  todaySession?.status === 'completed' ? "text-success" : "text-foreground"
+                )}>
+                  {todaySession?.status === 'completed' ? 'Completed' : 'Mark Complete'}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  {format(parseISO(selectedDate), 'EEE, MMM d')}
+                </p>
+              </div>
             </div>
-          </div>
-          <span className={cn(
-            "text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full shrink-0",
-            todaySession?.status === 'completed' 
-              ? "bg-success/20 text-success" 
-              : "bg-muted text-muted-foreground"
-          )}>
-            {todaySession?.status === 'completed' ? 'Done' : 'Tap'}
-          </span>
-        </button>
+            <span className={cn(
+              "text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full shrink-0",
+              todaySession?.status === 'completed' 
+                ? "bg-success/20 text-success" 
+                : "bg-muted text-muted-foreground"
+            )}>
+              {todaySession?.status === 'completed' ? 'Done' : 'Tap'}
+            </span>
+          </button>
+
+          {/* Cancel Session Button */}
+          {todaySession && todaySession.status !== 'completed' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-auto w-14 sm:w-16 rounded-xl border-2 border-dashed border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive shrink-0"
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <Ban className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="text-[10px]">Cancel</span>
+                  </div>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel Session</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cancel {student.name}'s session on {format(parseISO(selectedDate), 'EEEE, MMM d')}? This will be tracked in the session history.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep Session</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onRemoveSession(todaySession.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Cancel Session
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
 
         {/* Month Progress */}
         <div>
