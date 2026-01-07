@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO, isAfter, isBefore, startOfToday } from 'date-fns';
-import { History, Users, Check, X, Calendar, Ban, CalendarClock, TrendingUp } from 'lucide-react';
+import { History, Users, Check, X, Calendar, Ban, CalendarClock, TrendingUp, Plus } from 'lucide-react';
 import { Student } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,14 +30,16 @@ interface SessionHistoryBarProps {
   onRestoreSession?: (studentId: string, sessionId: string) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onRescheduleSession?: (studentId: string, sessionId: string, newDate: string) => void;
+  onAddSession?: (studentId: string, date: string) => void;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession, onToggleComplete, onRescheduleSession }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
   const todayStr = format(today, 'yyyy-MM-dd');
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
+  const [addSessionDate, setAddSessionDate] = useState<Date | undefined>(undefined);
 
   // Get selected student
   const selectedStudent = students.find(s => s.id === selectedStudentId);
@@ -64,18 +66,19 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     return { total, completed, pending, cancelled, completionRate };
   };
 
-  // Get next sessions for selected student (including cancelled and completed ones that are in the future or today)
+  // Get next sessions for selected student (only scheduled and cancelled, NOT completed)
   const getUpcomingSessions = () => {
     if (!selectedStudent) return [];
     
     const futureSessions = selectedStudent.sessions
       .filter(session => {
         const sessionDate = parseISO(session.date);
-        // Show all sessions (scheduled, cancelled, completed) that are today or in the future
-        return !isBefore(sessionDate, today);
+        // Show only scheduled and cancelled sessions that are today or in the future
+        // Completed sessions go directly to history
+        return !isBefore(sessionDate, today) && session.status !== 'completed';
       })
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 8); // Show more to account for various statuses
+      .slice(0, 8);
 
     return futureSessions.map(session => ({
       id: session.id,
@@ -161,6 +164,12 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
     setRescheduleDate(undefined);
   };
 
+  const handleAddSession = (studentId: string, date: Date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    onAddSession?.(studentId, formattedDate);
+    setAddSessionDate(undefined);
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -216,14 +225,37 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRestoreSession,
             </TabsList>
 
             <TabsContent value="upcoming" className="mt-3 space-y-3">
-              <div>
-                <p className="text-xs text-muted-foreground mb-2 font-medium flex items-center gap-1">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <CalendarClock className="h-3 w-3" />
                   {selectedStudent.name}'s Upcoming Sessions
-                  <Badge variant="secondary" className="ml-auto text-[10px]">
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
                     {upcomingSessions.length}
                   </Badge>
                 </p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
+                      <Plus className="h-3 w-3" />
+                      Add Session
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <CalendarPicker
+                      mode="single"
+                      selected={addSessionDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          handleAddSession(selectedStudent.id, date);
+                        }
+                      }}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
                 <ScrollArea className="h-[280px]">
                   <div className="space-y-1.5 pr-2">
                     {upcomingSessions.length === 0 ? (
