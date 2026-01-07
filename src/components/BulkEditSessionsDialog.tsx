@@ -101,7 +101,7 @@ export const BulkEditSessionsDialog = ({
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
-  const [currentTimeFilter, setCurrentTimeFilter] = useState<string>('');
+  const [currentTimeFilter, setCurrentTimeFilter] = useState<string>('all');
   const [newTime, setNewTime] = useState<string>('');
 
   // Calculate matching sessions
@@ -129,7 +129,7 @@ export const BulkEditSessionsDialog = ({
         if (!selectedDays.includes(sessionDate.getDay())) return;
 
         // Filter by current time (if specified)
-        if (currentTimeFilter && student.sessionTime !== currentTimeFilter) return;
+        if (currentTimeFilter !== 'all' && student.sessionTime !== currentTimeFilter) return;
 
         sessions.push({
           session,
@@ -441,12 +441,12 @@ export const BulkEditSessionsDialog = ({
               {/* Current Time Filter */}
               <div className="space-y-2">
                 <Label>الوقت الحالي (اختياري)</Label>
-                <Select value={currentTimeFilter} onValueChange={setCurrentTimeFilter}>
+              <Select value={currentTimeFilter} onValueChange={setCurrentTimeFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="جميع الأوقات" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">جميع الأوقات</SelectItem>
+                    <SelectItem value="all">جميع الأوقات</SelectItem>
                     {uniqueTimes.map(time => (
                       <SelectItem key={time} value={time}>
                         {formatTimeAr(time)}
