@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Trash2, Edit2, Check, X, Calendar, Clock, Monitor, MapPin, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,26 +62,6 @@ export const StudentCard = ({
     return sessionDate.getDay() === selectedDayOfWeek && s.status !== 'cancelled';
   });
   
-  // Get month sessions for progress (exclude cancelled)
-  const monthSessions = student.sessions.filter(s => {
-    if (s.status === 'cancelled') return false;
-    const sessionDate = parseISO(s.date);
-    return sessionDate.getMonth() === selectedMonth && sessionDate.getFullYear() === selectedYear;
-  });
-  const completedCount = monthSessions.filter(s => s.status === 'completed').length;
-  const cancelledCount = student.sessions.filter(s => {
-    if (s.status !== 'cancelled') return false;
-    const sessionDate = parseISO(s.date);
-    return sessionDate.getMonth() === selectedMonth && sessionDate.getFullYear() === selectedYear;
-  }).length;
-  const totalSessions = monthSessions.length;
-  const progress = totalSessions > 0 ? (completedCount / totalSessions) * 100 : 0;
-
-  // All-time stats
-  const allTimeCompleted = student.sessions.filter(s => s.status === 'completed').length;
-  const allTimeCancelled = student.sessions.filter(s => s.status === 'cancelled').length;
-  const allTimeTotal = student.sessions.length;
-
   const handleSaveName = () => {
     if (editName.trim()) {
       onUpdateName(editName.trim());
@@ -92,19 +72,10 @@ export const StudentCard = ({
     }
   };
 
-  const toggleScheduleDay = (day: number) => {
-    const currentDays = student.scheduleDays.map(d => d.dayOfWeek);
-    const newDays = currentDays.includes(day)
-      ? currentDays.filter(d => d !== day)
-      : [...currentDays, day].sort();
-    if (newDays.length > 0) {
-      onUpdateSchedule(newDays);
-    }
-  };
 
   // Stats for sessions on this day of week
   const completedOnDay = sessionsOnDay.filter(s => s.status === 'completed').length;
-  const scheduledOnDay = sessionsOnDay.filter(s => s.status === 'scheduled').length;
+  
 
   return (
     <Card className={cn(
@@ -221,41 +192,17 @@ export const StudentCard = ({
                   <p className="font-medium text-sm sm:text-base text-foreground">
                     {DAY_NAMES_FULL[selectedDayOfWeek]} Sessions
                   </p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
-                    {sessionsOnDay.length} total sessions
-                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs px-2 py-1 rounded-full bg-success/10 text-success">
                   {completedOnDay} done
                 </span>
-                <span className="text-xs px-2 py-1 rounded-full bg-warning/10 text-warning">
-                  {scheduledOnDay} pending
-                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Month Progress */}
-        <div>
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-muted-foreground text-[10px] sm:text-xs">This Month</span>
-            <div className="flex items-center gap-2">
-              {cancelledCount > 0 && (
-                <span className="text-[10px] text-destructive">-{cancelledCount}</span>
-              )}
-              <span className="font-semibold text-xs sm:text-sm">{completedCount}/{totalSessions}</span>
-            </div>
-          </div>
-          <div className="h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden">
-            <div 
-              className="h-full gradient-primary transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
 
         {/* Add Custom Session & Schedule settings */}
         <div className="flex items-center gap-2">
