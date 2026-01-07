@@ -384,6 +384,26 @@ const Index = () => {
                   <div className="flex items-center gap-2">
                       <Select value={studentFilter} onValueChange={(value) => {
                         setStudentFilter(value);
+                        // Auto-navigate to student's nearest session date
+                        if (value !== 'all') {
+                          const student = students.find(s => s.id === value);
+                          if (student && student.sessions.length > 0) {
+                            // Find nearest session to today
+                            const todayStr = format(today, 'yyyy-MM-dd');
+                            const futureSessions = student.sessions
+                              .filter(s => s.date >= todayStr && s.status !== 'cancelled')
+                              .sort((a, b) => a.date.localeCompare(b.date));
+                            const pastSessions = student.sessions
+                              .filter(s => s.date < todayStr)
+                              .sort((a, b) => b.date.localeCompare(a.date));
+                            
+                            // Prefer future sessions, fallback to most recent past
+                            const nearestSession = futureSessions[0] || pastSessions[0];
+                            if (nearestSession) {
+                              setSelectedDate(parseISO(nearestSession.date));
+                            }
+                          }
+                        }
                       }}>
                         <SelectTrigger className="w-full h-11">
                           <Users className="h-4 w-4 ml-2 text-muted-foreground shrink-0" />
