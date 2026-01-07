@@ -1,8 +1,10 @@
-import { format, addMonths, eachDayOfInterval, getDay, parseISO, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
+import { format, addMonths, eachDayOfInterval, getDay, parseISO, startOfMonth, endOfMonth, isSameMonth, startOfWeek } from 'date-fns';
 
 export const generateDefaultSemester = (months: number = 4): { start: string; end: string } => {
   const today = new Date();
-  const start = format(today, 'yyyy-MM-dd');
+  // Start from the beginning of the current week (Sunday) to include past days like Monday
+  const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+  const start = format(weekStart, 'yyyy-MM-dd');
   const end = format(addMonths(today, months), 'yyyy-MM-dd');
   return { start, end };
 };
