@@ -94,11 +94,11 @@ export const StudentCard = ({
 
   return (
     <Card className={cn(
-      "card-shadow hover:card-shadow-hover transition-all duration-300 animate-scale-in overflow-hidden",
+      "card-shadow transition-all duration-300 overflow-hidden",
       todaySession?.completed && "ring-2 ring-success/50"
     )}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
+      <CardHeader className="p-3 sm:pb-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             {isEditing ? (
               <div className="space-y-2">
@@ -106,7 +106,7 @@ export const StudentCard = ({
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="h-9"
+                    className="h-10"
                     autoFocus
                     placeholder="Student name"
                     onKeyDown={(e) => {
@@ -121,12 +121,12 @@ export const StudentCard = ({
                     type="time"
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
-                    className="h-8 w-28"
+                    className="h-10 w-28"
                   />
-                  <Button size="icon" variant="ghost" onClick={handleSaveName} className="shrink-0 h-8 w-8 text-success">
+                  <Button size="icon" variant="ghost" onClick={handleSaveName} className="shrink-0 h-10 w-10 text-success">
                     <Check className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => { setEditName(student.name); setEditTime(student.sessionTime || '16:00'); setIsEditing(false); }} className="shrink-0 h-8 w-8 text-destructive">
+                  <Button size="icon" variant="ghost" onClick={() => { setEditName(student.name); setEditTime(student.sessionTime || '16:00'); setIsEditing(false); }} className="shrink-0 h-10 w-10 text-destructive">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -134,18 +134,18 @@ export const StudentCard = ({
             ) : (
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-heading font-semibold text-lg truncate">{student.name}</h3>
-                  <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)} className="shrink-0 h-7 w-7">
-                    <Edit2 className="h-3 w-3" />
+                  <h3 className="font-heading font-semibold text-base sm:text-lg truncate">{student.name}</h3>
+                  <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)} className="shrink-0 h-8 w-8">
+                    <Edit2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-sm font-medium px-2.5 py-1 bg-accent/20 text-foreground rounded-lg flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
+                  <span className="text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 bg-accent/20 text-foreground rounded-lg flex items-center gap-1">
+                    <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     {student.sessionTime || '16:00'}
                   </span>
                   {student.scheduleDays.map(d => (
-                    <span key={d.dayOfWeek} className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                    <span key={d.dayOfWeek} className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 bg-primary/10 text-primary rounded-full">
                       {DAY_NAMES_SHORT[d.dayOfWeek]}
                     </span>
                   ))}
@@ -156,7 +156,7 @@ export const StudentCard = ({
           
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive">
+              <Button size="icon" variant="ghost" className="shrink-0 h-9 w-9 text-muted-foreground hover:text-destructive">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
@@ -178,55 +178,55 @@ export const StudentCard = ({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0 space-y-4">
+      <CardContent className="p-3 pt-0 space-y-3 sm:space-y-4">
         {/* Today's Session Status - Main Action */}
         <button
           onClick={handleToggleTodaySession}
           className={cn(
-            "w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between",
+            "w-full p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-between",
             todaySession?.completed
               ? "bg-success/10 border-success text-success"
-              : "bg-card border-dashed border-muted-foreground/30 hover:border-primary hover:bg-primary/5"
+              : "bg-card border-dashed border-muted-foreground/30 active:border-primary active:bg-primary/5"
           )}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <div className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+              "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all shrink-0",
               todaySession?.completed
                 ? "bg-success text-success-foreground"
                 : "border-2 border-muted-foreground/30"
             )}>
-              {todaySession?.completed && <Check className="h-5 w-5" />}
+              {todaySession?.completed && <Check className="h-4 w-4 sm:h-5 sm:w-5" />}
             </div>
             <div className="text-left">
               <p className={cn(
-                "font-medium",
+                "font-medium text-sm sm:text-base",
                 todaySession?.completed ? "text-success" : "text-foreground"
               )}>
-                {todaySession?.completed ? 'Session Completed' : 'Mark Session Complete'}
+                {todaySession?.completed ? 'Completed' : 'Mark Complete'}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {format(parseISO(selectedDate), 'EEEE, MMMM d')}
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                {format(parseISO(selectedDate), 'EEE, MMM d')}
               </p>
             </div>
           </div>
           <span className={cn(
-            "text-xs font-medium px-2 py-1 rounded-full",
+            "text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full shrink-0",
             todaySession?.completed 
               ? "bg-success/20 text-success" 
               : "bg-muted text-muted-foreground"
           )}>
-            {todaySession?.completed ? 'Done' : 'Tap to complete'}
+            {todaySession?.completed ? 'Done' : 'Tap'}
           </span>
         </button>
 
         {/* Month Progress */}
         <div>
-          <div className="flex items-center justify-between text-sm mb-1.5">
-            <span className="text-muted-foreground text-xs">This Month</span>
-            <span className="font-semibold text-sm">{completedCount}/{totalSessions}</span>
+          <div className="flex items-center justify-between text-sm mb-1">
+            <span className="text-muted-foreground text-[10px] sm:text-xs">This Month</span>
+            <span className="font-semibold text-xs sm:text-sm">{completedCount}/{totalSessions}</span>
           </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div className="h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden">
             <div 
               className="h-full gradient-primary transition-all duration-500"
               style={{ width: `${progress}%` }}
@@ -237,7 +237,7 @@ export const StudentCard = ({
         {/* Schedule settings collapsible */}
         <Collapsible open={showSettings} onOpenChange={setShowSettings}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground">
+            <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground h-9">
               Schedule settings
               {showSettings ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
             </Button>
@@ -249,10 +249,10 @@ export const StudentCard = ({
                   key={day}
                   onClick={() => toggleScheduleDay(index)}
                   className={cn(
-                    "px-2.5 py-1 rounded text-xs font-medium transition-all",
+                    "px-2.5 py-1.5 rounded text-xs font-medium transition-all min-w-[40px]",
                     student.scheduleDays.some(d => d.dayOfWeek === index)
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      : "bg-muted text-muted-foreground active:bg-muted/80"
                   )}
                 >
                   {day}
