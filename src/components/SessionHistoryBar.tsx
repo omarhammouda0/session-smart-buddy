@@ -157,33 +157,6 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Today's completion rate - always visible */}
-        <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Today's Progress</span>
-            </div>
-            <span className="text-2xl font-bold text-primary">
-              {todayStats.completionRate}%
-            </span>
-          </div>
-          <Progress value={todayStats.completionRate} className="h-2 mb-3" />
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-lg font-bold text-success">{todayStats.completed}</p>
-              <p className="text-[10px] text-muted-foreground">Completed</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-warning">{todayStats.pending}</p>
-              <p className="text-[10px] text-muted-foreground">Pending</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-muted-foreground">{todayStats.total}</p>
-              <p className="text-[10px] text-muted-foreground">Total</p>
-            </div>
-          </div>
-        </div>
 
         {/* Student filter */}
         <div className="flex items-center gap-2">
@@ -193,7 +166,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onRescheduleSessi
               <SelectValue placeholder="Select a student to view details" />
             </SelectTrigger>
             <SelectContent className="bg-popover z-50">
-              <SelectItem value="all" disabled className="text-muted-foreground">
+              <SelectItem value="all" className="text-muted-foreground">
                 Select a student...
               </SelectItem>
               {students.map(student => (
