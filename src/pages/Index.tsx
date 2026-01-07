@@ -289,13 +289,13 @@ const Index = () => {
                   </div>
 
                   {/* Week day quick navigation */}
-                  <div className="flex justify-start sm:justify-center gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+                  <div className="flex justify-start sm:justify-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
                     {weekDays.map(day => (
                       <button
                         key={day.date}
                         onClick={() => setSelectedDate(day.date)}
                         className={cn(
-                          "flex flex-col items-center px-2.5 py-2 rounded-lg transition-all min-w-[48px] shrink-0",
+                          "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[52px] shrink-0",
                           selectedDate === day.date
                             ? "bg-primary text-primary-foreground shadow-md"
                             : day.isToday
@@ -303,11 +303,10 @@ const Index = () => {
                               : "bg-card border border-border active:border-primary/50"
                         )}
                       >
-                        <span className="text-[11px] font-medium">{day.dayName}</span>
-                        <span className="text-base font-bold">{day.dayNum}</span>
+                        <span className="text-sm font-semibold">{day.dayName}</span>
                         {day.studentCount > 0 && (
                           <span className={cn(
-                            "text-[9px] px-1.5 rounded-full mt-0.5",
+                            "text-[9px] px-1.5 rounded-full mt-1",
                             selectedDate === day.date
                               ? "bg-primary-foreground/20"
                               : "bg-muted"
@@ -321,7 +320,23 @@ const Index = () => {
 
                   {/* Student filter dropdown */}
                   <div className="flex items-center gap-2">
-                      <Select value={studentFilter} onValueChange={setStudentFilter}>
+                      <Select value={studentFilter} onValueChange={(value) => {
+                        setStudentFilter(value);
+                        // Auto-navigate to student's next session day
+                        if (value !== 'all') {
+                          const student = students.find(s => s.id === value);
+                          if (student) {
+                            // Find next scheduled session for this student
+                            const todayStr = format(now, 'yyyy-MM-dd');
+                            const nextSession = student.sessions
+                              .filter(s => s.date >= todayStr && s.status === 'scheduled')
+                              .sort((a, b) => a.date.localeCompare(b.date))[0];
+                            if (nextSession) {
+                              setSelectedDate(nextSession.date);
+                            }
+                          }
+                        }
+                      }}>
                         <SelectTrigger className="w-full h-11">
                           <Users className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
                           <SelectValue placeholder="All Students" />
