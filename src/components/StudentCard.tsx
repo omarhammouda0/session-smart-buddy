@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Trash2, Edit2, Check, X, Plus, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Plus, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
 import { formatDayMonth, getSessionsForMonth } from '@/lib/dateUtils';
@@ -26,6 +25,7 @@ interface StudentCardProps {
   selectedYear: number;
   onRemove: () => void;
   onUpdateName: (name: string) => void;
+  onUpdateTime: (time: string) => void;
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
   onAddSession: (date: string) => void;
   onRemoveSession: (sessionId: string) => void;
@@ -38,6 +38,7 @@ export const StudentCard = ({
   selectedYear,
   onRemove,
   onUpdateName,
+  onUpdateTime,
   onUpdateSchedule,
   onAddSession,
   onRemoveSession,
@@ -45,6 +46,7 @@ export const StudentCard = ({
 }: StudentCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(student.name);
+  const [editTime, setEditTime] = useState(student.sessionTime || '16:00');
   const [showSettings, setShowSettings] = useState(false);
   const [addingSession, setAddingSession] = useState(false);
   const [newSessionDate, setNewSessionDate] = useState('');
@@ -57,6 +59,9 @@ export const StudentCard = ({
   const handleSaveName = () => {
     if (editName.trim()) {
       onUpdateName(editName.trim());
+      if (editTime !== student.sessionTime) {
+        onUpdateTime(editTime);
+      }
       setIsEditing(false);
     }
   };
@@ -85,39 +90,57 @@ export const StudentCard = ({
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             {isEditing ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="h-9"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveName();
-                    if (e.key === 'Escape') { setEditName(student.name); setIsEditing(false); }
-                  }}
-                />
-                <Button size="icon" variant="ghost" onClick={handleSaveName} className="shrink-0 h-9 w-9 text-success">
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => { setEditName(student.name); setIsEditing(false); }} className="shrink-0 h-9 w-9 text-destructive">
-                  <X className="h-4 w-4" />
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-9"
+                    autoFocus
+                    placeholder="Student name"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveName();
+                      if (e.key === 'Escape') { setEditName(student.name); setEditTime(student.sessionTime || '16:00'); setIsEditing(false); }
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="h-8 w-28"
+                  />
+                  <Button size="icon" variant="ghost" onClick={handleSaveName} className="shrink-0 h-8 w-8 text-success">
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => { setEditName(student.name); setEditTime(student.sessionTime || '16:00'); setIsEditing(false); }} className="shrink-0 h-8 w-8 text-destructive">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <h3 className="font-heading font-semibold text-lg truncate">{student.name}</h3>
-                <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)} className="shrink-0 h-7 w-7">
-                  <Edit2 className="h-3 w-3" />
-                </Button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-heading font-semibold text-lg truncate">{student.name}</h3>
+                  <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)} className="shrink-0 h-7 w-7">
+                    <Edit2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs px-2 py-0.5 bg-accent/20 text-accent-foreground rounded-full flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {student.sessionTime || '16:00'}
+                  </span>
+                  {student.scheduleDays.map(d => (
+                    <span key={d.dayOfWeek} className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                      {DAY_NAMES_SHORT[d.dayOfWeek]}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
-            <div className="flex flex-wrap gap-1 mt-1">
-              {student.scheduleDays.map(d => (
-                <span key={d.dayOfWeek} className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
-                  {DAY_NAMES_SHORT[d.dayOfWeek]}
-                </span>
-              ))}
-            </div>
           </div>
           
           <AlertDialog>

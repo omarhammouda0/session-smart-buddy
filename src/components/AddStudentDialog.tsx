@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
+import { UserPlus, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { DAY_NAMES } from '@/types/student';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], customStart?: string, customEnd?: string) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, customStart?: string, customEnd?: string) => void;
   defaultStart: string;
   defaultEnd: string;
 }
@@ -18,6 +18,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [selectedDays, setSelectedDays] = useState<number[]>([1]); // Monday by default
+  const [sessionTime, setSessionTime] = useState('16:00');
   const [showCustomDates, setShowCustomDates] = useState(false);
   const [customStart, setCustomStart] = useState(defaultStart);
   const [customEnd, setCustomEnd] = useState(defaultEnd);
@@ -29,6 +30,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
       onAdd(
         name.trim(),
         selectedDays,
+        sessionTime,
         useCustom ? customStart : undefined,
         useCustom ? customEnd : undefined
       );
@@ -40,6 +42,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
   const resetForm = () => {
     setName('');
     setSelectedDays([1]);
+    setSessionTime('16:00');
     setShowCustomDates(false);
     setCustomStart(defaultStart);
     setCustomEnd(defaultEnd);
@@ -73,6 +76,21 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd }: AddStudent
               placeholder="Enter student name"
               autoFocus
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="time" className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                Session Time
+              </Label>
+              <Input
+                id="time"
+                type="time"
+                value={sessionTime}
+                onChange={(e) => setSessionTime(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="space-y-3">
