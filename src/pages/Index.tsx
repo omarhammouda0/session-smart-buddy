@@ -1,23 +1,24 @@
 import { useState } from 'react';
-import { GraduationCap, BookOpen, CreditCard } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { format, addDays, parseISO, isToday } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
-import { MonthSelector } from '@/components/MonthSelector';
 import { StudentCard } from '@/components/StudentCard';
 import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { DAY_NAMES_SHORT } from '@/types/student';
 import { cn } from '@/lib/utils';
 
 const Index = () => {
   const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedDate, setSelectedDate] = useState(format(now, 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('sessions');
-  const [selectedDay, setSelectedDay] = useState<number>(now.getDay()); // Default to today's day
+  const [searchQuery, setSearchQuery] = useState('');
 
   const {
     students,
@@ -36,16 +37,68 @@ const Index = () => {
     togglePaymentStatus,
   } = useStudents();
 
-  // Filter students by selected day of week
-  const studentsForDay = students.filter(student =>
-    student.scheduleDays.some(d => d.dayOfWeek === selectedDay)
+  const selectedDateObj = parseISO(selectedDate);
+  const selectedDayOfWeek = selectedDateObj.getDay();
+  const selectedMonth = selectedDateObj.getMonth();
+  const selectedYear = selectedDateObj.getFullYear();
+
+  // Get students who have a session on the selected date
+  const getStudentsForDate = () => {
+    return students.filter(student => {
+      // Check if student has a session on this exact date
+      const hasSessionOnDate = student.sessions.some(s => s.date === selectedDate);
+      // Or if their schedule includes this day of week and the date is within their semester
+      const isInSchedule = student.scheduleDays.some(d => d.dayOfWeek === selectedDayOfWeek) &&
+        selectedDate >= student.semesterStart && selectedDate <= student.semesterEnd;
+      
+      return hasSessionOnDate || isInSchedule;
+    });
+  };
+
+  const studentsForDate = getStudentsForDate();
+
+  // Filter by search query
+  const filteredStudents = studentsForDate.filter(student =>
+    student.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Get days that have students scheduled
-  const daysWithStudents = DAY_NAMES_SHORT.map((_, index) => ({
-    day: index,
-    count: students.filter(s => s.scheduleDays.some(d => d.dayOfWeek === index)).length,
-  })).filter(d => d.count > 0);
+  // Navigation functions
+  const goToPrevDay = () => {
+    setSelectedDate(format(addDays(selectedDateObj, -1), 'yyyy-MM-dd'));
+  };
+
+  const goToNextDay = () => {
+    setSelectedDate(format(addDays(selectedDateObj, 1), 'yyyy-MM-dd'));
+  };
+
+  const goToToday = () => {
+    setSelectedDate(format(now, 'yyyy-MM-dd'));
+  };
+
+  // Quick day navigation (next 7 days)
+  const getWeekDays = () => {
+    const days = [];
+    for (let i = -3; i <= 3; i++) {
+      const date = addDays(now, i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayOfWeek = date.getDay();
+      const studentsOnDay = students.filter(student =>
+        student.sessions.some(s => s.date === dateStr) ||
+        (student.scheduleDays.some(d => d.dayOfWeek === dayOfWeek) &&
+          dateStr >= student.semesterStart && dateStr <= student.semesterEnd)
+      );
+      days.push({
+        date: dateStr,
+        dayName: DAY_NAMES_SHORT[dayOfWeek],
+        dayNum: format(date, 'd'),
+        isToday: isToday(date),
+        studentCount: studentsOnDay.length,
+      });
+    }
+    return days;
+  };
+
+  const weekDays = getWeekDays();
 
   if (!isLoaded) {
     return (
@@ -84,28 +137,6 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-4 space-y-4">
-        {/* Month Selector */}
-        <div className="flex justify-center">
-          <MonthSelector
-            month={selectedMonth}
-            year={selectedYear}
-            onChange={(m, y) => {
-              setSelectedMonth(m);
-              setSelectedYear(y);
-            }}
-          />
-        </div>
-
-        {/* Stats */}
-        {students.length > 0 && (
-          <StatsBar
-            students={students}
-            payments={payments}
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-          />
-        )}
-
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-2 mb-4">
@@ -124,55 +155,121 @@ const Index = () => {
               <EmptyState />
             ) : (
               <>
-                {/* Day Filter Bar */}
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {DAY_NAMES_SHORT.map((day, index) => {
-                    const dayData = daysWithStudents.find(d => d.day === index);
-                    const hasStudents = dayData && dayData.count > 0;
-                    const isToday = index === now.getDay();
-                    
-                    return (
+                {/* Date Navigation */}
+                <div className="space-y-3">
+                  {/* Main date display */}
+                  <div className="flex items-center justify-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={goToPrevDay} className="h-8 w-8">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="text-center min-w-[180px]">
+                      <p className="font-heading font-semibold text-lg">
+                        {format(selectedDateObj, 'EEEE')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(selectedDateObj, 'MMMM d, yyyy')}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-8 w-8">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    {!isToday(selectedDateObj) && (
+                      <Button variant="outline" size="sm" onClick={goToToday} className="ml-2">
+                        Today
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Week day quick navigation */}
+                  <div className="flex justify-center gap-1.5 overflow-x-auto pb-1">
+                    {weekDays.map(day => (
                       <button
-                        key={day}
-                        onClick={() => setSelectedDay(index)}
-                        disabled={!hasStudents}
+                        key={day.date}
+                        onClick={() => setSelectedDate(day.date)}
                         className={cn(
-                          "px-4 py-2 rounded-lg font-medium text-sm transition-all relative",
-                          selectedDay === index
+                          "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[52px]",
+                          selectedDate === day.date
                             ? "bg-primary text-primary-foreground shadow-md"
-                            : hasStudents
-                              ? "bg-card border border-border hover:border-primary/50 hover:bg-muted/50"
-                              : "bg-muted/30 text-muted-foreground/50 cursor-not-allowed",
-                          isToday && selectedDay !== index && hasStudents && "ring-2 ring-primary/30"
+                            : day.isToday
+                              ? "bg-primary/10 border-2 border-primary/30 hover:bg-primary/20"
+                              : "bg-card border border-border hover:border-primary/50"
                         )}
                       >
-                        {day}
-                        {hasStudents && (
+                        <span className="text-xs font-medium">{day.dayName}</span>
+                        <span className="text-lg font-bold">{day.dayNum}</span>
+                        {day.studentCount > 0 && (
                           <span className={cn(
-                            "ml-1.5 text-xs px-1.5 py-0.5 rounded-full",
-                            selectedDay === index
-                              ? "bg-primary-foreground/20 text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
+                            "text-[10px] px-1.5 rounded-full mt-0.5",
+                            selectedDate === day.date
+                              ? "bg-primary-foreground/20"
+                              : "bg-muted"
                           )}>
-                            {dayData.count}
+                            {day.studentCount}
                           </span>
                         )}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
+
+                  {/* Search filter */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search students..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    {searchQuery && (
+                      <Button variant="ghost" size="icon" onClick={() => setSearchQuery('')} className="h-10 w-10">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Students for selected day */}
-                {studentsForDay.length === 0 ? (
+                {/* Stats for selected date */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-card rounded-xl p-3 card-shadow text-center">
+                    <p className="text-xl font-heading font-bold">{filteredStudents.length}</p>
+                    <p className="text-xs text-muted-foreground">Students Today</p>
+                  </div>
+                  <div className="bg-success/10 rounded-xl p-3 card-shadow text-center">
+                    <p className="text-xl font-heading font-bold text-success">
+                      {filteredStudents.reduce((count, s) => {
+                        const session = s.sessions.find(sess => sess.date === selectedDate);
+                        return count + (session?.completed ? 1 : 0);
+                      }, 0)}
+                    </p>
+                    <p className="text-xs text-success/80">Completed</p>
+                  </div>
+                  <div className="bg-warning/10 rounded-xl p-3 card-shadow text-center">
+                    <p className="text-xl font-heading font-bold text-warning">
+                      {filteredStudents.reduce((count, s) => {
+                        const session = s.sessions.find(sess => sess.date === selectedDate);
+                        return count + (session && !session.completed ? 1 : 0);
+                      }, 0)}
+                    </p>
+                    <p className="text-xs text-warning/80">Pending</p>
+                  </div>
+                </div>
+
+                {/* Students for selected date */}
+                {filteredStudents.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    No students scheduled for {DAY_NAMES_SHORT[selectedDay]}
+                    {searchQuery
+                      ? `No students found matching "${searchQuery}"`
+                      : `No sessions scheduled for ${format(selectedDateObj, 'MMMM d')}`}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {studentsForDay.map(student => (
+                    {filteredStudents.map(student => (
                       <StudentCard
                         key={student.id}
                         student={student}
+                        selectedDate={selectedDate}
                         selectedMonth={selectedMonth}
                         selectedYear={selectedYear}
                         onRemove={() => removeStudent(student.id)}
@@ -190,7 +287,17 @@ const Index = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="payments" className="mt-0">
+          <TabsContent value="payments" className="mt-0 space-y-4">
+            {/* Stats for payments */}
+            {students.length > 0 && (
+              <StatsBar
+                students={students}
+                payments={payments}
+                selectedMonth={selectedMonth}
+                selectedYear={selectedYear}
+              />
+            )}
+            
             <PaymentsDashboard
               students={students}
               payments={payments}

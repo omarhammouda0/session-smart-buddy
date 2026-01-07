@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Trash2, Edit2, Check, X, Plus, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
-import { formatDayMonth, getSessionsForMonth } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,7 @@ import {
 
 interface StudentCardProps {
   student: Student;
+  selectedDate: string;
   selectedMonth: number;
   selectedYear: number;
   onRemove: () => void;
@@ -34,6 +35,7 @@ interface StudentCardProps {
 
 export const StudentCard = ({
   student,
+  selectedDate,
   selectedMonth,
   selectedYear,
   onRemove,
@@ -48,10 +50,15 @@ export const StudentCard = ({
   const [editName, setEditName] = useState(student.name);
   const [editTime, setEditTime] = useState(student.sessionTime || '16:00');
   const [showSettings, setShowSettings] = useState(false);
-  const [addingSession, setAddingSession] = useState(false);
-  const [newSessionDate, setNewSessionDate] = useState('');
 
-  const monthSessions = getSessionsForMonth(student.sessions, selectedMonth, selectedYear);
+  // Find today's session
+  const todaySession = student.sessions.find(s => s.date === selectedDate);
+  
+  // Get month sessions for progress
+  const monthSessions = student.sessions.filter(s => {
+    const sessionDate = parseISO(s.date);
+    return sessionDate.getMonth() === selectedMonth && sessionDate.getFullYear() === selectedYear;
+  });
   const completedCount = monthSessions.filter(s => s.completed).length;
   const totalSessions = monthSessions.length;
   const progress = totalSessions > 0 ? (completedCount / totalSessions) * 100 : 0;
@@ -66,14 +73,6 @@ export const StudentCard = ({
     }
   };
 
-  const handleAddSession = () => {
-    if (newSessionDate) {
-      onAddSession(newSessionDate);
-      setNewSessionDate('');
-      setAddingSession(false);
-    }
-  };
-
   const toggleScheduleDay = (day: number) => {
     const currentDays = student.scheduleDays.map(d => d.dayOfWeek);
     const newDays = currentDays.includes(day)
@@ -84,8 +83,20 @@ export const StudentCard = ({
     }
   };
 
+  const handleToggleTodaySession = () => {
+    if (todaySession) {
+      onToggleSession(todaySession.id);
+    } else {
+      // Create session for today if it doesn't exist
+      onAddSession(selectedDate);
+    }
+  };
+
   return (
-    <Card className="card-shadow hover:card-shadow-hover transition-all duration-300 animate-scale-in overflow-hidden">
+    <Card className={cn(
+      "card-shadow hover:card-shadow-hover transition-all duration-300 animate-scale-in overflow-hidden",
+      todaySession?.completed && "ring-2 ring-success/50"
+    )}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -128,9 +139,9 @@ export const StudentCard = ({
                     <Edit2 className="h-3 w-3" />
                   </Button>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs px-2 py-0.5 bg-accent/20 text-accent-foreground rounded-full flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <span className="text-sm font-medium px-2.5 py-1 bg-accent/20 text-foreground rounded-lg flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
                     {student.sessionTime || '16:00'}
                   </span>
                   {student.scheduleDays.map(d => (
@@ -165,9 +176,52 @@ export const StudentCard = ({
             </AlertDialogContent>
           </AlertDialog>
         </div>
+      </CardHeader>
 
-        {/* Progress Bar */}
-        <div className="mt-3">
+      <CardContent className="pt-0 space-y-4">
+        {/* Today's Session Status - Main Action */}
+        <button
+          onClick={handleToggleTodaySession}
+          className={cn(
+            "w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between",
+            todaySession?.completed
+              ? "bg-success/10 border-success text-success"
+              : "bg-card border-dashed border-muted-foreground/30 hover:border-primary hover:bg-primary/5"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+              todaySession?.completed
+                ? "bg-success text-success-foreground"
+                : "border-2 border-muted-foreground/30"
+            )}>
+              {todaySession?.completed && <Check className="h-5 w-5" />}
+            </div>
+            <div className="text-left">
+              <p className={cn(
+                "font-medium",
+                todaySession?.completed ? "text-success" : "text-foreground"
+              )}>
+                {todaySession?.completed ? 'Session Completed' : 'Mark Session Complete'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {format(parseISO(selectedDate), 'EEEE, MMMM d')}
+              </p>
+            </div>
+          </div>
+          <span className={cn(
+            "text-xs font-medium px-2 py-1 rounded-full",
+            todaySession?.completed 
+              ? "bg-success/20 text-success" 
+              : "bg-muted text-muted-foreground"
+          )}>
+            {todaySession?.completed ? 'Done' : 'Tap to complete'}
+          </span>
+        </button>
+
+        {/* Month Progress */}
+        <div>
           <div className="flex items-center justify-between text-sm mb-1.5">
             <span className="text-muted-foreground text-xs">This Month</span>
             <span className="font-semibold text-sm">{completedCount}/{totalSessions}</span>
@@ -179,78 +233,6 @@ export const StudentCard = ({
             />
           </div>
         </div>
-      </CardHeader>
-
-      <CardContent className="pt-0 space-y-3">
-        {/* Sessions for selected month */}
-        {monthSessions.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No sessions this month</p>
-        ) : (
-          <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
-            {monthSessions.map((session) => (
-              <div
-                key={session.id}
-                className={cn(
-                  "flex items-center gap-3 p-2.5 rounded-lg border transition-all",
-                  session.completed 
-                    ? "bg-success/10 border-success/30" 
-                    : "bg-card border-border hover:border-primary/30"
-                )}
-              >
-                <button
-                  onClick={() => onToggleSession(session.id)}
-                  className={cn(
-                    "w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0",
-                    session.completed
-                      ? "bg-success text-success-foreground"
-                      : "border-2 border-muted-foreground/30 hover:border-primary"
-                  )}
-                >
-                  {session.completed && <Check className="h-3 w-3" />}
-                </button>
-                
-                <span className="text-sm flex-1">{formatDayMonth(session.date)}</span>
-                
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                  onClick={() => onRemoveSession(session.id)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Add extra session */}
-        {addingSession ? (
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={newSessionDate}
-              onChange={(e) => setNewSessionDate(e.target.value)}
-              className="h-8 text-sm flex-1"
-            />
-            <Button size="sm" variant="ghost" onClick={handleAddSession} disabled={!newSessionDate}>
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setAddingSession(false); setNewSessionDate(''); }}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-muted-foreground"
-            onClick={() => setAddingSession(true)}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add extra session
-          </Button>
-        )}
 
         {/* Schedule settings collapsible */}
         <Collapsible open={showSettings} onOpenChange={setShowSettings}>
