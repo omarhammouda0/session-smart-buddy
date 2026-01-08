@@ -523,13 +523,13 @@ export const BulkEditSessionsDialog = ({
                                   {formatShortDateAr(session.date)}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                  ({formatTimeAr(student.sessionTime || '16:00')})
+                                  ({formatTimeAr(session.time || student.sessionTime || '16:00')})
                                 </span>
                               </div>
                               {newTime && (
                                 <div className="flex items-center gap-1 text-xs">
                                   <span className="text-muted-foreground">
-                                    {formatTimeAr(student.sessionTime || '16:00')}
+                                    {formatTimeAr(session.time || student.sessionTime || '16:00')}
                                   </span>
                                   <ChevronLeft className="h-3 w-3 text-primary" />
                                   <span className="text-primary font-medium">

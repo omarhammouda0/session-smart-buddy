@@ -174,7 +174,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             <p className={cn("font-medium truncate", session.status === 'cancelled' && "line-through text-muted-foreground")}>
                               {formatShortDateAr(session.date)}
                               <span className="text-muted-foreground font-normal mr-1">
-                                ({selectedStudent.sessionTime || '16:00'})
+                                ({session.time || selectedStudent.sessionTime || '16:00'})
                               </span>
                             </p>
                             {session.status === 'cancelled' && <span className="text-[10px] text-destructive">ملغاة</span>}
@@ -270,7 +270,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                           <p className="font-medium truncate">
                             {formatShortDateAr(session.date)}
                             <span className="text-muted-foreground font-normal mr-1">
-                              ({selectedStudent.sessionTime || '16:00'})
+                              ({session.time || selectedStudent.sessionTime || '16:00'})
                             </span>
                           </p>
                         </div>

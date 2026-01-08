@@ -365,7 +365,7 @@ export const useStudents = () => {
     );
   };
 
-  // Bulk update session times
+  // Bulk update session times - updates individual sessions, not the student's default time
   const bulkUpdateSessionTime = (
     studentIds: string[],
     sessionIds: string[],
@@ -380,15 +380,15 @@ export const useStudents = () => {
         const updatedSessions = student.sessions.map(session => {
           if (!sessionIds.includes(session.id)) return session;
           updatedCount++;
-          return session; // Session time is stored on student, not session
+          // Update the individual session's time
+          return {
+            ...session,
+            time: newTime,
+          };
         });
 
-        // Update student's session time if any of their sessions were updated
-        const hasUpdatedSession = student.sessions.some(s => sessionIds.includes(s.id));
-        
         return {
           ...student,
-          sessionTime: hasUpdatedSession ? newTime : student.sessionTime,
           sessions: updatedSessions,
         };
       })
