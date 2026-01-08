@@ -90,7 +90,11 @@ export const AddVacationDialog = ({
       else if (i === 2) label = 'الأسبوع الثالث';
       else label = 'الأسبوع الرابع';
 
-      const dateRange = `${format(weekStart, 'd', { locale: ar })} - ${format(weekEnd, 'd MMMM', { locale: ar })}`;
+      const startMonth = MONTH_NAMES_AR[weekStart.getMonth()];
+      const endMonth = MONTH_NAMES_AR[weekEnd.getMonth()];
+      const dateRange = startMonth === endMonth 
+        ? `${format(weekStart, 'd', { locale: ar })}-${format(weekEnd, 'd', { locale: ar })} ${startMonth}`
+        : `${format(weekStart, 'd', { locale: ar })} ${startMonth} - ${format(weekEnd, 'd', { locale: ar })} ${endMonth}`;
       
       options.push({
         id: `week-${i}`,
@@ -102,23 +106,19 @@ export const AddVacationDialog = ({
       });
     }
 
-    // Generate next 3 months
-    for (let i = 0; i < 3; i++) {
+    // Generate next 6 full months
+    for (let i = 0; i < 6; i++) {
       const monthDate = addMonths(now, i);
-      const monthStart = i === 0 ? now : startOfMonth(monthDate);
+      const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
-      
-      let label = '';
-      if (i === 0) label = 'هذا الشهر';
-      else if (i === 1) label = 'الشهر القادم';
-      else label = 'الشهر بعد القادم';
-
       const monthName = MONTH_NAMES_AR[monthDate.getMonth()];
+      const year = monthDate.getFullYear();
+      const daysInMonth = monthEnd.getDate();
       
       options.push({
         id: `month-${i}`,
-        label: `${label} (${monthName})`,
-        dateRange: `${format(monthStart, 'd', { locale: ar })} - ${format(monthEnd, 'd MMMM', { locale: ar })}`,
+        label: `${monthName} ${year}`,
+        dateRange: `1-${daysInMonth} ${monthName}`,
         start: monthStart,
         end: monthEnd,
         type: 'month',
@@ -353,11 +353,13 @@ export const AddVacationDialog = ({
                     <p className="text-xs text-muted-foreground mt-1">يمكنك اختيار أكثر من فترة</p>
                   </div>
                   
-                  <ScrollArea className="max-h-[300px]">
+                  <ScrollArea className="max-h-[350px]">
                     <div className="p-3 space-y-3">
                       {/* Week Options */}
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">الأسابيع القادمة</p>
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                          📅 الأسابيع
+                        </p>
                         {weekOptions.map(option => (
                           <label
                             key={option.id}
@@ -374,7 +376,7 @@ export const AddVacationDialog = ({
                             />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium">{option.label}</p>
-                              <p className="text-xs text-muted-foreground">{option.dateRange}</p>
+                              <p className="text-xs text-muted-foreground">({option.dateRange})</p>
                             </div>
                           </label>
                         ))}
@@ -384,7 +386,9 @@ export const AddVacationDialog = ({
 
                       {/* Month Options */}
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">الأشهر</p>
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                          📆 الأشهر الكاملة
+                        </p>
                         {monthOptions.map(option => (
                           <label
                             key={option.id}
@@ -401,7 +405,7 @@ export const AddVacationDialog = ({
                             />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium">{option.label}</p>
-                              <p className="text-xs text-muted-foreground">{option.dateRange}</p>
+                              <p className="text-xs text-muted-foreground">({option.dateRange})</p>
                             </div>
                           </label>
                         ))}
@@ -411,6 +415,9 @@ export const AddVacationDialog = ({
 
                       {/* Custom Range */}
                       <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                          📋 نطاق مخصص
+                        </p>
                         <label
                           className={cn(
                             "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors",
@@ -423,7 +430,7 @@ export const AddVacationDialog = ({
                             checked={useCustomRange}
                             onCheckedChange={(checked) => setUseCustomRange(checked === true)}
                           />
-                          <span className="text-sm font-medium">نطاق مخصص</span>
+                          <span className="text-sm font-medium">تحديد تواريخ مخصصة</span>
                         </label>
                         
                         {useCustomRange && (
@@ -496,33 +503,38 @@ export const AddVacationDialog = ({
               {/* Selected Periods as Chips */}
               {selectedPeriods.length > 0 && (
                 <div className="space-y-2">
-                  {selectedPeriods.map(period => (
-                    <div
-                      key={period.id}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-warning/10 border border-warning/30"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Palmtree className="h-4 w-4 text-warning shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{period.label}</p>
-                          <p className="text-xs text-muted-foreground">{period.dateRange}</p>
+                  {selectedPeriods.map(period => {
+                    const chipLabel = period.type === 'month' 
+                      ? `${period.label} (شهر كامل)`
+                      : period.type === 'custom'
+                        ? `${period.dateRange} (مخصص)`
+                        : `${period.label} (${period.dateRange})`;
+                    
+                    return (
+                      <div
+                        key={period.id}
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-warning/10 border border-warning/30"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Palmtree className="h-4 w-4 text-warning shrink-0" />
+                          <p className="text-sm font-medium truncate">{chipLabel}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant="secondary" className="text-xs">
+                            {periodSessionCounts[period.id] || 0} جلسة
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => removePeriod(period.id)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="secondary" className="text-xs">
-                          {periodSessionCounts[period.id] || 0} جلسة
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                          onClick={() => removePeriod(period.id)}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
