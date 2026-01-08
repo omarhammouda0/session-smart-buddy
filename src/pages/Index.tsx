@@ -1,38 +1,18 @@
 import { useState } from "react";
-import {
-  GraduationCap,
-  BookOpen,
-  CreditCard,
-  ChevronLeft,
-  ChevronRight,
-  Users,
-  X,
-  History,
-  CalendarDays,
-} from "lucide-react";
+import { BookOpen, CreditCard, History, CalendarDays, Users } from "lucide-react";
 
 import { useStudents } from "@/hooks/useStudents";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
-import { useConflictDetection, ConflictResult } from "@/hooks/useConflictDetection";
 
-import { AddStudentDialog } from "@/components/AddStudentDialog";
-import { SemesterSettings } from "@/components/SemesterSettings";
 import { StudentCard } from "@/components/StudentCard";
-import { PaymentsDashboard } from "@/components/PaymentsDashboard";
 import { EmptyState } from "@/components/EmptyState";
+import { CalendarView } from "@/components/CalendarView";
+import { SessionHistoryBar } from "@/components/SessionHistoryBar";
+import { PaymentsDashboard } from "@/components/PaymentsDashboard";
 import { StatsBar } from "@/components/StatsBar";
 import { EndOfMonthReminder } from "@/components/EndOfMonthReminder";
-import { SessionHistoryBar } from "@/components/SessionHistoryBar";
-import { BulkEditSessionsDialog } from "@/components/BulkEditSessionsDialog";
-import { AddVacationDialog } from "@/components/AddVacationDialog";
-import { RestoreConflictDialog } from "@/components/RestoreConflictDialog";
-import { ReminderSettingsDialog } from "@/components/ReminderSettingsDialog";
-import { ReminderHistoryDialog } from "@/components/ReminderHistoryDialog";
-import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
-import { CalendarView } from "@/components/CalendarView";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
@@ -40,48 +20,20 @@ import { cn } from "@/lib/utils";
 
 const Index = () => {
   const now = new Date();
+  const today = now.getDay();
 
   const [activeTab, setActiveTab] = useState("sessions");
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(today);
   const [studentFilter, setStudentFilter] = useState("all");
 
-  const [addConflictDialog, setAddConflictDialog] = useState<{
-    open: boolean;
-    studentId: string;
-    date: string;
-    conflictResult: ConflictResult;
-    sessionInfo: { studentName: string; date: string; time: string };
-  } | null>(null);
-
-  const {
-    students,
-    payments,
-    settings,
-    isLoaded,
-    updateSettings,
-    addStudent,
-    removeStudent,
-    updateStudentName,
-    updateStudentTime,
-    updateStudentPhone,
-    updateStudentSessionType,
-    updateStudentSchedule,
-    updateStudentDuration,
-    updateStudentCustomSettings,
-    rescheduleSession,
-    togglePaymentStatus,
-    bulkUpdateSessionTime,
-    bulkMarkAsVacation,
-    updateSessionDetails,
-  } = useStudents();
+  const { students, payments, settings, isLoaded, rescheduleSession, togglePaymentStatus, updateSessionDetails } =
+    useStudents();
 
   const { getCancellationCount, getAllStudentCancellations, clearMonthCancellations } =
     useCancellationTracking(students);
 
-  useConflictDetection(students); // kept for full functionality parity
-
   if (!isLoaded) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">جاري التحميل...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   }
 
   const studentsForDay = students
@@ -90,54 +42,20 @@ const Index = () => {
     .sort((a, b) => (a.sessionTime || "16:00").localeCompare(b.sessionTime || "16:00"));
 
   const weekDays = Array.from({ length: 7 }).map((_, i) => ({
-    dayOfWeek: i,
-    dayName: DAY_NAMES_SHORT_AR[i],
-    count: students.filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === i)).length,
+    day: i,
+    label: DAY_NAMES_SHORT_AR[i],
   }));
 
   return (
-    <div className="min-h-screen bg-background" dir="rtl">
-      {/* ================= HEADER ================= */}
-      <header className="sticky top-0 z-10 bg-card border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="font-bold">متابعة الطلاب</h1>
-              <p className="text-xs text-muted-foreground">إدارة الحصص والمدفوعات</p>
-            </div>
-          </div>
+    <div dir="rtl" className="min-h-screen relative overflow-hidden bg-background">
+      {/* 🌈 Animated gradient background */}
+      <div className="absolute inset-0 -z-10 bg-[length:400%_400%] animate-gradient bg-gradient-to-br from-primary/20 via-purple-500/10 to-blue-500/20" />
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
-            <BulkEditSessionsDialog
-              students={students}
-              onBulkUpdateTime={bulkUpdateSessionTime}
-              onBulkMarkAsVacation={bulkMarkAsVacation}
-            />
-            <MonthlyReportDialog students={students} payments={payments} settings={settings} />
-            <ReminderHistoryDialog />
-            <ReminderSettingsDialog />
-            <SemesterSettings settings={settings} onUpdate={updateSettings} />
-            <AddStudentDialog
-              onAdd={addStudent}
-              defaultStart={settings.defaultSemesterStart}
-              defaultEnd={settings.defaultSemesterEnd}
-              students={students}
-              defaultDuration={settings.defaultSessionDuration}
-            />
-          </div>
-        </div>
-      </header>
-
-      {/* ================= MAIN ================= */}
-      <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 bg-muted rounded-xl p-1">
+          <TabsList className="grid grid-cols-4 bg-background/60 backdrop-blur rounded-xl p-1">
             <TabsTrigger value="sessions">
-              <BookOpen className="h-4 w-4 ml-1" /> الحصص
+              <BookOpen className="h-4 w-4 ml-1" /> اليوم
             </TabsTrigger>
             <TabsTrigger value="calendar">
               <CalendarDays className="h-4 w-4 ml-1" /> التقويم
@@ -150,94 +68,62 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* ================= SESSIONS TAB ================= */}
-          <TabsContent value="sessions" className="space-y-4">
+          {/* ================= TODAY ================= */}
+          <TabsContent value="sessions" className="space-y-8">
             {students.length === 0 ? (
               <EmptyState />
             ) : (
               <>
-                {/* Title + Summary */}
-                <div className="text-center space-y-1">
-                  <h2 className="font-bold text-xl">حصص يوم {DAY_NAMES_AR[selectedDayOfWeek]}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    👤 {studentsForDay.length} طالب • ⏱️ {studentsForDay.length} حصة
-                  </p>
+                {/* ⚡ HERO */}
+                <div className="text-center space-y-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                  <p className="text-sm text-muted-foreground">⚡ اليوم</p>
+                  <h1 className="text-4xl font-heading font-bold">{studentsForDay.length} حصص</h1>
+                  <p className="text-sm text-muted-foreground">{DAY_NAMES_AR[selectedDayOfWeek]} • لنبدأ</p>
                 </div>
 
-                {/* Day Selector */}
-                <div className="flex justify-center gap-1 overflow-x-auto">
-                  {weekDays.map((day) => (
-                    <button
-                      key={day.dayOfWeek}
-                      onClick={() => {
-                        setSelectedDayOfWeek(day.dayOfWeek);
-                        setStudentFilter("all");
-                      }}
-                      className={cn(
-                        "px-3 py-2 rounded-lg text-sm transition",
-                        selectedDayOfWeek === day.dayOfWeek
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted hover:bg-accent",
-                      )}
-                    >
-                      {day.dayName}
-                      {day.count > 0 && <div className="text-[10px] opacity-70">{day.count}</div>}
-                    </button>
+                {/* 🎴 CARDS */}
+                <div
+                  key={selectedDayOfWeek}
+                  className="grid gap-4 animate-in fade-in slide-in-from-bottom-3 duration-300"
+                >
+                  {studentsForDay.map((student) => (
+                    <StudentCard
+                      key={student.id}
+                      student={student}
+                      students={students}
+                      settings={settings}
+                      selectedDayOfWeek={selectedDayOfWeek}
+                      onRemove={() => {}}
+                      onUpdateName={() => {}}
+                      onUpdateTime={() => {}}
+                      onUpdatePhone={() => {}}
+                      onUpdateSessionType={() => {}}
+                      onUpdateSchedule={() => {}}
+                      onUpdateDuration={() => {}}
+                      onUpdateCustomSettings={() => {}}
+                    />
                   ))}
                 </div>
 
-                {/* Filter + List */}
-                <div className="bg-card border rounded-xl p-3 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Select value={studentFilter} onValueChange={setStudentFilter}>
-                      <SelectTrigger className="w-full">
-                        <Users className="h-4 w-4 ml-2" />
-                        <SelectValue placeholder="جميع الطلاب" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">جميع الطلاب</SelectItem>
-                        {students.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {studentFilter !== "all" && (
-                      <Button variant="ghost" size="icon" onClick={() => setStudentFilter("all")}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+                {/* 🗓 OTHER DAYS */}
+                <div className="pt-6 text-center space-y-2">
+                  <p className="text-xs text-muted-foreground">يوم آخر؟</p>
+                  <div className="flex justify-center gap-1">
+                    {weekDays.map((d) => (
+                      <button
+                        key={d.day}
+                        onClick={() => setSelectedDayOfWeek(d.day)}
+                        className={cn(
+                          "px-3 py-2 rounded-lg text-sm transition",
+                          selectedDayOfWeek === d.day
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-background/60 backdrop-blur hover:bg-accent",
+                        )}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
                   </div>
-
-                  {/* 🔹 ANIMATED STUDENT LIST */}
-                  {studentsForDay.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">لا توجد حصص لهذا اليوم</div>
-                  ) : (
-                    <div
-                      key={selectedDayOfWeek}
-                      className="grid gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
-                    >
-                      {studentsForDay.map((student) => (
-                        <StudentCard
-                          key={student.id}
-                          student={student}
-                          students={students}
-                          settings={settings}
-                          selectedDayOfWeek={selectedDayOfWeek}
-                          onRemove={() => removeStudent(student.id)}
-                          onUpdateName={(n) => updateStudentName(student.id, n)}
-                          onUpdateTime={(t) => updateStudentTime(student.id, t)}
-                          onUpdatePhone={(p) => updateStudentPhone(student.id, p)}
-                          onUpdateSessionType={(t) => updateStudentSessionType(student.id, t)}
-                          onUpdateSchedule={(d, s, e) => updateStudentSchedule(student.id, d, s, e)}
-                          onUpdateDuration={(d) => updateStudentDuration(student.id, d)}
-                          onUpdateCustomSettings={(s) => updateStudentCustomSettings(student.id, s)}
-                        />
-                      ))}
-                    </div>
-                  )}
                 </div>
               </>
             )}
@@ -285,15 +171,6 @@ const Index = () => {
 
         <EndOfMonthReminder students={students} payments={payments} onTogglePayment={togglePaymentStatus} />
       </main>
-
-      {addConflictDialog && (
-        <RestoreConflictDialog
-          open={addConflictDialog.open}
-          onOpenChange={(open) => !open && setAddConflictDialog(null)}
-          conflictResult={addConflictDialog.conflictResult}
-          sessionInfo={addConflictDialog.sessionInfo}
-        />
-      )}
     </div>
   );
 };
