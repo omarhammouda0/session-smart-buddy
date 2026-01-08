@@ -464,8 +464,7 @@ const Index = () => {
                 student.name,
                 riskData.count,
                 riskData.limit,
-                cancellations,
-                'manual'
+                cancellations
               );
               
               if (result.success) {
