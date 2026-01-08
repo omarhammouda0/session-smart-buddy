@@ -23,7 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Student, Session } from '@/types/student';
@@ -359,12 +359,24 @@ export const AddVacationDialog = ({
                     إضافة فترة
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 p-0 bg-popover z-50 max-h-[80vh] overflow-hidden flex flex-col" align="start">
+                <PopoverContent 
+                  className="w-80 p-0 bg-popover z-50 max-h-[80vh] overflow-hidden flex flex-col pointer-events-auto" 
+                  align="start"
+                  onWheelCapture={(e) => e.stopPropagation()}
+                >
                   <div className="p-2.5 border-b">
                     <h4 className="font-medium text-sm">اختر فترة الإجازة</h4>
                   </div>
                   
-                  <ScrollArea className="flex-1 min-h-0">
+                  <div 
+                    className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+                    onWheelCapture={(e) => e.stopPropagation()}
+                    style={{ 
+                      maxHeight: "50vh",
+                      overscrollBehavior: "contain",
+                      WebkitOverflowScrolling: "touch"
+                    }}
+                  >
                     <div className="p-2 space-y-1">
                       {/* Week Options - Collapsible */}
                       <Collapsible open={weeksOpen} onOpenChange={setWeeksOpen}>
@@ -497,7 +509,7 @@ export const AddVacationDialog = ({
                         </CollapsibleContent>
                       </Collapsible>
                     </div>
-                  </ScrollArea>
+                  </div>
 
                   <div className="p-2 border-t space-y-1.5 bg-background">
                     <div className="flex gap-1.5">
