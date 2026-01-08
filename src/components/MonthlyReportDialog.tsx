@@ -674,9 +674,11 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
 
           {/* Step 3: Preview */}
           {currentStep === 'preview' && reportData && (
-            <div className="h-full flex flex-col">
-              <ScrollArea className="flex-1 border-y bg-white">
-                <MonthlyReportPreview ref={reportRef} data={reportData} />
+            <div className="h-full flex flex-col overflow-hidden">
+              <ScrollArea className="h-[calc(90vh-220px)] border-y bg-white">
+                <div className="p-4">
+                  <MonthlyReportPreview ref={reportRef} data={reportData} />
+                </div>
               </ScrollArea>
             </div>
           )}
