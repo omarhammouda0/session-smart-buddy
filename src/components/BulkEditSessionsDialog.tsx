@@ -859,13 +859,9 @@ export const BulkEditSessionsDialog = ({
                         </div>
                       </div>
 
-                      <div
-                        className="overflow-y-auto overflow-x-hidden flex-1 min-h-0"
-                        style={{
-                          maxHeight: "50vh",
-                          WebkitOverflowScrolling: "touch",
-                          overscrollBehavior: "contain",
-                        }}
+                      <ScrollArea 
+                        className="flex-1 min-h-0"
+                        style={{ maxHeight: "50vh" }}
                       >
                         <div className="p-3 space-y-3 pb-6">
                           {periodView === "weeks" && (
@@ -989,7 +985,7 @@ export const BulkEditSessionsDialog = ({
                             </div>
                           )}
                         </div>
-                      </div>
+                      </ScrollArea>
 
                       <div className="p-3 border-t bg-muted/30 space-y-2 shrink-0">
                         <div className="flex gap-2">
