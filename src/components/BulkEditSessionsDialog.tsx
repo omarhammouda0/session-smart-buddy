@@ -821,9 +821,10 @@ export const BulkEditSessionsDialog = ({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[80vh] bg-popover"
+                      className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[80vh] bg-popover pointer-events-auto"
                       align="start"
                       dir="rtl"
+                      onWheel={(e) => e.stopPropagation()}
                     >
                       <div className="p-3 border-b bg-muted/30 shrink-0">
                         <p className="font-medium text-sm mb-2">اختر فترات</p>
@@ -860,7 +861,7 @@ export const BulkEditSessionsDialog = ({
                       </div>
 
                       <ScrollArea 
-                        className="flex-1 min-h-0"
+                        className="flex-1 min-h-0 pointer-events-auto"
                         style={{ maxHeight: "50vh" }}
                       >
                         <div className="p-3 space-y-3 pb-6">
