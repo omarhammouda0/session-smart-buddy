@@ -94,6 +94,7 @@ const Index = () => {
   // Cancellation tracking
   const { 
     getCancellationCount, 
+    getAllStudentCancellations,
     recordCancellation,
     removeCancellation,
   } = useCancellationTracking(students);
@@ -405,6 +406,8 @@ const Index = () => {
                               student={student}
                               students={students}
                               currentCancellationCount={getCancellationCount(student.id)}
+                              allCancellations={getAllStudentCancellations(student.id)}
+                              onRestoreSession={handleRestoreSession}
                               onUpdateName={(name) => updateStudentName(student.id, name)}
                               onUpdateTime={(time) => updateStudentTime(student.id, time)}
                               onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}

@@ -170,6 +170,14 @@ export const useCancellationTracking = (students: Student[]) => {
     [cancellations]
   );
 
+  // Get ALL cancellations for a student (all months)
+  const getAllStudentCancellations = useCallback(
+    (studentId: string) => {
+      return cancellations.filter((c) => c.studentId === studentId);
+    },
+    [cancellations]
+  );
+
   // Check if parent was already notified this month
   const wasParentNotified = useCallback(
     (studentId: string, month?: string) => {
@@ -612,6 +620,7 @@ ${cancellationsText}
     isLoading,
     getCancellationCount,
     getStudentCancellations,
+    getAllStudentCancellations,
     wasParentNotified,
     recordCancellation,
     removeCancellation,
