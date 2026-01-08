@@ -98,6 +98,7 @@ const Index = () => {
     sendParentNotification, 
     getStudentCancellations,
     recordCancellation,
+    removeCancellation,
   } = useCancellationTracking(students);
 
   // Conflict detection
@@ -219,11 +220,19 @@ const Index = () => {
     });
   };
 
-  const handleRestoreSession = (studentId: string, sessionId: string) => {
+  const handleRestoreSession = async (studentId: string, sessionId: string) => {
+    const student = students.find(s => s.id === studentId);
+    const session = student?.sessions.find(s => s.id === sessionId);
+    
+    // Remove cancellation record if session was cancelled
+    if (session?.status === 'cancelled') {
+      await removeCancellation(studentId, session.date);
+    }
+    
     restoreSession(studentId, sessionId);
     toast({
       title: "تم استعادة الحصة",
-      description: "تم استعادة الحصة إلى مجدولة",
+      description: "تم استعادة الحصة وتحديث عداد الإلغاءات",
     });
   };
 
