@@ -136,6 +136,29 @@ export const useStudents = () => {
     );
   };
 
+  const updateStudentCustomSettings = (
+    studentId: string,
+    customSettings: {
+      useCustomSettings?: boolean;
+      sessionDuration?: number;
+      customPriceOnsite?: number;
+      customPriceOnline?: number;
+    }
+  ) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== studentId) return s;
+        return {
+          ...s,
+          useCustomSettings: customSettings.useCustomSettings,
+          sessionDuration: customSettings.sessionDuration,
+          customPriceOnsite: customSettings.customPriceOnsite,
+          customPriceOnline: customSettings.customPriceOnline,
+        };
+      })
+    );
+  };
+
   const removeStudent = (studentId: string) => {
     setStudents(prev => prev.filter(s => s.id !== studentId));
     setPayments(prev => prev.filter(p => p.studentId !== studentId));
@@ -514,6 +537,7 @@ export const useStudents = () => {
     updateStudentPhone,
     updateStudentSessionType,
     updateStudentDuration,
+    updateStudentCustomSettings,
     updateStudentSchedule,
     addExtraSession,
     removeSession,

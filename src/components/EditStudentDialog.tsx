@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Edit2, Phone, Clock, Monitor, MapPin, Calendar, XCircle, AlertTriangle, Check, Loader2 } from 'lucide-react';
+import { Edit2, Phone, Clock, Monitor, MapPin, Calendar, XCircle, AlertTriangle, Check, Loader2, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,6 +44,12 @@ interface EditStudentDialogProps {
   onUpdateSessionType: (type: SessionType) => void;
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
   onUpdateDuration?: (duration: number) => void;
+  onUpdateCustomSettings?: (settings: {
+    useCustomSettings?: boolean;
+    sessionDuration?: number;
+    customPriceOnsite?: number;
+    customPriceOnline?: number;
+  }) => void;
 }
 
 export const EditStudentDialog = ({
@@ -55,6 +61,7 @@ export const EditStudentDialog = ({
   onUpdateSessionType,
   onUpdateSchedule,
   onUpdateDuration,
+  onUpdateCustomSettings,
 }: EditStudentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(student.name);
@@ -65,6 +72,11 @@ export const EditStudentDialog = ({
   const [selectedDays, setSelectedDays] = useState<number[]>(
     student.scheduleDays.map(d => d.dayOfWeek)
   );
+  
+  // Custom settings state
+  const [useCustomSettings, setUseCustomSettings] = useState(student.useCustomSettings || false);
+  const [customPriceOnsite, setCustomPriceOnsite] = useState<string>(student.customPriceOnsite?.toString() || '');
+  const [customPriceOnline, setCustomPriceOnline] = useState<string>(student.customPriceOnline?.toString() || '');
   
   // Conflict detection state
   const [isChecking, setIsChecking] = useState(false);
@@ -172,6 +184,23 @@ export const EditStudentDialog = ({
       onUpdateDuration?.(sessionDuration);
     }
     
+    // Update custom settings
+    const hasCustomSettingsChange = 
+      useCustomSettings !== (student.useCustomSettings || false) ||
+      (useCustomSettings && (
+        parseFloat(customPriceOnsite || '0') !== (student.customPriceOnsite || 0) ||
+        parseFloat(customPriceOnline || '0') !== (student.customPriceOnline || 0)
+      ));
+    
+    if (hasCustomSettingsChange) {
+      onUpdateCustomSettings?.({
+        useCustomSettings,
+        sessionDuration,
+        customPriceOnsite: useCustomSettings && customPriceOnsite ? parseFloat(customPriceOnsite) : undefined,
+        customPriceOnline: useCustomSettings && customPriceOnline ? parseFloat(customPriceOnline) : undefined,
+      });
+    }
+    
     const currentDays = student.scheduleDays.map(d => d.dayOfWeek).sort().join(',');
     const newDays = selectedDays.sort().join(',');
     if (currentDays !== newDays && selectedDays.length > 0) {
@@ -191,6 +220,9 @@ export const EditStudentDialog = ({
       setSessionType(student.sessionType || 'onsite');
       setSessionDuration(student.sessionDuration || DEFAULT_DURATION);
       setSelectedDays(student.scheduleDays.map(d => d.dayOfWeek));
+      setUseCustomSettings(student.useCustomSettings || false);
+      setCustomPriceOnsite(student.customPriceOnsite?.toString() || '');
+      setCustomPriceOnline(student.customPriceOnline?.toString() || '');
       setConflictResults(new Map());
     }
     setOpen(isOpen);
@@ -212,7 +244,7 @@ export const EditStudentDialog = ({
             <Edit2 className="h-3.5 w-3.5" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
             <DialogTitle className="font-heading">تعديل بيانات الطالب</DialogTitle>
           </DialogHeader>
@@ -394,6 +426,68 @@ export const EditStudentDialog = ({
               </div>
               {selectedDays.length === 0 && (
                 <p className="text-xs text-destructive">يجب اختيار يوم واحد على الأقل</p>
+              )}
+            </div>
+
+            {/* Custom Pricing Settings */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="use-custom"
+                  checked={useCustomSettings}
+                  onCheckedChange={(checked) => setUseCustomSettings(checked === true)}
+                />
+                <Label htmlFor="use-custom" className="text-sm cursor-pointer flex items-center gap-1.5">
+                  <Banknote className="h-3.5 w-3.5" />
+                  أسعار مخصصة لهذا الطالب
+                </Label>
+              </div>
+              
+              {useCustomSettings && (
+                <div className="grid grid-cols-2 gap-3 pr-6">
+                  <div className="space-y-1">
+                    <Label htmlFor="custom-price-onsite" className="text-xs flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      حضوري
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="custom-price-onsite"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={customPriceOnsite}
+                        onChange={(e) => setCustomPriceOnsite(e.target.value)}
+                        placeholder="100"
+                        className="pl-10 h-9"
+                      />
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                        ريال
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="custom-price-online" className="text-xs flex items-center gap-1">
+                      <Monitor className="h-3 w-3" />
+                      أونلاين
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="custom-price-online"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={customPriceOnline}
+                        onChange={(e) => setCustomPriceOnline(e.target.value)}
+                        placeholder="80"
+                        className="pl-10 h-9"
+                      />
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                        ريال
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>

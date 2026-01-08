@@ -67,6 +67,7 @@ const Index = () => {
     updateStudentSessionType,
     updateStudentSchedule,
     updateStudentDuration,
+    updateStudentCustomSettings,
     addExtraSession,
     removeSession,
     deleteSession,
@@ -524,6 +525,7 @@ const Index = () => {
                         onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
                         onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
                         onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
+                        onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
                       />
                     ))}
                   </div>
