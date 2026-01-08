@@ -39,7 +39,15 @@ export const useStudents = () => {
 
     if (storedStudents) setStudents(JSON.parse(storedStudents));
     if (storedPayments) setPayments(JSON.parse(storedPayments));
-    if (storedSettings) setSettings(JSON.parse(storedSettings));
+    if (storedSettings) {
+      const parsed = JSON.parse(storedSettings);
+      // Ensure default prices exist (for existing users who didn't have them)
+      setSettings({
+        ...parsed,
+        defaultPriceOnsite: parsed.defaultPriceOnsite ?? 150,
+        defaultPriceOnline: parsed.defaultPriceOnline ?? 120,
+      });
+    }
     
     setIsLoaded(true);
   }, []);
