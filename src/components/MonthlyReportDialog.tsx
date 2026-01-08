@@ -468,7 +468,7 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0" dir="rtl">
+      <DialogContent className="max-w-4xl h-[90vh] overflow-hidden flex flex-col p-0" dir="rtl">
         {/* Header with step indicator */}
         <div className="border-b bg-muted/30 px-6 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -524,10 +524,11 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           {/* Step 1: Select Student */}
           {currentStep === 'select' && (
-            <div className="p-6 space-y-6 overflow-auto h-full">
+            <ScrollArea className="h-full">
+              <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader className="pb-3">
@@ -634,13 +635,14 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
                   </div>
                 </CardContent>
               </Card>
-            </div>
+              </div>
+            </ScrollArea>
           )}
 
           {/* Step 2: Edit Assessment */}
           {currentStep === 'edit' && (
             <ScrollArea className="h-full">
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 pb-8">
                 <p className="text-sm text-muted-foreground">
                   أضف تقييمك ومعلومات التواصل لتظهر في التقرير (اختياري)
                 </p>
@@ -760,13 +762,11 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
 
           {/* Step 3: Preview */}
           {currentStep === 'preview' && reportData && (
-            <div className="h-full flex flex-col overflow-hidden">
-              <ScrollArea className="h-[calc(90vh-220px)] border-y bg-white">
-                <div className="p-4">
-                  <MonthlyReportPreview ref={reportRef} data={reportData} />
-                </div>
-              </ScrollArea>
-            </div>
+            <ScrollArea className="h-full">
+              <div className="p-4 bg-background">
+                <MonthlyReportPreview ref={reportRef} data={reportData} />
+              </div>
+            </ScrollArea>
           )}
         </div>
 
