@@ -881,11 +881,15 @@ export const BulkEditSessionsDialog = ({
                         إضافة فترة
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0 max-h-[70vh] overflow-hidden flex flex-col" align="start" dir="rtl">
-                      <ScrollArea className="flex-1">
+                    <PopoverContent className="w-80 p-0 max-h-[60vh] flex flex-col" align="start" dir="rtl">
+                      {/* Header */}
+                      <div className="p-3 pb-2 border-b bg-popover">
+                        <p className="font-medium text-sm">اختر فترات (يمكن اختيار أكثر من واحدة):</p>
+                      </div>
+                      
+                      {/* Scrollable Content */}
+                      <ScrollArea className="flex-1 min-h-0 max-h-[calc(60vh-120px)]">
                         <div className="p-3 space-y-3">
-                          <p className="font-medium text-sm">اختر فترات (يمكن اختيار أكثر من واحدة):</p>
-                          
                           {!showCustomRange ? (
                             <>
                               {/* Weeks */}
@@ -916,16 +920,6 @@ export const BulkEditSessionsDialog = ({
                                     );
                                   })}
                                 </div>
-                              </div>
-
-                              {/* Quick Actions */}
-                              <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={selectAllPeriods}>
-                                  تحديد الكل
-                                </Button>
-                                <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={deselectAllPeriods}>
-                                  إلغاء التحديد
-                                </Button>
                               </div>
 
                               <Separator />
@@ -1005,37 +999,49 @@ export const BulkEditSessionsDialog = ({
                               </div>
                             </div>
                           )}
-
-                          <Separator />
-
-                          {/* Custom Range Toggle */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full text-xs"
-                            onClick={() => {
-                              setShowCustomRange(!showCustomRange);
-                              setCheckedPeriodIds(new Set());
-                            }}
-                          >
-                            {showCustomRange ? 'العودة للقائمة' : 'نطاق مخصص...'}
-                          </Button>
-
-                          {/* Action Buttons */}
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="flex-1" onClick={() => {
-                              setShowPeriodPicker(false);
-                              setShowCustomRange(false);
-                              setCheckedPeriodIds(new Set());
-                            }}>
-                              إلغاء
-                            </Button>
-                            <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
-                              {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
-                            </Button>
-                          </div>
                         </div>
                       </ScrollArea>
+                      
+                      {/* Fixed Footer Buttons */}
+                      <div className="p-3 pt-2 border-t bg-popover space-y-2">
+                        {!showCustomRange && (
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={selectAllPeriods}>
+                              تحديد الكل
+                            </Button>
+                            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={deselectAllPeriods}>
+                              إلغاء التحديد
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Custom Range Toggle */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={() => {
+                            setShowCustomRange(!showCustomRange);
+                            setCheckedPeriodIds(new Set());
+                          }}
+                        >
+                          {showCustomRange ? 'العودة للقائمة' : 'نطاق مخصص...'}
+                        </Button>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                            setShowPeriodPicker(false);
+                            setShowCustomRange(false);
+                            setCheckedPeriodIds(new Set());
+                          }}>
+                            إلغاء
+                          </Button>
+                          <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
+                            {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
+                          </Button>
+                        </div>
+                      </div>
                     </PopoverContent>
                   </Popover>
 
