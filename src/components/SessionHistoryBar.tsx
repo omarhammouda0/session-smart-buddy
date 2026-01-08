@@ -325,11 +325,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                   {formatShortDateAr(session.date)}
                                   <span className="text-muted-foreground font-normal mr-1">
                                     ({session.time || selectedStudent.sessionTime || '16:00'})
-                                    {(session.duration || selectedStudent.sessionDuration) && (
-                                      <span className="text-muted-foreground/70 mr-1">
-                                        ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
-                                      </span>
-                                    )}
+                                    <span className="text-muted-foreground/70 mr-1">
+                                      ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                                    </span>
                                   </span>
                                 </p>
                                 {session.status === 'cancelled' && <span className="text-[10px] text-destructive">ملغاة</span>}
@@ -461,11 +459,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             {formatShortDateAr(session.date)}
                             <span className="text-muted-foreground font-normal mr-1">
                               ({session.time || selectedStudent.sessionTime || '16:00'})
-                              {(session.duration || selectedStudent.sessionDuration) && (
-                                <span className="text-muted-foreground/70 mr-1">
-                                  ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
-                                </span>
-                              )}
+                              <span className="text-muted-foreground/70 mr-1">
+                                ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                              </span>
                             </span>
                           </p>
                         </div>
