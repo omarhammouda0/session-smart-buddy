@@ -175,6 +175,9 @@ export const PaymentsDashboard = ({
           phoneNumber: student.phone,
           month: MONTH_NAMES_AR[selectedMonth],
           year: selectedYear,
+          studentId: student.id,
+          type: 'payment',
+          logToDb: true,
         },
       });
 
@@ -238,6 +241,9 @@ export const PaymentsDashboard = ({
             studentName: student.name,
             phoneNumber: student.phone,
             customMessage: message,
+            studentId: student.id,
+            type: 'payment',
+            logToDb: true,
           },
         });
 

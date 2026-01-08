@@ -15,7 +15,7 @@ export interface ReminderSettings {
 export interface ReminderLog {
   id: string;
   user_id: string;
-  type: 'session' | 'payment';
+  type: 'session' | 'payment' | 'cancellation';
   student_id: string;
   student_name: string;
   phone_number: string;
