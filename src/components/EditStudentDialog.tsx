@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Edit2, Phone, Clock, Monitor, MapPin, Calendar, XCircle, AlertTriangle, Check, Loader2, Banknote, RotateCcw, History } from 'lucide-react';
+import { Edit2, Phone, Clock, Monitor, MapPin, Calendar, XCircle, AlertTriangle, Check, Loader2, Banknote, RotateCcw, History, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,6 +56,7 @@ interface EditStudentDialogProps {
   currentCancellationCount?: number;
   allCancellations?: CancellationRecord[];
   onRestoreSession?: (studentId: string, sessionId: string) => void;
+  onClearMonthCancellations?: (studentId: string, month: string) => Promise<boolean>;
   onUpdateName: (name: string) => void;
   onUpdateTime: (time: string) => void;
   onUpdatePhone: (phone: string) => void;
@@ -77,6 +78,7 @@ export const EditStudentDialog = ({
   currentCancellationCount = 0,
   allCancellations = [],
   onRestoreSession,
+  onClearMonthCancellations,
   onUpdateName,
   onUpdateTime,
   onUpdatePhone,
@@ -529,6 +531,7 @@ export const EditStudentDialog = ({
                 student={student}
                 cancellations={allCancellations}
                 onRestore={onRestoreSession}
+                onClearMonth={onClearMonthCancellations}
               />
             )}
           </div>
@@ -591,11 +594,15 @@ const CancellationHistorySection = ({
   student,
   cancellations,
   onRestore,
+  onClearMonth,
 }: {
   student: Student;
   cancellations: CancellationRecord[];
   onRestore?: (studentId: string, sessionId: string) => void;
+  onClearMonth?: (studentId: string, month: string) => Promise<boolean>;
 }) => {
+  const [clearingMonth, setClearingMonth] = useState<string | null>(null);
+
   // Group cancellations by month
   const groupedByMonth = useMemo(() => {
     const groups: Record<string, CancellationRecord[]> = {};
@@ -638,6 +645,16 @@ const CancellationHistorySection = ({
     }
   };
 
+  const handleClearMonth = async (month: string) => {
+    if (!onClearMonth) return;
+    setClearingMonth(month);
+    try {
+      await onClearMonth(student.id, month);
+    } finally {
+      setClearingMonth(null);
+    }
+  };
+
   const canRestore = (cancellation: CancellationRecord) => {
     return student.sessions.some(
       (s) => s.date === cancellation.sessionDate && s.status === 'cancelled'
@@ -660,20 +677,38 @@ const CancellationHistorySection = ({
         {groupedByMonth.map(([month, monthCancellations]) => (
           <div key={month} className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                {formatMonthLabel(month)}
-              </span>
-              <Badge
-                variant="outline"
-                className={cn(
-                  'text-xs',
-                  monthCancellations.length >= (student.cancellationPolicy?.monthlyLimit ?? 3)
-                    ? 'border-destructive text-destructive'
-                    : ''
-                )}
-              >
-                {monthCancellations.length} / {student.cancellationPolicy?.monthlyLimit ?? 3}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {formatMonthLabel(month)}
+                </span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-xs',
+                    monthCancellations.length >= (student.cancellationPolicy?.monthlyLimit ?? 3)
+                      ? 'border-destructive text-destructive'
+                      : ''
+                  )}
+                >
+                  {monthCancellations.length} / {student.cancellationPolicy?.monthlyLimit ?? 3}
+                </Badge>
+              </div>
+              {onClearMonth && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 gap-1 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => handleClearMonth(month)}
+                  disabled={clearingMonth === month}
+                >
+                  {clearingMonth === month ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3 w-3" />
+                  )}
+                  تصفير
+                </Button>
+              )}
             </div>
 
             <div className="space-y-1.5">
