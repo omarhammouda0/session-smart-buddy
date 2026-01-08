@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -124,7 +124,7 @@ export const ReminderSettingsDialog = () => {
           <span className="hidden sm:inline">التذكيرات</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" dir="rtl">
         <DialogHeader>
           <DialogTitle className="font-heading text-xl flex items-center gap-2">
             <Bell className="h-5 w-5" />
@@ -138,7 +138,9 @@ export const ReminderSettingsDialog = () => {
             <p className="mt-2 text-muted-foreground">جاري التحميل...</p>
           </div>
         ) : (
-          <div className="space-y-5 pt-4">
+          <>
+          <DialogBody>
+            <div className="space-y-5 pt-4">
             {/* Twilio Connection Test */}
             <div className="p-4 rounded-lg bg-muted/50 border space-y-3">
               <div className="flex items-center justify-between">
@@ -327,16 +329,18 @@ export const ReminderSettingsDialog = () => {
                 </p>
               </div>
             </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
-                إلغاء
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1 gradient-primary">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ الإعدادات'}
-              </Button>
             </div>
-          </div>
+          </DialogBody>
+
+          <DialogFooter className="flex-row-reverse gap-3 pt-2">
+            <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
+              إلغاء
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving} className="flex-1 gradient-primary">
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ الإعدادات'}
+            </Button>
+          </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>

@@ -3,6 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const Dialog = DialogPrimitive.Root;
 
@@ -52,14 +53,39 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
+  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left flex-shrink-0", className)} {...props} />
 );
 DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />
+  <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 flex-shrink-0", className)} {...props} />
 );
 DialogFooter.displayName = "DialogFooter";
+
+/**
+ * DialogBody - Scrollable content area for dialogs
+ * Use this component to wrap content that should scroll within a dialog.
+ * The header and footer will remain fixed while the body scrolls.
+ * 
+ * Usage:
+ * <DialogContent className="max-h-[90vh] flex flex-col">
+ *   <DialogHeader>...</DialogHeader>
+ *   <DialogBody>...scrollable content...</DialogBody>
+ *   <DialogFooter>...</DialogFooter>
+ * </DialogContent>
+ */
+interface DialogBodyProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'dir'> {
+  children: React.ReactNode;
+}
+
+const DialogBody = ({ className, children, ...props }: DialogBodyProps) => (
+  <ScrollArea className={cn("flex-1 min-h-0 -mx-6 px-6", className)} {...props}>
+    <div className="pr-2">
+      {children}
+    </div>
+  </ScrollArea>
+);
+DialogBody.displayName = "DialogBody";
 
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
@@ -89,6 +115,7 @@ export {
   DialogTrigger,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogFooter,
   DialogTitle,
   DialogDescription,
