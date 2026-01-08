@@ -654,6 +654,8 @@ const Index = () => {
               onMarkAsVacation={handleMarkAsVacation}
               onUpdateSessionDetails={updateSessionDetails}
               getCancellationCount={getCancellationCount}
+              getAllStudentCancellations={getAllStudentCancellations}
+              onClearMonthCancellations={clearMonthCancellations}
             />
           </TabsContent>
 

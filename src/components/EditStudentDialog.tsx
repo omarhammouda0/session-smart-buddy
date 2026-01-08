@@ -602,6 +602,7 @@ const CancellationHistorySection = ({
   onClearMonth?: (studentId: string, month: string) => Promise<boolean>;
 }) => {
   const [clearingMonth, setClearingMonth] = useState<string | null>(null);
+  const [confirmClearMonth, setConfirmClearMonth] = useState<string | null>(null);
 
   // Group cancellations by month
   const groupedByMonth = useMemo(() => {
@@ -648,6 +649,7 @@ const CancellationHistorySection = ({
   const handleClearMonth = async (month: string) => {
     if (!onClearMonth) return;
     setClearingMonth(month);
+    setConfirmClearMonth(null);
     try {
       await onClearMonth(student.id, month);
     } finally {
@@ -698,7 +700,7 @@ const CancellationHistorySection = ({
                   size="sm"
                   variant="ghost"
                   className="h-6 px-2 gap-1 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => handleClearMonth(month)}
+                  onClick={() => setConfirmClearMonth(month)}
                   disabled={clearingMonth === month}
                 >
                   {clearingMonth === month ? (
@@ -746,6 +748,32 @@ const CancellationHistorySection = ({
           </div>
         ))}
       </div>
+
+      {/* Confirmation Dialog for Clearing Month */}
+      <AlertDialog open={!!confirmClearMonth} onOpenChange={(open) => !open && setConfirmClearMonth(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              تأكيد تصفير الإلغاءات
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-right">
+              سيتم حذف جميع سجلات الإلغاء لشهر {confirmClearMonth ? formatMonthLabel(confirmClearMonth) : ''} نهائياً.
+              <br />
+              <span className="text-destructive font-medium">هذا الإجراء لا يمكن التراجع عنه.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmClearMonth && handleClearMonth(confirmClearMonth)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              تصفير
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
