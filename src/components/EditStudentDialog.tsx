@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Edit2, Phone, Clock, Monitor, MapPin, Calendar, XCircle, AlertTriangle, Check, Loader2, Banknote } from 'lucide-react';
+import { Edit2, Phone, Clock, Monitor, MapPin, Calendar, XCircle, AlertTriangle, Check, Loader2, Banknote, RotateCcw, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,17 +29,33 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { Student, SessionType, CancellationPolicy } from '@/types/student';
 import { DAY_NAMES_AR, formatDurationAr, calculateEndTime } from '@/lib/arabicConstants';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
 import { generateSessionsForSchedule } from '@/lib/dateUtils';
 import { DURATION_OPTIONS, DEFAULT_DURATION } from '@/types/student';
 import { CancellationPolicySettings } from '@/components/CancellationPolicySettings';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+
+interface CancellationRecord {
+  id: string;
+  studentId: string;
+  sessionDate: string;
+  sessionTime?: string;
+  reason?: string;
+  cancelledAt: string;
+  month: string;
+}
 
 interface EditStudentDialogProps {
   student: Student;
   students?: Student[];
   currentCancellationCount?: number;
+  allCancellations?: CancellationRecord[];
+  onRestoreSession?: (studentId: string, sessionId: string) => void;
   onUpdateName: (name: string) => void;
   onUpdateTime: (time: string) => void;
   onUpdatePhone: (phone: string) => void;
@@ -59,6 +75,8 @@ export const EditStudentDialog = ({
   student,
   students = [],
   currentCancellationCount = 0,
+  allCancellations = [],
+  onRestoreSession,
   onUpdateName,
   onUpdateTime,
   onUpdatePhone,
@@ -504,6 +522,15 @@ export const EditStudentDialog = ({
                 onSave={onUpdateCancellationPolicy}
               />
             )}
+
+            {/* Cancellation History Section */}
+            {allCancellations.length > 0 && (
+              <CancellationHistorySection
+                student={student}
+                cancellations={allCancellations}
+                onRestore={onRestoreSession}
+              />
+            )}
           </div>
 
           <DialogFooter className="flex-row-reverse gap-2">
@@ -556,5 +583,134 @@ export const EditStudentDialog = ({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+};
+
+// Cancellation History Section Component
+const CancellationHistorySection = ({
+  student,
+  cancellations,
+  onRestore,
+}: {
+  student: Student;
+  cancellations: CancellationRecord[];
+  onRestore?: (studentId: string, sessionId: string) => void;
+}) => {
+  // Group cancellations by month
+  const groupedByMonth = useMemo(() => {
+    const groups: Record<string, CancellationRecord[]> = {};
+    cancellations.forEach((c) => {
+      if (!groups[c.month]) {
+        groups[c.month] = [];
+      }
+      groups[c.month].push(c);
+    });
+    // Sort months descending (newest first)
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+  }, [cancellations]);
+
+  const formatMonthLabel = (monthStr: string) => {
+    try {
+      const [year, month] = monthStr.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+      return format(date, 'MMMM yyyy', { locale: ar });
+    } catch {
+      return monthStr;
+    }
+  };
+
+  const formatSessionDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return format(date, 'EEEE d MMMM', { locale: ar });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const handleRestore = (cancellation: CancellationRecord) => {
+    // Find the session by date
+    const session = student.sessions.find(
+      (s) => s.date === cancellation.sessionDate && s.status === 'cancelled'
+    );
+    if (session && onRestore) {
+      onRestore(student.id, session.id);
+    }
+  };
+
+  const canRestore = (cancellation: CancellationRecord) => {
+    return student.sessions.some(
+      (s) => s.date === cancellation.sessionDate && s.status === 'cancelled'
+    );
+  };
+
+  if (groupedByMonth.length === 0) return null;
+
+  return (
+    <div className="space-y-3 p-4 rounded-lg border bg-card" dir="rtl">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <History className="h-4 w-4 text-muted-foreground" />
+        <span>سجل الإلغاءات</span>
+        <Badge variant="secondary" className="text-xs">
+          {cancellations.length}
+        </Badge>
+      </div>
+
+      <div className="space-y-4 max-h-60 overflow-y-auto">
+        {groupedByMonth.map(([month, monthCancellations]) => (
+          <div key={month} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">
+                {formatMonthLabel(month)}
+              </span>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-xs',
+                  monthCancellations.length >= (student.cancellationPolicy?.monthlyLimit ?? 3)
+                    ? 'border-destructive text-destructive'
+                    : ''
+                )}
+              >
+                {monthCancellations.length} / {student.cancellationPolicy?.monthlyLimit ?? 3}
+              </Badge>
+            </div>
+
+            <div className="space-y-1.5">
+              {monthCancellations
+                .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate))
+                .map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between p-2 rounded-md bg-muted/50 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-xs">
+                        {formatSessionDate(c.sessionDate)}
+                      </p>
+                      {c.reason && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {c.reason}
+                        </p>
+                      )}
+                    </div>
+                    {canRestore(c) && onRestore && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 gap-1 text-xs shrink-0"
+                        onClick={() => handleRestore(c)}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        استعادة
+                      </Button>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
