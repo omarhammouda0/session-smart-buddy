@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format, parseISO, isBefore, isAfter, startOfToday } from 'date-fns';
-import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2, Palmtree, RotateCcw } from 'lucide-react';
-import { Student } from '@/types/student';
+import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2, Palmtree, RotateCcw, AlertTriangle, XCircle } from 'lucide-react';
+import { Student, Session } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +23,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { formatShortDateAr } from '@/lib/arabicConstants';
+import { useConflictDetection, ConflictResult, formatTimeAr } from '@/hooks/useConflictDetection';
+import { GapIndicator } from '@/components/GapIndicator';
+import { ConflictWarning } from '@/components/ConflictWarning';
+import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
 
 interface SessionHistoryBarProps {
   students: Student[];
@@ -41,8 +45,53 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
   const today = startOfToday();
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
   const [addSessionDate, setAddSessionDate] = useState<Date | undefined>(undefined);
+  
+  // Conflict detection
+  const { checkRestoreConflict, getSessionsWithGaps } = useConflictDetection(students);
+  const [restoreConflictDialog, setRestoreConflictDialog] = useState<{
+    open: boolean;
+    studentId: string;
+    sessionId: string;
+    conflictResult: ConflictResult;
+    sessionInfo: { studentName: string; date: string; time: string };
+  } | null>(null);
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
+  
+  // Handle restore with conflict check
+  const handleRestoreWithCheck = (studentId: string, sessionId: string) => {
+    const student = students.find(s => s.id === studentId);
+    const session = student?.sessions.find(s => s.id === sessionId);
+    if (!student || !session) return;
+    
+    const conflictResult = checkRestoreConflict(studentId, sessionId);
+    
+    if (conflictResult.severity === 'none') {
+      // No conflicts, restore directly
+      onRestoreSession?.(studentId, sessionId);
+      return;
+    }
+    
+    // Show conflict dialog
+    setRestoreConflictDialog({
+      open: true,
+      studentId,
+      sessionId,
+      conflictResult,
+      sessionInfo: {
+        studentName: student.name,
+        date: formatShortDateAr(session.date),
+        time: session.time || student.sessionTime || '16:00',
+      },
+    });
+  };
+  
+  const handleConfirmRestore = () => {
+    if (restoreConflictDialog) {
+      onRestoreSession?.(restoreConflictDialog.studentId, restoreConflictDialog.sessionId);
+      setRestoreConflictDialog(null);
+    }
+  };
 
   const getScheduledSessions = () => {
     if (!selectedStudent) return [];
@@ -195,7 +244,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                         <div className="flex items-center gap-1 shrink-0">
                           {session.status === 'cancelled' ? (
                             <>
-                              <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
                                 <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                               </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDeleteSession?.(session.studentId, session.id)} title="حذف نهائي">
@@ -204,7 +253,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             </>
                           ) : session.status === 'vacation' ? (
                             <>
-                              <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
                                 <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                               </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)} title="إلغاء">
@@ -309,11 +358,11 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                               <X className="h-3.5 w-3.5 ml-1" />تراجع
                             </Button>
                           ) : session.status === 'vacation' ? (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
                               <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                             </Button>
                           ) : (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
                               <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                             </Button>
                           )}
@@ -340,6 +389,17 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
           </div>
         )}
       </CardContent>
+      
+      {/* Restore Conflict Dialog */}
+      {restoreConflictDialog && (
+        <RestoreConflictDialog
+          open={restoreConflictDialog.open}
+          onOpenChange={(open) => !open && setRestoreConflictDialog(null)}
+          conflictResult={restoreConflictDialog.conflictResult}
+          sessionInfo={restoreConflictDialog.sessionInfo}
+          onConfirm={handleConfirmRestore}
+        />
+      )}
     </Card>
   );
 };
