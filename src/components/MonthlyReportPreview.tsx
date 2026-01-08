@@ -1,8 +1,9 @@
 import { forwardRef } from 'react';
-import { format, parseISO, startOfMonth, endOfMonth, getWeek } from 'date-fns';
+import { format, parseISO, getWeek } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Student, Session, MonthlyPayment } from '@/types/student';
-import { Check, X, Palmtree, FileText, BookOpen, ClipboardCheck, CreditCard } from 'lucide-react';
+import { SessionNote, Homework } from '@/types/notes';
+import { Check, X, Palmtree, FileText, BookOpen, ClipboardCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ReportData {
@@ -24,6 +25,8 @@ interface ReportData {
   tutorName?: string;
   tutorPhone?: string;
   tutorEmail?: string;
+  notes?: SessionNote[];
+  homework?: Homework[];
 }
 
 interface MonthlyReportPreviewProps {
@@ -42,7 +45,11 @@ const ENGLISH_MONTHS = [
 
 export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPreviewProps>(
   ({ data }, ref) => {
-    const { student, month, year, sessions, payment, settings, assessment, tutorName, tutorPhone, tutorEmail } = data;
+    const { student, month, year, sessions, payment, settings, assessment, tutorName, tutorPhone, tutorEmail, notes = [], homework = [] } = data;
+
+    // Filter notes and homework that are included in report
+    const includedNotes = notes.filter(n => n.include_in_report !== false);
+    const includedHomework = homework.filter(h => h.include_in_report !== false);
 
     // Calculate stats
     const completed = sessions.filter(s => s.status === 'completed').length;
@@ -55,12 +62,12 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
     const attendanceTotal = completed + cancelled;
     const attendanceRate = attendanceTotal > 0 ? Math.round((completed / attendanceTotal) * 100) : 0;
 
-    // Homework stats
-    const sessionsWithHomework = sessions.filter(s => s.homework && s.homeworkStatus !== 'none');
-    const homeworkCompleted = sessions.filter(s => s.homeworkStatus === 'completed').length;
-    const homeworkIncomplete = sessions.filter(s => s.homeworkStatus === 'incomplete' || s.homeworkStatus === 'assigned').length;
-    const homeworkRate = sessionsWithHomework.length > 0 
-      ? Math.round((homeworkCompleted / sessionsWithHomework.length) * 100) 
+    // Homework stats from actual homework table
+    const homeworkCompleted = includedHomework.filter(h => h.status === 'completed').length;
+    const homeworkNotCompleted = includedHomework.filter(h => h.status === 'not_completed').length;
+    const homeworkPending = includedHomework.filter(h => h.status === 'pending').length;
+    const homeworkRate = includedHomework.length > 0 
+      ? Math.round((homeworkCompleted / includedHomework.length) * 100) 
       : 100;
 
     // Price calculation
@@ -77,6 +84,25 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
       acc[weekNum].push(session);
       return acc;
     }, {} as Record<number, Session[]>);
+
+    // Category icons and labels
+    const getCategoryIcon = (category: string) => {
+      switch (category) {
+        case 'progress': return '📌';
+        case 'challenge': return '⚠️';
+        case 'achievement': return '🎯';
+        default: return '📝';
+      }
+    };
+
+    const getCategoryLabel = (category: string) => {
+      switch (category) {
+        case 'progress': return 'تقدم';
+        case 'challenge': return 'تحدي';
+        case 'achievement': return 'إنجاز';
+        default: return 'عام';
+      }
+    };
 
     const reportDate = new Date();
     const isPartialMonth = month === reportDate.getMonth() && year === reportDate.getFullYear() && reportDate.getDate() < 28;
@@ -220,22 +246,8 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
                                 <strong>الموضوع:</strong> {session.topic}
                               </p>
                             )}
-                            {session.notes && (
-                              <p className="flex items-center gap-1">
-                                <FileText className="h-3 w-3" />
-                                <strong>الملاحظات:</strong> {session.notes}
-                              </p>
-                            )}
-                            {session.homework && (
-                              <p className="flex items-center gap-1">
-                                <ClipboardCheck className="h-3 w-3" />
-                                <strong>الواجب:</strong> {session.homework}
-                                {session.homeworkStatus === 'completed' && ' ✓'}
-                                {session.homeworkStatus === 'incomplete' && ' ❌'}
-                              </p>
-                            )}
-                            {!session.topic && !session.notes && !session.homework && (
-                              <p className="text-gray-500 italic">لا توجد ملاحظات</p>
+                            {!session.topic && (
+                              <p className="text-gray-500 italic">لا يوجد موضوع محدد</p>
                             )}
                           </div>
                         )}
@@ -246,26 +258,69 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
             ))}
         </div>
 
-        {/* Section 3: Homework Summary */}
+        {/* Section 3: Teacher's Notes */}
         <div className="mb-6">
           <h2 className="text-lg font-bold border-b border-gray-300 pb-2 mb-3 flex items-center gap-2">
-            📚 ملخص الواجبات المنزلية / Homework Summary
+            📝 ملاحظات المعلم / Teacher's Notes
           </h2>
           
-          {sessionsWithHomework.length === 0 ? (
+          {includedNotes.length === 0 ? (
+            <p className="text-gray-500 text-sm">لا توجد ملاحظات لهذا الشهر</p>
+          ) : (
+            <div className="space-y-3">
+              {includedNotes
+                .sort((a, b) => a.session_date.localeCompare(b.session_date))
+                .map(note => (
+                  <div key={note.id} className="p-3 border rounded bg-gray-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span>{getCategoryIcon(note.category)}</span>
+                      <span className="text-xs font-semibold text-gray-600">
+                        {getCategoryLabel(note.category)}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        - {format(parseISO(note.session_date), 'd MMMM yyyy', { locale: ar })}
+                      </span>
+                    </div>
+                    {note.title && (
+                      <p className="font-medium text-sm mb-1">{note.title}</p>
+                    )}
+                    {note.content && (
+                      <p className="text-sm whitespace-pre-line">{note.content}</p>
+                    )}
+                    {note.type === 'voice' && note.duration && (
+                      <p className="text-xs text-gray-500 mt-1">🎤 تسجيل صوتي ({Math.floor(note.duration / 60)}:{(note.duration % 60).toString().padStart(2, '0')})</p>
+                    )}
+                    {note.type === 'file' && note.file_name && (
+                      <p className="text-xs text-gray-500 mt-1">📎 ملف مرفق: {note.file_name}</p>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        {/* Section 4: Homework Summary */}
+        <div className="mb-6">
+          <h2 className="text-lg font-bold border-b border-gray-300 pb-2 mb-3 flex items-center gap-2">
+            📚 الواجبات المنزلية / Homework Assignments
+          </h2>
+          
+          {includedHomework.length === 0 ? (
             <p className="text-gray-500 text-sm">لم يتم تعيين واجبات منزلية هذا الشهر</p>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                 <div>
-                  <p>إجمالي الواجبات: <strong>{sessionsWithHomework.length}</strong></p>
+                  <p>إجمالي الواجبات: <strong>{includedHomework.length}</strong></p>
                   <p className="text-green-700">تم إكماله: <strong>{homeworkCompleted} ✓</strong></p>
-                  <p className="text-red-700">لم يكتمل: <strong>{homeworkIncomplete} ❌</strong></p>
+                  <p className="text-red-700">لم يكتمل: <strong>{homeworkNotCompleted} ❌</strong></p>
+                  <p className="text-yellow-600">قيد الانتظار: <strong>{homeworkPending} ⏳</strong></p>
                 </div>
                 <div className="text-left" dir="ltr">
-                  <p>Total Assignments: <strong>{sessionsWithHomework.length}</strong></p>
+                  <p>Total Assignments: <strong>{includedHomework.length}</strong></p>
                   <p className="text-green-700">Completed: <strong>{homeworkCompleted} ✓</strong></p>
-                  <p className="text-red-700">Not Completed: <strong>{homeworkIncomplete} ❌</strong></p>
+                  <p className="text-red-700">Not Completed: <strong>{homeworkNotCompleted} ❌</strong></p>
+                  <p className="text-yellow-600">Pending: <strong>{homeworkPending} ⏳</strong></p>
                 </div>
               </div>
               
@@ -275,25 +330,60 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
                 </p>
               </div>
               
-              {homeworkIncomplete > 0 && (
-                <div>
-                  <p className="text-sm font-semibold mb-2">الواجبات غير المكتملة:</p>
-                  <ul className="list-disc list-inside text-sm space-y-1">
-                    {sessions
-                      .filter(s => s.homeworkStatus === 'incomplete' || s.homeworkStatus === 'assigned')
-                      .map(s => (
-                        <li key={s.id} className="text-red-700">
-                          {format(parseISO(s.date), 'd MMMM', { locale: ar })} - {s.homework}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              )}
+              {/* Homework details */}
+              <div className="space-y-2">
+                {includedHomework
+                  .sort((a, b) => a.session_date.localeCompare(b.session_date))
+                  .map(hw => (
+                    <div 
+                      key={hw.id} 
+                      className={cn(
+                        "p-3 border rounded text-sm",
+                        hw.status === 'completed' && "bg-green-50 border-green-200",
+                        hw.status === 'not_completed' && "bg-red-50 border-red-200",
+                        hw.status === 'pending' && "bg-yellow-50 border-yellow-200"
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          {hw.status === 'completed' && <span>✅</span>}
+                          {hw.status === 'not_completed' && <span>❌</span>}
+                          {hw.status === 'pending' && <span>⏳</span>}
+                          <span className="font-medium">{hw.description}</span>
+                        </div>
+                        <span className={cn(
+                          "text-xs px-2 py-0.5 rounded",
+                          hw.status === 'completed' && "bg-green-200 text-green-800",
+                          hw.status === 'not_completed' && "bg-red-200 text-red-800",
+                          hw.status === 'pending' && "bg-yellow-200 text-yellow-800"
+                        )}>
+                          {hw.status === 'completed' && 'مُنجز'}
+                          {hw.status === 'not_completed' && 'لم يُنجز'}
+                          {hw.status === 'pending' && 'قيد الانتظار'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 mr-6">
+                        <p>تاريخ الجلسة: {format(parseISO(hw.session_date), 'd MMMM', { locale: ar })}</p>
+                        <p>تاريخ التسليم: {format(parseISO(hw.due_date), 'd MMMM', { locale: ar })}</p>
+                        {hw.status === 'completed' && hw.completed_at && (
+                          <p className="text-green-700">
+                            تم الإنجاز: {format(parseISO(hw.completed_at), 'd MMMM', { locale: ar })} ✓
+                          </p>
+                        )}
+                        {hw.priority !== 'normal' && (
+                          <p className={hw.priority === 'urgent' ? 'text-red-600' : 'text-orange-600'}>
+                            الأولوية: {hw.priority === 'urgent' ? '🔴 عاجل' : '🟡 مهم'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </>
           )}
         </div>
 
-        {/* Section 4: Overall Assessment */}
+        {/* Section 5: Overall Assessment */}
         {assessment && (assessment.strengths || assessment.improvements || assessment.recommendations || assessment.nextMonthGoal) && (
           <div className="mb-6">
             <h2 className="text-lg font-bold border-b border-gray-300 pb-2 mb-3 flex items-center gap-2">
@@ -332,7 +422,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
           </div>
         )}
 
-        {/* Section 5: Payment Status */}
+        {/* Section 6: Payment Status */}
         <div className="mb-6">
           <h2 className="text-lg font-bold border-b border-gray-300 pb-2 mb-3 flex items-center gap-2">
             💰 حالة الدفع / Payment Status
