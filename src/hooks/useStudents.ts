@@ -25,6 +25,8 @@ export const useStudents = () => {
       defaultSemesterStart: start,
       defaultSemesterEnd: end,
       defaultSessionDuration: 60,
+      defaultPriceOnsite: 150,
+      defaultPriceOnline: 120,
     };
   });
   const [isLoaded, setIsLoaded] = useState(false);
