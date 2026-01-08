@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins, Send } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins, Send, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import { Student, StudentPayments, AppSettings } from '@/types/student';
 import { formatMonthYearAr, DAY_NAMES_SHORT_AR, MONTH_NAMES_AR } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,7 @@ export const PaymentsDashboard = ({
   const now = new Date();
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  const [studentSearch, setStudentSearch] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
   const [selectedYear, setSelectedYear] = useState(initialYear);
   const [selectedStudentHistory, setSelectedStudentHistory] = useState<string | null>(null);
@@ -266,13 +268,17 @@ export const PaymentsDashboard = ({
     }
   };
 
-  const filteredStudents = students.filter(student => {
-    const isPaid = getPaymentStatus(student.id);
-    if (paymentFilter === 'paid' && !isPaid) return false;
-    if (paymentFilter === 'unpaid' && isPaid) return false;
-    if (studentFilter !== 'all' && student.id !== studentFilter) return false;
-    return true;
-  });
+  const filteredStudents = useMemo(() => {
+    const searchLower = studentSearch.trim().toLowerCase();
+    return students.filter(student => {
+      const isPaid = getPaymentStatus(student.id);
+      if (paymentFilter === 'paid' && !isPaid) return false;
+      if (paymentFilter === 'unpaid' && isPaid) return false;
+      if (studentFilter !== 'all' && student.id !== studentFilter) return false;
+      if (searchLower && !student.name.toLowerCase().includes(searchLower)) return false;
+      return true;
+    });
+  }, [students, paymentFilter, studentFilter, studentSearch, payments, selectedMonth, selectedYear]);
 
   const selectedStudent = students.find(s => s.id === selectedStudentHistory);
 
@@ -386,15 +392,28 @@ export const PaymentsDashboard = ({
       )}
 
       <Card className="card-shadow">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 space-y-3">
           <CardTitle className="font-heading text-lg flex items-center gap-2">
             <Calendar className="h-5 w-5 text-primary" />
             {formatMonthYearAr(selectedMonth, selectedYear)}
           </CardTitle>
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="ابحث عن طالب..."
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              className="pr-9 bg-background"
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {filteredStudents.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4 text-sm">لا يوجد طلاب تطابق الفلتر</p>
+            <p className="text-center text-muted-foreground py-4 text-sm">
+              {studentSearch.trim() ? 'لا يوجد نتائج' : 'لا يوجد طلاب تطابق الفلتر'}
+            </p>
           ) : (
             filteredStudents.map(student => {
               const isPaid = getPaymentStatus(student.id);
