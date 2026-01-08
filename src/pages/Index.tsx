@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History, FileText, Search } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { Input } from '@/components/ui/input';
 import { useStudents } from '@/hooks/useStudents';
 import { useConflictDetection, ConflictResult } from '@/hooks/useConflictDetection';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
@@ -10,6 +9,7 @@ import { StudentCard } from '@/components/StudentCard';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
+import { StudentSearchCombobox } from '@/components/StudentSearchCombobox';
 import { StatsBar } from '@/components/StatsBar';
 import { EndOfMonthReminder } from '@/components/EndOfMonthReminder';
 import { SessionHistoryBar } from '@/components/SessionHistoryBar';
@@ -306,15 +306,13 @@ const Index = () => {
                   <SheetHeader>
                     <SheetTitle className="font-heading text-right">جميع الطلاب ({students.length})</SheetTitle>
                   </SheetHeader>
-                  {/* Search Input */}
-                  <div className="mt-4 relative" dir="rtl">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="ابحث عن طالب..."
+                  {/* Search Combobox */}
+                  <div className="mt-4">
+                    <StudentSearchCombobox
+                      students={students}
                       value={allStudentsSearch}
-                      onChange={(e) => setAllStudentsSearch(e.target.value)}
-                      className="pr-9 bg-background"
+                      onChange={setAllStudentsSearch}
+                      placeholder="ابحث عن طالب..."
                     />
                   </div>
                   <div className="mt-3 space-y-2 max-h-[calc(100vh-180px)] overflow-y-auto" dir="rtl">

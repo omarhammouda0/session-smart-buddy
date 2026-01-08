@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins, Send, Search } from 'lucide-react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Input } from '@/components/ui/input';
+import { StudentSearchCombobox } from '@/components/StudentSearchCombobox';
 import { Student, StudentPayments, AppSettings } from '@/types/student';
 import { formatMonthYearAr, DAY_NAMES_SHORT_AR, MONTH_NAMES_AR } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
@@ -397,17 +397,13 @@ export const PaymentsDashboard = ({
             <Calendar className="h-5 w-5 text-primary" />
             {formatMonthYearAr(selectedMonth, selectedYear)}
           </CardTitle>
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="ابحث عن طالب..."
-              value={studentSearch}
-              onChange={(e) => setStudentSearch(e.target.value)}
-              className="pr-9 bg-background"
-            />
-          </div>
+          {/* Search Combobox */}
+          <StudentSearchCombobox
+            students={students}
+            value={studentSearch}
+            onChange={setStudentSearch}
+            placeholder="ابحث عن طالب..."
+          />
         </CardHeader>
         <CardContent className="space-y-2">
           {filteredStudents.length === 0 ? (
