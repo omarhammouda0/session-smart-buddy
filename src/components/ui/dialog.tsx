@@ -80,11 +80,15 @@ interface DialogBodyProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'di
 
 const DialogBody = ({ className, children, ...props }: DialogBodyProps) => (
   <div 
-    className={cn("flex-1 min-h-0 -mx-6 px-6 overflow-y-auto", className)} 
-    style={{ maxHeight: 'calc(90vh - 180px)', WebkitOverflowScrolling: 'touch' }}
+    className={cn("flex-1 min-h-0 -mx-6 px-6 overflow-y-auto overflow-x-hidden", className)} 
+    style={{ 
+      maxHeight: 'calc(90vh - 180px)', 
+      WebkitOverflowScrolling: 'touch',
+      overscrollBehavior: 'contain'
+    }}
     {...props}
   >
-    <div className="pr-2">
+    <div className="pr-2 pb-4">
       {children}
     </div>
   </div>
