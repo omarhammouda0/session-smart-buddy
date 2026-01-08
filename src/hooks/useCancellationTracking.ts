@@ -379,12 +379,6 @@ export const useCancellationTracking = (students: Student[]) => {
           severity,
           parentNotified: wasParentNotified(student.id, currentMonth),
         };
-          count,
-          limit,
-          percentage,
-          severity,
-          parentNotified: wasParentNotified(student.id, currentMonth),
-        };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null && item.count > 0)
       .sort((a, b) => b.percentage - a.percentage);
