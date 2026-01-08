@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format, parseISO, isBefore, isAfter, startOfToday } from 'date-fns';
-import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2, Palmtree, RotateCcw, AlertTriangle, XCircle } from 'lucide-react';
-import { Student, Session } from '@/types/student';
+import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2, Palmtree, RotateCcw, AlertTriangle, XCircle, FileText, BookOpen, ClipboardCheck } from 'lucide-react';
+import { Student, Session, HomeworkStatus } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import { useConflictDetection, ConflictResult, formatTimeAr } from '@/hooks/useC
 import { GapIndicator } from '@/components/GapIndicator';
 import { ConflictWarning } from '@/components/ConflictWarning';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
+import { SessionNotesDialog } from '@/components/SessionNotesDialog';
 
 interface SessionHistoryBarProps {
   students: Student[];
@@ -37,9 +38,15 @@ interface SessionHistoryBarProps {
   onRescheduleSession?: (studentId: string, sessionId: string, newDate: string) => void;
   onAddSession?: (studentId: string, date: string) => void;
   onMarkAsVacation?: (studentId: string, sessionId: string) => void;
+  onUpdateSessionDetails?: (studentId: string, sessionId: string, details: {
+    topic?: string;
+    notes?: string;
+    homework?: string;
+    homeworkStatus?: HomeworkStatus;
+  }) => void;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession, onMarkAsVacation }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession, onMarkAsVacation, onUpdateSessionDetails }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
@@ -440,54 +447,82 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                     <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص سابقة</p>
                   ) : (
                     historySessions.map(session => (
-                      <div key={session.id} className={cn("flex items-center justify-between p-2 rounded text-xs border",
+                      <div key={session.id} className={cn("flex flex-col p-2 rounded text-xs border",
                         session.status === 'completed' && "bg-success/5 border-success/20",
                         session.status === 'vacation' && "bg-warning/5 border-warning/20",
                         session.status === 'cancelled' && "bg-destructive/5 border-destructive/20"
                       )}>
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className={cn("w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                            session.status === 'completed' && "bg-success/20 text-success",
-                            session.status === 'vacation' && "bg-warning/20 text-warning",
-                            session.status === 'cancelled' && "bg-destructive/20 text-destructive"
-                          )}>
-                            {session.status === 'completed' ? <Check className="h-3 w-3" /> : 
-                             session.status === 'vacation' ? <Palmtree className="h-3 w-3" /> : 
-                             <X className="h-3 w-3" />}
-                          </div>
-                          <p className="font-medium truncate">
-                            {formatShortDateAr(session.date)}
-                            <span className="text-muted-foreground font-normal mr-1">
-                              ({session.time || selectedStudent.sessionTime || '16:00'})
-                              <span className="text-muted-foreground/70 mr-1">
-                                ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className={cn("w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                              session.status === 'completed' && "bg-success/20 text-success",
+                              session.status === 'vacation' && "bg-warning/20 text-warning",
+                              session.status === 'cancelled' && "bg-destructive/20 text-destructive"
+                            )}>
+                              {session.status === 'completed' ? <Check className="h-3 w-3" /> : 
+                               session.status === 'vacation' ? <Palmtree className="h-3 w-3" /> : 
+                               <X className="h-3 w-3" />}
+                            </div>
+                            <p className="font-medium truncate">
+                              {formatShortDateAr(session.date)}
+                              <span className="text-muted-foreground font-normal mr-1">
+                                ({session.time || selectedStudent.sessionTime || '16:00'})
+                                <span className="text-muted-foreground/70 mr-1">
+                                  ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                                </span>
                               </span>
-                            </span>
-                          </p>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {session.status === 'completed' && onUpdateSessionDetails && (
+                              <SessionNotesDialog
+                                session={session}
+                                studentName={session.studentName}
+                                onSave={(details) => onUpdateSessionDetails(session.studentId, session.id, details)}
+                              />
+                            )}
+                            {session.status === 'completed' ? (
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-warning" onClick={() => onToggleComplete?.(session.studentId, session.id)}>
+                                <X className="h-3.5 w-3.5 ml-1" />تراجع
+                              </Button>
+                            ) : session.status === 'vacation' ? (
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
+                                <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
+                              </Button>
+                            ) : (
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
+                                <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
+                              </Button>
+                            )}
+                            <Badge variant="outline" className={cn("text-[10px]",
+                              session.status === 'completed' && "border-success/30 text-success",
+                              session.status === 'vacation' && "border-warning/30 text-warning",
+                              session.status === 'cancelled' && "border-destructive/30 text-destructive"
+                            )}>
+                              {session.status === 'completed' ? 'مكتملة' : 
+                               session.status === 'vacation' ? 'إجازة' : 'ملغاة'}
+                            </Badge>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {session.status === 'completed' ? (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-warning" onClick={() => onToggleComplete?.(session.studentId, session.id)}>
-                              <X className="h-3.5 w-3.5 ml-1" />تراجع
-                            </Button>
-                          ) : session.status === 'vacation' ? (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
-                              <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
-                            </Button>
-                          ) : (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
-                              <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
-                            </Button>
-                          )}
-                          <Badge variant="outline" className={cn("text-[10px]",
-                            session.status === 'completed' && "border-success/30 text-success",
-                            session.status === 'vacation' && "border-warning/30 text-warning",
-                            session.status === 'cancelled' && "border-destructive/30 text-destructive"
-                          )}>
-                            {session.status === 'completed' ? 'مكتملة' : 
-                             session.status === 'vacation' ? 'إجازة' : 'ملغاة'}
-                          </Badge>
-                        </div>
+                        {/* Show notes preview for completed sessions */}
+                        {session.status === 'completed' && (session.topic || session.notes || session.homework) && (
+                          <div className="mt-2 mr-7 text-[10px] text-muted-foreground space-y-0.5 bg-muted/30 rounded p-1.5">
+                            {session.topic && (
+                              <p className="flex items-center gap-1">
+                                <BookOpen className="h-2.5 w-2.5" />
+                                {session.topic}
+                              </p>
+                            )}
+                            {session.homework && (
+                              <p className="flex items-center gap-1">
+                                <ClipboardCheck className="h-2.5 w-2.5" />
+                                {session.homework}
+                                {session.homeworkStatus === 'completed' && ' ✓'}
+                                {session.homeworkStatus === 'incomplete' && ' ❌'}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

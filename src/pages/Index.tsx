@@ -81,6 +81,7 @@ const Index = () => {
     bulkUpdateSessionTime,
     markSessionAsVacation,
     bulkMarkAsVacation,
+    updateSessionDetails,
   } = useStudents();
 
   // Conflict detection
@@ -554,6 +555,7 @@ const Index = () => {
               onRescheduleSession={rescheduleSession}
               onAddSession={handleAddSession}
               onMarkAsVacation={handleMarkAsVacation}
+              onUpdateSessionDetails={updateSessionDetails}
             />
           </TabsContent>
 
