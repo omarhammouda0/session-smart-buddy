@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check, Monitor, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check, Monitor, MapPin, AlertTriangle, XCircle } from 'lucide-react';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { useConflictDetection } from '@/hooks/useConflictDetection';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface UpcomingSessionsManagerProps {
   students: Student[];
@@ -37,6 +44,12 @@ export const UpcomingSessionsManager = ({
   const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
+
+  // Conflict detection
+  const { getSessionsWithGaps, scanAllConflicts } = useConflictDetection(students);
+  
+  // Scan all conflicts once (memoized)
+  const allConflicts = useMemo(() => scanAllConflicts(), [scanAllConflicts]);
 
   // Week view dates
   const currentWeekStart = startOfWeek(addWeeks(now, weekOffset), { weekStartsOn: 1 });
@@ -296,100 +309,148 @@ export const UpcomingSessionsManager = ({
                         if (!hasActiveSession && !scheduled && !isCancelled) return null;
                         if (!inSemester) return null;
 
+                        // Check for conflicts
+                        const sessionConflict = session ? allConflicts.get(session.id) : undefined;
+                        const hasConflict = !!sessionConflict && sessionConflict.severity !== 'none';
+                        const conflictType = sessionConflict?.type;
+                        const isErrorConflict = sessionConflict?.severity === 'error';
+
                         return (
-                          <div
-                            key={student.id}
-                            className={cn(
-                              "flex items-center justify-between gap-1 rounded text-xs",
-                              viewMode === 'week' ? "p-1.5" : "p-1",
-                              hasActiveSession && session?.status === 'completed' && "bg-success/10 border border-success/20 text-success",
-                              hasActiveSession && session?.status !== 'completed' && "bg-primary/10 border border-primary/20",
-                              isCancelled && "bg-destructive/10 border border-destructive/20 text-destructive"
-                            )}
-                          >
-                            <div className="truncate flex-1 min-w-0">
-                              {viewMode === 'week' ? (
-                                <>
-                                  <div className="flex items-center gap-1">
-                                    <span className={cn(
-                                      "font-medium truncate",
-                                      session?.status === 'completed' && "line-through opacity-70"
-                                    )}>{student.name}</span>
-                                    {(student.sessionType || 'onsite') === 'online' ? (
-                                      <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
+                          <TooltipProvider key={student.id} delayDuration={300}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={cn(
+                                    "relative flex items-center justify-between gap-1 rounded text-xs",
+                                    viewMode === 'week' ? "p-1.5" : "p-1",
+                                    hasActiveSession && session?.status === 'completed' && "bg-success/10 border border-success/20 text-success",
+                                    hasActiveSession && session?.status !== 'completed' && !hasConflict && "bg-primary/10 border border-primary/20",
+                                    hasActiveSession && session?.status !== 'completed' && hasConflict && isErrorConflict && "bg-destructive/10 border-2 border-destructive/40",
+                                    hasActiveSession && session?.status !== 'completed' && hasConflict && !isErrorConflict && "bg-warning/10 border-2 border-warning/40",
+                                    isCancelled && "bg-destructive/10 border border-destructive/20 text-destructive"
+                                  )}
+                                >
+                                  {/* Conflict indicator */}
+                                  {hasConflict && viewMode === 'week' && (
+                                    <div className={cn(
+                                      "absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center shadow-sm z-10",
+                                      isErrorConflict ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground"
+                                    )}>
+                                      {isErrorConflict ? (
+                                        <XCircle className="h-2.5 w-2.5" />
+                                      ) : (
+                                        <AlertTriangle className="h-2.5 w-2.5" />
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  <div className="truncate flex-1 min-w-0">
+                                    {viewMode === 'week' ? (
+                                      <>
+                                        <div className="flex items-center gap-1">
+                                          <span className={cn(
+                                            "font-medium truncate",
+                                            session?.status === 'completed' && "line-through opacity-70"
+                                          )}>{student.name}</span>
+                                          {(student.sessionType || 'onsite') === 'online' ? (
+                                            <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
+                                          ) : (
+                                            <MapPin className="h-3 w-3 text-orange-500 shrink-0" />
+                                          )}
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground">{session?.time || student.sessionTime}</span>
+                                      </>
                                     ) : (
-                                      <MapPin className="h-3 w-3 text-orange-500 shrink-0" />
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center gap-0.5">
+                                          <span className={cn(
+                                            "font-medium truncate text-[10px]",
+                                            session?.status === 'completed' && "line-through opacity-70"
+                                          )}>{student.name.split(' ')[0]}</span>
+                                          {(student.sessionType || 'onsite') === 'online' ? (
+                                            <Monitor className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                                          ) : (
+                                            <MapPin className="h-2.5 w-2.5 text-orange-500 shrink-0" />
+                                          )}
+                                          {hasConflict && (
+                                            <span className={cn(
+                                              "w-2 h-2 rounded-full shrink-0",
+                                              isErrorConflict ? "bg-destructive" : "bg-warning"
+                                            )} />
+                                          )}
+                                        </div>
+                                        <span className="text-[9px] text-muted-foreground">{session?.time || student.sessionTime}</span>
+                                      </div>
                                     )}
                                   </div>
-                                  <span className="text-[10px] text-muted-foreground">{session?.time || student.sessionTime}</span>
-                                </>
-                              ) : (
-                                <div className="flex flex-col">
-                                  <div className="flex items-center gap-0.5">
-                                    <span className={cn(
-                                      "font-medium truncate text-[10px]",
-                                      session?.status === 'completed' && "line-through opacity-70"
-                                    )}>{student.name.split(' ')[0]}</span>
-                                    {(student.sessionType || 'onsite') === 'online' ? (
-                                      <Monitor className="h-2.5 w-2.5 text-blue-500 shrink-0" />
-                                    ) : (
-                                      <MapPin className="h-2.5 w-2.5 text-orange-500 shrink-0" />
-                                    )}
-                                  </div>
-                                  <span className="text-[9px] text-muted-foreground">{session?.time || student.sessionTime}</span>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Re-add cancelled session */}
-                            {isCancelled && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 shrink-0"
-                                onClick={() => onAddSession(student.id, dayStr)}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            )}
-
-                            {/* Cancel session button - hide in month view for space */}
-                            {viewMode === 'week' && hasActiveSession && session?.status !== 'completed' && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Cancel Session</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Cancel {student.name}'s session on {format(day, 'EEEE, MMM d')}?
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Keep</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => onRemoveSession(student.id, session!.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  
+                                  {/* Re-add cancelled session */}
+                                  {isCancelled && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 shrink-0"
+                                      onClick={() => onAddSession(student.id, dayStr)}
                                     >
-                                      Cancel Session
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  )}
 
-                            {/* Completed indicator */}
-                            {hasActiveSession && session?.status === 'completed' && (
-                              <Check className={cn("text-success shrink-0", viewMode === 'week' ? "h-3.5 w-3.5" : "h-2.5 w-2.5")} />
-                            )}
-                          </div>
+                                  {/* Cancel session button - hide in month view for space */}
+                                  {viewMode === 'week' && hasActiveSession && session?.status !== 'completed' && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Cancel Session</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Cancel {student.name}'s session on {format(day, 'EEEE, MMM d')}?
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Keep</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => onRemoveSession(student.id, session!.id)}
+                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                          >
+                                            Cancel Session
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
+
+                                  {/* Completed indicator */}
+                                  {hasActiveSession && session?.status === 'completed' && (
+                                    <Check className={cn("text-success shrink-0", viewMode === 'week' ? "h-3.5 w-3.5" : "h-2.5 w-2.5")} />
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              {hasConflict && sessionConflict && (
+                                <TooltipContent side="top" className="max-w-xs text-xs" dir="rtl">
+                                  <div className="space-y-1">
+                                    <p className={cn("font-medium", isErrorConflict ? "text-destructive" : "text-warning")}>
+                                      {isErrorConflict ? '❌ تعارض' : '⚠️ قريب جداً'}
+                                    </p>
+                                    {sessionConflict.conflicts.slice(0, 2).map((c, i) => (
+                                      <p key={i} className="text-muted-foreground">
+                                        {c.student.name}: {c.session.time || c.student.sessionTime || '16:00'}
+                                        {c.type === 'close' && c.gap !== undefined && ` (${c.gap} دقيقة فاصل)`}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
                         );
                       })
                     )}
