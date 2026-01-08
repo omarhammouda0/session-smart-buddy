@@ -66,6 +66,7 @@ export type Database = {
           description: string
           due_date: string
           id: string
+          include_in_report: boolean
           priority: Database["public"]["Enums"]["homework_priority"]
           session_date: string
           session_id: string
@@ -82,6 +83,7 @@ export type Database = {
           description: string
           due_date: string
           id?: string
+          include_in_report?: boolean
           priority?: Database["public"]["Enums"]["homework_priority"]
           session_date: string
           session_id: string
@@ -98,6 +100,7 @@ export type Database = {
           description?: string
           due_date?: string
           id?: string
+          include_in_report?: boolean
           priority?: Database["public"]["Enums"]["homework_priority"]
           session_date?: string
           session_id?: string
@@ -294,6 +297,7 @@ export type Database = {
           file_type: string | null
           file_url: string | null
           id: string
+          include_in_report: boolean
           session_date: string
           session_id: string
           student_id: string
@@ -312,6 +316,7 @@ export type Database = {
           file_type?: string | null
           file_url?: string | null
           id?: string
+          include_in_report?: boolean
           session_date: string
           session_id: string
           student_id: string
@@ -330,6 +335,7 @@ export type Database = {
           file_type?: string | null
           file_url?: string | null
           id?: string
+          include_in_report?: boolean
           session_date?: string
           session_id?: string
           student_id?: string

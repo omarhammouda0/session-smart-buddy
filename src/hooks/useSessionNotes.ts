@@ -35,6 +35,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
         ...note,
         category: note.category as NoteCategory,
         type: note.type as NoteType,
+        include_in_report: note.include_in_report ?? true,
       }));
       
       setNotes(mappedNotes);
@@ -76,6 +77,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
             ...hw,
             priority: hw.priority as HomeworkPriority,
             status: hw.status as HomeworkStatusType,
+            include_in_report: hw.include_in_report ?? true,
             attachments: attachments || [],
           } as Homework;
         })
@@ -101,6 +103,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     title?: string;
     content: string;
     category: NoteCategory;
+    includeInReport?: boolean;
   }) => {
     try {
       const { error } = await supabase.from('session_notes').insert({
@@ -112,6 +115,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
         content: params.content,
         category: params.category,
         type: 'text',
+        include_in_report: params.includeInReport ?? true,
       });
 
       if (error) throw error;
@@ -282,6 +286,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     description: string;
     dueDate: string;
     priority: HomeworkPriority;
+    includeInReport?: boolean;
     voiceBlob?: Blob;
     voiceDuration?: number;
     files?: File[];
@@ -318,6 +323,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
           due_date: params.dueDate,
           priority: params.priority,
           status: 'pending',
+          include_in_report: params.includeInReport ?? true,
           voice_instruction_url: voiceUrl,
           voice_instruction_duration: params.voiceDuration,
         })
@@ -410,6 +416,54 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     }
   };
 
+  // Update note report inclusion
+  const updateNoteReportInclusion = async (noteId: string, include: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('session_notes')
+        .update({ include_in_report: include })
+        .eq('id', noteId);
+
+      if (error) throw error;
+      
+      // Update local state
+      setNotes(prev => prev.map(n => 
+        n.id === noteId ? { ...n, include_in_report: include } : n
+      ));
+      
+      toast.success(include ? 'ستظهر في التقرير' : 'تم استبعادها من التقرير');
+      return true;
+    } catch (error) {
+      console.error('Error updating note:', error);
+      toast.error('فشل التحديث');
+      return false;
+    }
+  };
+
+  // Update homework report inclusion
+  const updateHomeworkReportInclusion = async (homeworkId: string, include: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('homework')
+        .update({ include_in_report: include })
+        .eq('id', homeworkId);
+
+      if (error) throw error;
+      
+      // Update local state
+      setHomework(prev => prev.map(h => 
+        h.id === homeworkId ? { ...h, include_in_report: include } : h
+      ));
+      
+      toast.success(include ? 'سيظهر في التقرير' : 'تم استبعاده من التقرير');
+      return true;
+    } catch (error) {
+      console.error('Error updating homework:', error);
+      toast.error('فشل التحديث');
+      return false;
+    }
+  };
+
   return {
     notes,
     homework,
@@ -422,6 +476,8 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     addHomework,
     updateHomeworkStatus,
     deleteHomework,
+    updateNoteReportInclusion,
+    updateHomeworkReportInclusion,
     refetch: () => {
       fetchNotes();
       fetchHomework();

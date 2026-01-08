@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HomeworkPriority, HOMEWORK_PRIORITY_LABELS, HOMEWORK_PRIORITY_COLORS } from '@/types/notes';
@@ -18,6 +19,7 @@ interface HomeworkEditorProps {
     description: string;
     dueDate: string;
     priority: HomeworkPriority;
+    includeInReport: boolean;
     voiceBlob?: Blob;
     voiceDuration?: number;
     files?: File[];
@@ -35,6 +37,7 @@ export function HomeworkEditor({ onSave, onCancel, defaultDueDate }: HomeworkEdi
     defaultDueDate ? parseISO(defaultDueDate) : addDays(new Date(), 7)
   );
   const [priority, setPriority] = useState<HomeworkPriority>('normal');
+  const [includeInReport, setIncludeInReport] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [voiceData, setVoiceData] = useState<{ blob: Blob; duration: number } | null>(null);
@@ -84,6 +87,7 @@ export function HomeworkEditor({ onSave, onCancel, defaultDueDate }: HomeworkEdi
       description: description.trim(),
       dueDate: format(dueDate, 'yyyy-MM-dd'),
       priority,
+      includeInReport,
       voiceBlob: voiceData?.blob,
       voiceDuration: voiceData?.duration,
       files: files.length > 0 ? files : undefined,
@@ -257,6 +261,18 @@ export function HomeworkEditor({ onSave, onCancel, defaultDueDate }: HomeworkEdi
             />
           </>
         )}
+      </div>
+
+      {/* Include in Report */}
+      <div className="flex items-center gap-2 pt-1">
+        <Checkbox
+          id="hw-include-in-report"
+          checked={includeInReport}
+          onCheckedChange={(checked) => setIncludeInReport(checked === true)}
+        />
+        <Label htmlFor="hw-include-in-report" className="text-sm cursor-pointer">
+          تضمين في التقرير الشهري
+        </Label>
       </div>
 
       <div className="flex justify-between gap-2 pt-2">

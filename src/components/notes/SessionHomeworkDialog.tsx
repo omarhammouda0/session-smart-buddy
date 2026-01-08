@@ -33,6 +33,7 @@ export function SessionHomeworkDialog({ session, studentId, studentName, trigger
     addHomework,
     updateHomeworkStatus,
     deleteHomework,
+    updateHomeworkReportInclusion,
   } = useSessionNotes(studentId, session.id);
 
   const handleAddHomework = async (params: any) => {
@@ -123,6 +124,7 @@ export function SessionHomeworkDialog({ session, studentId, studentName, trigger
                       homework={hw}
                       onUpdateStatus={(status) => updateHomeworkStatus(hw.id, status)}
                       onDelete={() => deleteHomework(hw.id)}
+                      onToggleReportInclusion={(include) => updateHomeworkReportInclusion(hw.id, include)}
                     />
                   ))}
                 </div>

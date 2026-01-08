@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { BookOpen, Calendar, Check, X, Play, Pause, Download, Paperclip, Trash2, AlertTriangle, Clock } from 'lucide-react';
+import { BookOpen, Calendar, Check, X, Play, Pause, Download, Paperclip, Trash2, AlertTriangle, Clock, FileCheck, FileX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,9 +23,10 @@ interface HomeworkCardProps {
   homework: Homework;
   onUpdateStatus: (status: HomeworkStatusType) => void;
   onDelete: () => void;
+  onToggleReportInclusion?: (include: boolean) => void;
 }
 
-export function HomeworkCard({ homework, onUpdateStatus, onDelete }: HomeworkCardProps) {
+export function HomeworkCard({ homework, onUpdateStatus, onDelete, onToggleReportInclusion }: HomeworkCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -207,6 +208,33 @@ export function HomeworkCard({ homework, onUpdateStatus, onDelete }: HomeworkCar
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Report inclusion toggle */}
+      {onToggleReportInclusion && (
+        <div className="pt-1 border-t border-border/50 mt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-6 px-2 text-[10px] gap-1 w-full justify-start",
+              homework.include_in_report ? "text-success" : "text-muted-foreground"
+            )}
+            onClick={() => onToggleReportInclusion(!homework.include_in_report)}
+          >
+            {homework.include_in_report ? (
+              <>
+                <FileCheck className="h-3 w-3" />
+                سيظهر في التقرير الشهري
+              </>
+            ) : (
+              <>
+                <FileX className="h-3 w-3" />
+                مستبعد من التقرير
+              </>
+            )}
+          </Button>
         </div>
       )}
 

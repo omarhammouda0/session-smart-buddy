@@ -38,6 +38,7 @@ export function SessionNotesDialog({ session, studentId, studentName, trigger }:
     addVoiceNote,
     addFileNote,
     deleteNote,
+    updateNoteReportInclusion,
   } = useSessionNotes(studentId, session.id);
 
   const handleAddTextNote = async (params: { title?: string; content: string; category: any }) => {
@@ -165,6 +166,7 @@ export function SessionNotesDialog({ session, studentId, studentName, trigger }:
                       key={note.id}
                       note={note}
                       onDelete={deleteNote}
+                      onToggleReportInclusion={updateNoteReportInclusion}
                     />
                   ))}
                 </div>
