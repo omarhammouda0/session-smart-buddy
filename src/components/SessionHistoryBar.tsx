@@ -28,6 +28,7 @@ import { GapIndicator } from '@/components/GapIndicator';
 import { ConflictWarning } from '@/components/ConflictWarning';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
 import { SessionNotesManager } from '@/components/notes/SessionNotesManager';
+import { toast } from '@/hooks/use-toast';
 
 interface SessionHistoryBarProps {
   students: Student[];
@@ -84,6 +85,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
     if (conflictResult.severity === 'none') {
       // No conflicts, restore directly
       onRestoreSession?.(studentId, sessionId);
+      toast({ title: "تم الاستعادة", description: `تم استعادة جلسة ${student.name} - ${formatShortDateAr(session.date)}` });
       return;
     }
     
@@ -103,7 +105,9 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
   
   const handleConfirmRestore = () => {
     if (restoreConflictDialog) {
+      const student = students.find(s => s.id === restoreConflictDialog.studentId);
       onRestoreSession?.(restoreConflictDialog.studentId, restoreConflictDialog.sessionId);
+      toast({ title: "تم الاستعادة", description: `تم استعادة الجلسة بنجاح` });
       setRestoreConflictDialog(null);
     }
   };
@@ -130,8 +134,41 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
   const handleConfirmVacation = () => {
     if (vacationDialog) {
       onMarkAsVacation?.(vacationDialog.studentId, vacationDialog.sessionId);
+      toast({ title: "تم التحديد", description: `تم تحديد الجلسة كإجازة` });
       setVacationDialog(null);
     }
+  };
+
+  // Wrapper functions with toast notifications
+  const handleToggleComplete = (studentId: string, sessionId: string) => {
+    const student = students.find(s => s.id === studentId);
+    const session = student?.sessions.find(s => s.id === sessionId);
+    if (!student || !session) return;
+    
+    const isCompleted = session.status === 'completed';
+    onToggleComplete?.(studentId, sessionId);
+    toast({ 
+      title: isCompleted ? "تم التراجع" : "تم الإكمال", 
+      description: isCompleted 
+        ? `تم إلغاء إكمال جلسة ${student.name}` 
+        : `تم تسجيل إكمال جلسة ${student.name}`
+    });
+  };
+
+  const handleCancelSession = (studentId: string, sessionId: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+    
+    onCancelSession?.(studentId, sessionId);
+    toast({ title: "تم الإلغاء", description: `تم إلغاء الجلسة` });
+  };
+
+  const handleDeleteSession = (studentId: string, sessionId: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+    
+    onDeleteSession?.(studentId, sessionId);
+    toast({ title: "تم الحذف", description: `تم حذف الجلسة نهائياً`, variant: "destructive" });
   };
 
   const getScheduledSessions = () => {
@@ -175,6 +212,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
   const handleAddSession = (studentId: string, date: Date) => {
     onAddSession?.(studentId, format(date, 'yyyy-MM-dd'));
     setAddSessionDate(undefined);
+    toast({ title: "تم الإضافة", description: `تم إضافة جلسة بتاريخ ${formatShortDateAr(format(date, 'yyyy-MM-dd'))}` });
   };
 
   return (
@@ -359,7 +397,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                   <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
                                     <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDeleteSession?.(session.studentId, session.id)} title="حذف نهائي">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSession(session.studentId, session.id)} title="حذف نهائي">
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </>
@@ -368,22 +406,22 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                   <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
                                     <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)} title="إلغاء">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleCancelSession(session.studentId, session.id)} title="إلغاء">
                                     <Ban className="h-3.5 w-3.5" />
                                   </Button>
                                 </>
                               ) : (
                                 <>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => onToggleComplete?.(session.studentId, session.id)} title="إكمال">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => handleToggleComplete(session.studentId, session.id)} title="إكمال">
                                     <Check className="h-3.5 w-3.5" />
                                   </Button>
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-warning" onClick={() => handleMarkAsVacation(session.studentId, session.id)} title="إجازة">
                                     <Palmtree className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)} title="إلغاء">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleCancelSession(session.studentId, session.id)} title="إلغاء">
                                     <Ban className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => onDeleteSession?.(session.studentId, session.id)} title="حذف نهائي">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteSession(session.studentId, session.id)} title="حذف نهائي">
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </>
@@ -487,7 +525,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                               studentName={session.studentName}
                             />
                             {session.status === 'completed' ? (
-                              <Button variant="ghost" size="sm" className="h-7 px-2 text-warning" onClick={() => onToggleComplete?.(session.studentId, session.id)}>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-warning" onClick={() => handleToggleComplete(session.studentId, session.id)}>
                                 <X className="h-3.5 w-3.5 ml-1" />تراجع
                               </Button>
                             ) : session.status === 'vacation' ? (

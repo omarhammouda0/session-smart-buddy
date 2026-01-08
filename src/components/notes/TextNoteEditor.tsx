@@ -46,9 +46,14 @@ export function TextNoteEditor({
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <FileText className="h-4 w-4" />
-        ملاحظة نصية جديدة
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <FileText className="h-4 w-4" />
+          ملاحظة نصية جديدة
+        </div>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          رجوع
+        </Button>
       </div>
 
       <div className="space-y-2">

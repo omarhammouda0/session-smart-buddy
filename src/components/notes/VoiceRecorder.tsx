@@ -202,6 +202,15 @@ export function VoiceRecorder({ onSave, onCancel, maxDuration = 300 }: VoiceReco
 
   return (
     <div className="space-y-4 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Mic className="h-4 w-4" />
+          تسجيل صوتي
+        </div>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          رجوع
+        </Button>
+      </div>
       <div className="text-center space-y-4">
         {isRecording && (
           <div className={cn(
@@ -269,12 +278,6 @@ export function VoiceRecorder({ onSave, onCancel, maxDuration = 300 }: VoiceReco
           </>
         )}
       </div>
-
-      {!isRecording && (
-        <Button variant="ghost" size="sm" onClick={onCancel} className="w-full">
-          إلغاء
-        </Button>
-      )}
     </div>
   );
 }
