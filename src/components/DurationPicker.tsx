@@ -17,11 +17,12 @@ import { cn } from '@/lib/utils';
 
 interface DurationPickerProps {
   startTime: string;
-  duration: number;
+  duration: number | undefined;
   onDurationChange: (duration: number) => void;
   onEndTimeOverride?: (endTime: string) => void;
   className?: string;
   showEndTime?: boolean;
+  placeholder?: string;
 }
 
 export const DurationPicker = ({
@@ -31,20 +32,21 @@ export const DurationPicker = ({
   onEndTimeOverride,
   className,
   showEndTime = true,
+  placeholder = 'اختر المدة',
 }: DurationPickerProps) => {
-  const [isCustom, setIsCustom] = useState(!DURATION_OPTIONS.includes(duration as any));
-  const [customValue, setCustomValue] = useState(isCustom ? String(duration) : '');
+  const [isCustom, setIsCustom] = useState(duration !== undefined && !DURATION_OPTIONS.includes(duration as any));
+  const [customValue, setCustomValue] = useState(isCustom && duration ? String(duration) : '');
   const [isEditingEndTime, setIsEditingEndTime] = useState(false);
   const [manualEndTime, setManualEndTime] = useState('');
 
   // Calculate end time
-  const { endTime, crossesMidnight } = calculateEndTime(startTime, duration);
+  const { endTime, crossesMidnight } = calculateEndTime(startTime, duration || 60);
 
   // Handle preset selection
   const handlePresetChange = (value: string) => {
     if (value === 'custom') {
       setIsCustom(true);
-      setCustomValue(String(duration));
+      setCustomValue(duration ? String(duration) : '60');
     } else {
       setIsCustom(false);
       const newDuration = parseInt(value, 10);
@@ -76,7 +78,10 @@ export const DurationPicker = ({
 
   // Validate custom duration
   const isCustomValid = !isCustom || (parseInt(customValue, 10) >= MIN_DURATION && parseInt(customValue, 10) <= MAX_DURATION);
-  const durationWarning = duration < MIN_DURATION ? 'المدة قصيرة جداً' : duration > 180 ? 'المدة طويلة جداً' : null;
+  const durationWarning = duration && duration < MIN_DURATION ? 'المدة قصيرة جداً' : duration && duration > 180 ? 'المدة طويلة جداً' : null;
+
+  // Determine select value
+  const selectValue = duration === undefined ? '' : (isCustom ? 'custom' : String(duration));
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -88,11 +93,11 @@ export const DurationPicker = ({
         </Label>
         <div className="flex gap-2">
           <Select
-            value={isCustom ? 'custom' : String(duration)}
+            value={selectValue}
             onValueChange={handlePresetChange}
           >
             <SelectTrigger className="flex-1">
-              <SelectValue placeholder="اختر المدة" />
+              <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent className="bg-popover z-50">
               {DURATION_OPTIONS.map((opt) => (
