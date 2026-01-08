@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -184,11 +184,12 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
             إضافة طالب
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col" dir="rtl">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl">إضافة طالب جديد</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-5 pt-4 pb-2">
+          <DialogBody>
+            <form onSubmit={handleSubmit} className="space-y-5 pt-4 pb-2">
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">اسم الطالب</Label>
@@ -401,27 +402,29 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                 </div>
               </CollapsibleContent>
             </Collapsible>
+            </form>
+          </DialogBody>
 
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
-                إلغاء
-              </Button>
-              <Button 
-                type="submit" 
-                className="flex-1 gradient-primary"
-                disabled={!name.trim() || selectedDays.length === 0 || !sessionTime || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
-              >
-                {isChecking ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                    جاري التحقق...
-                  </>
-                ) : (
-                  'إضافة الطالب'
-                )}
-              </Button>
-            </div>
-          </form>
+          <DialogFooter className="flex-row-reverse gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
+              إلغاء
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={handleSubmit}
+              className="flex-1 gradient-primary"
+              disabled={!name.trim() || selectedDays.length === 0 || !sessionTime || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
+            >
+              {isChecking ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                  جاري التحقق...
+                </>
+              ) : (
+                'إضافة الطالب'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       

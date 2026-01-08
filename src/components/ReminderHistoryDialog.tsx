@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -256,7 +256,7 @@ export const ReminderHistoryDialog = () => {
         </div>
 
         {/* Log List */}
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <DialogBody>
           {!hasActiveFilters ? (
             <div className="py-12 text-center">
               <History className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
@@ -316,7 +316,7 @@ export const ReminderHistoryDialog = () => {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </DialogBody>
 
         {/* Detail Modal */}
         {selectedLog && (

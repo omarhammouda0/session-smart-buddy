@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogBody,
 } from '@/components/ui/dialog';
 import {
   Popover,
@@ -341,8 +342,8 @@ export const AddVacationDialog = ({
         </DialogHeader>
 
         {!showPreview ? (
-          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
-            <div className="space-y-4 py-2 pr-2">
+          <DialogBody>
+            <div className="space-y-4 py-2">
             {/* Period Selection */}
             <div className="space-y-3">
               <Label className="flex items-center gap-1.5">
@@ -648,11 +649,11 @@ export const AddVacationDialog = ({
               </div>
             )}
             </div>
-          </ScrollArea>
+          </DialogBody>
         ) : (
           /* Preview View */
-          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
-            <div className="pr-2">
+          <DialogBody>
+            <div>
               <div className="flex items-center justify-between mb-3">
                 <span className="font-medium">معاينة ({sessionsToMark.length} جلسة)</span>
                 <Button variant="ghost" size="sm" onClick={() => setShowPreview(false)}>
@@ -695,7 +696,7 @@ export const AddVacationDialog = ({
                 })}
               </div>
             </div>
-          </ScrollArea>
+          </DialogBody>
         )}
 
         <DialogFooter className="flex-row-reverse gap-2 pt-2">

@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogBody,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -291,12 +292,13 @@ export const EditStudentDialog = ({
             <Edit2 className="h-3.5 w-3.5" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col" dir="rtl">
           <DialogHeader>
             <DialogTitle className="font-heading">تعديل بيانات الطالب</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
+          <DialogBody>
+            <div className="space-y-4 py-4">
             {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="edit-name">اسم الطالب</Label>
@@ -600,7 +602,8 @@ export const EditStudentDialog = ({
                 onClearMonth={onClearMonthCancellations}
               />
             )}
-          </div>
+            </div>
+          </DialogBody>
 
           <DialogFooter className="flex-row-reverse gap-2">
             <Button 

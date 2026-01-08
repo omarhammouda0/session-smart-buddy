@@ -27,6 +27,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogBody,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -823,8 +825,9 @@ export const BulkEditSessionsDialog = ({
 
           {/* Main Form */}
           {!showPreview && !showSuccessDialog && (
-            <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
-              <div className="space-y-4 pb-2 pr-2">
+            <>
+            <DialogBody>
+              <div className="space-y-4 pb-2">
                 {/* Undo Banner */}
                 {undoData && undoTimeLeft > 0 && (
                   <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center justify-between">
@@ -1225,18 +1228,18 @@ export const BulkEditSessionsDialog = ({
                   )}
                 </div>
               </div>
+            </DialogBody>
 
-              {/* Action Buttons */}
-              <div className="flex gap-2 pt-4 border-t">
-                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
-                  إلغاء
-                </Button>
-                <Button className="flex-1 gap-1" onClick={handleShowPreview}>
-                  معاينة
-                  <ArrowDown className="h-4 w-4 -rotate-90" />
-                </Button>
-              </div>
-            </ScrollArea>
+            <DialogFooter className="flex-row-reverse gap-2 pt-4 border-t">
+              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
+                إلغاء
+              </Button>
+              <Button className="flex-1 gap-1" onClick={handleShowPreview}>
+                معاينة
+                <ArrowDown className="h-4 w-4 -rotate-90" />
+              </Button>
+            </DialogFooter>
+            </>
           )}
 
           {/* Preview View */}
@@ -1266,7 +1269,7 @@ export const BulkEditSessionsDialog = ({
               </div>
 
               {/* Sessions List Grouped by Week */}
-              <ScrollArea className="flex-1 -mx-6 px-6">
+              <DialogBody>
                 <div className="space-y-4 pb-4">
                   {Object.entries(sessionsByWeek).map(([weekLabel, sessions]) => (
                     <div key={weekLabel} className="space-y-2">
@@ -1326,18 +1329,18 @@ export const BulkEditSessionsDialog = ({
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </DialogBody>
 
               {/* Apply Buttons */}
-              <div className="flex flex-col gap-2 pt-4 border-t">
+              <DialogFooter className="flex-col gap-2 pt-4 border-t">
                 {categorizedSessions.conflicts.length > 0 && (
-                  <p className="text-xs text-red-600 text-center">
+                  <p className="text-xs text-red-600 text-center w-full">
                     لا يمكن تطبيق الجلسات المتعارضة ({categorizedSessions.conflicts.length})
                   </p>
                 )}
                 
                 {categorizedSessions.warnings.length > 0 && categorizedSessions.safe.length > 0 && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full">
                     <Button
                       variant="outline"
                       className="flex-1"
@@ -1365,7 +1368,7 @@ export const BulkEditSessionsDialog = ({
                     تطبيق مع التحذيرات ({categorizedSessions.warnings.length})
                   </Button>
                 )}
-              </div>
+              </DialogFooter>
             </>
           )}
 
