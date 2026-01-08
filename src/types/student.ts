@@ -6,6 +6,8 @@ export interface SessionHistory {
   note?: string;
 }
 
+export type HomeworkStatus = 'none' | 'assigned' | 'completed' | 'incomplete';
+
 export interface Session {
   id: string;
   date: string; // YYYY-MM-DD format
@@ -17,6 +19,11 @@ export interface Session {
   cancelledAt?: string;
   completedAt?: string;
   vacationAt?: string;
+  // Session notes and homework tracking
+  topic?: string; // Session topic/subject
+  notes?: string; // Tutor notes about the session
+  homework?: string; // Homework description
+  homeworkStatus?: HomeworkStatus; // Homework completion status
 }
 
 export interface ScheduleDay {
