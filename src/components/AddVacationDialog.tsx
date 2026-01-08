@@ -359,12 +359,12 @@ export const AddVacationDialog = ({
                     إضافة فترة
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 p-0 bg-popover z-50" align="start">
+                <PopoverContent className="w-80 p-0 bg-popover z-50 max-h-[80vh] overflow-hidden flex flex-col" align="start">
                   <div className="p-2.5 border-b">
                     <h4 className="font-medium text-sm">اختر فترة الإجازة</h4>
                   </div>
                   
-                  <ScrollArea className="h-[300px]">
+                  <ScrollArea className="flex-1 min-h-0">
                     <div className="p-2 space-y-1">
                       {/* Week Options - Collapsible */}
                       <Collapsible open={weeksOpen} onOpenChange={setWeeksOpen}>
