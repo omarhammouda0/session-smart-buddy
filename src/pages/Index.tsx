@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
+import { useConflictDetection, ConflictResult } from '@/hooks/useConflictDetection';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
 import { StudentCard } from '@/components/StudentCard';
@@ -11,10 +12,11 @@ import { StatsBar } from '@/components/StatsBar';
 import { EndOfMonthReminder } from '@/components/EndOfMonthReminder';
 import { SessionHistoryBar } from '@/components/SessionHistoryBar';
 import { BulkEditSessionsDialog } from '@/components/BulkEditSessionsDialog';
+import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR } from '@/lib/arabicConstants';
+import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR, formatShortDateAr } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -41,6 +43,15 @@ const Index = () => {
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
   const [activeTab, setActiveTab] = useState('sessions');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  
+  // Conflict dialog state for adding sessions
+  const [addConflictDialog, setAddConflictDialog] = useState<{
+    open: boolean;
+    studentId: string;
+    date: string;
+    conflictResult: ConflictResult;
+    sessionInfo: { studentName: string; date: string; time: string };
+  } | null>(null);
 
   const {
     students,
@@ -67,14 +78,69 @@ const Index = () => {
     bulkMarkAsVacation,
   } = useStudents();
 
-  // Wrapper functions with toast notifications
+  // Conflict detection
+  const { checkConflict } = useConflictDetection(students);
+
+  // Wrapper functions with toast notifications - WITH CONFLICT CHECK
   const handleAddSession = (studentId: string, date: string) => {
     const student = students.find(s => s.id === studentId);
+    if (!student) return;
+    
+    const sessionTime = student.sessionTime || '16:00';
+    const conflictResult = checkConflict({ date, startTime: sessionTime });
+    
+    if (conflictResult.severity === 'error') {
+      // Block - show error dialog
+      setAddConflictDialog({
+        open: true,
+        studentId,
+        date,
+        conflictResult,
+        sessionInfo: {
+          studentName: student.name,
+          date: formatShortDateAr(date),
+          time: sessionTime,
+        },
+      });
+      return;
+    }
+    
+    if (conflictResult.severity === 'warning') {
+      // Show warning dialog, allow user to proceed
+      setAddConflictDialog({
+        open: true,
+        studentId,
+        date,
+        conflictResult,
+        sessionInfo: {
+          studentName: student.name,
+          date: formatShortDateAr(date),
+          time: sessionTime,
+        },
+      });
+      return;
+    }
+    
+    // No conflict - add directly
     addExtraSession(studentId, date);
     toast({
       title: "تمت إضافة الحصة",
       description: `حصة جديدة بتاريخ ${format(parseISO(date), 'dd/MM/yyyy')}${student ? ` لـ ${student.name}` : ''}`,
     });
+  };
+  
+  // Force add session (after user confirms warning)
+  const handleForceAddSession = () => {
+    if (!addConflictDialog) return;
+    const { studentId, date } = addConflictDialog;
+    const student = students.find(s => s.id === studentId);
+    
+    addExtraSession(studentId, date);
+    toast({
+      title: "تمت إضافة الحصة",
+      description: `حصة جديدة بتاريخ ${format(parseISO(date), 'dd/MM/yyyy')}${student ? ` لـ ${student.name}` : ''}`,
+    });
+    setAddConflictDialog(null);
   };
 
   const handleCancelSession = (studentId: string, sessionId: string) => {
@@ -502,6 +568,19 @@ const Index = () => {
           onTogglePayment={togglePaymentStatus}
         />
       </main>
+      
+      {/* Add Session Conflict Dialog */}
+      {addConflictDialog && (
+        <RestoreConflictDialog
+          open={addConflictDialog.open}
+          onOpenChange={(open) => !open && setAddConflictDialog(null)}
+          conflictResult={addConflictDialog.conflictResult}
+          sessionInfo={addConflictDialog.sessionInfo}
+          onConfirm={addConflictDialog.conflictResult.severity === 'warning' ? handleForceAddSession : undefined}
+          title={addConflictDialog.conflictResult.severity === 'error' ? 'لا يمكن إضافة الحصة' : 'تحذير: تعارض في الوقت'}
+          confirmText={addConflictDialog.conflictResult.severity === 'warning' ? 'إضافة على أي حال' : undefined}
+        />
+      )}
     </div>
   );
 };
