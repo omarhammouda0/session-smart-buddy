@@ -124,7 +124,8 @@ export const BulkEditSessionsDialog = ({
         if (dateTo && session.date > format(dateTo, 'yyyy-MM-dd')) return;
 
         // Filter by current time (if specified)
-        if (currentTimeFilter !== 'all' && student.sessionTime !== currentTimeFilter) return;
+        const sessionTime = session.time || student.sessionTime;
+        if (currentTimeFilter !== 'all' && sessionTime !== currentTimeFilter) return;
 
         sessions.push({
           session,
@@ -347,11 +348,36 @@ export const BulkEditSessionsDialog = ({
                     size="sm"
                     className="text-xs h-7"
                     onClick={() => {
+                      const nextWeekStart = addWeeks(today, 1);
+                      setDateFrom(nextWeekStart);
+                      setDateTo(addDays(nextWeekStart, 6));
+                    }}
+                  >
+                    الأسبوع القادم
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
                       setDateFrom(today);
                       setDateTo(addWeeks(today, 2));
                     }}
                   >
                     أسبوعين
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
+                      setDateFrom(today);
+                      setDateTo(endOfMonth(today));
+                    }}
+                  >
+                    هذا الشهر
                   </Button>
                   <Button
                     type="button"
