@@ -1,11 +1,11 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, Banknote } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Student, SessionType, AppSettings } from '@/types/student';
-import { EditStudentDialog } from '@/components/EditStudentDialog';
-import { cn } from '@/lib/utils';
-import { DAY_NAMES_SHORT_AR, formatDurationAr } from '@/lib/arabicConstants';
+import { Trash2, Clock, Monitor, MapPin, Phone } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Student, SessionType, AppSettings } from "@/types/student";
+import { EditStudentDialog } from "@/components/EditStudentDialog";
+import { cn } from "@/lib/utils";
+import { DAY_NAMES_SHORT_AR, formatDurationAr } from "@/lib/arabicConstants";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 
 interface StudentCardProps {
   student: Student;
@@ -52,93 +52,98 @@ export const StudentCard = ({
   onUpdateDuration,
   onUpdateCustomSettings,
 }: StudentCardProps) => {
-
-  const defaultPriceOnsite = settings?.defaultPriceOnsite ?? 150;
-  const defaultPriceOnline = settings?.defaultPriceOnline ?? 120;
-
-  const effectivePrice = (() => {
-    if (student.useCustomSettings) {
-      if ((student.sessionType || 'onsite') === 'online') {
-        return typeof student.customPriceOnline === 'number' && student.customPriceOnline > 0
-          ? student.customPriceOnline
-          : defaultPriceOnline;
-      }
-      return typeof student.customPriceOnsite === 'number' && student.customPriceOnsite > 0
-        ? student.customPriceOnsite
-        : defaultPriceOnsite;
-    }
-    return (student.sessionType || 'onsite') === 'online' ? defaultPriceOnline : defaultPriceOnsite;
-  })();
+  const initials = student.name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("");
 
   return (
-    <Card className={cn(
-      "card-shadow transition-all duration-300 overflow-hidden"
-    )} dir="rtl">
-      <CardHeader className="p-3 sm:pb-3">
+    <Card dir="rtl" className="transition-all hover:shadow-lg hover:-translate-y-0.5 border-border/60">
+      <CardHeader className="p-4 pb-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-heading font-semibold text-base sm:text-lg truncate">{student.name}</h3>
-              <EditStudentDialog
-                student={student}
-                students={students}
-                appSettings={settings}
-                onUpdateName={onUpdateName}
-                onUpdateTime={onUpdateTime}
-                onUpdatePhone={onUpdatePhone}
-                onUpdateSessionType={onUpdateSessionType}
-                onUpdateSchedule={onUpdateSchedule}
-                onUpdateDuration={onUpdateDuration}
-                onUpdateCustomSettings={onUpdateCustomSettings}
-              />
+          {/* Avatar + Name */}
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
+              {initials}
             </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
-              <span className="text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 bg-accent/20 text-foreground rounded-lg flex items-center gap-1">
-                <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                {student.sessionTime || '16:00'}
-                <span className="text-muted-foreground">({formatDurationAr(student.sessionDuration || 60)})</span>
-              </span>
-              <Badge variant="outline" className={cn(
-                "text-[10px] gap-1",
-                (student.sessionType || 'onsite') === 'online' 
-                  ? "border-blue-500/30 text-blue-600 bg-blue-500/10"
-                  : "border-orange-500/30 text-orange-600 bg-orange-500/10"
-              )}>
-                {(student.sessionType || 'onsite') === 'online' ? (
-                  <><Monitor className="h-3 w-3" /> أونلاين</>
-                ) : (
-                  <><MapPin className="h-3 w-3" /> حضوري</>
-                )}
-              </Badge>
-              {student.scheduleDays.map(d => (
-                <span key={d.dayOfWeek} className={cn(
-                  "text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full",
-                  d.dayOfWeek === selectedDayOfWeek 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-primary/10 text-primary"
-                )}>
-                  {DAY_NAMES_SHORT_AR[d.dayOfWeek]}
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-heading font-semibold text-base truncate">{student.name}</h3>
+                <EditStudentDialog
+                  student={student}
+                  students={students}
+                  appSettings={settings}
+                  onUpdateName={onUpdateName}
+                  onUpdateTime={onUpdateTime}
+                  onUpdatePhone={onUpdatePhone}
+                  onUpdateSessionType={onUpdateSessionType}
+                  onUpdateSchedule={onUpdateSchedule}
+                  onUpdateDuration={onUpdateDuration}
+                  onUpdateCustomSettings={onUpdateCustomSettings}
+                />
+              </div>
+
+              {/* Meta */}
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-muted">
+                  <Clock className="h-3 w-3" />
+                  {student.sessionTime || "16:00"} ({formatDurationAr(student.sessionDuration || 60)})
                 </span>
-              ))}
+
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px]",
+                    (student.sessionType || "onsite") === "online"
+                      ? "border-blue-500/30 text-blue-600 bg-blue-500/10"
+                      : "border-orange-500/30 text-orange-600 bg-orange-500/10",
+                  )}
+                >
+                  {(student.sessionType || "onsite") === "online" ? (
+                    <>
+                      <Monitor className="h-3 w-3 ml-1" /> أونلاين
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="h-3 w-3 ml-1" /> حضوري
+                    </>
+                  )}
+                </Badge>
+
+                {student.scheduleDays.map((d) => (
+                  <span
+                    key={d.dayOfWeek}
+                    className={cn(
+                      "text-[10px] px-2 py-0.5 rounded-full",
+                      d.dayOfWeek === selectedDayOfWeek
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-primary/10 text-primary",
+                    )}
+                  >
+                    {DAY_NAMES_SHORT_AR[d.dayOfWeek]}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
-          
+
+          {/* Delete */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="icon" variant="ghost" className="shrink-0 h-9 w-9 text-muted-foreground hover:text-destructive">
+              <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent dir="rtl">
               <AlertDialogHeader>
                 <AlertDialogTitle>حذف الطالب</AlertDialogTitle>
-                <AlertDialogDescription>
-                  هل أنت متأكد من حذف {student.name}؟ سيتم حذف جميع سجلات الحصص والمدفوعات.
-                </AlertDialogDescription>
+                <AlertDialogDescription>هل أنت متأكد من حذف {student.name}؟</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter className="flex-row-reverse gap-2">
                 <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={onRemove} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                <AlertDialogAction onClick={onRemove} className="bg-destructive text-destructive-foreground">
                   حذف
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -148,12 +153,12 @@ export const StudentCard = ({
       </CardHeader>
 
       {student.phone && (
-        <CardContent className="p-3 pt-0">
-          <a 
-            href={`https://wa.me/${student.phone.replace(/\D/g, '')}`}
+        <CardContent className="px-4 pb-4 pt-0">
+          <a
+            href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
           >
             <Phone className="h-3 w-3" />
             {student.phone}
