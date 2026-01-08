@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Student, SessionType } from '@/types/student';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { cn } from '@/lib/utils';
-import { DAY_NAMES_SHORT_AR } from '@/lib/arabicConstants';
+import { DAY_NAMES_SHORT_AR, formatDurationAr } from '@/lib/arabicConstants';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +65,9 @@ export const StudentCard = ({
               <span className="text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 bg-accent/20 text-foreground rounded-lg flex items-center gap-1">
                 <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 {student.sessionTime || '16:00'}
+                {student.sessionDuration && (
+                  <span className="text-muted-foreground">({formatDurationAr(student.sessionDuration)})</span>
+                )}
               </span>
               <Badge variant="outline" className={cn(
                 "text-[10px] gap-1",
