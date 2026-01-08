@@ -460,13 +460,11 @@ export const PaymentsDashboard = ({
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{student.sessionTime || '16:00'}</span>
-                        <span>•</span>
                         <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join('، ')}</span>
                         {billableCount > 0 && (
                           <>
                             <span>•</span>
-                            <span className="text-primary">{billableCount} × {pricePerSession} {CURRENCY}</span>
+                            <span className="text-primary">{billableCount} جلسة</span>
                           </>
                         )}
                         {monthStats.vacation > 0 && (
