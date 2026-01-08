@@ -65,7 +65,10 @@ const getStudentSessionPrice = (student: Student, settings?: AppSettings): numbe
 const getStudentMonthTotal = (student: Student, month: number, year: number, settings?: AppSettings): number => {
   const stats = getStudentMonthStats(student, month, year);
   const pricePerSession = getStudentSessionPrice(student, settings);
-  return stats.completed * pricePerSession;
+
+  // Count sessions that should be paid for (scheduled + completed)
+  const billableCount = stats.completed + stats.scheduled;
+  return billableCount * pricePerSession;
 };
 
 interface PaymentsDashboardProps {
@@ -223,9 +226,9 @@ export const PaymentsDashboard = ({
       const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
       
       // Build custom message with student details
-      const message = `عزيزي ولي الأمر،
+       const message = `عزيزي ولي الأمر،
 تذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}
-عدد الجلسات: ${monthStats.completed}
+عدد الجلسات: ${monthStats.completed + monthStats.scheduled}
 المبلغ المستحق: ${studentTotal} ${CURRENCY}
 شكراً لتعاونكم`;
 
@@ -432,6 +435,7 @@ export const PaymentsDashboard = ({
               const isPaid = getPaymentStatus(student.id);
               const isSending = sendingReminder === student.id;
               const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+              const billableCount = monthStats.completed + monthStats.scheduled;
               const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
               const pricePerSession = getStudentSessionPrice(student, settings);
               return (
@@ -443,7 +447,7 @@ export const PaymentsDashboard = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium truncate">{student.name}</span>
-                        {studentTotal > 0 && (
+                        {billableCount > 0 && (
                           <span className={cn("text-sm font-medium shrink-0", isPaid ? "text-success" : "text-foreground")}>
                             {studentTotal.toLocaleString()} {CURRENCY}
                           </span>
@@ -453,10 +457,10 @@ export const PaymentsDashboard = ({
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{student.sessionTime || '16:00'}</span>
                         <span>•</span>
                         <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join('، ')}</span>
-                        {monthStats.completed > 0 && (
+                        {billableCount > 0 && (
                           <>
                             <span>•</span>
-                            <span className="text-success">{monthStats.completed} × {pricePerSession} {CURRENCY}</span>
+                            <span className="text-primary">{billableCount} × {pricePerSession} {CURRENCY}</span>
                           </>
                         )}
                         {monthStats.vacation > 0 && (
