@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { formatShortDateAr } from '@/lib/arabicConstants';
+import { formatShortDateAr, formatDurationAr } from '@/lib/arabicConstants';
 import { useConflictDetection, ConflictResult, formatTimeAr } from '@/hooks/useConflictDetection';
 import { GapIndicator } from '@/components/GapIndicator';
 import { ConflictWarning } from '@/components/ConflictWarning';
@@ -325,6 +325,11 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                   {formatShortDateAr(session.date)}
                                   <span className="text-muted-foreground font-normal mr-1">
                                     ({session.time || selectedStudent.sessionTime || '16:00'})
+                                    {(session.duration || selectedStudent.sessionDuration) && (
+                                      <span className="text-muted-foreground/70 mr-1">
+                                        ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                                      </span>
+                                    )}
                                   </span>
                                 </p>
                                 {session.status === 'cancelled' && <span className="text-[10px] text-destructive">ملغاة</span>}
@@ -456,6 +461,11 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             {formatShortDateAr(session.date)}
                             <span className="text-muted-foreground font-normal mr-1">
                               ({session.time || selectedStudent.sessionTime || '16:00'})
+                              {(session.duration || selectedStudent.sessionDuration) && (
+                                <span className="text-muted-foreground/70 mr-1">
+                                  ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                                </span>
+                              )}
                             </span>
                           </p>
                         </div>
