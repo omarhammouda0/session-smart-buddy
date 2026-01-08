@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, parseISO, isBefore, isAfter, startOfDay } from 'date-fns';
+import { format, parseISO, isBefore, isAfter, startOfDay, addDays, addWeeks, endOfMonth, startOfMonth, addMonths } from 'date-fns';
 import { Calendar, Clock, Users, AlertTriangle, Check, ChevronLeft } from 'lucide-react';
 import { Student, Session } from '@/types/student';
 import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR, formatShortDateAr } from '@/lib/arabicConstants';
@@ -326,6 +326,60 @@ export const BulkEditSessionsDialog = ({
                   <Calendar className="h-4 w-4" />
                   نطاق التاريخ
                 </Label>
+                
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
+                      setDateFrom(today);
+                      setDateTo(addDays(today, 6));
+                    }}
+                  >
+                    هذا الأسبوع
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
+                      setDateFrom(today);
+                      setDateTo(addWeeks(today, 2));
+                    }}
+                  >
+                    أسبوعين
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
+                      setDateFrom(today);
+                      setDateTo(endOfMonth(today));
+                    }}
+                  >
+                    هذا الشهر
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
+                      const nextMonth = addMonths(today, 1);
+                      setDateFrom(startOfMonth(nextMonth));
+                      setDateTo(endOfMonth(nextMonth));
+                    }}
+                  >
+                    الشهر القادم
+                  </Button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="text-xs text-muted-foreground">من</span>
