@@ -46,13 +46,30 @@ export const useCancellationTracking = (students: Student[]) => {
   const [notifications, setNotifications] = useState<CancellationNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load data from Supabase
+  const getUserId = useCallback(async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('Auth error (getUser):', error);
+      return null;
+    }
+    return data.user?.id ?? null;
+  }, []);
+
+  // Load data from backend
   const loadData = useCallback(async () => {
     try {
+      const userId = await getUserId();
+      if (!userId) {
+        setCancellations([]);
+        setMonthlyTracking([]);
+        setNotifications([]);
+        return;
+      }
       // Load cancellations
       const { data: cancellationData, error: cancellationError } = await supabase
         .from('session_cancellations')
         .select('*')
+        .eq('user_id', userId)
         .order('cancelled_at', { ascending: false });
 
       if (cancellationError) {
@@ -74,7 +91,8 @@ export const useCancellationTracking = (students: Student[]) => {
       // Load monthly tracking
       const { data: trackingData, error: trackingError } = await supabase
         .from('student_cancellation_tracking')
-        .select('*');
+        .select('*')
+        .eq('user_id', userId);
 
       if (trackingError) {
         console.error('Error loading tracking:', trackingError);
@@ -97,6 +115,7 @@ export const useCancellationTracking = (students: Student[]) => {
       const { data: notificationData, error: notificationError } = await supabase
         .from('cancellation_notifications')
         .select('*')
+        .eq('user_id', userId)
         .order('sent_at', { ascending: false });
 
       if (notificationError) {
@@ -185,6 +204,12 @@ export const useCancellationTracking = (students: Student[]) => {
       const autoNotifyParent = student?.cancellationPolicy?.autoNotifyParent ?? true;
 
       try {
+        const userId = await getUserId();
+        if (!userId) {
+          console.error('recordCancellation: no authenticated user');
+          return { success: false, newCount: 0, limitReached: false, limitExceeded: false, limit };
+        }
+
         // Insert cancellation record
         const { error: insertError } = await supabase
           .from('session_cancellations')
@@ -201,11 +226,21 @@ export const useCancellationTracking = (students: Student[]) => {
           return { success: false, newCount: 0, limitReached: false, limitExceeded: false, limit };
         }
 
-        // Upsert monthly tracking
-        const currentCount = getCancellationCount(studentId, month);
-        const newCount = currentCount + 1;
-        const limitReached = limit !== null && newCount === limit;
-        const limitExceeded = limit !== null && newCount > limit;
+        // Always compute count from DB to avoid stale state (fixes "always 1/3")
+        const { count, error: countError } = await supabase
+          .from('session_cancellations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('student_id', studentId)
+          .eq('month', month);
+
+        if (countError) {
+          console.error('Error counting cancellations:', countError);
+        }
+
+        const newCount = count ?? (getCancellationCount(studentId, month) + 1);
+        const limitReached = newCount === limit;
+        const limitExceeded = newCount > limit;
 
         const { error: upsertError } = await supabase
           .from('student_cancellation_tracking')
@@ -232,47 +267,27 @@ export const useCancellationTracking = (students: Student[]) => {
         // Check if we should auto-notify parent
         let autoNotificationSent = false;
         if ((limitReached || limitExceeded) && autoNotifyParent && student?.phone) {
-          // Check if parent was already notified this month
+          // Re-check from backend state after reload
           const alreadyNotified = wasParentNotified(studentId, month);
-          
+
           if (!alreadyNotified) {
             console.log('Auto-sending parent notification for:', student.name);
-            
-            // Get fresh cancellation list for this month
+
             const studentCancellations = cancellations.filter(
               (c) => c.studentId === studentId && c.month === month
             );
-            
-            // Add the current cancellation to the list for the message
-            const allCancellations = [
-              ...studentCancellations,
-              {
-                id: 'pending',
-                studentId,
-                sessionDate,
-                sessionTime,
-                reason,
-                cancelledAt: new Date().toISOString(),
-                month,
-              },
-            ];
 
             const result = await sendParentNotificationInternal(
               studentId,
               student.phone,
               student.name,
               newCount,
-              limit!,
-              allCancellations,
+              limit,
+              studentCancellations,
               'auto'
             );
 
             autoNotificationSent = result.success;
-            if (result.success) {
-              console.log('Auto-notification sent successfully');
-            } else {
-              console.error('Auto-notification failed:', result.error);
-            }
           }
         }
 
