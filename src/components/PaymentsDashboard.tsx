@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins } from 'lucide-react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Student, StudentPayments, AppSettings } from '@/types/student';
 import { formatMonthYearAr, DAY_NAMES_SHORT_AR, MONTH_NAMES_AR } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
@@ -76,6 +77,9 @@ export const PaymentsDashboard = ({
   const [selectedStudentHistory, setSelectedStudentHistory] = useState<string | null>(null);
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
   const [confirmPaymentStudent, setConfirmPaymentStudent] = useState<Student | null>(null);
+  const [bulkSendingReminders, setBulkSendingReminders] = useState(false);
+  const [bulkSendProgress, setBulkSendProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
 
   const getPaymentStatus = (studentId: string, month?: number, year?: number): boolean => {
     const studentPayments = payments.find(p => p.studentId === studentId);
@@ -169,10 +173,88 @@ export const PaymentsDashboard = ({
       toast({ title: "الكل دفعوا!", description: "جميع الطلاب دفعوا لهذا الشهر." });
       return;
     }
+    // Show confirmation dialog for bulk send
+    setShowBulkConfirm(true);
+  };
+
+  const sendBulkWhatsAppReminders = async () => {
+    const studentsWithPhone = unpaidStudents.filter(s => s.phone);
+    const studentsWithoutPhone = unpaidStudents.filter(s => !s.phone);
+    
+    if (studentsWithPhone.length === 0) {
+      toast({ 
+        title: "لا يوجد أرقام هاتف", 
+        description: "لا يوجد أرقام هاتف مسجلة للطلاب الذين لم يدفعوا",
+        variant: "destructive" 
+      });
+      setShowBulkConfirm(false);
+      return;
+    }
+
+    setBulkSendingReminders(true);
+    setBulkSendProgress({ current: 0, total: studentsWithPhone.length, success: 0, failed: 0 });
+    setShowBulkConfirm(false);
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < studentsWithPhone.length; i++) {
+      const student = studentsWithPhone[i];
+      const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+      const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+      
+      // Build custom message with student details
+      const message = `عزيزي ولي الأمر،
+تذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}
+عدد الجلسات: ${monthStats.completed}
+المبلغ المستحق: ${studentTotal} ${CURRENCY}
+شكراً لتعاونكم`;
+
+      try {
+        const { error } = await supabase.functions.invoke('send-whatsapp-reminder', {
+          body: {
+            studentName: student.name,
+            phoneNumber: student.phone,
+            customMessage: message,
+          },
+        });
+
+        if (error) throw error;
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to send to ${student.name}:`, error);
+        failedCount++;
+      }
+
+      setBulkSendProgress({ 
+        current: i + 1, 
+        total: studentsWithPhone.length, 
+        success: successCount, 
+        failed: failedCount 
+      });
+
+      // Small delay between messages to avoid rate limiting
+      if (i < studentsWithPhone.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    setBulkSendingReminders(false);
+
+    // Show results
+    let description = `تم إرسال ${successCount} تذكير بنجاح`;
+    if (failedCount > 0) {
+      description += `، فشل ${failedCount}`;
+    }
+    if (studentsWithoutPhone.length > 0) {
+      description += `\n${studentsWithoutPhone.length} طالب بدون رقم هاتف: ${studentsWithoutPhone.map(s => s.name).join('، ')}`;
+    }
+
     toast({
-      title: "تذكير بالدفع",
-      description: `${unpaidStudents.length} طالب لم يدفعوا لشهر ${formatMonthYearAr(selectedMonth, selectedYear)}: ${unpaidStudents.map(s => s.name).join('، ')}`,
+      title: successCount > 0 ? "تم الإرسال" : "فشل الإرسال",
+      description,
       duration: 8000,
+      variant: failedCount > 0 && successCount === 0 ? "destructive" : "default",
     });
   };
 
@@ -272,10 +354,36 @@ export const PaymentsDashboard = ({
         </button>
       </div>
 
-      <Button variant="outline" className="w-full gap-2 border-warning/50 text-warning hover:bg-warning/10" onClick={sendPaymentReminder}>
-        <Bell className="h-4 w-4" />
-        تذكير بالدفع ({unpaidCount} لم يدفعوا)
-      </Button>
+      {bulkSendingReminders ? (
+        <div className="p-4 rounded-lg border bg-card space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              جاري إرسال التذكيرات...
+            </span>
+            <span className="text-muted-foreground">
+              {bulkSendProgress.current} / {bulkSendProgress.total}
+            </span>
+          </div>
+          <Progress value={(bulkSendProgress.current / bulkSendProgress.total) * 100} className="h-2" />
+          <div className="flex gap-4 text-xs">
+            <span className="text-success">✓ نجح: {bulkSendProgress.success}</span>
+            {bulkSendProgress.failed > 0 && (
+              <span className="text-destructive">✗ فشل: {bulkSendProgress.failed}</span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <Button 
+          variant="outline" 
+          className="w-full gap-2 border-green-500/50 text-green-600 hover:bg-green-500/10" 
+          onClick={sendPaymentReminder}
+          disabled={unpaidCount === 0}
+        >
+          <Send className="h-4 w-4" />
+          إرسال تذكير WhatsApp للجميع ({unpaidCount} لم يدفعوا)
+        </Button>
+      )}
 
       <Card className="card-shadow">
         <CardHeader className="pb-3">
@@ -376,6 +484,35 @@ export const PaymentsDashboard = ({
             </DialogClose>
             <Button onClick={handleConfirmPayment} className="gradient-accent">
               نعم، تم الدفع
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Send Confirmation Dialog */}
+      <Dialog open={showBulkConfirm} onOpenChange={setShowBulkConfirm}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-green-600" />
+              إرسال تذكيرات جماعية
+            </DialogTitle>
+            <DialogDescription>
+              سيتم إرسال رسالة WhatsApp تذكير بالدفع لـ {unpaidStudents.filter(s => s.phone).length} طالب لم يدفعوا لشهر {formatMonthYearAr(selectedMonth, selectedYear)}.
+              {unpaidStudents.filter(s => !s.phone).length > 0 && (
+                <span className="block mt-2 text-warning">
+                  ⚠️ {unpaidStudents.filter(s => !s.phone).length} طالب بدون رقم هاتف لن يتم إرسال تذكير لهم.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <DialogClose asChild>
+              <Button variant="outline">إلغاء</Button>
+            </DialogClose>
+            <Button onClick={sendBulkWhatsAppReminders} className="gap-2 bg-green-600 hover:bg-green-700">
+              <Send className="h-4 w-4" />
+              إرسال الآن
             </Button>
           </DialogFooter>
         </DialogContent>
