@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Palmtree, Calendar, Users, Send, AlertTriangle, Plus, X, Check } from 'lucide-react';
+import { Palmtree, Calendar, Users, Send, AlertTriangle, Plus, X, Check, ChevronDown, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,6 +14,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -71,6 +76,11 @@ export const AddVacationDialog = ({
   const [reason, setReason] = useState('');
   const [notifyParents, setNotifyParents] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  
+  // Collapsible section states
+  const [weeksOpen, setWeeksOpen] = useState(true);
+  const [monthsOpen, setMonthsOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
 
   const today = new Date();
 
@@ -348,124 +358,152 @@ export const AddVacationDialog = ({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0 bg-popover z-50" align="start">
-                  <div className="p-3 border-b">
+                  <div className="p-2.5 border-b">
                     <h4 className="font-medium text-sm">اختر فترة الإجازة</h4>
-                    <p className="text-xs text-muted-foreground mt-1">يمكنك اختيار أكثر من فترة</p>
                   </div>
                   
-                  <ScrollArea className="max-h-[350px]">
-                    <div className="p-3 space-y-3">
-                      {/* Week Options */}
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                          📅 الأسابيع
-                        </p>
-                        {weekOptions.map(option => (
+                  <ScrollArea className="h-[300px]">
+                    <div className="p-2 space-y-1">
+                      {/* Week Options - Collapsible */}
+                      <Collapsible open={weeksOpen} onOpenChange={setWeeksOpen}>
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-md hover:bg-muted/50 transition-colors">
+                          <span className="text-sm font-medium flex items-center gap-1.5">
+                            📅 الأسابيع
+                            {weekOptions.filter(o => tempSelectedPeriodIds.has(o.id)).length > 0 && (
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                {weekOptions.filter(o => tempSelectedPeriodIds.has(o.id)).length}
+                              </Badge>
+                            )}
+                          </span>
+                          {weeksOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-1 pr-2 pt-1">
+                          {weekOptions.map(option => (
+                            <label
+                              key={option.id}
+                              className={cn(
+                                "flex items-center gap-2 p-1.5 rounded-md border cursor-pointer transition-colors text-sm",
+                                tempSelectedPeriodIds.has(option.id)
+                                  ? "bg-warning/10 border-warning"
+                                  : "hover:bg-muted/50 border-transparent"
+                              )}
+                            >
+                              <Checkbox
+                                checked={tempSelectedPeriodIds.has(option.id)}
+                                onCheckedChange={() => togglePeriodInTemp(option.id)}
+                                className="h-4 w-4"
+                              />
+                              <span className="flex-1 truncate">
+                                {option.label} <span className="text-muted-foreground text-xs">({option.dateRange})</span>
+                              </span>
+                            </label>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      <Separator className="my-1" />
+
+                      {/* Month Options - Collapsible */}
+                      <Collapsible open={monthsOpen} onOpenChange={setMonthsOpen}>
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-md hover:bg-muted/50 transition-colors">
+                          <span className="text-sm font-medium flex items-center gap-1.5">
+                            📆 الأشهر الكاملة
+                            {monthOptions.filter(o => tempSelectedPeriodIds.has(o.id)).length > 0 && (
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                {monthOptions.filter(o => tempSelectedPeriodIds.has(o.id)).length}
+                              </Badge>
+                            )}
+                          </span>
+                          {monthsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-1 pr-2 pt-1">
+                          {monthOptions.map(option => (
+                            <label
+                              key={option.id}
+                              className={cn(
+                                "flex items-center gap-2 p-1.5 rounded-md border cursor-pointer transition-colors text-sm",
+                                tempSelectedPeriodIds.has(option.id)
+                                  ? "bg-warning/10 border-warning"
+                                  : "hover:bg-muted/50 border-transparent"
+                              )}
+                            >
+                              <Checkbox
+                                checked={tempSelectedPeriodIds.has(option.id)}
+                                onCheckedChange={() => togglePeriodInTemp(option.id)}
+                                className="h-4 w-4"
+                              />
+                              <span className="flex-1 truncate">
+                                {option.label} <span className="text-muted-foreground text-xs">({option.dateRange})</span>
+                              </span>
+                            </label>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      <Separator className="my-1" />
+
+                      {/* Custom Range - Collapsible */}
+                      <Collapsible open={customOpen} onOpenChange={setCustomOpen}>
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-md hover:bg-muted/50 transition-colors">
+                          <span className="text-sm font-medium flex items-center gap-1.5">
+                            📋 نطاق مخصص
+                            {useCustomRange && customStart && customEnd && (
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1">1</Badge>
+                            )}
+                          </span>
+                          {customOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pr-2 pt-1 space-y-2">
                           <label
-                            key={option.id}
                             className={cn(
-                              "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors",
-                              tempSelectedPeriodIds.has(option.id)
+                              "flex items-center gap-2 p-1.5 rounded-md border cursor-pointer transition-colors text-sm",
+                              useCustomRange
                                 ? "bg-warning/10 border-warning"
-                                : "hover:bg-muted/50"
+                                : "hover:bg-muted/50 border-transparent"
                             )}
                           >
                             <Checkbox
-                              checked={tempSelectedPeriodIds.has(option.id)}
-                              onCheckedChange={() => togglePeriodInTemp(option.id)}
+                              checked={useCustomRange}
+                              onCheckedChange={(checked) => setUseCustomRange(checked === true)}
+                              className="h-4 w-4"
                             />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium">{option.label}</p>
-                              <p className="text-xs text-muted-foreground">({option.dateRange})</p>
-                            </div>
+                            <span>تحديد تواريخ مخصصة</span>
                           </label>
-                        ))}
-                      </div>
-
-                      <Separator />
-
-                      {/* Month Options */}
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                          📆 الأشهر الكاملة
-                        </p>
-                        {monthOptions.map(option => (
-                          <label
-                            key={option.id}
-                            className={cn(
-                              "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors",
-                              tempSelectedPeriodIds.has(option.id)
-                                ? "bg-warning/10 border-warning"
-                                : "hover:bg-muted/50"
-                            )}
-                          >
-                            <Checkbox
-                              checked={tempSelectedPeriodIds.has(option.id)}
-                              onCheckedChange={() => togglePeriodInTemp(option.id)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium">{option.label}</p>
-                              <p className="text-xs text-muted-foreground">({option.dateRange})</p>
+                          
+                          {useCustomRange && (
+                            <div className="grid grid-cols-2 gap-2 pr-6">
+                              <div className="space-y-0.5">
+                                <Label className="text-xs">من</Label>
+                                <Input
+                                  type="date"
+                                  value={customStart}
+                                  onChange={(e) => setCustomStart(e.target.value)}
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-xs">إلى</Label>
+                                <Input
+                                  type="date"
+                                  value={customEnd}
+                                  onChange={(e) => setCustomEnd(e.target.value)}
+                                  className="h-8 text-sm"
+                                />
+                              </div>
                             </div>
-                          </label>
-                        ))}
-                      </div>
-
-                      <Separator />
-
-                      {/* Custom Range */}
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                          📋 نطاق مخصص
-                        </p>
-                        <label
-                          className={cn(
-                            "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors",
-                            useCustomRange
-                              ? "bg-warning/10 border-warning"
-                              : "hover:bg-muted/50"
                           )}
-                        >
-                          <Checkbox
-                            checked={useCustomRange}
-                            onCheckedChange={(checked) => setUseCustomRange(checked === true)}
-                          />
-                          <span className="text-sm font-medium">تحديد تواريخ مخصصة</span>
-                        </label>
-                        
-                        {useCustomRange && (
-                          <div className="grid grid-cols-2 gap-2 pr-8">
-                            <div className="space-y-1">
-                              <Label className="text-xs">من</Label>
-                              <Input
-                                type="date"
-                                value={customStart}
-                                onChange={(e) => setCustomStart(e.target.value)}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">إلى</Label>
-                              <Input
-                                type="date"
-                                value={customEnd}
-                                onChange={(e) => setCustomEnd(e.target.value)}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   </ScrollArea>
 
-                  <div className="p-3 border-t space-y-2">
-                    <div className="flex gap-2">
+                  <div className="p-2 border-t space-y-1.5 bg-background">
+                    <div className="flex gap-1.5">
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={selectAllPeriods}
-                        className="flex-1 text-xs"
+                        className="flex-1 text-xs h-7"
                       >
                         تحديد الكل
                       </Button>
@@ -473,17 +511,17 @@ export const AddVacationDialog = ({
                         variant="ghost" 
                         size="sm" 
                         onClick={deselectAllPeriods}
-                        className="flex-1 text-xs"
+                        className="flex-1 text-xs h-7"
                       >
                         إلغاء التحديد
                       </Button>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <Button 
                         variant="outline" 
                         size="sm" 
                         onClick={() => setPeriodPopoverOpen(false)}
-                        className="flex-1"
+                        className="flex-1 h-8"
                       >
                         إلغاء
                       </Button>
@@ -491,7 +529,7 @@ export const AddVacationDialog = ({
                         size="sm" 
                         onClick={addSelectedPeriods}
                         disabled={selectedCount === 0}
-                        className="flex-1 bg-warning text-warning-foreground hover:bg-warning/90"
+                        className="flex-1 h-8 bg-warning text-warning-foreground hover:bg-warning/90"
                       >
                         إضافة ({selectedCount})
                       </Button>
