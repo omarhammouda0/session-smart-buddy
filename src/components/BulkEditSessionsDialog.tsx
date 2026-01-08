@@ -823,8 +823,8 @@ export const BulkEditSessionsDialog = ({
 
           {/* Main Form */}
           {!showPreview && !showSuccessDialog && (
-            <>
-              <div className="space-y-4 pb-2">
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-4 pb-2 pr-2">
                 {/* Undo Banner */}
                 {undoData && undoTimeLeft > 0 && (
                   <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center justify-between">
@@ -1238,7 +1238,7 @@ export const BulkEditSessionsDialog = ({
                   <ArrowDown className="h-4 w-4 -rotate-90" />
                 </Button>
               </div>
-            </>
+            </ScrollArea>
           )}
 
           {/* Preview View */}
