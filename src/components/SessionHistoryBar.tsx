@@ -348,6 +348,12 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
+                              {/* Notes button - available for all session statuses */}
+                              <SessionNotesManager
+                                session={session}
+                                studentId={session.studentId}
+                                studentName={session.studentName}
+                              />
                               {session.status === 'cancelled' ? (
                                 <>
                                   <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
@@ -474,13 +480,12 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {session.status === 'completed' && (
-                              <SessionNotesManager
-                                session={session}
-                                studentId={session.studentId}
-                                studentName={session.studentName}
-                              />
-                            )}
+                            {/* Notes button - available for all session statuses */}
+                            <SessionNotesManager
+                              session={session}
+                              studentId={session.studentId}
+                              studentName={session.studentName}
+                            />
                             {session.status === 'completed' ? (
                               <Button variant="ghost" size="sm" className="h-7 px-2 text-warning" onClick={() => onToggleComplete?.(session.studentId, session.id)}>
                                 <X className="h-3.5 w-3.5 ml-1" />تراجع
