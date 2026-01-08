@@ -14,13 +14,19 @@ import { toast } from '@/hooks/use-toast';
 
 type FilterType = 'session' | 'payment' | 'cancellation';
 type FilterStatus = 'sent' | 'failed';
-type FilterTime = 'week' | 'month';
+type FilterTime = '1week' | '2weeks' | '3weeks' | '1month';
+
+const TYPE_LABELS: Record<FilterType, string> = {
+  session: 'جلسات',
+  payment: 'دفع',
+  cancellation: 'إلغاء'
+};
 
 export const ReminderHistoryDialog = () => {
   const { logs, fetchLogs, retryFailedReminders } = useReminderSettings();
   const [open, setOpen] = useState(false);
   const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
-  const [filterStatuses, setFilterStatuses] = useState<FilterStatus[]>([]);
+  const [filterStatus, setFilterStatus] = useState<FilterStatus | null>(null);
   const [filterTime, setFilterTime] = useState<FilterTime | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [selectedLog, setSelectedLog] = useState<ReminderLog | null>(null);
@@ -46,14 +52,18 @@ export const ReminderHistoryDialog = () => {
 
   const filteredLogs = logs.filter(log => {
     if (filterTypes.length > 0 && !filterTypes.includes(log.type as FilterType)) return false;
-    if (filterStatuses.length > 0 && !filterStatuses.includes(log.status as FilterStatus)) return false;
+    if (filterStatus && log.status !== filterStatus) return false;
     
     if (filterTime) {
       const logDate = parseISO(log.sent_at);
       const now = new Date();
-      if (filterTime === 'week') {
+      if (filterTime === '1week') {
         if (!isWithinInterval(logDate, { start: subWeeks(now, 1), end: now })) return false;
-      } else if (filterTime === 'month') {
+      } else if (filterTime === '2weeks') {
+        if (!isWithinInterval(logDate, { start: subWeeks(now, 2), end: now })) return false;
+      } else if (filterTime === '3weeks') {
+        if (!isWithinInterval(logDate, { start: subWeeks(now, 3), end: now })) return false;
+      } else if (filterTime === '1month') {
         if (!isWithinInterval(logDate, { start: subMonths(now, 1), end: now })) return false;
       }
     }
@@ -69,31 +79,41 @@ export const ReminderHistoryDialog = () => {
   };
 
   const handleStatusSelect = (value: string) => {
-    const status = value as FilterStatus;
-    if (!filterStatuses.includes(status)) {
-      setFilterStatuses(prev => [...prev, status]);
-    }
+    setFilterStatus(value as FilterStatus);
   };
 
   const handleTimeSelect = (value: string) => {
     setFilterTime(value as FilterTime);
   };
 
-  const removeTypeFilter = (type: FilterType) => {
-    setFilterTypes(prev => prev.filter(t => t !== type));
-  };
-
-  const removeStatusFilter = (status: FilterStatus) => {
-    setFilterStatuses(prev => prev.filter(s => s !== status));
-  };
-
   const clearFilters = () => {
     setFilterTypes([]);
-    setFilterStatuses([]);
+    setFilterStatus(null);
     setFilterTime(null);
   };
 
-  const hasActiveFilters = filterTypes.length > 0 || filterStatuses.length > 0 || filterTime !== null;
+  const getTypeLabel = () => {
+    if (filterTypes.length === 0) return 'النوع';
+    return filterTypes.map(t => TYPE_LABELS[t]).join('/');
+  };
+
+  const getStatusLabel = () => {
+    if (!filterStatus) return 'الحالة';
+    return filterStatus === 'sent' ? 'نجح' : 'فشل';
+  };
+
+  const getTimeLabel = () => {
+    if (!filterTime) return 'الفترة';
+    const labels: Record<FilterTime, string> = {
+      '1week': 'أسبوع',
+      '2weeks': 'أسبوعين',
+      '3weeks': '3 أسابيع',
+      '1month': 'شهر'
+    };
+    return labels[filterTime];
+  };
+
+  const hasActiveFilters = filterTypes.length > 0 || filterStatus !== null || filterTime !== null;
   const failedCount = logs.filter(l => l.status === 'failed').length;
 
   const formatDateTime = (dateStr: string) => {
@@ -133,11 +153,7 @@ export const ReminderHistoryDialog = () => {
           <div className="grid grid-cols-3 gap-2">
             <Select onValueChange={handleTypeSelect} value="">
               <SelectTrigger className="h-8 text-xs">
-                <span className="truncate">
-                  {filterTypes.length === 0 ? 'النوع' : 
-                   filterTypes.length === 1 ? (filterTypes[0] === 'session' ? 'جلسات' : filterTypes[0] === 'payment' ? 'دفع' : 'إلغاء') :
-                   `${filterTypes.length} أنواع`}
-                </span>
+                <span className="truncate">{getTypeLabel()}</span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="session" disabled={filterTypes.includes('session')}>
@@ -161,22 +177,18 @@ export const ReminderHistoryDialog = () => {
               </SelectContent>
             </Select>
 
-            <Select onValueChange={handleStatusSelect} value="">
+            <Select onValueChange={handleStatusSelect} value={filterStatus || ""}>
               <SelectTrigger className="h-8 text-xs">
-                <span className="truncate">
-                  {filterStatuses.length === 0 ? 'الحالة' : 
-                   filterStatuses.length === 1 ? (filterStatuses[0] === 'sent' ? 'نجح' : 'فشل') :
-                   'نجح و فشل'}
-                </span>
+                <span className="truncate">{getStatusLabel()}</span>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="sent" disabled={filterStatuses.includes('sent')}>
+                <SelectItem value="sent">
                   <span className="flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" />
                     نجح
                   </span>
                 </SelectItem>
-                <SelectItem value="failed" disabled={filterStatuses.includes('failed')}>
+                <SelectItem value="failed">
                   <span className="flex items-center gap-1">
                     <XCircle className="h-3 w-3" />
                     فشل
@@ -187,18 +199,28 @@ export const ReminderHistoryDialog = () => {
 
             <Select onValueChange={handleTimeSelect} value={filterTime || ""}>
               <SelectTrigger className="h-8 text-xs">
-                <span className="truncate">
-                  {filterTime === null ? 'الفترة' : filterTime === 'week' ? 'أسبوع' : 'شهر'}
-                </span>
+                <span className="truncate">{getTimeLabel()}</span>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="week">
+                <SelectItem value="1week">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     أسبوع
                   </span>
                 </SelectItem>
-                <SelectItem value="month">
+                <SelectItem value="2weeks">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    أسبوعين
+                  </span>
+                </SelectItem>
+                <SelectItem value="3weeks">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    3 أسابيع
+                  </span>
+                </SelectItem>
+                <SelectItem value="1month">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     شهر
