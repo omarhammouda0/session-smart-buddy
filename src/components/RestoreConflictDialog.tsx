@@ -21,7 +21,10 @@ interface RestoreConflictDialogProps {
     date: string;
     time: string;
   };
-  onConfirm: () => void;
+  onConfirm?: () => void;
+  title?: string;
+  confirmText?: string;
+  cancelText?: string;
 }
 
 export const RestoreConflictDialog = ({
@@ -30,10 +33,17 @@ export const RestoreConflictDialog = ({
   conflictResult,
   sessionInfo,
   onConfirm,
+  title,
+  confirmText,
+  cancelText,
 }: RestoreConflictDialogProps) => {
   const isError = conflictResult.severity === 'error';
   const Icon = isError ? XCircle : AlertTriangle;
   const iconColor = isError ? 'text-destructive' : 'text-warning';
+
+  const dialogTitle = title || (isError ? '❌ لا يمكن استعادة الجلسة' : '⚠️ تحذير');
+  const confirmButtonText = confirmText || 'نعم، استعادة';
+  const cancelButtonText = cancelText || (isError ? 'حسناً' : 'إلغاء');
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -41,19 +51,19 @@ export const RestoreConflictDialog = ({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Icon className={cn("h-5 w-5", iconColor)} />
-            {isError ? '❌ لا يمكن استعادة الجلسة' : '⚠️ تحذير'}
+            {dialogTitle}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3">
               <p>
                 {isError
                   ? 'يوجد تعارض مع جلسة أخرى'
-                  : 'استعادة هذه الجلسة ستكون قريبة جداً من جلسة أخرى'}
+                  : 'هذه الجلسة ستكون قريبة جداً من جلسة أخرى'}
               </p>
 
-              {/* Session being restored */}
+              {/* Session being added/restored */}
               <div className="p-3 rounded-lg bg-muted/50 border">
-                <p className="text-xs text-muted-foreground mb-1">الجلسة المُستعادة:</p>
+                <p className="text-xs text-muted-foreground mb-1">الجلسة:</p>
                 <p className="font-medium">{sessionInfo.studentName}</p>
                 <p className="text-sm text-muted-foreground">
                   {sessionInfo.date} • {formatTimeAr(sessionInfo.time)}
@@ -94,11 +104,11 @@ export const RestoreConflictDialog = ({
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-row-reverse gap-2">
           <AlertDialogCancel>
-            {isError ? 'حسناً' : 'إلغاء'}
+            {cancelButtonText}
           </AlertDialogCancel>
-          {!isError && (
+          {!isError && onConfirm && (
             <AlertDialogAction onClick={onConfirm}>
-              نعم، استعادة
+              {confirmButtonText}
             </AlertDialogAction>
           )}
         </AlertDialogFooter>
