@@ -341,7 +341,8 @@ export const AddVacationDialog = ({
         </DialogHeader>
 
         {!showPreview ? (
-          <div className="space-y-4 py-2 flex-1 overflow-auto">
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-4 py-2 pr-2">
             {/* Period Selection */}
             <div className="space-y-3">
               <Label className="flex items-center gap-1.5">
@@ -646,18 +647,19 @@ export const AddVacationDialog = ({
                 <span className="text-muted-foreground">لا توجد جلسات مجدولة في الفترات المختارة</span>
               </div>
             )}
-          </div>
+            </div>
+          </ScrollArea>
         ) : (
           /* Preview View */
-          <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-medium">معاينة ({sessionsToMark.length} جلسة)</span>
-              <Button variant="ghost" size="sm" onClick={() => setShowPreview(false)}>
-                ← رجوع
-              </Button>
-            </div>
-            
-            <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="pr-2">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium">معاينة ({sessionsToMark.length} جلسة)</span>
+                <Button variant="ghost" size="sm" onClick={() => setShowPreview(false)}>
+                  ← رجوع
+                </Button>
+              </div>
+              
               <div className="space-y-4">
                 {selectedPeriods.map(period => {
                   const periodSessions = sessionsByPeriod[period.id] || [];
@@ -692,8 +694,8 @@ export const AddVacationDialog = ({
                   );
                 })}
               </div>
-            </ScrollArea>
-          </div>
+            </div>
+          </ScrollArea>
         )}
 
         <DialogFooter className="flex-row-reverse gap-2 pt-2">
