@@ -361,6 +361,7 @@ const Index = () => {
                 defaultStart={settings.defaultSemesterStart}
                 defaultEnd={settings.defaultSemesterEnd}
                 students={students}
+                defaultDuration={settings.defaultSessionDuration}
               />
             </div>
           </div>
