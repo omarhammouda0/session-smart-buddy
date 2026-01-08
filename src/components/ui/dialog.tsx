@@ -82,13 +82,13 @@ const DialogBody = ({ className, children, ...props }: DialogBodyProps) => (
   <div 
     className={cn("flex-1 min-h-0 -mx-6 px-6 overflow-y-auto overflow-x-hidden", className)} 
     style={{ 
-      maxHeight: 'calc(90vh - 180px)', 
+      maxHeight: 'calc(90vh - 200px)', 
       WebkitOverflowScrolling: 'touch',
       overscrollBehavior: 'contain'
     }}
     {...props}
   >
-    <div className="pr-2 pb-4">
+    <div className="pr-2 pb-6">
       {children}
     </div>
   </div>
