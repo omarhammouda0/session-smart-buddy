@@ -893,7 +893,7 @@ export const BulkEditSessionsDialog = ({
                       className="w-[min(360px,88vw)] p-0 flex flex-col" 
                       align="start" 
                       dir="rtl"
-                      style={{ maxHeight: '65vh' }}
+                      style={{ maxHeight: '70vh' }}
                     >
                       {/* Fixed Header */}
                       <div className="p-3 border-b bg-muted/30 shrink-0">
@@ -904,7 +904,7 @@ export const BulkEditSessionsDialog = ({
                       <div 
                         className="overflow-y-auto overflow-x-hidden scroll-smooth [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-muted [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50"
                         style={{ 
-                          maxHeight: 'calc(60vh - 140px)',
+                          maxHeight: '35vh',
                           WebkitOverflowScrolling: 'touch',
                           scrollbarWidth: 'thin'
                         }}
@@ -1030,6 +1030,8 @@ export const BulkEditSessionsDialog = ({
                               </div>
                             </div>
                           )}
+                          {/* Bottom spacing to ensure last item visible */}
+                          <div className="h-4" />
                         </div>
                       </div>
 
