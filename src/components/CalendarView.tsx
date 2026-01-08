@@ -22,7 +22,7 @@ import {
   GripVertical,
   Clock,
   CalendarDays,
-  ChevronDown,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -30,14 +30,10 @@ import { cn } from "@/lib/utils";
 import { Student, Session } from "@/types/student";
 import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 
 interface CalendarViewProps {
@@ -60,9 +56,12 @@ interface DragState {
 
 export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("week");
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
+  const [selectedDaySheet, setSelectedDaySheet] = useState<{ date: string; sessions: SessionWithStudent[] } | null>(
+    null,
+  );
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     sessionId: string;
@@ -97,9 +96,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
   }, [students]);
 
   const days = useMemo(() => {
-    if (viewMode === "day") {
-      return [currentDate];
-    } else if (viewMode === "week") {
+    if (viewMode === "week") {
       const start = startOfWeek(currentDate, { weekStartsOn: 0 });
       const end = endOfWeek(currentDate, { weekStartsOn: 0 });
       return eachDayOfInterval({ start, end });
@@ -129,11 +126,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
   }, [currentDate, viewMode]);
 
   const goToPrev = () => {
-    if (viewMode === "day") {
-      const newDate = new Date(currentDate);
-      newDate.setDate(newDate.getDate() - 1);
-      setCurrentDate(newDate);
-    } else if (viewMode === "week") {
+    if (viewMode === "week") {
       setCurrentDate(subWeeks(currentDate, 1));
     } else {
       setCurrentDate(subMonths(currentDate, 1));
@@ -141,11 +134,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
   };
 
   const goToNext = () => {
-    if (viewMode === "day") {
-      const newDate = new Date(currentDate);
-      newDate.setDate(newDate.getDate() + 1);
-      setCurrentDate(newDate);
-    } else if (viewMode === "week") {
+    if (viewMode === "week") {
       setCurrentDate(addWeeks(currentDate, 1));
     } else {
       setCurrentDate(addMonths(currentDate, 1));
@@ -339,22 +328,20 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
           {/* View Mode Pills */}
           <div className="flex items-center gap-1.5 bg-muted/50 p-1.5 rounded-xl shadow-inner">
             {[
-              { value: "day", label: "يومي", icon: CalendarDays },
-              { value: "week", label: "أسبوعي", icon: CalendarDays },
-              { value: "month", label: "شهري", icon: CalendarIcon },
-            ].map(({ value, label, icon: Icon }) => (
+              { value: "week", label: "أسبوعي" },
+              { value: "month", label: "شهري" },
+            ].map(({ value, label }) => (
               <button
                 key={value}
-                onClick={() => setViewMode(value as "day" | "week" | "month")}
+                onClick={() => setViewMode(value as "week" | "month")}
                 className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2",
+                  "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                   viewMode === value
                     ? "bg-background text-primary shadow-md scale-105"
                     : "text-muted-foreground hover:text-foreground hover:bg-background/50",
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{label}</span>
+                {label}
               </button>
             ))}
           </div>
@@ -382,11 +369,9 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
           </div>
 
           <h3 className="font-bold text-sm sm:text-base text-center px-3 py-1.5 bg-primary/5 rounded-lg">
-            {viewMode === "day"
-              ? format(currentDate, "EEEE dd MMMM yyyy", { locale: ar })
-              : viewMode === "week"
-                ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
-                : format(currentDate, "MMMM yyyy", { locale: ar })}
+            {viewMode === "week"
+              ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
+              : format(currentDate, "MMMM yyyy", { locale: ar })}
           </h3>
 
           <Button
@@ -401,33 +386,33 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
       </CardHeader>
 
       <CardContent className="p-3 sm:p-6">
-        {/* Calendar Grid */}
-        <div className={cn("grid gap-2", viewMode === "day" ? "grid-cols-1" : "grid-cols-7")}>
+        {/* Calendar Grid - LARGER DAYS */}
+        <div className={cn("grid gap-3", "grid-cols-7")}>
           {/* Day headers */}
-          {viewMode !== "day" &&
-            DAY_NAMES_SHORT_AR.map((day, i) => (
-              <div
-                key={i}
-                className="text-center text-xs font-bold text-muted-foreground py-2 bg-muted/30 rounded-t-xl border-b-2 border-primary/10"
-              >
-                {day}
-              </div>
-            ))}
+          {DAY_NAMES_SHORT_AR.map((day, i) => (
+            <div
+              key={i}
+              className="text-center text-sm font-bold text-muted-foreground py-3 bg-muted/30 rounded-xl border-b-2 border-primary/10"
+            >
+              {day}
+            </div>
+          ))}
 
-          {/* Day cells */}
+          {/* Day cells - MUCH LARGER */}
           {days.map((day, index) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const daySessions = sessionsByDate.get(dateStr) || [];
             const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
             const isToday = isSameDay(day, today);
             const isDragTarget = dropTargetDate === dateStr && dragState?.originalDate !== dateStr;
+            const maxVisible = viewMode === "week" ? 4 : 2;
 
             return (
               <div
                 key={index}
                 className={cn(
-                  "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200",
-                  viewMode === "day" ? "min-h-[500px]" : viewMode === "week" ? "min-h-[140px]" : "min-h-[100px]",
+                  "border-2 rounded-xl p-3 transition-all duration-200",
+                  viewMode === "week" ? "min-h-[200px]" : "min-h-[140px]",
                   !isCurrentMonth && "opacity-40 bg-muted/20",
                   isToday && "ring-2 ring-primary shadow-lg bg-primary/5",
                   isDragTarget &&
@@ -441,34 +426,28 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                 {/* Date header */}
                 <div
                   className={cn(
-                    "flex items-center justify-between mb-2 pb-2 border-b-2",
+                    "flex items-center justify-between mb-3 pb-2 border-b-2",
                     isToday ? "border-primary" : "border-border/50",
                   )}
                 >
                   <span
                     className={cn(
-                      "text-sm font-bold",
-                      isToday && "bg-primary text-primary-foreground px-2 py-1 rounded-lg shadow-sm",
+                      "text-lg font-bold",
+                      isToday && "bg-primary text-primary-foreground px-2.5 py-1 rounded-lg shadow-sm",
                     )}
                   >
-                    {viewMode === "day" ? format(day, "EEEE dd MMMM", { locale: ar }) : format(day, "d")}
+                    {format(day, "d")}
                   </span>
                   {daySessions.length > 0 && (
-                    <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-bold shadow-sm">
+                    <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full font-bold shadow-sm">
                       {daySessions.length}
                     </span>
                   )}
                 </div>
 
-                {/* Sessions */}
-                <div
-                  className={cn(
-                    "space-y-2",
-                    viewMode === "day" ? "max-h-[420px]" : "max-h-[90px]",
-                    "overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent",
-                  )}
-                >
-                  {(viewMode === "month" ? daySessions.slice(0, 2) : daySessions).map(({ session, student }) => {
+                {/* Sessions - LARGER CARDS */}
+                <div className="space-y-2">
+                  {daySessions.slice(0, maxVisible).map(({ session, student }) => {
                     const time = session.time || student.sessionTime || "16:00";
                     const canDrag = session.status === "scheduled";
 
@@ -481,27 +460,85 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                         }
                         onDragEnd={handleDragEnd}
                         className={cn(
-                          "text-xs p-2.5 rounded-lg border-2 flex items-start gap-2 transition-all duration-200",
+                          "text-sm p-3 rounded-lg border-2 flex items-start gap-2 transition-all duration-200",
                           getStatusColor(session.status),
                           canDrag && "cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-105",
                           !canDrag && "cursor-default opacity-75",
                         )}
                       >
-                        {canDrag && <GripVertical className="h-4 w-4 shrink-0 opacity-50" />}
+                        {canDrag && <GripVertical className="h-4 w-4 shrink-0 opacity-50 mt-0.5" />}
                         <div className="flex-1 min-w-0">
                           <div className="font-bold truncate">{student.name}</div>
-                          <div className="text-[10px] opacity-80 flex items-center gap-1.5 mt-1">
-                            <Clock className="h-3 w-3" />
+                          <div className="text-xs opacity-80 flex items-center gap-1.5 mt-1">
+                            <Clock className="h-3.5 w-3.5" />
                             <span className="font-medium">{time}</span>
                           </div>
                         </div>
                       </div>
                     );
                   })}
-                  {viewMode === "month" && daySessions.length > 2 && (
-                    <div className="text-[10px] text-center text-muted-foreground py-1 font-medium">
-                      +{daySessions.length - 2} المزيد
-                    </div>
+
+                  {/* Show More Button */}
+                  {daySessions.length > maxVisible && (
+                    <Sheet
+                      open={selectedDaySheet?.date === dateStr}
+                      onOpenChange={(open) => !open && setSelectedDaySheet(null)}
+                    >
+                      <SheetTrigger asChild>
+                        <button
+                          onClick={() => setSelectedDaySheet({ date: dateStr, sessions: daySessions })}
+                          className="w-full text-xs text-primary hover:text-primary/80 py-2 bg-primary/5 hover:bg-primary/10 rounded-lg font-bold transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />+{daySessions.length - maxVisible} المزيد
+                        </button>
+                      </SheetTrigger>
+                      <SheetContent side="left" className="w-full sm:max-w-md">
+                        <SheetHeader>
+                          <SheetTitle className="text-right font-bold">
+                            {format(parseISO(dateStr), "EEEE dd MMMM yyyy", { locale: ar })}
+                          </SheetTitle>
+                        </SheetHeader>
+                        <ScrollArea className="h-[calc(100vh-120px)] mt-4">
+                          <div className="space-y-3 pr-4">
+                            {daySessions.map(({ session, student }) => {
+                              const time = session.time || student.sessionTime || "16:00";
+                              const canDrag = session.status === "scheduled";
+
+                              return (
+                                <div
+                                  key={session.id}
+                                  className={cn(
+                                    "p-4 rounded-xl border-2 transition-all",
+                                    getStatusColor(session.status),
+                                  )}
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div>
+                                      <div className="font-bold text-base">{student.name}</div>
+                                      <div className="text-sm opacity-80 flex items-center gap-2 mt-2">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="font-medium">{time}</span>
+                                      </div>
+                                    </div>
+                                    <div
+                                      className={cn(
+                                        "text-xs px-2.5 py-1 rounded-full font-bold",
+                                        session.status === "completed" && "bg-emerald-500/30 text-emerald-700",
+                                        session.status === "cancelled" && "bg-rose-500/30 text-rose-700",
+                                        session.status === "vacation" && "bg-amber-500/30 text-amber-700",
+                                        session.status === "scheduled" && "bg-blue-500/30 text-blue-700",
+                                      )}
+                                    >
+                                      {getStatusLabel(session.status)}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
+                      </SheetContent>
+                    </Sheet>
                   )}
                 </div>
               </div>
@@ -510,7 +547,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t-2 text-xs bg-muted/20 p-3 rounded-xl">
+        <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t-2 text-sm bg-muted/20 p-4 rounded-xl">
           <span className="text-muted-foreground font-bold">الحالة:</span>
           {[
             { color: "bg-blue-500/40", label: "مجدولة" },
@@ -542,7 +579,6 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Original */}
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground font-medium">الموعد الحالي:</Label>
               <div className="p-3 bg-muted/50 rounded-xl border-2">
@@ -556,7 +592,6 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
               </div>
             </div>
 
-            {/* New */}
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground font-medium">الموعد الجديد:</Label>
               <div className="p-3 bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/30 rounded-xl">
@@ -566,7 +601,6 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
               </div>
             </div>
 
-            {/* Time */}
             <div className="space-y-2">
               <Label htmlFor="new-time" className="text-sm font-medium">
                 الوقت:
