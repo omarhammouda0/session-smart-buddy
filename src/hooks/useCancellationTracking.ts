@@ -409,6 +409,47 @@ export const useCancellationTracking = (students: Student[]) => {
     [getUserId, loadData]
   );
 
+  // Clear all cancellations for a student in a specific month
+  const clearMonthCancellations = useCallback(
+    async (studentId: string, month: string): Promise<boolean> => {
+      try {
+        const userId = await getUserId();
+        if (!userId) {
+          console.error('clearMonthCancellations: no authenticated user');
+          return false;
+        }
+
+        // Delete all cancellation records for this student/month
+        const { error: deleteError } = await supabase
+          .from('session_cancellations')
+          .delete()
+          .eq('user_id', userId)
+          .eq('student_id', studentId)
+          .eq('month', month);
+
+        if (deleteError) {
+          console.error('Error deleting month cancellations:', deleteError);
+          return false;
+        }
+
+        // Delete tracking record for this month
+        await supabase
+          .from('student_cancellation_tracking')
+          .delete()
+          .eq('user_id', userId)
+          .eq('student_id', studentId)
+          .eq('month', month);
+
+        await loadData();
+        return true;
+      } catch (error) {
+        console.error('Error clearing month cancellations:', error);
+        return false;
+      }
+    },
+    [getUserId, loadData]
+  );
+
   // Mark parent as notified
   const markParentNotified = useCallback(
     async (studentId: string, month?: string): Promise<boolean> => {
@@ -624,6 +665,7 @@ ${cancellationsText}
     wasParentNotified,
     recordCancellation,
     removeCancellation,
+    clearMonthCancellations,
     markParentNotified,
     logNotification,
     sendParentNotification,

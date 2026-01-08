@@ -97,6 +97,7 @@ const Index = () => {
     getAllStudentCancellations,
     recordCancellation,
     removeCancellation,
+    clearMonthCancellations,
   } = useCancellationTracking(students);
 
   // Conflict detection
@@ -408,6 +409,7 @@ const Index = () => {
                               currentCancellationCount={getCancellationCount(student.id)}
                               allCancellations={getAllStudentCancellations(student.id)}
                               onRestoreSession={handleRestoreSession}
+                              onClearMonthCancellations={clearMonthCancellations}
                               onUpdateName={(name) => updateStudentName(student.id, name)}
                               onUpdateTime={(time) => updateStudentTime(student.id, time)}
                               onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
