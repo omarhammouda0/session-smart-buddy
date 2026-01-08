@@ -83,27 +83,22 @@ interface PeriodOption {
   endDate: Date;
 }
 
-// Storage key for undo data
 const UNDO_STORAGE_KEY = "bulk-edit-undo-data";
-const UNDO_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const UNDO_TIMEOUT_MS = 10 * 60 * 1000;
 
-// Helper to parse time to minutes
 const timeToMinutes = (time: string): number => {
-  if (!time) return 16 * 60; // Default 4 PM
+  if (!time) return 16 * 60;
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
 };
 
-// Helper to convert minutes to time string
 const minutesToTime = (minutes: number): string => {
-  // Handle overflow past midnight
   const normalizedMinutes = ((minutes % 1440) + 1440) % 1440;
   const h = Math.floor(normalizedMinutes / 60);
   const m = normalizedMinutes % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
 
-// Format time in Arabic (12-hour)
 const formatTimeAr = (time: string): string => {
   if (!time) return "4:00 م";
   const [h, m] = time.split(":").map(Number);
@@ -112,14 +107,12 @@ const formatTimeAr = (time: string): string => {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 };
 
-// Generate time options for dropdown (every 30 mins)
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const hour = Math.floor(i / 2);
   const min = (i % 2) * 30;
   return `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 });
 
-// Day of week options (0 = Sunday, 6 = Saturday)
 const DAY_OPTIONS = [
   { value: 0, label: "الأحد" },
   { value: 1, label: "الاثنين" },
@@ -132,24 +125,17 @@ const DAY_OPTIONS = [
 
 type ModificationType = "offset" | "day-change";
 
-// Calculate new date when changing day of week
 const calculateNewDate = (originalDate: string, originalDay: number, newDay: number): string => {
   const date = parseISO(originalDate);
   const currentDay = getDay(date);
-
-  // Calculate day difference
   let dayDiff = newDay - currentDay;
-
-  // If new day is before or same as original day in the week, move to next week
   if (dayDiff <= 0) {
     dayDiff += 7;
   }
-
   const newDate = addDays(date, dayDiff);
   return format(newDate, "yyyy-MM-dd");
 };
 
-// Format date range for display
 const formatDateRangeAr = (start: Date, end: Date): string => {
   const startDay = format(start, "d");
   const endDay = format(end, "d");
@@ -162,7 +148,7 @@ const formatDateRangeAr = (start: Date, end: Date): string => {
   return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
 };
 
-// Generate week options (next 4 weeks only)
+// Changed to 4 weeks only
 const generateWeekOptions = (today: Date): PeriodOption[] => {
   const weeks: PeriodOption[] = [];
   const weekLabels = ["هذا الأسبوع", "الأسبوع القادم", "الأسبوع الثالث", "الأسبوع الرابع"];
@@ -184,7 +170,6 @@ const generateWeekOptions = (today: Date): PeriodOption[] => {
   return weeks;
 };
 
-// Generate month options (next 6 months)
 const generateMonthOptions = (today: Date): PeriodOption[] => {
   const months: PeriodOption[] = [];
 
@@ -220,11 +205,8 @@ export const BulkEditSessionsDialog = ({
     conflicts: 0,
   });
 
-  // Filters
   const today = startOfDay(new Date());
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
-
-  // Period selection using chips
   const [selectedPeriods, setSelectedPeriods] = useState<PeriodOption[]>([]);
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
   const [checkedPeriodIds, setCheckedPeriodIds] = useState<Set<string>>(new Set());
@@ -232,29 +214,20 @@ export const BulkEditSessionsDialog = ({
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(today);
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>(endOfMonth(today));
 
-  // Generate options
   const weekOptions = useMemo(() => generateWeekOptions(today), []);
   const monthOptions = useMemo(() => generateMonthOptions(today), []);
 
-  // Modification type
   const [modType, setModType] = useState<ModificationType>("offset");
-
-  // Offset modification
   const [offsetDirection, setOffsetDirection] = useState<"+" | "-">("+");
   const [offsetHours, setOffsetHours] = useState<number>(4);
   const [offsetMinutes, setOffsetMinutes] = useState<number>(0);
-
-  // Day change modification
-  const [originalDay, setOriginalDay] = useState<number>(1); // Monday
+  const [originalDay, setOriginalDay] = useState<number>(1);
   const [originalTime, setOriginalTime] = useState<string>("16:00");
-  const [newDay, setNewDay] = useState<number>(5); // Friday
+  const [newDay, setNewDay] = useState<number>(5);
   const [newTime, setNewTime] = useState<string>("13:00");
-
-  // Undo state
   const [undoData, setUndoData] = useState<UndoData | null>(null);
   const [undoTimeLeft, setUndoTimeLeft] = useState<number>(0);
 
-  // Toggle period checkbox
   const togglePeriodCheck = (periodId: string) => {
     setCheckedPeriodIds((prev) => {
       const next = new Set(prev);
@@ -267,21 +240,17 @@ export const BulkEditSessionsDialog = ({
     });
   };
 
-  // Select all periods
   const selectAllPeriods = () => {
     const allIds = [...weekOptions, ...monthOptions].map((p) => p.id);
     setCheckedPeriodIds(new Set(allIds));
   };
 
-  // Deselect all periods
   const deselectAllPeriods = () => {
     setCheckedPeriodIds(new Set());
   };
 
-  // Add checked periods
   const addCheckedPeriods = () => {
     if (showCustomRange && customDateFrom && customDateTo) {
-      // Validate dates
       if (customDateTo < customDateFrom) {
         toast({
           title: "تواريخ غير صحيحة",
@@ -291,7 +260,6 @@ export const BulkEditSessionsDialog = ({
         return;
       }
 
-      // Add custom range
       const customPeriod: PeriodOption = {
         id: `custom-${Date.now()}`,
         type: "custom",
@@ -301,7 +269,6 @@ export const BulkEditSessionsDialog = ({
         endDate: customDateTo,
       };
 
-      // Check for duplicates
       const exists = selectedPeriods.some(
         (p) =>
           p.type === "custom" &&
@@ -334,7 +301,6 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
-    // Find all checked periods that aren't already selected
     const allOptions = [...weekOptions, ...monthOptions];
     const periodsToAdd = allOptions.filter(
       (p) => checkedPeriodIds.has(p.id) && !selectedPeriods.some((sp) => sp.id === p.id),
@@ -354,12 +320,10 @@ export const BulkEditSessionsDialog = ({
     setCheckedPeriodIds(new Set());
   };
 
-  // Remove period
   const removePeriod = (periodId: string) => {
     setSelectedPeriods(selectedPeriods.filter((p) => p.id !== periodId));
   };
 
-  // Check if date is within any selected period
   const isDateInSelectedPeriods = (dateStr: string): { inPeriod: boolean; weekLabel?: string } => {
     const date = parseISO(dateStr);
 
@@ -372,7 +336,6 @@ export const BulkEditSessionsDialog = ({
     return { inPeriod: false };
   };
 
-  // Load undo data on mount
   useEffect(() => {
     const stored = localStorage.getItem(UNDO_STORAGE_KEY);
     if (stored) {
@@ -390,7 +353,6 @@ export const BulkEditSessionsDialog = ({
     }
   }, []);
 
-  // Update undo timer
   useEffect(() => {
     if (!undoData) {
       setUndoTimeLeft(0);
@@ -413,7 +375,6 @@ export const BulkEditSessionsDialog = ({
     return () => clearInterval(interval);
   }, [undoData]);
 
-  // Calculate new time based on offset modification
   const calculateOffsetTime = (sessionTime: string): string => {
     const originalMinutes = timeToMinutes(sessionTime);
     const offsetTotalMinutes = offsetHours * 60 + offsetMinutes;
@@ -422,15 +383,12 @@ export const BulkEditSessionsDialog = ({
     return minutesToTime(newMinutes);
   };
 
-  // Get selected student
   const selectedStudent = useMemo(() => {
     return students.find((s) => s.id === selectedStudentId);
   }, [students, selectedStudentId]);
 
-  // Check if any period is selected
   const hasSelectedPeriod = selectedPeriods.length > 0;
 
-  // Calculate available days and times for the student in selected periods
   const availableDaysAndTimes = useMemo(() => {
     const dayCount: { [key: number]: number } = {};
     const timeCount: { [key: string]: number } = {};
@@ -452,12 +410,10 @@ export const BulkEditSessionsDialog = ({
       timeCount[sessionTime] = (timeCount[sessionTime] || 0) + 1;
     });
 
-    // Sort days by day of week order (0=Sunday to 6=Saturday)
     const days = Object.entries(dayCount)
       .map(([day, count]) => ({ day: Number(day), count }))
       .sort((a, b) => a.day - b.day);
 
-    // Sort times chronologically
     const times = Object.entries(timeCount)
       .map(([time, count]) => ({ time, count }))
       .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
@@ -465,7 +421,6 @@ export const BulkEditSessionsDialog = ({
     return { days, times };
   }, [selectedStudent, hasSelectedPeriod, selectedPeriods]);
 
-  // Auto-select first available day/time when options change
   useEffect(() => {
     if (modType === "day-change" && availableDaysAndTimes.days.length > 0) {
       const currentDayValid = availableDaysAndTimes.days.some((d) => d.day === originalDay);
@@ -484,28 +439,23 @@ export const BulkEditSessionsDialog = ({
     }
   }, [availableDaysAndTimes.times, modType]);
 
-  // Calculate matching sessions with new times/dates
   const matchingSessions = useMemo(() => {
     const sessions: SessionWithStudent[] = [];
 
     if (!selectedStudentId || !selectedStudent || !hasSelectedPeriod) return sessions;
 
     selectedStudent.sessions.forEach((session) => {
-      // Only scheduled sessions
       if (session.status !== "scheduled") return;
 
-      // Must be in selected period
       const { inPeriod, weekLabel } = isDateInSelectedPeriods(session.date);
       if (!inPeriod) return;
 
       const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
 
-      // For day-change mode, filter by original day and time
       if (modType === "day-change") {
         const sessionDay = getDay(parseISO(session.date));
         if (sessionDay !== originalDay) return;
 
-        // Check if time matches (within 30 min tolerance for matching)
         const sessionMinutes = timeToMinutes(sessionTime);
         const originalMinutes = timeToMinutes(originalTime);
         if (Math.abs(sessionMinutes - originalMinutes) > 30) return;
@@ -517,7 +467,6 @@ export const BulkEditSessionsDialog = ({
       if (modType === "offset") {
         calculatedNewTime = calculateOffsetTime(sessionTime);
       } else {
-        // day-change
         calculatedNewTime = newTime;
         calculatedNewDate = calculateNewDate(session.date, originalDay, newDay);
       }
@@ -549,7 +498,6 @@ export const BulkEditSessionsDialog = ({
     newTime,
   ]);
 
-  // Group sessions by week for preview
   const sessionsByWeek = useMemo(() => {
     const groups: { [key: string]: SessionWithStudent[] } = {};
 
@@ -564,7 +512,6 @@ export const BulkEditSessionsDialog = ({
     return groups;
   }, [matchingSessions]);
 
-  // Categorize sessions by conflict status
   const categorizedSessions = useMemo((): CategorizedSessions => {
     const result: CategorizedSessions = { safe: [], warnings: [], conflicts: [] };
     const sessionDuration = 60;
@@ -577,9 +524,8 @@ export const BulkEditSessionsDialog = ({
 
       let conflictType = "none" as "none" | "close" | "overlap";
 
-      // Check against all other sessions on the NEW date from OTHER students
       students.forEach((otherStudent) => {
-        if (otherStudent.id === student.id) return; // Skip same student
+        if (otherStudent.id === student.id) return;
 
         otherStudent.sessions.forEach((otherSession) => {
           if (otherSession.date !== sessNewDate) return;
@@ -589,13 +535,11 @@ export const BulkEditSessionsDialog = ({
           const otherStartMinutes = timeToMinutes(otherTime);
           const otherEndMinutes = otherStartMinutes + sessionDuration;
 
-          // Check exact overlap
           if (newStartMinutes === otherStartMinutes) {
             conflictType = "overlap";
             return;
           }
 
-          // Check partial overlap
           const overlaps =
             (newStartMinutes >= otherStartMinutes && newStartMinutes < otherEndMinutes) ||
             (newEndMinutes > otherStartMinutes && newEndMinutes <= otherEndMinutes) ||
@@ -606,7 +550,6 @@ export const BulkEditSessionsDialog = ({
             return;
           }
 
-          // Check close sessions
           const gapBefore = Math.abs(newStartMinutes - otherEndMinutes);
           const gapAfter = Math.abs(otherStartMinutes - newEndMinutes);
           const gap = Math.min(gapBefore, gapAfter);
@@ -685,7 +628,6 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
-    // Validate offset range (-12h to +12h)
     if (modType === "offset") {
       const totalOffset = offsetHours * 60 + offsetMinutes;
       if (totalOffset > 12 * 60) {
@@ -715,7 +657,6 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
-    // Save undo data before applying
     const undoInfo: UndoData = {
       sessionUpdates: sessionsToApply.map((s) => ({
         sessionId: s.session.id,
@@ -730,13 +671,10 @@ export const BulkEditSessionsDialog = ({
     localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoInfo));
     setUndoData(undoInfo);
 
-    // Apply changes
     sessionsToApply.forEach((s) => {
       if (modType === "day-change" && onUpdateSessionDate) {
-        // Update both date and time
         onUpdateSessionDate(s.student.id, s.session.id, s.newDate, s.newTime);
       } else {
-        // Just update time
         onBulkUpdateTime([s.student.id], [s.session.id], s.newTime);
       }
     });
@@ -754,7 +692,6 @@ export const BulkEditSessionsDialog = ({
   const handleUndo = () => {
     if (!undoData) return;
 
-    // Restore original times and dates
     undoData.sessionUpdates.forEach((update) => {
       if (onUpdateSessionDate) {
         onUpdateSessionDate(update.studentId, update.sessionId, update.originalDate, update.originalTime);
@@ -798,7 +735,6 @@ export const BulkEditSessionsDialog = ({
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
   };
 
-  // Format date with day name in Arabic
   const formatDateWithDay = (dateStr: string): string => {
     const date = parseISO(dateStr);
     const dayIndex = getDay(date);
@@ -832,11 +768,9 @@ export const BulkEditSessionsDialog = ({
             </DialogTitle>
           </DialogHeader>
 
-          {/* Main Form */}
           {!showPreview && !showSuccessDialog && (
             <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
               <div className="space-y-4 pb-2 pr-2">
-                {/* Undo Banner */}
                 {undoData && undoTimeLeft > 0 && (
                   <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center justify-between">
                     <div className="text-sm">
@@ -852,7 +786,6 @@ export const BulkEditSessionsDialog = ({
                   </div>
                 )}
 
-                {/* Step 1: Select Student */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5 text-sm">
                     <User className="h-4 w-4" />
@@ -874,14 +807,12 @@ export const BulkEditSessionsDialog = ({
 
                 <Separator />
 
-                {/* Step 2: Period Selection with Chips */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5 text-sm">
                     <Calendar className="h-4 w-4" />
                     الفترة الزمنية
                   </Label>
 
-                  {/* Add Period Button */}
                   <Popover open={showPeriodPicker} onOpenChange={setShowPeriodPicker}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1 w-full">
@@ -889,45 +820,36 @@ export const BulkEditSessionsDialog = ({
                         إضافة فترة
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent 
-                      className="w-[min(360px,88vw)] p-0 flex flex-col" 
-                      align="start" 
+                    <PopoverContent
+                      className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[85vh]"
+                      align="start"
                       dir="rtl"
-                      style={{ maxHeight: '80vh' }}
                     >
-                      {/* Fixed Header */}
                       <div className="p-3 border-b bg-muted/30 shrink-0">
                         <p className="font-medium text-sm">اختر فترات (تحديد متعدد)</p>
                       </div>
-                      
-                      {/* Scrollable Content */}
-                      <div 
-                        className="overflow-y-auto overflow-x-hidden scroll-smooth [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-muted [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50"
-                        style={{ 
-                          maxHeight: '50vh',
-                          WebkitOverflowScrolling: 'touch',
-                          scrollbarWidth: 'thin'
-                        }}
-                        onWheel={(e) => {
-                          e.currentTarget.scrollTop += e.deltaY;
+
+                      <div
+                        className="overflow-y-auto overflow-x-hidden flex-1 min-h-0"
+                        style={{
+                          maxHeight: "55vh",
                         }}
                       >
-                        <div className="p-3 space-y-3 pb-6">
+                        <div className="p-3 space-y-3">
                           {!showCustomRange ? (
                             <>
-                              {/* Weeks Section */}
                               <div className="space-y-2">
                                 <p className="text-xs font-medium text-muted-foreground">📅 الأسابيع:</p>
                                 <div className="space-y-1">
-                                  {weekOptions.map(week => {
-                                    const isAlreadyAdded = selectedPeriods.some(p => p.id === week.id);
+                                  {weekOptions.map((week) => {
+                                    const isAlreadyAdded = selectedPeriods.some((p) => p.id === week.id);
                                     return (
                                       <label
                                         key={week.id}
                                         className={cn(
-                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
-                                          checkedPeriodIds.has(week.id) && 'bg-primary/10',
-                                          isAlreadyAdded && 'opacity-50 cursor-not-allowed'
+                                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
+                                          checkedPeriodIds.has(week.id) && "bg-primary/10",
+                                          isAlreadyAdded && "opacity-50 cursor-not-allowed",
                                         )}
                                       >
                                         <Checkbox
@@ -945,19 +867,18 @@ export const BulkEditSessionsDialog = ({
 
                               <Separator />
 
-                              {/* Months Section */}
                               <div className="space-y-2">
                                 <p className="text-xs font-medium text-muted-foreground">📆 الأشهر:</p>
                                 <div className="space-y-1">
-                                  {monthOptions.map(month => {
-                                    const isAlreadyAdded = selectedPeriods.some(p => p.id === month.id);
+                                  {monthOptions.map((month) => {
+                                    const isAlreadyAdded = selectedPeriods.some((p) => p.id === month.id);
                                     return (
                                       <label
                                         key={month.id}
                                         className={cn(
-                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
-                                          checkedPeriodIds.has(month.id) && 'bg-primary/10',
-                                          isAlreadyAdded && 'opacity-50 cursor-not-allowed'
+                                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
+                                          checkedPeriodIds.has(month.id) && "bg-primary/10",
+                                          isAlreadyAdded && "opacity-50 cursor-not-allowed",
                                         )}
                                       >
                                         <Checkbox
@@ -972,18 +893,26 @@ export const BulkEditSessionsDialog = ({
                                 </div>
                               </div>
 
-                              {/* Quick Actions */}
-                              <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs" onClick={selectAllPeriods}>
+                              <div className="flex gap-2 pt-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="flex-1 h-8 text-xs"
+                                  onClick={selectAllPeriods}
+                                >
                                   تحديد الكل
                                 </Button>
-                                <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs" onClick={deselectAllPeriods}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="flex-1 h-8 text-xs"
+                                  onClick={deselectAllPeriods}
+                                >
                                   إلغاء التحديد
                                 </Button>
                               </div>
                             </>
                           ) : (
-                            /* Custom Range */
                             <div className="space-y-3">
                               <p className="text-xs font-medium text-muted-foreground">📋 نطاق مخصص:</p>
                               <div className="space-y-2">
@@ -994,7 +923,7 @@ export const BulkEditSessionsDialog = ({
                                       variant="outline"
                                       className="w-full justify-start text-right font-normal text-sm"
                                     >
-                                      {customDateFrom ? format(customDateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                      {customDateFrom ? format(customDateFrom, "dd/MM/yyyy") : "اختر تاريخ"}
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
@@ -1015,7 +944,7 @@ export const BulkEditSessionsDialog = ({
                                       variant="outline"
                                       className="w-full justify-start text-right font-normal text-sm"
                                     >
-                                      {customDateTo ? format(customDateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                      {customDateTo ? format(customDateTo, "dd/MM/yyyy") : "اختر تاريخ"}
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
@@ -1030,12 +959,11 @@ export const BulkEditSessionsDialog = ({
                               </div>
                             </div>
                           )}
-                          {/* Bottom spacing to ensure last item visible */}
-                          <div className="h-4" />
+
+                          <div className="h-2" />
                         </div>
                       </div>
 
-                      {/* Fixed Footer */}
                       <div className="p-3 border-t bg-muted/30 space-y-2 shrink-0">
                         <Button
                           variant="ghost"
@@ -1046,14 +974,14 @@ export const BulkEditSessionsDialog = ({
                             setCheckedPeriodIds(new Set());
                           }}
                         >
-                          {showCustomRange ? '← العودة للقائمة' : 'نطاق مخصص...'}
+                          {showCustomRange ? "← العودة للقائمة" : "نطاق مخصص..."}
                         </Button>
-                        
+
                         <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="flex-1" 
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
                             onClick={() => {
                               setShowPeriodPicker(false);
                               setShowCustomRange(false);
@@ -1062,19 +990,16 @@ export const BulkEditSessionsDialog = ({
                           >
                             إلغاء
                           </Button>
-                          <Button 
-                            size="sm" 
-                            className="flex-1" 
-                            onClick={addCheckedPeriods}
-                          >
-                            {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
+                          <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
+                            {showCustomRange
+                              ? "إضافة"
+                              : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ""}`}
                           </Button>
                         </div>
                       </div>
                     </PopoverContent>
                   </Popover>
 
-                  {/* Selected Period Chips */}
                   {selectedPeriods.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {selectedPeriods.map((period) => (
@@ -1091,7 +1016,6 @@ export const BulkEditSessionsDialog = ({
                     </div>
                   )}
 
-                  {/* Session Count */}
                   {hasSelectedPeriod && selectedStudentId && (
                     <p className="text-sm text-muted-foreground mt-2">{matchingSessions.length} جلسة محددة</p>
                   )}
@@ -1099,7 +1023,6 @@ export const BulkEditSessionsDialog = ({
 
                 <Separator />
 
-                {/* Step 3: Modification Type (Compact Dropdown) */}
                 <div className="space-y-3">
                   <Label className="text-sm">نوع التعديل</Label>
 
@@ -1113,7 +1036,6 @@ export const BulkEditSessionsDialog = ({
                     </SelectContent>
                   </Select>
 
-                  {/* Offset Options */}
                   {modType === "offset" && (
                     <div className="flex items-center gap-2 flex-wrap">
                       <Select value={offsetDirection} onValueChange={(v: "+" | "-") => setOffsetDirection(v)}>
@@ -1152,17 +1074,14 @@ export const BulkEditSessionsDialog = ({
                     </div>
                   )}
 
-                  {/* Day Change Options */}
                   {modType === "day-change" && (
                     <div className="space-y-3">
-                      {/* No sessions warning */}
                       {hasSelectedPeriod && selectedStudentId && availableDaysAndTimes.days.length === 0 && (
                         <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg text-center">
                           لا توجد جلسات مجدولة لـ {selectedStudent?.name} في الفترات المختارة
                         </div>
                       )}
 
-                      {/* Original Day + Time (Dynamic) */}
                       {(availableDaysAndTimes.days.length > 0 || !hasSelectedPeriod || !selectedStudentId) && (
                         <div className="space-y-1">
                           <p className="text-xs text-muted-foreground">من:</p>
@@ -1218,14 +1137,12 @@ export const BulkEditSessionsDialog = ({
                         </div>
                       )}
 
-                      {/* Arrow */}
                       {availableDaysAndTimes.days.length > 0 && (
                         <div className="flex justify-center">
                           <ArrowDown className="h-4 w-4 text-muted-foreground" />
                         </div>
                       )}
 
-                      {/* New Day + Time (All options) */}
                       {availableDaysAndTimes.days.length > 0 && (
                         <div className="space-y-1">
                           <p className="text-xs text-muted-foreground">إلى:</p>
@@ -1263,7 +1180,6 @@ export const BulkEditSessionsDialog = ({
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-2 pt-4 border-t">
                 <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
                   إلغاء
@@ -1276,7 +1192,6 @@ export const BulkEditSessionsDialog = ({
             </ScrollArea>
           )}
 
-          {/* Preview View - Keep exactly as before */}
           {showPreview && !showSuccessDialog && (
             <>
               <div className="flex items-center gap-2 mb-3">
@@ -1286,7 +1201,6 @@ export const BulkEditSessionsDialog = ({
                 <span className="font-medium">المعاينة ({matchingSessions.length} جلسة)</span>
               </div>
 
-              {/* Stats Summary */}
               <div className="flex gap-3 mb-3 text-sm">
                 <div className="flex items-center gap-1 text-green-600">
                   <CheckCircle2 className="h-4 w-4" />
@@ -1302,7 +1216,6 @@ export const BulkEditSessionsDialog = ({
                 </div>
               </div>
 
-              {/* Sessions List Grouped by Week */}
               <ScrollArea className="flex-1 -mx-6 px-6">
                 <div className="space-y-4 pb-4">
                   {Object.entries(sessionsByWeek).map(([weekLabel, sessions]) => (
@@ -1372,7 +1285,6 @@ export const BulkEditSessionsDialog = ({
                 </div>
               </ScrollArea>
 
-              {/* Apply Buttons */}
               <div className="flex flex-col gap-2 pt-4 border-t">
                 {categorizedSessions.conflicts.length > 0 && (
                   <p className="text-xs text-red-600 text-center">
@@ -1406,7 +1318,6 @@ export const BulkEditSessionsDialog = ({
             </>
           )}
 
-          {/* Success Dialog - Keep exactly as before */}
           {showSuccessDialog && (
             <div className="text-center py-6 space-y-4">
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
