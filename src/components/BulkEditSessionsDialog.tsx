@@ -184,20 +184,33 @@ const formatDateRangeAr = (start: Date, end: Date): string => {
   return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
 };
 
-// Generate week options (next 8 weeks)
+// Generate week options (next 8 weeks) - compact labels
 const generateWeekOptions = (today: Date): PeriodOption[] => {
   const weeks: PeriodOption[] = [];
-  const weekLabels = ['هذا الأسبوع', 'الأسبوع القادم', 'الأسبوع الثالث', 'الأسبوع الرابع', 'الأسبوع الخامس', 'الأسبوع السادس', 'الأسبوع السابع', 'الأسبوع الثامن'];
+  const weekLabels = ['هذا الأسبوع', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4', 'الأسبوع 5', 'الأسبوع 6', 'الأسبوع 7', 'الأسبوع 8'];
   
   for (let i = 0; i < 8; i++) {
     const weekStart = i === 0 ? today : startOfWeek(addWeeks(today, i), { weekStartsOn: 0 });
     const weekEnd = endOfWeek(addWeeks(today, i), { weekStartsOn: 0 });
     
+    // Compact date range: just day numbers if same month
+    const startDay = format(weekStart, 'd');
+    const endDay = format(weekEnd, 'd');
+    const startMonth = MONTH_NAMES_AR[weekStart.getMonth()];
+    const endMonth = MONTH_NAMES_AR[weekEnd.getMonth()];
+    
+    let compactRange: string;
+    if (startMonth === endMonth) {
+      compactRange = `${startDay}-${endDay}`;
+    } else {
+      compactRange = `${startDay}-${endDay} ${endMonth}`;
+    }
+    
     weeks.push({
       id: `week-${i}`,
       type: 'week',
-      label: weekLabels[i],
-      dateRange: formatDateRangeAr(weekStart, weekEnd),
+      label: i === 0 ? weekLabels[i] : weekLabels[i],
+      dateRange: compactRange,
       startDate: weekStart,
       endDate: weekEnd,
     });
@@ -881,30 +894,35 @@ export const BulkEditSessionsDialog = ({
                         إضافة فترة
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0 max-h-[60vh] flex flex-col" align="start" dir="rtl">
+                    <PopoverContent 
+                      className="w-[90vw] max-w-[360px] sm:max-w-[400px] p-0 max-h-[70vh] sm:max-h-[60vh] flex flex-col" 
+                      align="center" 
+                      dir="rtl"
+                      sideOffset={8}
+                    >
                       {/* Header */}
-                      <div className="p-3 pb-2 border-b bg-popover">
-                        <p className="font-medium text-sm">اختر فترات (يمكن اختيار أكثر من واحدة):</p>
+                      <div className="p-3 pb-2 border-b bg-popover shrink-0">
+                        <p className="font-medium text-sm">اختر فترات:</p>
                       </div>
                       
                       {/* Scrollable Content */}
-                      <ScrollArea className="flex-1 min-h-0 max-h-[calc(60vh-120px)]">
+                      <ScrollArea className="flex-1 min-h-0">
                         <div className="p-3 space-y-3">
                           {!showCustomRange ? (
                             <>
                               {/* Weeks */}
                               <div className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-xs text-muted-foreground font-medium">الأسابيع القادمة:</p>
-                                </div>
-                                <div className="space-y-1 pr-2">
+                                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                                  📅 الأسابيع:
+                                </p>
+                                <div className="space-y-0.5">
                                   {weekOptions.map(week => {
                                     const isAlreadyAdded = selectedPeriods.some(p => p.id === week.id);
                                     return (
                                       <label
                                         key={week.id}
                                         className={cn(
-                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                          'flex items-center gap-2 p-1.5 sm:p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
                                           checkedPeriodIds.has(week.id) && 'bg-primary/10',
                                           isAlreadyAdded && 'opacity-50 cursor-not-allowed'
                                         )}
@@ -913,9 +931,10 @@ export const BulkEditSessionsDialog = ({
                                           checked={checkedPeriodIds.has(week.id) || isAlreadyAdded}
                                           disabled={isAlreadyAdded}
                                           onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(week.id)}
+                                          className="shrink-0"
                                         />
-                                        <span>{week.label}</span>
-                                        <span className="text-muted-foreground text-xs mr-auto">({week.dateRange})</span>
+                                        <span className="truncate">{week.label}</span>
+                                        <span className="text-muted-foreground text-xs mr-auto shrink-0">({week.dateRange})</span>
                                       </label>
                                     );
                                   })}
@@ -926,15 +945,17 @@ export const BulkEditSessionsDialog = ({
 
                               {/* Months */}
                               <div className="space-y-1">
-                                <p className="text-xs text-muted-foreground font-medium">الأشهر:</p>
-                                <div className="space-y-1 pr-2">
+                                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                                  📆 الأشهر:
+                                </p>
+                                <div className="space-y-0.5">
                                   {monthOptions.map(month => {
                                     const isAlreadyAdded = selectedPeriods.some(p => p.id === month.id);
                                     return (
                                       <label
                                         key={month.id}
                                         className={cn(
-                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                          'flex items-center gap-2 p-1.5 sm:p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
                                           checkedPeriodIds.has(month.id) && 'bg-primary/10',
                                           isAlreadyAdded && 'opacity-50 cursor-not-allowed'
                                         )}
@@ -943,6 +964,7 @@ export const BulkEditSessionsDialog = ({
                                           checked={checkedPeriodIds.has(month.id) || isAlreadyAdded}
                                           disabled={isAlreadyAdded}
                                           onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(month.id)}
+                                          className="shrink-0"
                                         />
                                         <span>{month.label}</span>
                                       </label>
@@ -953,6 +975,9 @@ export const BulkEditSessionsDialog = ({
                             </>
                           ) : (
                             <div className="space-y-3">
+                              <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                                📋 نطاق مخصص:
+                              </p>
                               <div className="space-y-2">
                                 <span className="text-xs text-muted-foreground">من:</span>
                                 <Popover>
@@ -1003,13 +1028,13 @@ export const BulkEditSessionsDialog = ({
                       </ScrollArea>
                       
                       {/* Fixed Footer Buttons */}
-                      <div className="p-3 pt-2 border-t bg-popover space-y-2">
+                      <div className="p-2 sm:p-3 pt-2 border-t bg-popover space-y-2 shrink-0">
                         {!showCustomRange && (
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={selectAllPeriods}>
+                          <div className="flex gap-1 sm:gap-2">
+                            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 px-2" onClick={selectAllPeriods}>
                               تحديد الكل
                             </Button>
-                            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={deselectAllPeriods}>
+                            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 px-2" onClick={deselectAllPeriods}>
                               إلغاء التحديد
                             </Button>
                           </div>
@@ -1019,25 +1044,25 @@ export const BulkEditSessionsDialog = ({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="w-full text-xs"
+                          className="w-full text-xs h-7"
                           onClick={() => {
                             setShowCustomRange(!showCustomRange);
                             setCheckedPeriodIds(new Set());
                           }}
                         >
-                          {showCustomRange ? 'العودة للقائمة' : 'نطاق مخصص...'}
+                          {showCustomRange ? '← العودة للقائمة' : '📋 نطاق مخصص...'}
                         </Button>
 
                         {/* Action Buttons */}
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                          <Button variant="outline" size="sm" className="flex-1 h-9" onClick={() => {
                             setShowPeriodPicker(false);
                             setShowCustomRange(false);
                             setCheckedPeriodIds(new Set());
                           }}>
                             إلغاء
                           </Button>
-                          <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
+                          <Button size="sm" className="flex-1 h-9" onClick={addCheckedPeriods}>
                             {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
                           </Button>
                         </div>
