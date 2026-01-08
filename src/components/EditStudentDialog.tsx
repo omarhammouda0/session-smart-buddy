@@ -462,7 +462,7 @@ export const EditStudentDialog = ({
                         className="pl-10 h-9"
                       />
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                        ريال
+                        جنيه
                       </span>
                     </div>
                   </div>
@@ -483,7 +483,7 @@ export const EditStudentDialog = ({
                         className="pl-10 h-9"
                       />
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                        ريال
+                        جنيه
                       </span>
                     </div>
                   </div>
