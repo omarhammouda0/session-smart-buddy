@@ -341,7 +341,7 @@ export const AddVacationDialog = ({
         </DialogHeader>
 
         {!showPreview ? (
-          <ScrollArea className="flex-1 -mx-6 px-6">
+          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
             <div className="space-y-4 py-2 pr-2">
             {/* Period Selection */}
             <div className="space-y-3">
@@ -651,7 +651,7 @@ export const AddVacationDialog = ({
           </ScrollArea>
         ) : (
           /* Preview View */
-          <ScrollArea className="flex-1 -mx-6 px-6">
+          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
             <div className="pr-2">
               <div className="flex items-center justify-between mb-3">
                 <span className="font-medium">معاينة ({sessionsToMark.length} جلسة)</span>

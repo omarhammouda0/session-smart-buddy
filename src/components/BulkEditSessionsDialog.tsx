@@ -823,7 +823,7 @@ export const BulkEditSessionsDialog = ({
 
           {/* Main Form */}
           {!showPreview && !showSuccessDialog && (
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
               <div className="space-y-4 pb-2 pr-2">
                 {/* Undo Banner */}
                 {undoData && undoTimeLeft > 0 && (
@@ -878,18 +878,18 @@ export const BulkEditSessionsDialog = ({
                         إضافة فترة
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0" align="start" dir="rtl">
-                      <div className="p-3 space-y-3">
-                        <p className="font-medium text-sm">اختر فترات (يمكن اختيار أكثر من واحدة):</p>
-                        
-                        {!showCustomRange ? (
-                          <>
-                            {/* Weeks */}
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs text-muted-foreground font-medium">الأسابيع القادمة:</p>
-                              </div>
-                              <ScrollArea className="h-32">
+                    <PopoverContent className="w-80 p-0 max-h-[70vh] overflow-hidden flex flex-col" align="start" dir="rtl">
+                      <ScrollArea className="flex-1">
+                        <div className="p-3 space-y-3">
+                          <p className="font-medium text-sm">اختر فترات (يمكن اختيار أكثر من واحدة):</p>
+                          
+                          {!showCustomRange ? (
+                            <>
+                              {/* Weeks */}
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs text-muted-foreground font-medium">الأسابيع القادمة:</p>
+                                </div>
                                 <div className="space-y-1 pr-2">
                                   {weekOptions.map(week => {
                                     const isAlreadyAdded = selectedPeriods.some(p => p.id === week.id);
@@ -913,25 +913,23 @@ export const BulkEditSessionsDialog = ({
                                     );
                                   })}
                                 </div>
-                              </ScrollArea>
-                            </div>
+                              </div>
 
-                            {/* Quick Actions */}
-                            <div className="flex gap-2">
-                              <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={selectAllPeriods}>
-                                تحديد الكل
-                              </Button>
-                              <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={deselectAllPeriods}>
-                                إلغاء التحديد
-                              </Button>
-                            </div>
+                              {/* Quick Actions */}
+                              <div className="flex gap-2">
+                                <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={selectAllPeriods}>
+                                  تحديد الكل
+                                </Button>
+                                <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={deselectAllPeriods}>
+                                  إلغاء التحديد
+                                </Button>
+                              </div>
 
-                            <Separator />
+                              <Separator />
 
-                            {/* Months */}
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground font-medium">الأشهر:</p>
-                              <ScrollArea className="h-24">
+                              {/* Months */}
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground font-medium">الأشهر:</p>
                                 <div className="space-y-1 pr-2">
                                   {monthOptions.map(month => {
                                     const isAlreadyAdded = selectedPeriods.some(p => p.id === month.id);
@@ -954,87 +952,87 @@ export const BulkEditSessionsDialog = ({
                                     );
                                   })}
                                 </div>
-                              </ScrollArea>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="space-y-2">
+                                <span className="text-xs text-muted-foreground">من:</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className={cn('w-full justify-start text-right font-normal text-sm')}
+                                    >
+                                      {customDateFrom ? format(customDateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <CalendarPicker
+                                      mode="single"
+                                      selected={customDateFrom}
+                                      onSelect={setCustomDateFrom}
+                                      initialFocus
+                                      className="pointer-events-auto"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                              <div className="space-y-2">
+                                <span className="text-xs text-muted-foreground">إلى:</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className={cn('w-full justify-start text-right font-normal text-sm')}
+                                    >
+                                      {customDateTo ? format(customDateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <CalendarPicker
+                                      mode="single"
+                                      selected={customDateTo}
+                                      onSelect={setCustomDateTo}
+                                      initialFocus
+                                      className="pointer-events-auto"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
                             </div>
-                          </>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="space-y-2">
-                              <span className="text-xs text-muted-foreground">من:</span>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className={cn('w-full justify-start text-right font-normal text-sm')}
-                                  >
-                                    {customDateFrom ? format(customDateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <CalendarPicker
-                                    mode="single"
-                                    selected={customDateFrom}
-                                    onSelect={setCustomDateFrom}
-                                    initialFocus
-                                    className="pointer-events-auto"
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                            <div className="space-y-2">
-                              <span className="text-xs text-muted-foreground">إلى:</span>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className={cn('w-full justify-start text-right font-normal text-sm')}
-                                  >
-                                    {customDateTo ? format(customDateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <CalendarPicker
-                                    mode="single"
-                                    selected={customDateTo}
-                                    onSelect={setCustomDateTo}
-                                    initialFocus
-                                    className="pointer-events-auto"
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            </div>
+                          )}
+
+                          <Separator />
+
+                          {/* Custom Range Toggle */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={() => {
+                              setShowCustomRange(!showCustomRange);
+                              setCheckedPeriodIds(new Set());
+                            }}
+                          >
+                            {showCustomRange ? 'العودة للقائمة' : 'نطاق مخصص...'}
+                          </Button>
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                              setShowPeriodPicker(false);
+                              setShowCustomRange(false);
+                              setCheckedPeriodIds(new Set());
+                            }}>
+                              إلغاء
+                            </Button>
+                            <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
+                              {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
+                            </Button>
                           </div>
-                        )}
-
-                        <Separator />
-
-                        {/* Custom Range Toggle */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => {
-                            setShowCustomRange(!showCustomRange);
-                            setCheckedPeriodIds(new Set());
-                          }}
-                        >
-                          {showCustomRange ? 'العودة للقائمة' : 'نطاق مخصص...'}
-                        </Button>
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" className="flex-1" onClick={() => {
-                            setShowPeriodPicker(false);
-                            setShowCustomRange(false);
-                            setCheckedPeriodIds(new Set());
-                          }}>
-                            إلغاء
-                          </Button>
-                          <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
-                            {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
-                          </Button>
                         </div>
-                      </div>
+                      </ScrollArea>
                     </PopoverContent>
                   </Popover>
 
