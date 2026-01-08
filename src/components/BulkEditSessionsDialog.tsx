@@ -210,7 +210,7 @@ export const BulkEditSessionsDialog = ({
   const [selectedPeriods, setSelectedPeriods] = useState<PeriodOption[]>([]);
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
   const [checkedPeriodIds, setCheckedPeriodIds] = useState<Set<string>>(new Set());
-  const [showCustomRange, setShowCustomRange] = useState(false);
+  const [periodView, setPeriodView] = useState<"weeks" | "months" | "custom">("weeks");
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(today);
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>(endOfMonth(today));
 
@@ -250,7 +250,7 @@ export const BulkEditSessionsDialog = ({
   };
 
   const addCheckedPeriods = () => {
-    if (showCustomRange && customDateFrom && customDateTo) {
+    if (periodView === "custom" && customDateFrom && customDateTo) {
       if (customDateTo < customDateFrom) {
         toast({
           title: "تواريخ غير صحيحة",
@@ -287,7 +287,7 @@ export const BulkEditSessionsDialog = ({
 
       setSelectedPeriods([...selectedPeriods, customPeriod]);
       setShowPeriodPicker(false);
-      setShowCustomRange(false);
+      setPeriodView("weeks");
       setCheckedPeriodIds(new Set());
       return;
     }
@@ -715,7 +715,7 @@ export const BulkEditSessionsDialog = ({
     setSelectedPeriods([]);
     setShowPeriodPicker(false);
     setCheckedPeriodIds(new Set());
-    setShowCustomRange(false);
+    setPeriodView("weeks");
     setCustomDateFrom(today);
     setCustomDateTo(endOfMonth(today));
     setModType("offset");
@@ -830,33 +830,27 @@ export const BulkEditSessionsDialog = ({
                         {/* Tab buttons */}
                         <div className="flex gap-1">
                           <Button
-                            variant={!showCustomRange && checkedPeriodIds.size === 0 || [...checkedPeriodIds].some(id => id.startsWith('week')) ? "default" : "outline"}
+                            variant={periodView === "weeks" ? "default" : "outline"}
                             size="sm"
                             className="flex-1 h-7 text-xs"
-                            onClick={() => {
-                              setShowCustomRange(false);
-                              // Show weeks section
-                            }}
+                            onClick={() => setPeriodView("weeks")}
                           >
                             📅 الأسابيع
                           </Button>
                           <Button
-                            variant={[...checkedPeriodIds].some(id => id.startsWith('month')) ? "default" : "outline"}
+                            variant={periodView === "months" ? "default" : "outline"}
                             size="sm"
                             className="flex-1 h-7 text-xs"
-                            onClick={() => {
-                              setShowCustomRange(false);
-                              // Show months section
-                            }}
+                            onClick={() => setPeriodView("months")}
                           >
                             📆 الأشهر
                           </Button>
                           <Button
-                            variant={showCustomRange ? "default" : "outline"}
+                            variant={periodView === "custom" ? "default" : "outline"}
                             size="sm"
                             className="flex-1 h-7 text-xs"
                             onClick={() => {
-                              setShowCustomRange(true);
+                              setPeriodView("custom");
                               setCheckedPeriodIds(new Set());
                             }}
                           >
@@ -874,97 +868,78 @@ export const BulkEditSessionsDialog = ({
                         }}
                       >
                         <div className="p-3 space-y-3 pb-6">
-                          {!showCustomRange ? (
-                            <>
-                              <div className="space-y-2">
-                                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                  📅 الأسابيع
-                                  {weekOptions.filter(w => checkedPeriodIds.has(w.id)).length > 0 && (
-                                    <Badge variant="secondary" className="text-[10px] h-4 px-1">
-                                      {weekOptions.filter(w => checkedPeriodIds.has(w.id)).length}
-                                    </Badge>
-                                  )}
-                                </p>
-                                <div className="space-y-1">
-                                  {weekOptions.map((week) => {
-                                    const isAlreadyAdded = selectedPeriods.some((p) => p.id === week.id);
-                                    return (
-                                      <label
-                                        key={week.id}
-                                        className={cn(
-                                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
-                                          checkedPeriodIds.has(week.id) && "bg-primary/10",
-                                          isAlreadyAdded && "opacity-50 cursor-not-allowed",
-                                        )}
-                                      >
-                                        <Checkbox
-                                          checked={checkedPeriodIds.has(week.id) || isAlreadyAdded}
-                                          disabled={isAlreadyAdded}
-                                          onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(week.id)}
-                                        />
-                                        <span className="flex-1">{week.label}</span>
-                                        <span className="text-xs text-muted-foreground">({week.dateRange})</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
+                          {periodView === "weeks" && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                📅 الأسابيع
+                                {weekOptions.filter(w => checkedPeriodIds.has(w.id)).length > 0 && (
+                                  <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                    {weekOptions.filter(w => checkedPeriodIds.has(w.id)).length}
+                                  </Badge>
+                                )}
+                              </p>
+                              <div className="space-y-1">
+                                {weekOptions.map((week) => {
+                                  const isAlreadyAdded = selectedPeriods.some((p) => p.id === week.id);
+                                  return (
+                                    <label
+                                      key={week.id}
+                                      className={cn(
+                                        "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
+                                        checkedPeriodIds.has(week.id) && "bg-primary/10",
+                                        isAlreadyAdded && "opacity-50 cursor-not-allowed",
+                                      )}
+                                    >
+                                      <Checkbox
+                                        checked={checkedPeriodIds.has(week.id) || isAlreadyAdded}
+                                        disabled={isAlreadyAdded}
+                                        onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(week.id)}
+                                      />
+                                      <span className="flex-1">{week.label}</span>
+                                      <span className="text-xs text-muted-foreground">({week.dateRange})</span>
+                                    </label>
+                                  );
+                                })}
                               </div>
+                            </div>
+                          )}
 
-                              <Separator />
-
-                              <div className="space-y-2">
-                                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                  📆 الأشهر
-                                  {monthOptions.filter(m => checkedPeriodIds.has(m.id)).length > 0 && (
-                                    <Badge variant="secondary" className="text-[10px] h-4 px-1">
-                                      {monthOptions.filter(m => checkedPeriodIds.has(m.id)).length}
-                                    </Badge>
-                                  )}
-                                </p>
-                                <div className="space-y-1">
-                                  {monthOptions.map((month) => {
-                                    const isAlreadyAdded = selectedPeriods.some((p) => p.id === month.id);
-                                    return (
-                                      <label
-                                        key={month.id}
-                                        className={cn(
-                                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
-                                          checkedPeriodIds.has(month.id) && "bg-primary/10",
-                                          isAlreadyAdded && "opacity-50 cursor-not-allowed",
-                                        )}
-                                      >
-                                        <Checkbox
-                                          checked={checkedPeriodIds.has(month.id) || isAlreadyAdded}
-                                          disabled={isAlreadyAdded}
-                                          onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(month.id)}
-                                        />
-                                        <span>{month.label}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
+                          {periodView === "months" && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                📆 الأشهر
+                                {monthOptions.filter(m => checkedPeriodIds.has(m.id)).length > 0 && (
+                                  <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                    {monthOptions.filter(m => checkedPeriodIds.has(m.id)).length}
+                                  </Badge>
+                                )}
+                              </p>
+                              <div className="space-y-1">
+                                {monthOptions.map((month) => {
+                                  const isAlreadyAdded = selectedPeriods.some((p) => p.id === month.id);
+                                  return (
+                                    <label
+                                      key={month.id}
+                                      className={cn(
+                                        "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
+                                        checkedPeriodIds.has(month.id) && "bg-primary/10",
+                                        isAlreadyAdded && "opacity-50 cursor-not-allowed",
+                                      )}
+                                    >
+                                      <Checkbox
+                                        checked={checkedPeriodIds.has(month.id) || isAlreadyAdded}
+                                        disabled={isAlreadyAdded}
+                                        onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(month.id)}
+                                      />
+                                      <span>{month.label}</span>
+                                    </label>
+                                  );
+                                })}
                               </div>
+                            </div>
+                          )}
 
-                              <div className="flex gap-2 pt-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="flex-1 h-8 text-xs"
-                                  onClick={selectAllPeriods}
-                                >
-                                  تحديد الكل
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="flex-1 h-8 text-xs"
-                                  onClick={deselectAllPeriods}
-                                >
-                                  إلغاء التحديد
-                                </Button>
-                              </div>
-                            </>
-                          ) : (
+                          {periodView === "custom" && (
                             <div className="space-y-3">
                               <p className="text-xs font-medium text-muted-foreground">📋 نطاق مخصص:</p>
                               <div className="space-y-2">
@@ -1024,14 +999,14 @@ export const BulkEditSessionsDialog = ({
                             className="flex-1"
                             onClick={() => {
                               setShowPeriodPicker(false);
-                              setShowCustomRange(false);
+                              setPeriodView("weeks");
                               setCheckedPeriodIds(new Set());
                             }}
                           >
                             إلغاء
                           </Button>
                           <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
-                            {showCustomRange
+                            {periodView === "custom"
                               ? "إضافة"
                               : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ""}`}
                           </Button>
