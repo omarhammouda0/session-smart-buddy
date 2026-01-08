@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
   format,
-  isBefore,
   startOfDay,
   startOfWeek,
   endOfWeek,
@@ -12,12 +11,11 @@ import {
   parseISO,
   getDay,
   addDays,
-  isSameMonth,
   isWithinInterval,
 } from 'date-fns';
-import { Calendar, Clock, User, Undo2, CheckCircle2, XCircle, AlertCircle, ArrowDown, CheckSquare, Square } from 'lucide-react';
+import { Calendar, Clock, User, Undo2, CheckCircle2, XCircle, AlertCircle, ArrowDown, Plus, X } from 'lucide-react';
 import { Student, Session } from '@/types/student';
-import { formatShortDateAr, DAY_NAMES_AR, MONTH_NAMES_AR } from '@/lib/arabicConstants';
+import { formatShortDateAr, MONTH_NAMES_AR } from '@/lib/arabicConstants';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -39,8 +37,9 @@ import {
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface BulkEditSessionsDialogProps {
   students: Student[];
@@ -95,19 +94,11 @@ interface UndoData {
   studentName: string;
 }
 
-interface WeekOption {
+interface PeriodOption {
   id: string;
+  type: 'week' | 'month' | 'custom';
   label: string;
   dateRange: string;
-  startDate: Date;
-  endDate: Date;
-}
-
-interface MonthOption {
-  id: string;
-  label: string;
-  year: number;
-  month: number;
   startDate: Date;
   endDate: Date;
 }
@@ -159,7 +150,7 @@ const DAY_OPTIONS = [
   { value: 6, label: 'السبت' },
 ];
 
-type ModificationType = 'offset' | 'specific' | 'day-change';
+type ModificationType = 'offset' | 'day-change';
 
 // Calculate new date when changing day of week
 const calculateNewDate = (originalDate: string, originalDay: number, newDay: number): string => {
@@ -192,8 +183,8 @@ const formatDateRangeAr = (start: Date, end: Date): string => {
 };
 
 // Generate week options (next 8 weeks)
-const generateWeekOptions = (today: Date): WeekOption[] => {
-  const weeks: WeekOption[] = [];
+const generateWeekOptions = (today: Date): PeriodOption[] => {
+  const weeks: PeriodOption[] = [];
   const weekLabels = ['هذا الأسبوع', 'الأسبوع القادم', 'الأسبوع الثالث', 'الأسبوع الرابع', 'الأسبوع الخامس', 'الأسبوع السادس', 'الأسبوع السابع', 'الأسبوع الثامن'];
   
   for (let i = 0; i < 8; i++) {
@@ -202,6 +193,7 @@ const generateWeekOptions = (today: Date): WeekOption[] => {
     
     weeks.push({
       id: `week-${i}`,
+      type: 'week',
       label: weekLabels[i],
       dateRange: formatDateRangeAr(weekStart, weekEnd),
       startDate: weekStart,
@@ -213,8 +205,8 @@ const generateWeekOptions = (today: Date): WeekOption[] => {
 };
 
 // Generate month options (next 6 months)
-const generateMonthOptions = (today: Date): MonthOption[] => {
-  const months: MonthOption[] = [];
+const generateMonthOptions = (today: Date): PeriodOption[] => {
+  const months: PeriodOption[] = [];
   
   for (let i = 0; i < 6; i++) {
     const monthDate = addMonths(today, i);
@@ -223,9 +215,9 @@ const generateMonthOptions = (today: Date): MonthOption[] => {
     
     months.push({
       id: `month-${i}`,
+      type: 'month',
       label: `${MONTH_NAMES_AR[monthDate.getMonth()]} ${monthDate.getFullYear()}`,
-      year: monthDate.getFullYear(),
-      month: monthDate.getMonth(),
+      dateRange: formatDateRangeAr(monthStart, monthEnd),
       startDate: monthStart,
       endDate: monthEnd,
     });
@@ -248,16 +240,17 @@ export const BulkEditSessionsDialog = ({
   const today = startOfDay(new Date());
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   
-  // Multi-period selection
-  const [selectedWeeks, setSelectedWeeks] = useState<Set<string>>(new Set());
-  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
-  const [useCustomRange, setUseCustomRange] = useState(false);
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(today);
-  const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(today));
+  // Period selection using chips
+  const [selectedPeriods, setSelectedPeriods] = useState<PeriodOption[]>([]);
+  const [showPeriodPicker, setShowPeriodPicker] = useState(false);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
+  const [showCustomRange, setShowCustomRange] = useState(false);
+  const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(today);
+  const [customDateTo, setCustomDateTo] = useState<Date | undefined>(endOfMonth(today));
 
   // Generate options
-  const weekOptions = useMemo(() => generateWeekOptions(today), [today]);
-  const monthOptions = useMemo(() => generateMonthOptions(today), [today]);
+  const weekOptions = useMemo(() => generateWeekOptions(today), []);
+  const monthOptions = useMemo(() => generateMonthOptions(today), []);
 
   // Modification type
   const [modType, setModType] = useState<ModificationType>('offset');
@@ -266,9 +259,6 @@ export const BulkEditSessionsDialog = ({
   const [offsetDirection, setOffsetDirection] = useState<'+' | '-'>('+');
   const [offsetHours, setOffsetHours] = useState<number>(4);
   const [offsetMinutes, setOffsetMinutes] = useState<number>(0);
-
-  // Specific time modification
-  const [specificTime, setSpecificTime] = useState<string>('');
 
   // Day change modification
   const [originalDay, setOriginalDay] = useState<number>(1); // Monday
@@ -280,81 +270,82 @@ export const BulkEditSessionsDialog = ({
   const [undoData, setUndoData] = useState<UndoData | null>(null);
   const [undoTimeLeft, setUndoTimeLeft] = useState<number>(0);
 
-  // Toggle week selection
-  const toggleWeek = (weekId: string) => {
-    setUseCustomRange(false);
-    const newSelected = new Set(selectedWeeks);
-    if (newSelected.has(weekId)) {
-      newSelected.delete(weekId);
-    } else {
-      newSelected.add(weekId);
-    }
-    setSelectedWeeks(newSelected);
-  };
-
-  // Toggle month selection (also toggles all weeks in that month)
-  const toggleMonth = (monthId: string) => {
-    setUseCustomRange(false);
-    const newSelectedMonths = new Set(selectedMonths);
-    const month = monthOptions.find(m => m.id === monthId);
-    
-    if (!month) return;
-    
-    if (newSelectedMonths.has(monthId)) {
-      newSelectedMonths.delete(monthId);
-      // Unselect weeks that fall within this month
-      const newSelectedWeeks = new Set(selectedWeeks);
-      weekOptions.forEach(week => {
-        if (isSameMonth(week.startDate, month.startDate) || isSameMonth(week.endDate, month.startDate)) {
-          newSelectedWeeks.delete(week.id);
-        }
-      });
-      setSelectedWeeks(newSelectedWeeks);
-    } else {
-      newSelectedMonths.add(monthId);
-      // Select weeks that fall within this month
-      const newSelectedWeeks = new Set(selectedWeeks);
-      weekOptions.forEach(week => {
-        if (isSameMonth(week.startDate, month.startDate) || isSameMonth(week.endDate, month.startDate)) {
-          newSelectedWeeks.add(week.id);
-        }
-      });
-      setSelectedWeeks(newSelectedWeeks);
+  // Add period
+  const addPeriod = () => {
+    if (showCustomRange && customDateFrom && customDateTo) {
+      // Add custom range
+      const customPeriod: PeriodOption = {
+        id: `custom-${Date.now()}`,
+        type: 'custom',
+        label: 'نطاق مخصص',
+        dateRange: formatDateRangeAr(customDateFrom, customDateTo),
+        startDate: customDateFrom,
+        endDate: customDateTo,
+      };
+      
+      // Check for duplicates
+      const exists = selectedPeriods.some(p => 
+        p.type === 'custom' && 
+        format(p.startDate, 'yyyy-MM-dd') === format(customDateFrom, 'yyyy-MM-dd') &&
+        format(p.endDate, 'yyyy-MM-dd') === format(customDateTo, 'yyyy-MM-dd')
+      );
+      
+      if (exists) {
+        toast({
+          title: 'فترة مكررة',
+          description: 'هذه الفترة مضافة بالفعل',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      setSelectedPeriods([...selectedPeriods, customPeriod]);
+      setShowPeriodPicker(false);
+      setShowCustomRange(false);
+      return;
     }
     
-    setSelectedMonths(newSelectedMonths);
+    if (!selectedPeriodId) {
+      toast({
+        title: 'اختر فترة',
+        description: 'الرجاء اختيار فترة من القائمة',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Find the period from week or month options
+    const period = [...weekOptions, ...monthOptions].find(p => p.id === selectedPeriodId);
+    if (!period) return;
+    
+    // Check for duplicates
+    const exists = selectedPeriods.some(p => p.id === period.id);
+    if (exists) {
+      toast({
+        title: 'فترة مكررة',
+        description: `${period.label} مضافة بالفعل`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setSelectedPeriods([...selectedPeriods, period]);
+    setShowPeriodPicker(false);
+    setSelectedPeriodId('');
   };
 
-  // Select all
-  const selectAll = () => {
-    setUseCustomRange(false);
-    setSelectedWeeks(new Set(weekOptions.map(w => w.id)));
-    setSelectedMonths(new Set(monthOptions.map(m => m.id)));
-  };
-
-  // Deselect all
-  const deselectAll = () => {
-    setSelectedWeeks(new Set());
-    setSelectedMonths(new Set());
-    setUseCustomRange(false);
+  // Remove period
+  const removePeriod = (periodId: string) => {
+    setSelectedPeriods(selectedPeriods.filter(p => p.id !== periodId));
   };
 
   // Check if date is within any selected period
   const isDateInSelectedPeriods = (dateStr: string): { inPeriod: boolean; weekLabel?: string } => {
     const date = parseISO(dateStr);
     
-    if (useCustomRange && dateFrom && dateTo) {
-      if (isWithinInterval(date, { start: dateFrom, end: dateTo })) {
-        return { inPeriod: true, weekLabel: 'نطاق مخصص' };
-      }
-      return { inPeriod: false };
-    }
-    
-    // Check weeks
-    for (const weekId of selectedWeeks) {
-      const week = weekOptions.find(w => w.id === weekId);
-      if (week && isWithinInterval(date, { start: week.startDate, end: week.endDate })) {
-        return { inPeriod: true, weekLabel: `${week.label} (${week.dateRange})` };
+    for (const period of selectedPeriods) {
+      if (isWithinInterval(date, { start: period.startDate, end: period.endDate })) {
+        return { inPeriod: true, weekLabel: `${period.label} (${period.dateRange})` };
       }
     }
     
@@ -418,9 +409,7 @@ export const BulkEditSessionsDialog = ({
   }, [students, selectedStudentId]);
 
   // Check if any period is selected
-  const hasSelectedPeriod = useMemo(() => {
-    return selectedWeeks.size > 0 || selectedMonths.size > 0 || useCustomRange;
-  }, [selectedWeeks, selectedMonths, useCustomRange]);
+  const hasSelectedPeriod = selectedPeriods.length > 0;
 
   // Calculate matching sessions with new times/dates
   const matchingSessions = useMemo(() => {
@@ -454,8 +443,6 @@ export const BulkEditSessionsDialog = ({
 
       if (modType === 'offset') {
         calculatedNewTime = calculateOffsetTime(sessionTime);
-      } else if (modType === 'specific') {
-        calculatedNewTime = specificTime || sessionTime;
       } else {
         // day-change
         calculatedNewTime = newTime;
@@ -474,7 +461,7 @@ export const BulkEditSessionsDialog = ({
     });
 
     return sessions.sort((a, b) => a.session.date.localeCompare(b.session.date));
-  }, [selectedStudent, selectedStudentId, hasSelectedPeriod, selectedWeeks, selectedMonths, useCustomRange, dateFrom, dateTo, modType, offsetDirection, offsetHours, offsetMinutes, specificTime, originalDay, originalTime, newDay, newTime, weekOptions]);
+  }, [selectedStudent, selectedStudentId, hasSelectedPeriod, selectedPeriods, modType, offsetDirection, offsetHours, offsetMinutes, originalDay, originalTime, newDay, newTime]);
 
   // Group sessions by week for preview
   const sessionsByWeek = useMemo(() => {
@@ -571,7 +558,7 @@ export const BulkEditSessionsDialog = ({
     if (!hasSelectedPeriod) {
       toast({
         title: 'اختر فترة زمنية',
-        description: 'يجب اختيار أسبوع واحد على الأقل',
+        description: 'يجب إضافة فترة واحدة على الأقل',
         variant: 'destructive',
       });
       return;
@@ -600,15 +587,6 @@ export const BulkEditSessionsDialog = ({
           variant: 'destructive',
         });
       }
-      return;
-    }
-
-    if (modType === 'specific' && !specificTime) {
-      toast({
-        title: 'خطأ',
-        description: 'الرجاء تحديد الوقت الجديد',
-        variant: 'destructive',
-      });
       return;
     }
 
@@ -711,16 +689,16 @@ export const BulkEditSessionsDialog = ({
 
   const resetForm = () => {
     setSelectedStudentId('');
-    setSelectedWeeks(new Set());
-    setSelectedMonths(new Set());
-    setUseCustomRange(false);
-    setDateFrom(today);
-    setDateTo(endOfMonth(today));
+    setSelectedPeriods([]);
+    setShowPeriodPicker(false);
+    setSelectedPeriodId('');
+    setShowCustomRange(false);
+    setCustomDateFrom(today);
+    setCustomDateTo(endOfMonth(today));
     setModType('offset');
     setOffsetDirection('+');
     setOffsetHours(4);
     setOffsetMinutes(0);
-    setSpecificTime('');
     setOriginalDay(1);
     setOriginalTime('16:00');
     setNewDay(5);
@@ -757,7 +735,7 @@ export const BulkEditSessionsDialog = ({
             <span className="hidden sm:inline">تعديل جماعي</span>
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-heading">
               <Clock className="h-5 w-5" />
@@ -768,326 +746,342 @@ export const BulkEditSessionsDialog = ({
           {/* Main Form */}
           {!showPreview && !showSuccessDialog && (
             <>
-              <ScrollArea className="flex-1 -mx-6 px-6">
-                <div className="space-y-5 pb-4">
-                  {/* Undo Banner */}
-                  {undoData && undoTimeLeft > 0 && (
-                    <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center justify-between">
-                      <div className="text-sm">
-                        <p className="font-medium">يمكنك التراجع عن التعديل السابق</p>
-                        <p className="text-muted-foreground text-xs">
-                          {undoData.count} جلسة لـ {undoData.studentName} • متبقي {formatUndoTimeLeft()}
-                        </p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={handleUndo} className="gap-1">
-                        <Undo2 className="h-3.5 w-3.5" />
-                        تراجع
+              <div className="space-y-4 pb-2">
+                {/* Undo Banner */}
+                {undoData && undoTimeLeft > 0 && (
+                  <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center justify-between">
+                    <div className="text-sm">
+                      <p className="font-medium">يمكنك التراجع عن التعديل السابق</p>
+                      <p className="text-muted-foreground text-xs">
+                        {undoData.count} جلسة لـ {undoData.studentName} • متبقي {formatUndoTimeLeft()}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleUndo} className="gap-1">
+                      <Undo2 className="h-3.5 w-3.5" />
+                      تراجع
+                    </Button>
+                  </div>
+                )}
+
+                {/* Step 1: Select Student */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5 text-sm">
+                    <User className="h-4 w-4" />
+                    اختر الطالب
+                  </Label>
+                  <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                    <SelectTrigger className={cn(!selectedStudentId && 'text-muted-foreground')}>
+                      <SelectValue placeholder="اختر طالب..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students.map(student => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name} ({formatTimeAr(student.sessionTime || '16:00')})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator />
+
+                {/* Step 2: Period Selection with Chips */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5 text-sm">
+                    <Calendar className="h-4 w-4" />
+                    الفترة الزمنية
+                  </Label>
+                  
+                  {/* Add Period Button */}
+                  <Popover open={showPeriodPicker} onOpenChange={setShowPeriodPicker}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1 w-full">
+                        <Plus className="h-4 w-4" />
+                        إضافة فترة
                       </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-0" align="start" dir="rtl">
+                      <div className="p-3 space-y-3">
+                        <p className="font-medium text-sm">اختر فترة:</p>
+                        
+                        {!showCustomRange ? (
+                          <RadioGroup value={selectedPeriodId} onValueChange={setSelectedPeriodId}>
+                            {/* Weeks */}
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground font-medium">الأسابيع القادمة:</p>
+                              <ScrollArea className="h-32">
+                                <div className="space-y-1 pr-2">
+                                  {weekOptions.map(week => (
+                                    <label
+                                      key={week.id}
+                                      className={cn(
+                                        'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                        selectedPeriodId === week.id && 'bg-primary/10'
+                                      )}
+                                    >
+                                      <RadioGroupItem value={week.id} />
+                                      <span>{week.label}</span>
+                                      <span className="text-muted-foreground text-xs mr-auto">({week.dateRange})</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </div>
+
+                            <Separator />
+
+                            {/* Months */}
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground font-medium">الأشهر:</p>
+                              <ScrollArea className="h-24">
+                                <div className="space-y-1 pr-2">
+                                  {monthOptions.map(month => (
+                                    <label
+                                      key={month.id}
+                                      className={cn(
+                                        'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                        selectedPeriodId === month.id && 'bg-primary/10'
+                                      )}
+                                    >
+                                      <RadioGroupItem value={month.id} />
+                                      <span>{month.label}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          </RadioGroup>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <span className="text-xs text-muted-foreground">من:</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn('w-full justify-start text-right font-normal text-sm')}
+                                  >
+                                    {customDateFrom ? format(customDateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarPicker
+                                    mode="single"
+                                    selected={customDateFrom}
+                                    onSelect={setCustomDateFrom}
+                                    initialFocus
+                                    className="pointer-events-auto"
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div className="space-y-2">
+                              <span className="text-xs text-muted-foreground">إلى:</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn('w-full justify-start text-right font-normal text-sm')}
+                                  >
+                                    {customDateTo ? format(customDateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarPicker
+                                    mode="single"
+                                    selected={customDateTo}
+                                    onSelect={setCustomDateTo}
+                                    initialFocus
+                                    className="pointer-events-auto"
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+                        )}
+
+                        <Separator />
+
+                        {/* Custom Range Toggle */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={() => {
+                            setShowCustomRange(!showCustomRange);
+                            setSelectedPeriodId('');
+                          }}
+                        >
+                          {showCustomRange ? 'العودة للقائمة' : 'نطاق مخصص...'}
+                        </Button>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                            setShowPeriodPicker(false);
+                            setShowCustomRange(false);
+                            setSelectedPeriodId('');
+                          }}>
+                            إلغاء
+                          </Button>
+                          <Button size="sm" className="flex-1" onClick={addPeriod}>
+                            إضافة
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Selected Period Chips */}
+                  {selectedPeriods.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedPeriods.map(period => (
+                        <Badge
+                          key={period.id}
+                          variant="secondary"
+                          className="gap-1 py-1.5 px-3 text-sm"
+                        >
+                          <span>{period.type === 'custom' ? period.dateRange : `${period.label}`}</span>
+                          {period.type !== 'custom' && (
+                            <span className="text-muted-foreground text-xs">({period.dateRange})</span>
+                          )}
+                          <button
+                            onClick={() => removePeriod(period.id)}
+                            className="mr-1 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
                     </div>
                   )}
 
-                  {/* Step 1: Select Student */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <User className="h-4 w-4" />
-                      اختر الطالب
-                    </Label>
-                    <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                      <SelectTrigger className={cn(!selectedStudentId && 'text-muted-foreground')}>
-                        <SelectValue placeholder="اختر طالب..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {students.map(student => (
-                          <SelectItem key={student.id} value={student.id}>
-                            {student.name} ({formatTimeAr(student.sessionTime || '16:00')})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Step 2: Multi-Period Selection */}
-                  <div className="space-y-3">
-                    <Label className="flex items-center gap-1.5">
-                      <Calendar className="h-4 w-4" />
-                      الفترة الزمنية (يمكن اختيار أكثر من واحدة)
-                    </Label>
-                    
-                    {/* Quick Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-xs flex-1"
-                        onClick={selectAll}
-                      >
-                        <CheckSquare className="h-3.5 w-3.5 ml-1" />
-                        تحديد الكل
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-xs flex-1"
-                        onClick={deselectAll}
-                      >
-                        <Square className="h-3.5 w-3.5 ml-1" />
-                        إلغاء التحديد
-                      </Button>
-                    </div>
-                    
-                    {/* Weeks */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-medium">الأسابيع:</p>
-                      <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto">
-                        {weekOptions.map(week => (
-                          <label
-                            key={week.id}
-                            className={cn(
-                              'flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors text-sm',
-                              selectedWeeks.has(week.id) && !useCustomRange
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border hover:border-primary/50'
-                            )}
-                          >
-                            <Checkbox
-                              checked={selectedWeeks.has(week.id) && !useCustomRange}
-                              onCheckedChange={() => toggleWeek(week.id)}
-                            />
-                            <span className="font-medium">{week.label}</span>
-                            <span className="text-muted-foreground text-xs mr-auto">({week.dateRange})</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Months */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-medium">أو الأشهر الكاملة:</p>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {monthOptions.map(month => (
-                          <label
-                            key={month.id}
-                            className={cn(
-                              'flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors text-sm',
-                              selectedMonths.has(month.id) && !useCustomRange
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border hover:border-primary/50'
-                            )}
-                          >
-                            <Checkbox
-                              checked={selectedMonths.has(month.id) && !useCustomRange}
-                              onCheckedChange={() => toggleMonth(month.id)}
-                            />
-                            <span className="font-medium">{month.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Custom Date Range */}
-                    <div className="space-y-1.5">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          checked={useCustomRange}
-                          onCheckedChange={(checked) => {
-                            setUseCustomRange(!!checked);
-                            if (checked) {
-                              setSelectedWeeks(new Set());
-                              setSelectedMonths(new Set());
-                            }
-                          }}
-                        />
-                        <span className="text-xs text-muted-foreground font-medium">أو نطاق مخصص</span>
-                      </label>
-                      
-                      {useCustomRange && (
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          <div>
-                            <span className="text-xs text-muted-foreground">من</span>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className={cn('w-full justify-start text-right font-normal text-sm', !dateFrom && 'text-muted-foreground')}
-                                >
-                                  {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <CalendarPicker
-                                  mode="single"
-                                  selected={dateFrom}
-                                  onSelect={setDateFrom}
-                                  initialFocus
-                                  className="pointer-events-auto"
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                          <div>
-                            <span className="text-xs text-muted-foreground">إلى</span>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className={cn('w-full justify-start text-right font-normal text-sm', !dateTo && 'text-muted-foreground')}
-                                >
-                                  {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <CalendarPicker
-                                  mode="single"
-                                  selected={dateTo}
-                                  onSelect={setDateTo}
-                                  disabled={date => dateFrom ? isBefore(date, dateFrom) : false}
-                                  initialFocus
-                                  className="pointer-events-auto"
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Session Count */}
-                    {selectedStudentId && hasSelectedPeriod && (
-                      <div className="text-sm font-medium text-primary">
-                        {matchingSessions.length} جلسة محددة
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Step 3: Modification Type */}
-                  <div className="space-y-3">
-                    <Label className="flex items-center gap-1.5">
-                      <Clock className="h-4 w-4" />
-                      نوع التعديل
-                    </Label>
-
-                    <RadioGroup value={modType} onValueChange={(v) => setModType(v as ModificationType)}>
-                      {/* Offset Option */}
-                      <div className={cn('border rounded-lg p-3 transition-colors', modType === 'offset' && 'border-primary bg-primary/5')}>
-                        <div className="flex items-center gap-2">
-                          <RadioGroupItem value="offset" id="offset" />
-                          <Label htmlFor="offset" className="font-medium cursor-pointer">تحويل بمقدار زمني</Label>
-                        </div>
-                        {modType === 'offset' && (
-                          <div className="mt-3 flex items-center gap-2 flex-wrap">
-                            <Select value={offsetDirection} onValueChange={(v) => setOffsetDirection(v as '+' | '-')}>
-                              <SelectTrigger className="w-16">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="+">+</SelectItem>
-                                <SelectItem value="-">-</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Select value={String(offsetHours)} onValueChange={(v) => setOffsetHours(Number(v))}>
-                              <SelectTrigger className="w-20">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => (
-                                  <SelectItem key={h} value={String(h)}>{h} ساعة</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select value={String(offsetMinutes)} onValueChange={(v) => setOffsetMinutes(Number(v))}>
-                              <SelectTrigger className="w-20">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[0, 15, 30, 45].map(m => (
-                                  <SelectItem key={m} value={String(m)}>{m} دقيقة</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-xs text-muted-foreground">
-                              (مثال: 4:00 م → {formatTimeAr(calculateOffsetTime('16:00'))})
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Day + Time Change Option */}
-                      <div className={cn('border rounded-lg p-3 transition-colors', modType === 'day-change' && 'border-primary bg-primary/5')}>
-                        <div className="flex items-center gap-2">
-                          <RadioGroupItem value="day-change" id="day-change" />
-                          <Label htmlFor="day-change" className="font-medium cursor-pointer">تغيير اليوم والوقت</Label>
-                        </div>
-                        {modType === 'day-change' && (
-                          <div className="mt-3 space-y-3">
-                            {/* Original Day + Time */}
-                            <div className="space-y-2">
-                              <p className="text-xs text-muted-foreground">من:</p>
-                              <div className="flex gap-2">
-                                <Select value={String(originalDay)} onValueChange={(v) => setOriginalDay(Number(v))}>
-                                  <SelectTrigger className="flex-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {DAY_OPTIONS.map(d => (
-                                      <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <span className="text-xs text-muted-foreground self-center">في</span>
-                                <Select value={originalTime} onValueChange={setOriginalTime}>
-                                  <SelectTrigger className="w-28">
-                                    <SelectValue>{formatTimeAr(originalTime)}</SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {TIME_OPTIONS.map(t => (
-                                      <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-
-                            {/* Arrow */}
-                            <div className="flex justify-center">
-                              <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                            </div>
-
-                            {/* New Day + Time */}
-                            <div className="space-y-2">
-                              <p className="text-xs text-muted-foreground">إلى:</p>
-                              <div className="flex gap-2">
-                                <Select value={String(newDay)} onValueChange={(v) => setNewDay(Number(v))}>
-                                  <SelectTrigger className="flex-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {DAY_OPTIONS.map(d => (
-                                      <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <span className="text-xs text-muted-foreground self-center">في</span>
-                                <Select value={newTime} onValueChange={setNewTime}>
-                                  <SelectTrigger className="w-28">
-                                    <SelectValue>{formatTimeAr(newTime)}</SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {TIME_OPTIONS.map(t => (
-                                      <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </RadioGroup>
-                  </div>
+                  {/* Session Count */}
+                  {hasSelectedPeriod && selectedStudentId && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {matchingSessions.length} جلسة محددة
+                    </p>
+                  )}
                 </div>
-              </ScrollArea>
+
+                <Separator />
+
+                {/* Step 3: Modification Type (Compact Dropdown) */}
+                <div className="space-y-3">
+                  <Label className="text-sm">نوع التعديل</Label>
+                  
+                  <Select value={modType} onValueChange={(v: ModificationType) => setModType(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="offset">تحويل بمقدار زمني</SelectItem>
+                      <SelectItem value="day-change">تغيير اليوم والوقت</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Offset Options */}
+                  {modType === 'offset' && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select value={offsetDirection} onValueChange={(v: '+' | '-') => setOffsetDirection(v)}>
+                        <SelectTrigger className="w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="+">+</SelectItem>
+                          <SelectItem value="-">-</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={String(offsetHours)} onValueChange={(v) => setOffsetHours(Number(v))}>
+                        <SelectTrigger className="w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 13 }, (_, i) => (
+                            <SelectItem key={i} value={String(i)}>{i} ساعة</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={String(offsetMinutes)} onValueChange={(v) => setOffsetMinutes(Number(v))}>
+                        <SelectTrigger className="w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[0, 15, 30, 45].map(m => (
+                            <SelectItem key={m} value={String(m)}>{m} دقيقة</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Day Change Options */}
+                  {modType === 'day-change' && (
+                    <div className="space-y-3">
+                      {/* Original Day + Time */}
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">من:</p>
+                        <div className="flex gap-2">
+                          <Select value={String(originalDay)} onValueChange={(v) => setOriginalDay(Number(v))}>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DAY_OPTIONS.map(d => (
+                                <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-xs text-muted-foreground self-center">في</span>
+                          <Select value={originalTime} onValueChange={setOriginalTime}>
+                            <SelectTrigger className="w-24">
+                              <SelectValue>{formatTimeAr(originalTime)}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIME_OPTIONS.map(t => (
+                                <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Arrow */}
+                      <div className="flex justify-center">
+                        <ArrowDown className="h-4 w-4 text-muted-foreground" />
+                      </div>
+
+                      {/* New Day + Time */}
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">إلى:</p>
+                        <div className="flex gap-2">
+                          <Select value={String(newDay)} onValueChange={(v) => setNewDay(Number(v))}>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DAY_OPTIONS.map(d => (
+                                <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-xs text-muted-foreground self-center">في</span>
+                          <Select value={newTime} onValueChange={setNewTime}>
+                            <SelectTrigger className="w-24">
+                              <SelectValue>{formatTimeAr(newTime)}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIME_OPTIONS.map(t => (
+                                <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex gap-2 pt-4 border-t">
@@ -1095,7 +1089,7 @@ export const BulkEditSessionsDialog = ({
                   إلغاء
                 </Button>
                 <Button className="flex-1 gap-1" onClick={handleShowPreview}>
-                  معاينة التغييرات
+                  معاينة
                   <ArrowDown className="h-4 w-4 -rotate-90" />
                 </Button>
               </div>
