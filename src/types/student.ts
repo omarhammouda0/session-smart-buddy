@@ -29,6 +29,9 @@ export interface Student {
   id: string;
   sessionTime: string; // HH:mm format like "16:30"
   sessionDuration?: number; // Default session duration in minutes for this student
+  customPriceOnsite?: number; // Custom on-site price for this student
+  customPriceOnline?: number; // Custom online price for this student
+  useCustomSettings?: boolean; // Whether to use custom settings or global defaults
   name: string;
   phone?: string; // WhatsApp contact number
   sessionType: SessionType; // online or on-site
@@ -56,6 +59,8 @@ export interface AppSettings {
   defaultSemesterStart: string;
   defaultSemesterEnd: string;
   defaultSessionDuration: number; // Default session duration in minutes (default: 60)
+  defaultPriceOnsite?: number; // Default on-site session price
+  defaultPriceOnline?: number; // Default online session price
 }
 
 // Duration constants

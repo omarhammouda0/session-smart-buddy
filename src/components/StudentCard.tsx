@@ -29,6 +29,12 @@ interface StudentCardProps {
   onUpdateSessionType: (type: SessionType) => void;
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
   onUpdateDuration?: (duration: number) => void;
+  onUpdateCustomSettings?: (settings: {
+    useCustomSettings?: boolean;
+    sessionDuration?: number;
+    customPriceOnsite?: number;
+    customPriceOnline?: number;
+  }) => void;
 }
 
 export const StudentCard = ({
@@ -42,6 +48,7 @@ export const StudentCard = ({
   onUpdateSessionType,
   onUpdateSchedule,
   onUpdateDuration,
+  onUpdateCustomSettings,
 }: StudentCardProps) => {
 
   return (
@@ -62,6 +69,7 @@ export const StudentCard = ({
                 onUpdateSessionType={onUpdateSessionType}
                 onUpdateSchedule={onUpdateSchedule}
                 onUpdateDuration={onUpdateDuration}
+                onUpdateCustomSettings={onUpdateCustomSettings}
               />
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
