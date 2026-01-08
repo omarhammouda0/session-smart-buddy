@@ -5,15 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { NoteCategory, NOTE_CATEGORY_LABELS, NOTE_CATEGORY_COLORS } from '@/types/notes';
 import { cn } from '@/lib/utils';
 
 interface TextNoteEditorProps {
-  onSave: (params: { title?: string; content: string; category: NoteCategory }) => Promise<boolean>;
+  onSave: (params: { title?: string; content: string; category: NoteCategory; includeInReport: boolean }) => Promise<boolean>;
   onCancel: () => void;
   initialTitle?: string;
   initialContent?: string;
   initialCategory?: NoteCategory;
+  initialIncludeInReport?: boolean;
 }
 
 const MAX_CONTENT_LENGTH = 2000;
@@ -24,10 +26,12 @@ export function TextNoteEditor({
   initialTitle = '',
   initialContent = '',
   initialCategory = 'general',
+  initialIncludeInReport = true,
 }: TextNoteEditorProps) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [category, setCategory] = useState<NoteCategory>(initialCategory);
+  const [includeInReport, setIncludeInReport] = useState(initialIncludeInReport);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
@@ -37,6 +41,7 @@ export function TextNoteEditor({
       title: title.trim() || undefined,
       content: content.trim(),
       category,
+      includeInReport,
     });
     setIsSaving(false);
     if (success) {
@@ -113,6 +118,18 @@ export function TextNoteEditor({
             );
           })}
         </RadioGroup>
+      </div>
+
+      {/* Include in Report */}
+      <div className="flex items-center gap-2 pt-1">
+        <Checkbox
+          id="include-in-report"
+          checked={includeInReport}
+          onCheckedChange={(checked) => setIncludeInReport(checked === true)}
+        />
+        <Label htmlFor="include-in-report" className="text-sm cursor-pointer">
+          تضمين في التقرير الشهري
+        </Label>
       </div>
 
       <div className="flex justify-between gap-2 pt-2">

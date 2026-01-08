@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { FileText, Mic, Paperclip, Trash2, Edit2, Download, Play, Pause, ExternalLink } from 'lucide-react';
+import { FileText, Mic, Paperclip, Trash2, Edit2, Download, Play, Pause, ExternalLink, FileCheck, FileX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -22,9 +22,10 @@ interface NoteCardProps {
   note: SessionNote;
   onDelete: (noteId: string) => void;
   onEdit?: (note: SessionNote) => void;
+  onToggleReportInclusion?: (noteId: string, include: boolean) => void;
 }
 
-export function NoteCard({ note, onDelete, onEdit }: NoteCardProps) {
+export function NoteCard({ note, onDelete, onEdit, onToggleReportInclusion }: NoteCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -83,7 +84,32 @@ export function NoteCard({ note, onDelete, onEdit }: NoteCardProps) {
         )}
 
         <div className="flex items-center justify-between pt-1">
-          <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
+            {onToggleReportInclusion && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-5 px-1.5 text-[10px] gap-0.5",
+                  note.include_in_report ? "text-success" : "text-muted-foreground"
+                )}
+                onClick={() => onToggleReportInclusion(note.id, !note.include_in_report)}
+              >
+                {note.include_in_report ? (
+                  <>
+                    <FileCheck className="h-3 w-3" />
+                    بالتقرير
+                  </>
+                ) : (
+                  <>
+                    <FileX className="h-3 w-3" />
+                    مستبعد
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
           <div className="flex items-center gap-1">
             {onEdit && (
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(note)}>
@@ -157,9 +183,34 @@ export function NoteCard({ note, onDelete, onEdit }: NoteCardProps) {
         )}
 
         <div className="flex items-center justify-between pt-1">
-          <span className="text-[10px] text-muted-foreground">
-            {timeAgo} • {formatFileSize(note.file_size)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">
+              {timeAgo} • {formatFileSize(note.file_size)}
+            </span>
+            {onToggleReportInclusion && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-5 px-1.5 text-[10px] gap-0.5",
+                  note.include_in_report ? "text-success" : "text-muted-foreground"
+                )}
+                onClick={() => onToggleReportInclusion(note.id, !note.include_in_report)}
+              >
+                {note.include_in_report ? (
+                  <>
+                    <FileCheck className="h-3 w-3" />
+                    بالتقرير
+                  </>
+                ) : (
+                  <>
+                    <FileX className="h-3 w-3" />
+                    مستبعد
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
           <div className="flex items-center gap-1">
             {note.file_url && (
               <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
@@ -215,7 +266,32 @@ export function NoteCard({ note, onDelete, onEdit }: NoteCardProps) {
       )}
 
       <div className="flex items-center justify-between pt-1">
-        <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
+          {onToggleReportInclusion && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-5 px-1.5 text-[10px] gap-0.5",
+                note.include_in_report ? "text-success" : "text-muted-foreground"
+              )}
+              onClick={() => onToggleReportInclusion(note.id, !note.include_in_report)}
+            >
+              {note.include_in_report ? (
+                <>
+                  <FileCheck className="h-3 w-3" />
+                  بالتقرير
+                </>
+              ) : (
+                <>
+                  <FileX className="h-3 w-3" />
+                  مستبعد
+                </>
+              )}
+            </Button>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           {note.file_url && (
             <>

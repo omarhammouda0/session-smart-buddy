@@ -26,6 +26,7 @@ export interface SessionNote {
   file_size?: number;
   file_type?: string;
   duration?: number; // for voice notes in seconds
+  include_in_report: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -44,6 +45,7 @@ export interface Homework {
   completed_at?: string;
   voice_instruction_url?: string;
   voice_instruction_duration?: number;
+  include_in_report: boolean;
   created_at: string;
   updated_at: string;
   attachments?: HomeworkAttachment[];
