@@ -15,31 +15,21 @@ import {
   parseISO,
 } from "date-fns";
 import { ar } from "date-fns/locale";
-import {
-  ChevronRight,
-  ChevronLeft,
-  Calendar as CalendarIcon,
-  GripVertical,
-  Clock,
-  Monitor,
-  MapPin,
-} from "lucide-react";
+import { ChevronRight, ChevronLeft, Calendar as CalendarIcon, GripVertical, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Student, Session } from "@/types/student";
 import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 
 interface CalendarViewProps {
   students: Student[];
-  onRescheduleSession: (studentId: string, sessionId: string, newDate: string, newTime: string) => void;
+  onRescheduleSession: (studentId: string, sessionId: string, newDate: string) => void;
 }
 
 interface SessionWithStudent {
@@ -158,34 +148,26 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
     setCurrentDate(new Date());
   };
 
-  // Check for conflicts
-  const checkForConflicts = (
+  // Check for time conflicts
+  const checkTimeConflict = (
     studentId: string,
     sessionId: string,
     newDate: string,
     newTime: string,
-  ): { hasConflict: boolean; conflictingStudent?: string } => {
-    // Check if the student already has a session on the new date
-    const student = students.find((s) => s.id === studentId);
-    const hasExistingSession = student?.sessions.some((s) => s.date === newDate && s.id !== sessionId);
-
-    if (hasExistingSession) {
-      return { hasConflict: true, conflictingStudent: student?.name };
-    }
-
-    // Check for time conflicts with other students
+  ): { hasConflict: boolean; conflictStudent?: string } => {
     const sessionsOnDate = sessionsByDate.get(newDate) || [];
     const sessionDuration = 60; // minutes
-    const [newHour, newMinute] = newTime.split(":").map(Number);
-    const newStartMinutes = newHour * 60 + newMinute;
+
+    const [newHour, newMin] = newTime.split(":").map(Number);
+    const newStartMinutes = newHour * 60 + newMin;
     const newEndMinutes = newStartMinutes + sessionDuration;
 
-    for (const { session, student: otherStudent } of sessionsOnDate) {
+    for (const { session, student } of sessionsOnDate) {
       if (session.id === sessionId) continue; // Skip the session being moved
 
-      const otherTime = session.time || otherStudent.sessionTime || "16:00";
-      const [otherHour, otherMinute] = otherTime.split(":").map(Number);
-      const otherStartMinutes = otherHour * 60 + otherMinute;
+      const otherTime = session.time || student.sessionTime || "16:00";
+      const [otherHour, otherMin] = otherTime.split(":").map(Number);
+      const otherStartMinutes = otherHour * 60 + otherMin;
       const otherEndMinutes = otherStartMinutes + sessionDuration;
 
       // Check for overlap
@@ -195,7 +177,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
         (newStartMinutes <= otherStartMinutes && newEndMinutes >= otherEndMinutes);
 
       if (hasOverlap) {
-        return { hasConflict: true, conflictingStudent: otherStudent.name };
+        return { hasConflict: true, conflictStudent: student.name };
       }
     }
 
@@ -240,7 +222,21 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
       return;
     }
 
-    // Show dialog to ask for new time
+    // Check if the student already has a session on the new date
+    const student = students.find((s) => s.id === dragState.studentId);
+    const hasExistingSession = student?.sessions.some((s) => s.date === newDate && s.id !== dragState.sessionId);
+
+    if (hasExistingSession) {
+      toast({
+        title: "لا يمكن النقل",
+        description: `${dragState.studentName} لديه حصة بالفعل في هذا التاريخ`,
+        variant: "destructive",
+      });
+      setDragState(null);
+      return;
+    }
+
+    // Show confirmation dialog with time selection
     setConfirmDialog({
       open: true,
       sessionId: dragState.sessionId,
@@ -257,8 +253,8 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
   const confirmReschedule = () => {
     if (!confirmDialog) return;
 
-    // Check for conflicts
-    const { hasConflict, conflictingStudent } = checkForConflicts(
+    // Check for time conflicts
+    const { hasConflict, conflictStudent } = checkTimeConflict(
       confirmDialog.studentId,
       confirmDialog.sessionId,
       confirmDialog.newDate,
@@ -268,19 +264,16 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
     if (hasConflict) {
       toast({
         title: "تعارض في الموعد",
-        description: conflictingStudent
-          ? `يوجد تعارض مع حصة ${conflictingStudent}`
-          : `${confirmDialog.studentName} لديه حصة بالفعل في هذا التاريخ`,
+        description: `يوجد تعارض مع حصة ${conflictStudent} في نفس الوقت`,
         variant: "destructive",
       });
       return;
     }
 
-    onRescheduleSession(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate, confirmDialog.newTime);
-
+    onRescheduleSession(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate);
     toast({
       title: "تم تعديل موعد الحصة",
-      description: `تم نقل حصة ${confirmDialog.studentName} من ${format(parseISO(confirmDialog.originalDate), "dd/MM")} إلى ${format(parseISO(confirmDialog.newDate), "dd/MM")}`,
+      description: `تم نقل حصة ${confirmDialog.studentName} من ${format(parseISO(confirmDialog.originalDate), "dd/MM")} إلى ${format(parseISO(confirmDialog.newDate), "dd/MM")} الساعة ${confirmDialog.newTime}`,
     });
     setConfirmDialog(null);
   };
@@ -312,7 +305,6 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
   };
 
   const today = new Date();
-  const todayStr = format(today, "yyyy-MM-dd");
 
   // Generate time options (every 30 minutes)
   const timeOptions = useMemo(() => {
@@ -328,60 +320,59 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
 
   return (
     <Card className="w-full">
-      <CardHeader className="pb-3">
-        <div className="flex flex-col gap-3">
-          {/* Title and View Toggles */}
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CalendarIcon className="h-5 w-5 text-primary" />
-              عرض التقويم
-            </CardTitle>
+      <CardHeader className="space-y-3 pb-3">
+        {/* Header Row */}
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <CalendarIcon className="h-5 w-5 text-primary" />
+            عرض التقويم
+          </CardTitle>
 
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "day" | "week" | "month")}>
-              <TabsList className="grid grid-cols-3 h-9">
-                <TabsTrigger value="day" className="text-xs px-3">
-                  يومي
-                </TabsTrigger>
-                <TabsTrigger value="week" className="text-xs px-3">
-                  أسبوعي
-                </TabsTrigger>
-                <TabsTrigger value="month" className="text-xs px-3">
-                  شهري
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+          {/* View Mode Tabs */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "day" | "week" | "month")}>
+            <TabsList className="grid grid-cols-3 h-9">
+              <TabsTrigger value="day" className="text-xs px-2 sm:px-3">
+                يومي
+              </TabsTrigger>
+              <TabsTrigger value="week" className="text-xs px-2 sm:px-3">
+                أسبوعي
+              </TabsTrigger>
+              <TabsTrigger value="month" className="text-xs px-2 sm:px-3">
+                شهري
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-          {/* Navigation */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Button variant="outline" size="sm" onClick={goToNext} className="h-9 w-9 p-0">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={goToPrev} className="h-9 w-9 p-0">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <h3 className="font-semibold text-sm">
-              {viewMode === "day"
-                ? format(currentDate, "EEEE dd MMMM yyyy", { locale: ar })
-                : viewMode === "week"
-                  ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[6], "dd MMM yyyy", { locale: ar })}`
-                  : format(currentDate, "MMMM yyyy", { locale: ar })}
-            </h3>
-
-            <Button variant="outline" size="sm" onClick={goToToday} className="h-9 px-3">
-              اليوم
+        {/* Navigation Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" onClick={goToNext} className="h-9 w-9 p-0">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={goToPrev} className="h-9 w-9 p-0">
+              <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
+
+          <h3 className="font-semibold text-xs sm:text-sm">
+            {viewMode === "day"
+              ? format(currentDate, "EEEE dd MMMM yyyy", { locale: ar })
+              : viewMode === "week"
+                ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
+                : format(currentDate, "MMMM yyyy", { locale: ar })}
+          </h3>
+
+          <Button variant="outline" size="sm" onClick={goToToday} className="h-9 px-3 text-xs">
+            اليوم
+          </Button>
         </div>
       </CardHeader>
 
       <CardContent className="p-2 sm:p-4">
         {/* Calendar Grid */}
         <div className={cn("grid gap-1", viewMode === "day" ? "grid-cols-1" : "grid-cols-7")}>
-          {/* Day headers (except for day view) */}
+          {/* Day headers (hide for day view) */}
           {viewMode !== "day" &&
             DAY_NAMES_SHORT_AR.map((day, i) => (
               <div key={i} className="text-center text-xs font-medium text-muted-foreground py-2 border-b">
@@ -401,26 +392,44 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
               <div
                 key={index}
                 className={cn(
-                  "border rounded-lg p-2 transition-colors",
-                  viewMode === "day" ? "min-h-[400px]" : viewMode === "week" ? "min-h-[120px]" : "min-h-[80px]",
-                  !isCurrentMonth && "opacity-40",
-                  isToday && "ring-2 ring-primary",
-                  isDragTarget && "bg-primary/10 border-primary border-2 border-dashed",
+                  "border rounded-lg p-2 transition-all",
+                  viewMode === "day"
+                    ? "min-h-[400px]"
+                    : viewMode === "week"
+                      ? "min-h-[100px] sm:min-h-[120px]"
+                      : "min-h-[70px] sm:min-h-[90px]",
+                  !isCurrentMonth && "opacity-40 bg-muted/20",
+                  isToday && "ring-2 ring-primary shadow-sm",
+                  isDragTarget && "bg-primary/10 border-primary border-2 border-dashed shadow-lg scale-105",
                 )}
                 onDragOver={(e) => handleDragOver(e, dateStr)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, dateStr)}
               >
                 {/* Date header */}
-                <div className={cn("text-sm font-medium mb-2 pb-1 border-b", isToday && "text-primary font-bold")}>
-                  {viewMode === "day" ? format(day, "EEEE dd MMMM", { locale: ar }) : format(day, "d")}
+                <div
+                  className={cn(
+                    "text-sm font-medium mb-2 pb-1.5 border-b flex items-center justify-between",
+                    isToday && "text-primary font-bold",
+                  )}
+                >
+                  <span>{viewMode === "day" ? format(day, "EEEE dd MMMM", { locale: ar }) : format(day, "d")}</span>
+                  {daySessions.length > 0 && (
+                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                      {daySessions.length}
+                    </span>
+                  )}
                 </div>
 
                 {/* Sessions */}
                 <div
-                  className={cn("space-y-1", viewMode === "day" ? "max-h-[350px]" : "max-h-[90px]", "overflow-y-auto")}
+                  className={cn(
+                    "space-y-1.5",
+                    viewMode === "day" ? "max-h-[340px]" : "max-h-[75px]",
+                    "overflow-y-auto",
+                  )}
                 >
-                  {daySessions.map(({ session, student }) => {
+                  {(viewMode === "month" ? daySessions.slice(0, 2) : daySessions).map(({ session, student }) => {
                     const time = session.time || student.sessionTime || "16:00";
                     const canDrag = session.status === "scheduled";
 
@@ -433,9 +442,9 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                         }
                         onDragEnd={handleDragEnd}
                         className={cn(
-                          "text-xs p-2 rounded-md border flex items-start gap-1.5",
+                          "text-xs p-2 rounded-md border flex items-start gap-1.5 transition-all",
                           getStatusColor(session.status),
-                          canDrag && "cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow",
+                          canDrag && "cursor-grab active:cursor-grabbing hover:shadow-md hover:scale-105",
                           !canDrag && "cursor-default opacity-70",
                         )}
                       >
@@ -450,6 +459,11 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                       </div>
                     );
                   })}
+                  {viewMode === "month" && daySessions.length > 2 && (
+                    <div className="text-[10px] text-center text-muted-foreground py-1">
+                      +{daySessions.length - 2} المزيد
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -478,7 +492,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
           <div className="flex items-center gap-1.5 mr-auto text-muted-foreground">
             <GripVertical className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">اسحب لتغيير الموعد</span>
-            <span className="sm:hidden">اسحب للنقل</span>
+            <span className="sm:hidden">اسحب</span>
           </div>
         </div>
       </CardContent>
@@ -489,7 +503,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
           <DialogHeader>
             <DialogTitle>تأكيد تغيير موعد الحصة</DialogTitle>
             <DialogDescription>
-              حصة <span className="font-semibold">{confirmDialog?.studentName}</span>
+              حصة <span className="font-semibold text-foreground">{confirmDialog?.studentName}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -527,7 +541,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                 value={confirmDialog?.newTime}
                 onValueChange={(time) => setConfirmDialog((prev) => (prev ? { ...prev, newTime: time } : null))}
               >
-                <SelectTrigger id="new-time">
+                <SelectTrigger id="new-time" className="h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
