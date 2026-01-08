@@ -360,6 +360,7 @@ const Index = () => {
                 onAdd={addStudent}
                 defaultStart={settings.defaultSemesterStart}
                 defaultEnd={settings.defaultSemesterEnd}
+                students={students}
               />
             </div>
           </div>
