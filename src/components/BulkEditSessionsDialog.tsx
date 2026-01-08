@@ -12,12 +12,13 @@ import {
   parseISO,
   getDay,
   addDays,
+  isSameMonth,
+  isWithinInterval,
 } from 'date-fns';
-import { Calendar, Clock, User, ChevronLeft, Undo2, CheckCircle2, XCircle, AlertCircle, ArrowDown } from 'lucide-react';
+import { Calendar, Clock, User, Undo2, CheckCircle2, XCircle, AlertCircle, ArrowDown, CheckSquare, Square } from 'lucide-react';
 import { Student, Session } from '@/types/student';
-import { formatShortDateAr, DAY_NAMES_AR } from '@/lib/arabicConstants';
+import { formatShortDateAr, DAY_NAMES_AR, MONTH_NAMES_AR } from '@/lib/arabicConstants';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface BulkEditSessionsDialogProps {
   students: Student[];
@@ -66,6 +68,7 @@ interface SessionWithStudent {
   newTime: string;
   originalDate: string;
   newDate: string;
+  weekLabel?: string;
 }
 
 interface ConflictInfo {
@@ -90,6 +93,23 @@ interface UndoData {
   timestamp: number;
   count: number;
   studentName: string;
+}
+
+interface WeekOption {
+  id: string;
+  label: string;
+  dateRange: string;
+  startDate: Date;
+  endDate: Date;
+}
+
+interface MonthOption {
+  id: string;
+  label: string;
+  year: number;
+  month: number;
+  startDate: Date;
+  endDate: Date;
 }
 
 // Storage key for undo data
@@ -139,7 +159,6 @@ const DAY_OPTIONS = [
   { value: 6, label: 'السبت' },
 ];
 
-type TimePeriod = 'this-week' | 'next-week' | 'this-month' | 'next-month' | 'custom';
 type ModificationType = 'offset' | 'specific' | 'day-change';
 
 // Calculate new date when changing day of week
@@ -159,6 +178,62 @@ const calculateNewDate = (originalDate: string, originalDay: number, newDay: num
   return format(newDate, 'yyyy-MM-dd');
 };
 
+// Format date range for display
+const formatDateRangeAr = (start: Date, end: Date): string => {
+  const startDay = format(start, 'd');
+  const endDay = format(end, 'd');
+  const startMonth = MONTH_NAMES_AR[start.getMonth()];
+  const endMonth = MONTH_NAMES_AR[end.getMonth()];
+  
+  if (startMonth === endMonth) {
+    return `${startDay}-${endDay} ${startMonth}`;
+  }
+  return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
+};
+
+// Generate week options (next 8 weeks)
+const generateWeekOptions = (today: Date): WeekOption[] => {
+  const weeks: WeekOption[] = [];
+  const weekLabels = ['هذا الأسبوع', 'الأسبوع القادم', 'الأسبوع الثالث', 'الأسبوع الرابع', 'الأسبوع الخامس', 'الأسبوع السادس', 'الأسبوع السابع', 'الأسبوع الثامن'];
+  
+  for (let i = 0; i < 8; i++) {
+    const weekStart = i === 0 ? today : startOfWeek(addWeeks(today, i), { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(addWeeks(today, i), { weekStartsOn: 0 });
+    
+    weeks.push({
+      id: `week-${i}`,
+      label: weekLabels[i],
+      dateRange: formatDateRangeAr(weekStart, weekEnd),
+      startDate: weekStart,
+      endDate: weekEnd,
+    });
+  }
+  
+  return weeks;
+};
+
+// Generate month options (next 6 months)
+const generateMonthOptions = (today: Date): MonthOption[] => {
+  const months: MonthOption[] = [];
+  
+  for (let i = 0; i < 6; i++) {
+    const monthDate = addMonths(today, i);
+    const monthStart = i === 0 ? today : startOfMonth(monthDate);
+    const monthEnd = endOfMonth(monthDate);
+    
+    months.push({
+      id: `month-${i}`,
+      label: `${MONTH_NAMES_AR[monthDate.getMonth()]} ${monthDate.getFullYear()}`,
+      year: monthDate.getFullYear(),
+      month: monthDate.getMonth(),
+      startDate: monthStart,
+      endDate: monthEnd,
+    });
+  }
+  
+  return months;
+};
+
 export const BulkEditSessionsDialog = ({
   students,
   onBulkUpdateTime,
@@ -172,9 +247,17 @@ export const BulkEditSessionsDialog = ({
   // Filters
   const today = startOfDay(new Date());
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
-  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('this-month');
+  
+  // Multi-period selection
+  const [selectedWeeks, setSelectedWeeks] = useState<Set<string>>(new Set());
+  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
+  const [useCustomRange, setUseCustomRange] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(today);
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(today));
+
+  // Generate options
+  const weekOptions = useMemo(() => generateWeekOptions(today), [today]);
+  const monthOptions = useMemo(() => generateMonthOptions(today), [today]);
 
   // Modification type
   const [modType, setModType] = useState<ModificationType>('offset');
@@ -197,31 +280,85 @@ export const BulkEditSessionsDialog = ({
   const [undoData, setUndoData] = useState<UndoData | null>(null);
   const [undoTimeLeft, setUndoTimeLeft] = useState<number>(0);
 
-  // Calculate date range based on selected period
-  const updateDateRange = (period: TimePeriod) => {
-    setSelectedPeriod(period);
-    switch (period) {
-      case 'this-week':
-        setDateFrom(today);
-        setDateTo(endOfWeek(today, { weekStartsOn: 0 }));
-        break;
-      case 'next-week':
-        const nextWeekStart = startOfWeek(addWeeks(today, 1), { weekStartsOn: 0 });
-        setDateFrom(nextWeekStart);
-        setDateTo(endOfWeek(nextWeekStart, { weekStartsOn: 0 }));
-        break;
-      case 'this-month':
-        setDateFrom(today);
-        setDateTo(endOfMonth(today));
-        break;
-      case 'next-month':
-        const nextMonth = addMonths(today, 1);
-        setDateFrom(startOfMonth(nextMonth));
-        setDateTo(endOfMonth(nextMonth));
-        break;
-      case 'custom':
-        break;
+  // Toggle week selection
+  const toggleWeek = (weekId: string) => {
+    setUseCustomRange(false);
+    const newSelected = new Set(selectedWeeks);
+    if (newSelected.has(weekId)) {
+      newSelected.delete(weekId);
+    } else {
+      newSelected.add(weekId);
     }
+    setSelectedWeeks(newSelected);
+  };
+
+  // Toggle month selection (also toggles all weeks in that month)
+  const toggleMonth = (monthId: string) => {
+    setUseCustomRange(false);
+    const newSelectedMonths = new Set(selectedMonths);
+    const month = monthOptions.find(m => m.id === monthId);
+    
+    if (!month) return;
+    
+    if (newSelectedMonths.has(monthId)) {
+      newSelectedMonths.delete(monthId);
+      // Unselect weeks that fall within this month
+      const newSelectedWeeks = new Set(selectedWeeks);
+      weekOptions.forEach(week => {
+        if (isSameMonth(week.startDate, month.startDate) || isSameMonth(week.endDate, month.startDate)) {
+          newSelectedWeeks.delete(week.id);
+        }
+      });
+      setSelectedWeeks(newSelectedWeeks);
+    } else {
+      newSelectedMonths.add(monthId);
+      // Select weeks that fall within this month
+      const newSelectedWeeks = new Set(selectedWeeks);
+      weekOptions.forEach(week => {
+        if (isSameMonth(week.startDate, month.startDate) || isSameMonth(week.endDate, month.startDate)) {
+          newSelectedWeeks.add(week.id);
+        }
+      });
+      setSelectedWeeks(newSelectedWeeks);
+    }
+    
+    setSelectedMonths(newSelectedMonths);
+  };
+
+  // Select all
+  const selectAll = () => {
+    setUseCustomRange(false);
+    setSelectedWeeks(new Set(weekOptions.map(w => w.id)));
+    setSelectedMonths(new Set(monthOptions.map(m => m.id)));
+  };
+
+  // Deselect all
+  const deselectAll = () => {
+    setSelectedWeeks(new Set());
+    setSelectedMonths(new Set());
+    setUseCustomRange(false);
+  };
+
+  // Check if date is within any selected period
+  const isDateInSelectedPeriods = (dateStr: string): { inPeriod: boolean; weekLabel?: string } => {
+    const date = parseISO(dateStr);
+    
+    if (useCustomRange && dateFrom && dateTo) {
+      if (isWithinInterval(date, { start: dateFrom, end: dateTo })) {
+        return { inPeriod: true, weekLabel: 'نطاق مخصص' };
+      }
+      return { inPeriod: false };
+    }
+    
+    // Check weeks
+    for (const weekId of selectedWeeks) {
+      const week = weekOptions.find(w => w.id === weekId);
+      if (week && isWithinInterval(date, { start: week.startDate, end: week.endDate })) {
+        return { inPeriod: true, weekLabel: `${week.label} (${week.dateRange})` };
+      }
+    }
+    
+    return { inPeriod: false };
   };
 
   // Load undo data on mount
@@ -280,23 +417,24 @@ export const BulkEditSessionsDialog = ({
     return students.find(s => s.id === selectedStudentId);
   }, [students, selectedStudentId]);
 
+  // Check if any period is selected
+  const hasSelectedPeriod = useMemo(() => {
+    return selectedWeeks.size > 0 || selectedMonths.size > 0 || useCustomRange;
+  }, [selectedWeeks, selectedMonths, useCustomRange]);
+
   // Calculate matching sessions with new times/dates
   const matchingSessions = useMemo(() => {
     const sessions: SessionWithStudent[] = [];
     
-    if (!selectedStudentId || !selectedStudent) return sessions;
-    
-    const todayStr = format(today, 'yyyy-MM-dd');
-    const fromStr = dateFrom ? format(dateFrom, 'yyyy-MM-dd') : todayStr;
-    const toStr = dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined;
+    if (!selectedStudentId || !selectedStudent || !hasSelectedPeriod) return sessions;
 
     selectedStudent.sessions.forEach(session => {
       // Only scheduled sessions
       if (session.status !== 'scheduled') return;
       
-      // Must be in date range
-      if (session.date < fromStr) return;
-      if (toStr && session.date > toStr) return;
+      // Must be in selected period
+      const { inPeriod, weekLabel } = isDateInSelectedPeriods(session.date);
+      if (!inPeriod) return;
 
       const sessionTime = session.time || selectedStudent.sessionTime || '16:00';
 
@@ -331,11 +469,27 @@ export const BulkEditSessionsDialog = ({
         newTime: calculatedNewTime,
         originalDate: session.date,
         newDate: calculatedNewDate,
+        weekLabel,
       });
     });
 
     return sessions.sort((a, b) => a.session.date.localeCompare(b.session.date));
-  }, [selectedStudent, selectedStudentId, dateFrom, dateTo, modType, offsetDirection, offsetHours, offsetMinutes, specificTime, originalDay, originalTime, newDay, newTime, today]);
+  }, [selectedStudent, selectedStudentId, hasSelectedPeriod, selectedWeeks, selectedMonths, useCustomRange, dateFrom, dateTo, modType, offsetDirection, offsetHours, offsetMinutes, specificTime, originalDay, originalTime, newDay, newTime, weekOptions]);
+
+  // Group sessions by week for preview
+  const sessionsByWeek = useMemo(() => {
+    const groups: { [key: string]: SessionWithStudent[] } = {};
+    
+    matchingSessions.forEach(session => {
+      const key = session.weekLabel || 'أخرى';
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(session);
+    });
+    
+    return groups;
+  }, [matchingSessions]);
 
   // Categorize sessions by conflict status
   const categorizedSessions = useMemo((): CategorizedSessions => {
@@ -414,6 +568,15 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
+    if (!hasSelectedPeriod) {
+      toast({
+        title: 'اختر فترة زمنية',
+        description: 'يجب اختيار أسبوع واحد على الأقل',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (modType === 'day-change' && originalDay === newDay) {
       toast({
         title: 'اليوم متطابق',
@@ -427,13 +590,13 @@ export const BulkEditSessionsDialog = ({
       if (modType === 'day-change') {
         toast({
           title: 'لا توجد جلسات',
-          description: `لا توجد جلسات لـ ${selectedStudent?.name} في ${DAY_OPTIONS.find(d => d.value === originalDay)?.label} الساعة ${formatTimeAr(originalTime)} خلال الفترة المحددة`,
+          description: `لا توجد جلسات لـ ${selectedStudent?.name} في ${DAY_OPTIONS.find(d => d.value === originalDay)?.label} الساعة ${formatTimeAr(originalTime)} خلال الفترات المختارة`,
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'لا توجد جلسات',
-          description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || 'الطالب'} في هذه الفترة`,
+          description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || 'الطالب'} في الفترات المختارة`,
           variant: 'destructive',
         });
       }
@@ -548,7 +711,9 @@ export const BulkEditSessionsDialog = ({
 
   const resetForm = () => {
     setSelectedStudentId('');
-    setSelectedPeriod('this-month');
+    setSelectedWeeks(new Set());
+    setSelectedMonths(new Set());
+    setUseCustomRange(false);
     setDateFrom(today);
     setDateTo(endOfMonth(today));
     setModType('offset');
@@ -641,112 +806,159 @@ export const BulkEditSessionsDialog = ({
                     </Select>
                   </div>
 
-                  {/* Step 2: Select Time Period */}
-                  <div className="space-y-2">
+                  {/* Step 2: Multi-Period Selection */}
+                  <div className="space-y-3">
                     <Label className="flex items-center gap-1.5">
                       <Calendar className="h-4 w-4" />
-                      الفترة الزمنية
+                      الفترة الزمنية (يمكن اختيار أكثر من واحدة)
                     </Label>
                     
-                    {/* Quick Period Buttons */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* Quick Actions */}
+                    <div className="flex gap-2">
                       <Button
                         type="button"
-                        variant={selectedPeriod === 'this-week' ? 'default' : 'outline'}
+                        variant="outline"
                         size="sm"
-                        className="text-xs"
-                        onClick={() => updateDateRange('this-week')}
+                        className="text-xs flex-1"
+                        onClick={selectAll}
                       >
-                        هذا الأسبوع
+                        <CheckSquare className="h-3.5 w-3.5 ml-1" />
+                        تحديد الكل
                       </Button>
                       <Button
                         type="button"
-                        variant={selectedPeriod === 'next-week' ? 'default' : 'outline'}
+                        variant="outline"
                         size="sm"
-                        className="text-xs"
-                        onClick={() => updateDateRange('next-week')}
+                        className="text-xs flex-1"
+                        onClick={deselectAll}
                       >
-                        الأسبوع القادم
+                        <Square className="h-3.5 w-3.5 ml-1" />
+                        إلغاء التحديد
                       </Button>
-                      <Button
-                        type="button"
-                        variant={selectedPeriod === 'this-month' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => updateDateRange('this-month')}
-                      >
-                        هذا الشهر
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={selectedPeriod === 'next-month' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => updateDateRange('next-month')}
-                      >
-                        الشهر القادم
-                      </Button>
+                    </div>
+                    
+                    {/* Weeks */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">الأسابيع:</p>
+                      <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto">
+                        {weekOptions.map(week => (
+                          <label
+                            key={week.id}
+                            className={cn(
+                              'flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors text-sm',
+                              selectedWeeks.has(week.id) && !useCustomRange
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            )}
+                          >
+                            <Checkbox
+                              checked={selectedWeeks.has(week.id) && !useCustomRange}
+                              onCheckedChange={() => toggleWeek(week.id)}
+                            />
+                            <span className="font-medium">{week.label}</span>
+                            <span className="text-muted-foreground text-xs mr-auto">({week.dateRange})</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Months */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">أو الأشهر الكاملة:</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {monthOptions.map(month => (
+                          <label
+                            key={month.id}
+                            className={cn(
+                              'flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors text-sm',
+                              selectedMonths.has(month.id) && !useCustomRange
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            )}
+                          >
+                            <Checkbox
+                              checked={selectedMonths.has(month.id) && !useCustomRange}
+                              onCheckedChange={() => toggleMonth(month.id)}
+                            />
+                            <span className="font-medium">{month.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Custom Date Range */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">أو نطاق مخصص:</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <span className="text-xs text-muted-foreground">من</span>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn('w-full justify-start text-right font-normal', !dateFrom && 'text-muted-foreground')}
-                                onClick={() => setSelectedPeriod('custom')}
-                              >
-                                {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarPicker
-                                mode="single"
-                                selected={dateFrom}
-                                onSelect={(date) => {
-                                  setDateFrom(date);
-                                  setSelectedPeriod('custom');
-                                }}
-                                initialFocus
-                                className="pointer-events-auto"
-                              />
-                            </PopoverContent>
-                          </Popover>
+                    <div className="space-y-1.5">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={useCustomRange}
+                          onCheckedChange={(checked) => {
+                            setUseCustomRange(!!checked);
+                            if (checked) {
+                              setSelectedWeeks(new Set());
+                              setSelectedMonths(new Set());
+                            }
+                          }}
+                        />
+                        <span className="text-xs text-muted-foreground font-medium">أو نطاق مخصص</span>
+                      </label>
+                      
+                      {useCustomRange && (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <div>
+                            <span className="text-xs text-muted-foreground">من</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn('w-full justify-start text-right font-normal text-sm', !dateFrom && 'text-muted-foreground')}
+                                >
+                                  {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <CalendarPicker
+                                  mode="single"
+                                  selected={dateFrom}
+                                  onSelect={setDateFrom}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">إلى</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn('w-full justify-start text-right font-normal text-sm', !dateTo && 'text-muted-foreground')}
+                                >
+                                  {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <CalendarPicker
+                                  mode="single"
+                                  selected={dateTo}
+                                  onSelect={setDateTo}
+                                  disabled={date => dateFrom ? isBefore(date, dateFrom) : false}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-xs text-muted-foreground">إلى</span>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn('w-full justify-start text-right font-normal', !dateTo && 'text-muted-foreground')}
-                                onClick={() => setSelectedPeriod('custom')}
-                              >
-                                {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarPicker
-                                mode="single"
-                                selected={dateTo}
-                                onSelect={(date) => {
-                                  setDateTo(date);
-                                  setSelectedPeriod('custom');
-                                }}
-                                disabled={date => dateFrom ? isBefore(date, dateFrom) : false}
-                                initialFocus
-                                className="pointer-events-auto"
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
+                      )}
                     </div>
+
+                    {/* Session Count */}
+                    {selectedStudentId && hasSelectedPeriod && (
+                      <div className="text-sm font-medium text-primary">
+                        {matchingSessions.length} جلسة محددة
+                      </div>
+                    )}
                   </div>
 
                   {/* Step 3: Modification Type */}
@@ -801,7 +1013,7 @@ export const BulkEditSessionsDialog = ({
                         )}
                       </div>
 
-                      {/* Day + Time Change Option (NEW) */}
+                      {/* Day + Time Change Option */}
                       <div className={cn('border rounded-lg p-3 transition-colors', modType === 'day-change' && 'border-primary bg-primary/5')}>
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="day-change" id="day-change" />
@@ -872,273 +1084,172 @@ export const BulkEditSessionsDialog = ({
                           </div>
                         )}
                       </div>
-
-                      {/* Specific Time Option */}
-                      <div className={cn('border rounded-lg p-3 transition-colors', modType === 'specific' && 'border-primary bg-primary/5')}>
-                        <div className="flex items-center gap-2">
-                          <RadioGroupItem value="specific" id="specific" />
-                          <Label htmlFor="specific" className="font-medium cursor-pointer">تحديد وقت معين</Label>
-                        </div>
-                        {modType === 'specific' && (
-                          <div className="mt-3">
-                            <Input
-                              type="time"
-                              value={specificTime}
-                              onChange={e => setSpecificTime(e.target.value)}
-                              className="w-32"
-                            />
-                            {specificTime && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                جميع الجلسات → {formatTimeAr(specificTime)}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
                     </RadioGroup>
                   </div>
-
-                  {/* Session Count */}
-                  {selectedStudentId && (
-                    <div className={cn(
-                      'rounded-lg p-3 text-center',
-                      matchingSessions.length > 0 ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
-                    )}>
-                      <p className="text-lg font-bold">
-                        {matchingSessions.length} جلسة محددة
-                      </p>
-                      {matchingSessions.length === 0 && modType === 'day-change' && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          لا توجد جلسات لـ {selectedStudent?.name} في {DAY_OPTIONS.find(d => d.value === originalDay)?.label} الساعة {formatTimeAr(originalTime)}
-                        </p>
-                      )}
-                      {matchingSessions.length === 0 && modType !== 'day-change' && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          لا توجد جلسات مجدولة لـ {selectedStudent?.name} في هذه الفترة
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Quick Summary */}
-                  {selectedStudentId && matchingSessions.length > 0 && (
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <p className="text-sm font-medium mb-1">ملخص سريع</p>
-                      <div className="flex gap-3 text-xs">
-                        <span className="text-success flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" /> {categorizedSessions.safe.length} آمنة
-                        </span>
-                        <span className="text-warning flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" /> {categorizedSessions.warnings.length} تحذيرات
-                        </span>
-                        <span className="text-destructive flex items-center gap-1">
-                          <XCircle className="h-3 w-3" /> {categorizedSessions.conflicts.length} تعارضات
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </ScrollArea>
 
+              {/* Action Buttons */}
               <div className="flex gap-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
+                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
                   إلغاء
                 </Button>
-                <Button
-                  onClick={handleShowPreview}
-                  disabled={!selectedStudentId || matchingSessions.length === 0}
-                  className="flex-1"
-                >
+                <Button className="flex-1 gap-1" onClick={handleShowPreview}>
                   معاينة التغييرات
+                  <ArrowDown className="h-4 w-4 -rotate-90" />
                 </Button>
               </div>
             </>
           )}
 
-          {/* Preview Screen */}
+          {/* Preview View */}
           {showPreview && !showSuccessDialog && (
             <>
+              <div className="flex items-center gap-2 mb-3">
+                <Button variant="ghost" size="sm" onClick={() => setShowPreview(false)}>
+                  <ArrowDown className="h-4 w-4 rotate-90" />
+                </Button>
+                <span className="font-medium">المعاينة ({matchingSessions.length} جلسة)</span>
+              </div>
+
+              {/* Stats Summary */}
+              <div className="flex gap-3 mb-3 text-sm">
+                <div className="flex items-center gap-1 text-green-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>آمنة: {categorizedSessions.safe.length}</span>
+                </div>
+                <div className="flex items-center gap-1 text-yellow-600">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>تحذيرات: {categorizedSessions.warnings.length}</span>
+                </div>
+                <div className="flex items-center gap-1 text-red-600">
+                  <XCircle className="h-4 w-4" />
+                  <span>تعارضات: {categorizedSessions.conflicts.length}</span>
+                </div>
+              </div>
+
+              {/* Sessions List Grouped by Week */}
               <ScrollArea className="flex-1 -mx-6 px-6">
                 <div className="space-y-4 pb-4">
-                  {/* Header */}
-                  <div className="text-center">
-                    <p className="font-medium">{selectedStudent?.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      المعاينة ({matchingSessions.length} جلسات)
-                    </p>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-success/10 rounded p-2">
-                      <p className="text-lg font-bold text-success">{categorizedSessions.safe.length}</p>
-                      <p className="text-xs text-success">آمنة ✓</p>
-                    </div>
-                    <div className="bg-warning/10 rounded p-2">
-                      <p className="text-lg font-bold text-warning">{categorizedSessions.warnings.length}</p>
-                      <p className="text-xs text-warning">تحذيرات ⚠️</p>
-                    </div>
-                    <div className="bg-destructive/10 rounded p-2">
-                      <p className="text-lg font-bold text-destructive">{categorizedSessions.conflicts.length}</p>
-                      <p className="text-xs text-destructive">تعارضات ❌</p>
-                    </div>
-                  </div>
-
-                  {/* Safe Sessions */}
-                  {categorizedSessions.safe.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-success" />
-                        <p className="font-medium text-sm">آمنة ({categorizedSessions.safe.length})</p>
-                      </div>
-                      <div className="space-y-1">
-                        {categorizedSessions.safe.map(({ session, originalTime: origTime, newTime: nTime, originalDate, newDate }) => (
-                          <div key={session.id} className="bg-success/5 border border-success/20 rounded p-2 text-sm">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>✓</span>
-                            </div>
-                            <div className="text-center space-y-1 mt-1">
-                              <div className="text-muted-foreground">
-                                {modType === 'day-change' 
-                                  ? `${formatDateWithDay(originalDate)}، ${formatTimeAr(origTime)}`
-                                  : `${formatShortDateAr(originalDate)}، ${formatTimeAr(origTime)}`
-                                }
+                  {Object.entries(sessionsByWeek).map(([weekLabel, sessions]) => (
+                    <div key={weekLabel} className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground border-b pb-1">
+                        {weekLabel}
+                      </h4>
+                      <div className="space-y-2">
+                        {sessions.map(sessionData => {
+                          const isConflict = categorizedSessions.conflicts.some(c => c.session.id === sessionData.session.id);
+                          const isWarning = categorizedSessions.warnings.some(w => w.session.id === sessionData.session.id);
+                          
+                          return (
+                            <div
+                              key={sessionData.session.id}
+                              className={cn(
+                                'p-3 rounded-lg border text-sm',
+                                isConflict && 'border-red-300 bg-red-50',
+                                isWarning && 'border-yellow-300 bg-yellow-50',
+                                !isConflict && !isWarning && 'border-green-300 bg-green-50'
+                              )}
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                {isConflict ? (
+                                  <XCircle className="h-4 w-4 text-red-600" />
+                                ) : isWarning ? (
+                                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                                ) : (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                )}
+                                <span className="font-medium">{formatDateWithDay(sessionData.originalDate)}</span>
                               </div>
-                              <ArrowDown className="h-3 w-3 mx-auto text-success" />
-                              <div className="text-success font-medium">
-                                {modType === 'day-change'
-                                  ? `${formatDateWithDay(newDate)}، ${formatTimeAr(nTime)}`
-                                  : `${formatShortDateAr(newDate)}، ${formatTimeAr(nTime)}`
-                                }
+                              
+                              <div className="mr-6 text-muted-foreground">
+                                {modType === 'day-change' ? (
+                                  <>
+                                    <div>{formatDateWithDay(sessionData.originalDate)}، {formatTimeAr(sessionData.originalTime)}</div>
+                                    <div className="my-1 text-primary">↓</div>
+                                    <div>{formatDateWithDay(sessionData.newDate)}، {formatTimeAr(sessionData.newTime)}</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    {formatTimeAr(sessionData.originalTime)} → {formatTimeAr(sessionData.newTime)}
+                                  </>
+                                )}
                               </div>
+                              
+                              {isWarning && (
+                                <p className="text-xs text-yellow-700 mt-1 mr-6">تحذير: فاصل أقل من 15 دقيقة</p>
+                              )}
+                              {isConflict && (
+                                <p className="text-xs text-red-700 mt-1 mr-6">تعارض: توجد جلسة أخرى في نفس الوقت</p>
+                              )}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Warnings */}
-                  {categorizedSessions.warnings.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-warning" />
-                        <p className="font-medium text-sm">تحذيرات ({categorizedSessions.warnings.length})</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">جلسات قريبة من طلاب آخرين (أقل من 15 دقيقة)</p>
-                      <div className="space-y-1">
-                        {categorizedSessions.warnings.map(({ session, originalTime: origTime, newTime: nTime, originalDate, newDate }) => (
-                          <div key={session.id} className="bg-warning/5 border border-warning/20 rounded p-2 text-sm">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>⚠️</span>
-                            </div>
-                            <div className="text-center space-y-1 mt-1">
-                              <div className="text-muted-foreground">
-                                {modType === 'day-change'
-                                  ? `${formatDateWithDay(originalDate)}، ${formatTimeAr(origTime)}`
-                                  : `${formatShortDateAr(originalDate)}، ${formatTimeAr(origTime)}`
-                                }
-                              </div>
-                              <ArrowDown className="h-3 w-3 mx-auto text-warning" />
-                              <div className="text-warning font-medium">
-                                {modType === 'day-change'
-                                  ? `${formatDateWithDay(newDate)}، ${formatTimeAr(nTime)}`
-                                  : `${formatShortDateAr(newDate)}، ${formatTimeAr(nTime)}`
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
-                  )}
-
-                  {/* Conflicts */}
-                  {categorizedSessions.conflicts.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4 text-destructive" />
-                        <p className="font-medium text-sm">تعارضات ({categorizedSessions.conflicts.length})</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">هذه الجلسات لن يتم تعديلها</p>
-                      <div className="space-y-1">
-                        {categorizedSessions.conflicts.map(({ session, originalTime: origTime, newTime: nTime, originalDate, newDate }) => (
-                          <div key={session.id} className="bg-destructive/5 border border-destructive/20 rounded p-2 text-sm opacity-60">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>❌</span>
-                            </div>
-                            <div className="text-center space-y-1 mt-1">
-                              <div className="text-muted-foreground">
-                                {modType === 'day-change'
-                                  ? `${formatDateWithDay(originalDate)}، ${formatTimeAr(origTime)}`
-                                  : `${formatShortDateAr(originalDate)}، ${formatTimeAr(origTime)}`
-                                }
-                              </div>
-                              <ArrowDown className="h-3 w-3 mx-auto text-destructive" />
-                              <div className="text-destructive font-medium line-through">
-                                {modType === 'day-change'
-                                  ? `${formatDateWithDay(newDate)}، ${formatTimeAr(nTime)}`
-                                  : `${formatShortDateAr(newDate)}، ${formatTimeAr(nTime)}`
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </ScrollArea>
 
+              {/* Apply Buttons */}
               <div className="flex flex-col gap-2 pt-4 border-t">
+                {categorizedSessions.conflicts.length > 0 && (
+                  <p className="text-xs text-red-600 text-center">
+                    لا يمكن تطبيق الجلسات المتعارضة ({categorizedSessions.conflicts.length})
+                  </p>
+                )}
+                
                 {categorizedSessions.warnings.length > 0 && categorizedSessions.safe.length > 0 && (
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
+                      className="flex-1"
                       onClick={() => applyChanges(false)}
-                      className="flex-1 text-xs"
                     >
                       تطبيق الآمنة فقط ({categorizedSessions.safe.length})
                     </Button>
                     <Button
+                      className="flex-1"
                       onClick={() => applyChanges(true)}
-                      className="flex-1 text-xs"
                     >
-                      تطبيق مع التحذيرات ({categorizedSessions.safe.length + categorizedSessions.warnings.length})
+                      تطبيق الكل ({categorizedSessions.safe.length + categorizedSessions.warnings.length})
                     </Button>
                   </div>
                 )}
-                {(categorizedSessions.warnings.length === 0 || categorizedSessions.safe.length === 0) && (
-                  <Button
-                    onClick={() => applyChanges(true)}
-                    disabled={categorizedSessions.safe.length === 0 && categorizedSessions.warnings.length === 0}
-                    className="w-full"
-                  >
-                    تطبيق التغييرات ({categorizedSessions.safe.length + categorizedSessions.warnings.length})
+                
+                {categorizedSessions.warnings.length === 0 && categorizedSessions.safe.length > 0 && (
+                  <Button className="w-full" onClick={() => applyChanges(false)}>
+                    تطبيق التغييرات ({categorizedSessions.safe.length})
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => setShowPreview(false)}>
-                  <ChevronLeft className="h-4 w-4 ml-1" />
-                  رجوع
-                </Button>
+                
+                {categorizedSessions.safe.length === 0 && categorizedSessions.warnings.length > 0 && (
+                  <Button className="w-full" onClick={() => applyChanges(true)}>
+                    تطبيق مع التحذيرات ({categorizedSessions.warnings.length})
+                  </Button>
+                )}
               </div>
             </>
           )}
 
-          {/* Success Screen */}
+          {/* Success Dialog */}
           {showSuccessDialog && (
-            <div className="py-6 text-center space-y-4">
-              <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-8 w-8 text-success" />
-              </div>
-              <div>
-                <p className="text-lg font-medium">✓ تم تحديث {lastApplyResult.safe + lastApplyResult.warnings} جلسة</p>
-                <p className="text-sm text-muted-foreground">لـ {selectedStudent?.name}</p>
+            <div className="text-center py-6 space-y-4">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
               </div>
               
+              <div>
+                <h3 className="text-lg font-medium">✓ تم تحديث {lastApplyResult.safe + lastApplyResult.warnings} جلسة</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  لـ {selectedStudent?.name}
+                </p>
+              </div>
+
               {undoData && undoTimeLeft > 0 && (
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <Button variant="outline" onClick={handleUndo} className="gap-2">
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="text-sm mb-2">يمكنك التراجع عن هذا التعديل</p>
+                  <Button variant="outline" onClick={handleUndo} className="gap-1">
                     <Undo2 className="h-4 w-4" />
                     تراجع عن التغييرات
                   </Button>
@@ -1148,11 +1259,14 @@ export const BulkEditSessionsDialog = ({
                 </div>
               )}
 
-              <Button onClick={() => {
-                resetForm();
-                setShowSuccessDialog(false);
-                setOpen(false);
-              }} className="w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  setShowSuccessDialog(false);
+                  setOpen(false);
+                }}
+              >
                 إغلاق
               </Button>
             </div>
