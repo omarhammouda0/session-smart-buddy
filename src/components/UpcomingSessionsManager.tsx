@@ -324,16 +324,19 @@ export const UpcomingSessionsManager = ({
                                   <span className="text-[10px] text-muted-foreground">{student.sessionTime}</span>
                                 </>
                               ) : (
-                                <div className="flex items-center gap-0.5">
-                                  <span className={cn(
-                                    "font-medium truncate text-[10px]",
-                                    session?.status === 'completed' && "line-through opacity-70"
-                                  )}>{student.name.split(' ')[0]}</span>
-                                  {(student.sessionType || 'onsite') === 'online' ? (
-                                    <Monitor className="h-2.5 w-2.5 text-blue-500 shrink-0" />
-                                  ) : (
-                                    <MapPin className="h-2.5 w-2.5 text-orange-500 shrink-0" />
-                                  )}
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-0.5">
+                                    <span className={cn(
+                                      "font-medium truncate text-[10px]",
+                                      session?.status === 'completed' && "line-through opacity-70"
+                                    )}>{student.name.split(' ')[0]}</span>
+                                    {(student.sessionType || 'onsite') === 'online' ? (
+                                      <Monitor className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                                    ) : (
+                                      <MapPin className="h-2.5 w-2.5 text-orange-500 shrink-0" />
+                                    )}
+                                  </div>
+                                  <span className="text-[9px] text-muted-foreground">{student.sessionTime}</span>
                                 </div>
                               )}
                             </div>
