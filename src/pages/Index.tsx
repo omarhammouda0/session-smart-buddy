@@ -96,7 +96,8 @@ const Index = () => {
     getCancellationCount, 
     studentsAtRisk, 
     sendParentNotification, 
-    getStudentCancellations 
+    getStudentCancellations,
+    recordCancellation,
   } = useCancellationTracking(students);
 
   // Conflict detection
@@ -169,14 +170,45 @@ const Index = () => {
     const student = students.find(s => s.id === studentId);
     const session = student?.sessions.find(s => s.id === sessionId);
     if (session) {
-      // For now, just cancel the session - cancellation tracking integration will be done later
+      // Record cancellation to database and check for auto-notification
+      const result = await recordCancellation(studentId, session.date, session.time, reason);
+      
+      // Cancel the session in local state
       removeSession(studentId, sessionId);
+      
+      // Show appropriate toast based on result
+      if (result.success) {
+        if (result.autoNotificationSent) {
+          toast({
+            title: "تم إلغاء الحصة وإرسال تنبيه",
+            description: `تم إرسال رسالة WhatsApp تلقائياً لولي الأمر (${result.newCount}/${result.limit} إلغاءات)`,
+          });
+        } else if (result.limitReached || result.limitExceeded) {
+          toast({
+            title: "⚠️ تم الوصول للحد الأقصى",
+            description: `${student?.name} وصل لـ ${result.newCount}/${result.limit} إلغاء هذا الشهر`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "تم إلغاء الحصة",
+            description: reason ? `السبب: ${reason}` : `إلغاء ${result.newCount}${result.limit ? `/${result.limit}` : ''} هذا الشهر`,
+          });
+        }
+      } else {
+        toast({
+          title: "تم إلغاء الحصة",
+          description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح",
+          variant: "destructive",
+        });
+      }
+    } else {
+      toast({
+        title: "تم إلغاء الحصة",
+        description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح",
+        variant: "destructive",
+      });
     }
-    toast({
-      title: "تم إلغاء الحصة",
-      description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح",
-      variant: "destructive",
-    });
   };
 
   const handleDeleteSession = (studentId: string, sessionId: string) => {

@@ -134,6 +134,12 @@ export const useStudents = () => {
       semesterEnd,
       sessions,
       createdAt: new Date().toISOString(),
+      // Default cancellation policy: 3 per month, auto-notify parent
+      cancellationPolicy: {
+        monthlyLimit: 3,
+        alertTutor: true,
+        autoNotifyParent: true,
+      },
     };
 
     setStudents(prev => [...prev, newStudent]);

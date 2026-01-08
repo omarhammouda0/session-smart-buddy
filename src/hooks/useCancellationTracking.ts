@@ -180,8 +180,9 @@ export const useCancellationTracking = (students: Student[]) => {
     }> => {
       const month = format(new Date(sessionDate), 'yyyy-MM');
       const student = students.find((s) => s.id === studentId);
-      const limit = student?.cancellationPolicy?.monthlyLimit ?? null;
-      const autoNotifyParent = student?.cancellationPolicy?.autoNotifyParent ?? false;
+      // Default to 3 cancellations per month and auto-notify if no policy set
+      const limit = student?.cancellationPolicy?.monthlyLimit ?? 3;
+      const autoNotifyParent = student?.cancellationPolicy?.autoNotifyParent ?? true;
 
       try {
         // Insert cancellation record
@@ -511,8 +512,8 @@ ${cancellationsText}
     
     return students
       .map((student) => {
-        const limit = student.cancellationPolicy?.monthlyLimit ?? null;
-        if (limit === null) return null; // No limit set
+        // Default to 3 cancellations per month if no policy set
+        const limit = student.cancellationPolicy?.monthlyLimit ?? 3;
 
         const count = getCancellationCount(student.id, currentMonth);
         if (count === 0) return null;
