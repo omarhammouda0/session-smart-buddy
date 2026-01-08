@@ -38,6 +38,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+// PDF generation with html2canvas
 
 interface MonthlyReportDialogProps {
   students: Student[];
