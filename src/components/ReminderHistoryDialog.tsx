@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote, AlertTriangle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote, AlertTriangle, X } from 'lucide-react';
 import { useReminderSettings } from '@/hooks/useReminderSettings';
 import { ReminderLog } from '@/types/reminder';
-import { format, parseISO, isWithinInterval, subDays, subWeeks, subMonths } from 'date-fns';
+import { format, parseISO, isWithinInterval, subWeeks, subMonths } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -44,17 +45,12 @@ export const ReminderHistoryDialog = () => {
   };
 
   const filteredLogs = logs.filter(log => {
-    // Type filter - if any selected, log must match one
     if (filterTypes.length > 0 && !filterTypes.includes(log.type as FilterType)) return false;
-    
-    // Status filter - if any selected, log must match one
     if (filterStatuses.length > 0 && !filterStatuses.includes(log.status as FilterStatus)) return false;
     
-    // Time filter
     if (filterTime) {
       const logDate = parseISO(log.sent_at);
       const now = new Date();
-      
       if (filterTime === 'week') {
         if (!isWithinInterval(logDate, { start: subWeeks(now, 1), end: now })) return false;
       } else if (filterTime === 'month') {
@@ -65,20 +61,30 @@ export const ReminderHistoryDialog = () => {
     return true;
   });
 
-  const toggleTypeFilter = (type: FilterType) => {
-    setFilterTypes(prev => 
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
+  const handleTypeSelect = (value: string) => {
+    const type = value as FilterType;
+    if (!filterTypes.includes(type)) {
+      setFilterTypes(prev => [...prev, type]);
+    }
   };
 
-  const toggleStatusFilter = (status: FilterStatus) => {
-    setFilterStatuses(prev => 
-      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
-    );
+  const handleStatusSelect = (value: string) => {
+    const status = value as FilterStatus;
+    if (!filterStatuses.includes(status)) {
+      setFilterStatuses(prev => [...prev, status]);
+    }
   };
 
-  const toggleTimeFilter = (time: FilterTime) => {
-    setFilterTime(prev => prev === time ? null : time);
+  const handleTimeSelect = (value: string) => {
+    setFilterTime(value as FilterTime);
+  };
+
+  const removeTypeFilter = (type: FilterType) => {
+    setFilterTypes(prev => prev.filter(t => t !== type));
+  };
+
+  const removeStatusFilter = (status: FilterStatus) => {
+    setFilterStatuses(prev => prev.filter(s => s !== status));
   };
 
   const clearFilters = () => {
@@ -88,7 +94,6 @@ export const ReminderHistoryDialog = () => {
   };
 
   const hasActiveFilters = filterTypes.length > 0 || filterStatuses.length > 0 || filterTime !== null;
-
   const failedCount = logs.filter(l => l.status === 'failed').length;
 
   const formatDateTime = (dateStr: string) => {
@@ -116,131 +121,124 @@ export const ReminderHistoryDialog = () => {
         </DialogHeader>
 
         {/* Filters */}
-        <div className="space-y-2 py-2">
-          <div className="flex flex-wrap gap-1.5">
-            {/* Type Filters */}
-            <button
-              onClick={() => toggleTypeFilter('session')}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                filterTypes.includes('session')
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card border-border hover:border-primary/50"
-              )}
-            >
-              <MessageCircle className="h-3 w-3 inline ml-1" />
-              جلسات
-            </button>
-            <button
-              onClick={() => toggleTypeFilter('payment')}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                filterTypes.includes('payment')
-                  ? "bg-warning text-warning-foreground border-warning"
-                  : "bg-card border-border hover:border-warning/50"
-              )}
-            >
-              <Banknote className="h-3 w-3 inline ml-1" />
-              دفع
-            </button>
-            <button
-              onClick={() => toggleTypeFilter('cancellation')}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                filterTypes.includes('cancellation')
-                  ? "bg-destructive text-destructive-foreground border-destructive"
-                  : "bg-card border-border hover:border-destructive/50"
-              )}
-            >
-              <AlertTriangle className="h-3 w-3 inline ml-1" />
-              إلغاء
-            </button>
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Select onValueChange={handleTypeSelect} value="">
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="النوع" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="session">
+                  <span className="flex items-center gap-1">
+                    <MessageCircle className="h-3 w-3" />
+                    جلسات
+                  </span>
+                </SelectItem>
+                <SelectItem value="payment">
+                  <span className="flex items-center gap-1">
+                    <Banknote className="h-3 w-3" />
+                    دفع
+                  </span>
+                </SelectItem>
+                <SelectItem value="cancellation">
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    إلغاء
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="w-px bg-border mx-1" />
+            <Select onValueChange={handleStatusSelect} value="">
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="الحالة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sent">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    نجح
+                  </span>
+                </SelectItem>
+                <SelectItem value="failed">
+                  <span className="flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    فشل
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
-            {/* Status Filters */}
-            <button
-              onClick={() => toggleStatusFilter('sent')}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                filterStatuses.includes('sent')
-                  ? "bg-success text-success-foreground border-success"
-                  : "bg-card border-border hover:border-success/50"
-              )}
-            >
-              <CheckCircle className="h-3 w-3 inline ml-1" />
-              نجح
-            </button>
-            <button
-              onClick={() => toggleStatusFilter('failed')}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                filterStatuses.includes('failed')
-                  ? "bg-destructive text-destructive-foreground border-destructive"
-                  : "bg-card border-border hover:border-destructive/50"
-              )}
-            >
-              <XCircle className="h-3 w-3 inline ml-1" />
-              فشل
-            </button>
-
-            <div className="w-px bg-border mx-1" />
-
-            {/* Time Filters */}
-            <button
-              onClick={() => toggleTimeFilter('week')}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                filterTime === 'week'
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card border-border hover:border-primary/50"
-              )}
-            >
-              <Clock className="h-3 w-3 inline ml-1" />
-              أسبوع
-            </button>
-            <button
-              onClick={() => toggleTimeFilter('month')}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                filterTime === 'month'
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card border-border hover:border-primary/50"
-              )}
-            >
-              <Clock className="h-3 w-3 inline ml-1" />
-              شهر
-            </button>
+            <Select onValueChange={handleTimeSelect} value={filterTime || ""}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="الفترة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    أسبوع
+                  </span>
+                </SelectItem>
+                <SelectItem value="month">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    شهر
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="flex items-center justify-between">
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground"
-                onClick={clearFilters}
-              >
-                مسح الفلاتر
+          {/* Active Filters */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {filterTypes.map(type => (
+                <Badge key={type} variant="secondary" className="gap-1 text-xs">
+                  {type === 'session' ? 'جلسات' : type === 'payment' ? 'دفع' : 'إلغاء'}
+                  <button onClick={() => removeTypeFilter(type)} className="hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {filterStatuses.map(status => (
+                <Badge key={status} variant="secondary" className="gap-1 text-xs">
+                  {status === 'sent' ? 'نجح' : 'فشل'}
+                  <button onClick={() => removeStatusFilter(status)} className="hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {filterTime && (
+                <Badge variant="secondary" className="gap-1 text-xs">
+                  {filterTime === 'week' ? 'أسبوع' : 'شهر'}
+                  <button onClick={() => setFilterTime(null)} className="hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={clearFilters}>
+                مسح الكل
               </Button>
-            )}
-            {failedCount > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1 text-xs border-warning text-warning hover:bg-warning/10 mr-auto"
-                onClick={handleRetryFailed}
-                disabled={retrying}
-              >
-                {retrying ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3 w-3" />
-                )}
-                إعادة ({failedCount})
-              </Button>
-            )}
-          </div>
+            </div>
+          )}
+
+          {failedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-xs border-warning text-warning hover:bg-warning/10 w-full"
+              onClick={handleRetryFailed}
+              disabled={retrying}
+            >
+              {retrying ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              إعادة المحاولة للفاشلة ({failedCount})
+            </Button>
+          )}
         </div>
 
         {/* Log List */}
