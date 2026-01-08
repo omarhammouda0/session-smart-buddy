@@ -10,16 +10,14 @@ import {
   startOfMonth,
   addMonths,
   parseISO,
-  getDay,
 } from 'date-fns';
-import { Calendar, Clock, Users, AlertTriangle, Check, ChevronLeft, Undo2, CheckCircle2, XCircle, AlertCircle, Palmtree } from 'lucide-react';
+import { Calendar, Clock, User, ChevronLeft, Undo2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { Student, Session } from '@/types/student';
-import { DAY_NAMES_SHORT_AR, formatShortDateAr } from '@/lib/arabicConstants';
+import { formatShortDateAr } from '@/lib/arabicConstants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -36,16 +34,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -91,6 +79,7 @@ interface UndoData {
   sessionUpdates: { sessionId: string; studentId: string; originalTime: string }[];
   timestamp: number;
   count: number;
+  studentName: string;
 }
 
 // Storage key for undo data
@@ -122,10 +111,11 @@ const formatTimeAr = (time: string): string => {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
+type TimePeriod = 'this-week' | 'next-week' | 'this-month' | 'next-month' | 'custom';
+
 export const BulkEditSessionsDialog = ({
   students,
   onBulkUpdateTime,
-  onBulkMarkAsVacation,
 }: BulkEditSessionsDialogProps) => {
   const [open, setOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -134,21 +124,49 @@ export const BulkEditSessionsDialog = ({
 
   // Filters
   const today = startOfDay(new Date());
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('this-month');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(today);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
-  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(today));
 
   // Time modification
   const [timeModType, setTimeModType] = useState<'offset' | 'specific'>('offset');
   const [offsetDirection, setOffsetDirection] = useState<'+' | '-'>('+');
-  const [offsetHours, setOffsetHours] = useState<number>(3);
+  const [offsetHours, setOffsetHours] = useState<number>(4);
   const [offsetMinutes, setOffsetMinutes] = useState<number>(0);
   const [specificTime, setSpecificTime] = useState<string>('');
 
   // Undo state
   const [undoData, setUndoData] = useState<UndoData | null>(null);
   const [undoTimeLeft, setUndoTimeLeft] = useState<number>(0);
+
+  // Calculate date range based on selected period
+  const updateDateRange = (period: TimePeriod) => {
+    setSelectedPeriod(period);
+    switch (period) {
+      case 'this-week':
+        setDateFrom(today);
+        setDateTo(endOfWeek(today, { weekStartsOn: 0 }));
+        break;
+      case 'next-week':
+        const nextWeekStart = startOfWeek(addWeeks(today, 1), { weekStartsOn: 0 });
+        setDateFrom(nextWeekStart);
+        setDateTo(endOfWeek(nextWeekStart, { weekStartsOn: 0 }));
+        break;
+      case 'this-month':
+        setDateFrom(today);
+        setDateTo(endOfMonth(today));
+        break;
+      case 'next-month':
+        const nextMonth = addMonths(today, 1);
+        setDateFrom(startOfMonth(nextMonth));
+        setDateTo(endOfMonth(nextMonth));
+        break;
+      case 'custom':
+        // Keep current values
+        break;
+    }
+  };
 
   // Load undo data on mount
   useEffect(() => {
@@ -206,42 +224,42 @@ export const BulkEditSessionsDialog = ({
     return minutesToTime(newMinutes);
   };
 
+  // Get selected student
+  const selectedStudent = useMemo(() => {
+    return students.find(s => s.id === selectedStudentId);
+  }, [students, selectedStudentId]);
+
   // Calculate matching sessions with new times
   const matchingSessions = useMemo(() => {
     const sessions: SessionWithStudent[] = [];
+    
+    if (!selectedStudentId || !selectedStudent) return sessions;
+    
     const todayStr = format(today, 'yyyy-MM-dd');
+    const fromStr = dateFrom ? format(dateFrom, 'yyyy-MM-dd') : todayStr;
+    const toStr = dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined;
 
-    students.forEach(student => {
-      if (selectedStudentId !== 'all' && student.id !== selectedStudentId) return;
+    selectedStudent.sessions.forEach(session => {
+      // Only scheduled sessions
+      if (session.status !== 'scheduled') return;
+      
+      // Must be in date range
+      if (session.date < fromStr) return;
+      if (toStr && session.date > toStr) return;
 
-      student.sessions.forEach(session => {
-        if (session.status !== 'scheduled') return;
-        if (session.date < todayStr) return;
-        if (dateFrom && session.date < format(dateFrom, 'yyyy-MM-dd')) return;
-        if (dateTo && session.date > format(dateTo, 'yyyy-MM-dd')) return;
+      const originalTime = session.time || selectedStudent.sessionTime || '16:00';
+      const newTime = calculateNewTime(originalTime);
 
-        // Filter by day of week
-        const sessionDayOfWeek = getDay(parseISO(session.date));
-        if (!selectedDays.includes(sessionDayOfWeek)) return;
-
-        const originalTime = session.time || student.sessionTime || '16:00';
-        const newTime = calculateNewTime(originalTime);
-
-        sessions.push({
-          session,
-          student,
-          originalTime,
-          newTime,
-        });
+      sessions.push({
+        session,
+        student: selectedStudent,
+        originalTime,
+        newTime,
       });
     });
 
-    return sessions.sort((a, b) => {
-      const dateCompare = a.session.date.localeCompare(b.session.date);
-      if (dateCompare !== 0) return dateCompare;
-      return a.originalTime.localeCompare(b.originalTime);
-    });
-  }, [students, selectedStudentId, dateFrom, dateTo, selectedDays, timeModType, offsetDirection, offsetHours, offsetMinutes, specificTime, today]);
+    return sessions.sort((a, b) => a.session.date.localeCompare(b.session.date));
+  }, [selectedStudent, selectedStudentId, dateFrom, dateTo, timeModType, offsetDirection, offsetHours, offsetMinutes, specificTime, today]);
 
   // Categorize sessions by conflict status
   const categorizedSessions = useMemo((): CategorizedSessions => {
@@ -256,26 +274,18 @@ export const BulkEditSessionsDialog = ({
       const newEndMinutes = newStartMinutes + sessionDuration;
 
       let conflictType = 'none' as 'none' | 'close' | 'overlap';
-      let conflictGap = Infinity;
 
-      // Check against all other sessions on same date
+      // Check against all other sessions on same date from OTHER students
       students.forEach(otherStudent => {
+        if (otherStudent.id === student.id) return; // Skip same student
+        
         otherStudent.sessions.forEach(otherSession => {
-          if (otherSession.id === session.id) return;
           if (otherSession.date !== sessionDate) return;
-          if (otherSession.status === 'cancelled') return;
+          if (otherSession.status === 'cancelled' || otherSession.status === 'vacation') return;
 
-          // Check if this session is also being updated
-          const otherMatchingSession = matchingSessions.find(ms => ms.session.id === otherSession.id);
-          const otherTime = otherMatchingSession
-            ? otherMatchingSession.newTime
-            : (otherSession.time || otherStudent.sessionTime || '16:00');
-          
+          const otherTime = otherSession.time || otherStudent.sessionTime || '16:00';
           const otherStartMinutes = timeToMinutes(otherTime);
           const otherEndMinutes = otherStartMinutes + sessionDuration;
-
-          // Skip if same student (can't conflict with self unless exactly same time which is impossible)
-          if (student.id === otherStudent.id) return;
 
           // Check exact overlap
           if (newStartMinutes === otherStartMinutes) {
@@ -299,10 +309,9 @@ export const BulkEditSessionsDialog = ({
           const gapAfter = Math.abs(otherStartMinutes - newEndMinutes);
           const gap = Math.min(gapBefore, gapAfter);
 
-          if (gap > 0 && gap < minGap && gap < conflictGap) {
+          if (gap > 0 && gap < minGap) {
             if (conflictType !== 'overlap') {
               conflictType = 'close';
-              conflictGap = gap;
             }
           }
         });
@@ -320,17 +329,20 @@ export const BulkEditSessionsDialog = ({
     return result;
   }, [matchingSessions, students]);
 
-  const toggleDay = (day: number) => {
-    setSelectedDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    );
-  };
-
   const handleShowPreview = () => {
+    if (!selectedStudentId) {
+      toast({
+        title: 'اختر طالب',
+        description: 'الرجاء اختيار طالب أولاً',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (matchingSessions.length === 0) {
       toast({
         title: 'لا توجد جلسات',
-        description: 'لا توجد جلسات تطابق المعايير المحددة',
+        description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || 'الطالب'} في هذه الفترة`,
         variant: 'destructive',
       });
       return;
@@ -349,6 +361,17 @@ export const BulkEditSessionsDialog = ({
       toast({
         title: 'خطأ',
         description: 'الرجاء تحديد مقدار التعديل',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate offset range (-12h to +12h)
+    const totalOffset = offsetHours * 60 + offsetMinutes;
+    if (totalOffset > 12 * 60) {
+      toast({
+        title: 'خطأ',
+        description: 'الحد الأقصى للتعديل 12 ساعة',
         variant: 'destructive',
       });
       return;
@@ -380,16 +403,12 @@ export const BulkEditSessionsDialog = ({
       })),
       timestamp: Date.now(),
       count: sessionsToApply.length,
+      studentName: selectedStudent?.name || '',
     };
     localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoInfo));
     setUndoData(undoInfo);
 
-    // Apply changes
-    const studentIds = [...new Set(sessionsToApply.map(s => s.student.id))];
-    const sessionIds = sessionsToApply.map(s => s.session.id);
-    const newTime = sessionsToApply[0]?.newTime || '';
-
-    // For offset mode, we need to update each session with its own new time
+    // Apply changes - update each session with its own new time
     sessionsToApply.forEach(s => {
       onBulkUpdateTime([s.student.id], [s.session.id], s.newTime);
     });
@@ -423,13 +442,13 @@ export const BulkEditSessionsDialog = ({
   };
 
   const resetForm = () => {
+    setSelectedStudentId('');
+    setSelectedPeriod('this-month');
     setDateFrom(today);
-    setDateTo(undefined);
-    setSelectedStudentId('all');
-    setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+    setDateTo(endOfMonth(today));
     setTimeModType('offset');
     setOffsetDirection('+');
-    setOffsetHours(3);
+    setOffsetHours(4);
     setOffsetMinutes(0);
     setSpecificTime('');
     setShowPreview(false);
@@ -475,7 +494,7 @@ export const BulkEditSessionsDialog = ({
                       <div className="text-sm">
                         <p className="font-medium">يمكنك التراجع عن التعديل السابق</p>
                         <p className="text-muted-foreground text-xs">
-                          {undoData.count} جلسة • متبقي {formatUndoTimeLeft()}
+                          {undoData.count} جلسة لـ {undoData.studentName} • متبقي {formatUndoTimeLeft()}
                         </p>
                       </div>
                       <Button variant="outline" size="sm" onClick={handleUndo} className="gap-1">
@@ -485,88 +504,17 @@ export const BulkEditSessionsDialog = ({
                     </div>
                   )}
 
-                  {/* Date Range */}
+                  {/* Step 1: Select Student */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5">
-                      <Calendar className="h-4 w-4" />
-                      نطاق التاريخ
-                    </Label>
-                    
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      <Button type="button" variant="outline" size="sm" className="text-xs h-7"
-                        onClick={() => { setDateFrom(today); setDateTo(endOfWeek(today, { weekStartsOn: 0 })); }}>
-                        هذا الأسبوع
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="text-xs h-7"
-                        onClick={() => {
-                          const start = startOfWeek(addWeeks(today, 1), { weekStartsOn: 0 });
-                          setDateFrom(start); setDateTo(endOfWeek(start, { weekStartsOn: 0 }));
-                        }}>
-                        الأسبوع القادم
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="text-xs h-7"
-                        onClick={() => {
-                          setDateFrom(today);
-                          setDateTo(endOfWeek(addWeeks(today, 2), { weekStartsOn: 0 }));
-                        }}>
-                        أسبوعين
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="text-xs h-7"
-                        onClick={() => { setDateFrom(today); setDateTo(endOfMonth(today)); }}>
-                        هذا الشهر
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="text-xs h-7"
-                        onClick={() => {
-                          const nextMonth = addMonths(today, 1);
-                          setDateFrom(startOfMonth(nextMonth)); setDateTo(endOfMonth(nextMonth));
-                        }}>
-                        الشهر القادم
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-xs text-muted-foreground">من</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn('w-full justify-start text-right font-normal', !dateFrom && 'text-muted-foreground')}>
-                              {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarPicker mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="pointer-events-auto" />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <div>
-                        <span className="text-xs text-muted-foreground">إلى</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn('w-full justify-start text-right font-normal', !dateTo && 'text-muted-foreground')}>
-                              {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarPicker mode="single" selected={dateTo} onSelect={setDateTo}
-                              disabled={date => dateFrom ? isBefore(date, dateFrom) : false} initialFocus className="pointer-events-auto" />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Student Filter */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Users className="h-4 w-4" />
-                      تصفية حسب الطالب
+                      <User className="h-4 w-4" />
+                      اختر الطالب
                     </Label>
                     <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="جميع الطلاب" />
+                      <SelectTrigger className={cn(!selectedStudentId && 'text-muted-foreground')}>
+                        <SelectValue placeholder="اختر طالب..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">جميع الطلاب</SelectItem>
                         {students.map(student => (
                           <SelectItem key={student.id} value={student.id}>
                             {student.name} ({formatTimeAr(student.sessionTime || '16:00')})
@@ -576,39 +524,132 @@ export const BulkEditSessionsDialog = ({
                     </Select>
                   </div>
 
-                  {/* Days of Week Filter */}
+                  {/* Step 2: Select Time Period */}
                   <div className="space-y-2">
-                    <Label>تصفية حسب أيام الأسبوع</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[0, 1, 2, 3, 4, 5, 6].map(day => (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() => toggleDay(day)}
-                          className={cn(
-                            'px-3 py-1.5 rounded-lg text-xs border transition-colors',
-                            selectedDays.includes(day)
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-card border-border hover:border-primary/50'
-                          )}
-                        >
-                          {DAY_NAMES_SHORT_AR[day]}
-                        </button>
-                      ))}
+                    <Label className="flex items-center gap-1.5">
+                      <Calendar className="h-4 w-4" />
+                      الفترة الزمنية
+                    </Label>
+                    
+                    {/* Quick Period Buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant={selectedPeriod === 'this-week' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => updateDateRange('this-week')}
+                      >
+                        هذا الأسبوع
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={selectedPeriod === 'next-week' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => updateDateRange('next-week')}
+                      >
+                        الأسبوع القادم
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={selectedPeriod === 'this-month' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => updateDateRange('this-month')}
+                      >
+                        هذا الشهر
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={selectedPeriod === 'next-month' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => updateDateRange('next-month')}
+                      >
+                        الشهر القادم
+                      </Button>
                     </div>
-                    <div className="flex gap-2">
-                      <Button type="button" variant="ghost" size="sm" className="text-xs h-6"
-                        onClick={() => setSelectedDays([0, 1, 2, 3, 4, 5, 6])}>
-                        تحديد الكل
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" className="text-xs h-6"
-                        onClick={() => setSelectedDays([])}>
-                        إلغاء الكل
-                      </Button>
+
+                    {/* Custom Date Range */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">أو نطاق مخصص:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-xs text-muted-foreground">من</span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn('w-full justify-start text-right font-normal', !dateFrom && 'text-muted-foreground')}
+                                onClick={() => setSelectedPeriod('custom')}
+                              >
+                                {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarPicker
+                                mode="single"
+                                selected={dateFrom}
+                                onSelect={(date) => {
+                                  setDateFrom(date);
+                                  setSelectedPeriod('custom');
+                                }}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">إلى</span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn('w-full justify-start text-right font-normal', !dateTo && 'text-muted-foreground')}
+                                onClick={() => setSelectedPeriod('custom')}
+                              >
+                                {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarPicker
+                                mode="single"
+                                selected={dateTo}
+                                onSelect={(date) => {
+                                  setDateTo(date);
+                                  setSelectedPeriod('custom');
+                                }}
+                                disabled={date => dateFrom ? isBefore(date, dateFrom) : false}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Time Modification */}
+                  {/* Step 3: Session Count */}
+                  {selectedStudentId && (
+                    <div className={cn(
+                      'rounded-lg p-3 text-center',
+                      matchingSessions.length > 0 ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
+                    )}>
+                      <p className="text-lg font-bold">
+                        {matchingSessions.length} جلسة محددة
+                      </p>
+                      {matchingSessions.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          لا توجد جلسات مجدولة لـ {selectedStudent?.name} في هذه الفترة
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Step 4: Time Modification */}
                   <div className="space-y-3">
                     <Label className="flex items-center gap-1.5">
                       <Clock className="h-4 w-4" />
@@ -620,7 +661,7 @@ export const BulkEditSessionsDialog = ({
                       <div className={cn('border rounded-lg p-3 transition-colors', timeModType === 'offset' && 'border-primary bg-primary/5')}>
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="offset" id="offset" />
-                          <Label htmlFor="offset" className="font-medium cursor-pointer">تعديل بمقدار زمني</Label>
+                          <Label htmlFor="offset" className="font-medium cursor-pointer">تحويل بمقدار زمني</Label>
                         </div>
                         {timeModType === 'offset' && (
                           <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -686,11 +727,9 @@ export const BulkEditSessionsDialog = ({
                   </div>
 
                   {/* Quick Summary */}
-                  <div className="bg-muted/50 rounded-lg p-3">
-                    <p className="text-sm font-medium mb-1">
-                      الجلسات المطابقة: {matchingSessions.length}
-                    </p>
-                    {matchingSessions.length > 0 && (
+                  {selectedStudentId && matchingSessions.length > 0 && (
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-sm font-medium mb-1">ملخص سريع</p>
                       <div className="flex gap-3 text-xs">
                         <span className="text-success flex items-center gap-1">
                           <CheckCircle2 className="h-3 w-3" /> {categorizedSessions.safe.length} آمنة
@@ -702,8 +741,8 @@ export const BulkEditSessionsDialog = ({
                           <XCircle className="h-3 w-3" /> {categorizedSessions.conflicts.length} تعارضات
                         </span>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
 
@@ -711,7 +750,11 @@ export const BulkEditSessionsDialog = ({
                 <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
                   إلغاء
                 </Button>
-                <Button onClick={handleShowPreview} disabled={matchingSessions.length === 0} className="flex-1">
+                <Button
+                  onClick={handleShowPreview}
+                  disabled={!selectedStudentId || matchingSessions.length === 0}
+                  className="flex-1"
+                >
                   معاينة التغييرات
                 </Button>
               </div>
@@ -723,22 +766,27 @@ export const BulkEditSessionsDialog = ({
             <>
               <ScrollArea className="flex-1 -mx-6 px-6">
                 <div className="space-y-4 pb-4">
+                  {/* Header */}
+                  <div className="text-center">
+                    <p className="font-medium">{selectedStudent?.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      المعاينة ({matchingSessions.length} جلسات)
+                    </p>
+                  </div>
+
                   {/* Summary */}
-                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                    <p className="font-medium">ملخص التغييرات</p>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-success/10 rounded p-2">
-                        <p className="text-lg font-bold text-success">{categorizedSessions.safe.length}</p>
-                        <p className="text-xs text-success">آمنة</p>
-                      </div>
-                      <div className="bg-warning/10 rounded p-2">
-                        <p className="text-lg font-bold text-warning">{categorizedSessions.warnings.length}</p>
-                        <p className="text-xs text-warning">تحذيرات</p>
-                      </div>
-                      <div className="bg-destructive/10 rounded p-2">
-                        <p className="text-lg font-bold text-destructive">{categorizedSessions.conflicts.length}</p>
-                        <p className="text-xs text-destructive">تعارضات</p>
-                      </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-success/10 rounded p-2">
+                      <p className="text-lg font-bold text-success">{categorizedSessions.safe.length}</p>
+                      <p className="text-xs text-success">آمنة ✓</p>
+                    </div>
+                    <div className="bg-warning/10 rounded p-2">
+                      <p className="text-lg font-bold text-warning">{categorizedSessions.warnings.length}</p>
+                      <p className="text-xs text-warning">تحذيرات ⚠️</p>
+                    </div>
+                    <div className="bg-destructive/10 rounded p-2">
+                      <p className="text-lg font-bold text-destructive">{categorizedSessions.conflicts.length}</p>
+                      <p className="text-xs text-destructive">تعارضات ❌</p>
                     </div>
                   </div>
 
@@ -750,24 +798,19 @@ export const BulkEditSessionsDialog = ({
                         <p className="font-medium text-sm">آمنة ({categorizedSessions.safe.length})</p>
                       </div>
                       <div className="space-y-1">
-                        {categorizedSessions.safe.slice(0, 5).map(({ session, student, originalTime, newTime }) => (
+                        {categorizedSessions.safe.map(({ session, originalTime, newTime }) => (
                           <div key={session.id} className="bg-success/5 border border-success/20 rounded p-2 text-sm">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">{student.name}</span>
-                              <span className="text-xs text-muted-foreground">{formatShortDateAr(session.date)}</span>
+                              <span className="text-xs text-muted-foreground">✓</span>
+                              <span className="text-xs">{formatShortDateAr(session.date)}</span>
                             </div>
-                            <div className="flex items-center gap-1 text-xs mt-1">
+                            <div className="flex items-center justify-center gap-2 mt-1">
                               <span className="text-muted-foreground">{formatTimeAr(originalTime)}</span>
                               <ChevronLeft className="h-3 w-3 text-success" />
                               <span className="text-success font-medium">{formatTimeAr(newTime)}</span>
                             </div>
                           </div>
                         ))}
-                        {categorizedSessions.safe.length > 5 && (
-                          <p className="text-xs text-muted-foreground text-center">
-                            و {categorizedSessions.safe.length - 5} جلسة أخرى...
-                          </p>
-                        )}
                       </div>
                     </div>
                   )}
@@ -779,15 +822,15 @@ export const BulkEditSessionsDialog = ({
                         <AlertCircle className="h-4 w-4 text-warning" />
                         <p className="font-medium text-sm">تحذيرات ({categorizedSessions.warnings.length})</p>
                       </div>
-                      <p className="text-xs text-muted-foreground">جلسات قريبة من بعضها (أقل من 15 دقيقة)</p>
+                      <p className="text-xs text-muted-foreground">جلسات قريبة من طلاب آخرين (أقل من 15 دقيقة)</p>
                       <div className="space-y-1">
-                        {categorizedSessions.warnings.slice(0, 3).map(({ session, student, originalTime, newTime }) => (
+                        {categorizedSessions.warnings.map(({ session, originalTime, newTime }) => (
                           <div key={session.id} className="bg-warning/5 border border-warning/20 rounded p-2 text-sm">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">{student.name}</span>
-                              <span className="text-xs text-muted-foreground">{formatShortDateAr(session.date)}</span>
+                              <span className="text-xs text-muted-foreground">⚠️</span>
+                              <span className="text-xs">{formatShortDateAr(session.date)}</span>
                             </div>
-                            <div className="flex items-center gap-1 text-xs mt-1">
+                            <div className="flex items-center justify-center gap-2 mt-1">
                               <span className="text-muted-foreground">{formatTimeAr(originalTime)}</span>
                               <ChevronLeft className="h-3 w-3 text-warning" />
                               <span className="text-warning font-medium">{formatTimeAr(newTime)}</span>
@@ -807,13 +850,13 @@ export const BulkEditSessionsDialog = ({
                       </div>
                       <p className="text-xs text-muted-foreground">هذه الجلسات لن يتم تعديلها</p>
                       <div className="space-y-1">
-                        {categorizedSessions.conflicts.slice(0, 3).map(({ session, student, originalTime, newTime }) => (
-                          <div key={session.id} className="bg-destructive/5 border border-destructive/20 rounded p-2 text-sm">
+                        {categorizedSessions.conflicts.map(({ session, originalTime, newTime }) => (
+                          <div key={session.id} className="bg-destructive/5 border border-destructive/20 rounded p-2 text-sm opacity-60">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">{student.name}</span>
-                              <span className="text-xs text-muted-foreground">{formatShortDateAr(session.date)}</span>
+                              <span className="text-xs text-muted-foreground">❌</span>
+                              <span className="text-xs">{formatShortDateAr(session.date)}</span>
                             </div>
-                            <div className="flex items-center gap-1 text-xs mt-1">
+                            <div className="flex items-center justify-center gap-2 mt-1">
                               <span className="text-muted-foreground">{formatTimeAr(originalTime)}</span>
                               <ChevronLeft className="h-3 w-3 text-destructive" />
                               <span className="text-destructive font-medium line-through">{formatTimeAr(newTime)}</span>
@@ -827,67 +870,69 @@ export const BulkEditSessionsDialog = ({
               </ScrollArea>
 
               <div className="flex flex-col gap-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowPreview(false)}>
-                  العودة للتعديل
-                </Button>
-                {categorizedSessions.safe.length > 0 && (
-                  <Button onClick={() => applyChanges(false)} className="bg-success hover:bg-success/90">
-                    تطبيق الآمنة فقط ({categorizedSessions.safe.length})
-                  </Button>
-                )}
                 {categorizedSessions.warnings.length > 0 && categorizedSessions.safe.length > 0 && (
-                  <Button onClick={() => applyChanges(true)} variant="outline">
-                    تطبيق الآمنة + التحذيرات ({categorizedSessions.safe.length + categorizedSessions.warnings.length})
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => applyChanges(false)}
+                      className="flex-1 text-xs"
+                    >
+                      تطبيق الآمنة فقط ({categorizedSessions.safe.length})
+                    </Button>
+                    <Button
+                      onClick={() => applyChanges(true)}
+                      className="flex-1 text-xs"
+                    >
+                      تطبيق مع التحذيرات ({categorizedSessions.safe.length + categorizedSessions.warnings.length})
+                    </Button>
+                  </div>
+                )}
+                {(categorizedSessions.warnings.length === 0 || categorizedSessions.safe.length === 0) && (
+                  <Button
+                    onClick={() => applyChanges(true)}
+                    disabled={categorizedSessions.safe.length === 0 && categorizedSessions.warnings.length === 0}
+                    className="w-full"
+                  >
+                    تطبيق التغييرات ({categorizedSessions.safe.length + categorizedSessions.warnings.length})
                   </Button>
                 )}
+                <Button variant="outline" onClick={() => setShowPreview(false)}>
+                  <ChevronLeft className="h-4 w-4 ml-1" />
+                  رجوع
+                </Button>
               </div>
             </>
           )}
 
           {/* Success Screen */}
           {showSuccessDialog && (
-            <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center">
-                <Check className="h-8 w-8 text-success" />
+            <div className="py-6 text-center space-y-4">
+              <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-success" />
               </div>
-              <div className="text-center">
-                <p className="text-xl font-bold mb-1">تم بنجاح!</p>
-                <p className="text-muted-foreground">
-                  تم تعديل {lastApplyResult.safe + lastApplyResult.warnings} جلسة
-                </p>
+              <div>
+                <p className="text-lg font-medium">✓ تم تحديث {lastApplyResult.safe + lastApplyResult.warnings} جلسة</p>
+                <p className="text-sm text-muted-foreground">لـ {selectedStudent?.name}</p>
               </div>
-
-              <div className="bg-muted/50 rounded-lg p-3 w-full text-sm">
-                <div className="flex justify-between mb-1">
-                  <span>جلسات آمنة:</span>
-                  <span className="font-medium text-success">{lastApplyResult.safe}</span>
-                </div>
-                {lastApplyResult.warnings > 0 && (
-                  <div className="flex justify-between mb-1">
-                    <span>تحذيرات مقبولة:</span>
-                    <span className="font-medium text-warning">{lastApplyResult.warnings}</span>
-                  </div>
-                )}
-                {lastApplyResult.conflicts > 0 && (
-                  <div className="flex justify-between">
-                    <span>تعارضات تم تخطيها:</span>
-                    <span className="font-medium text-destructive">{lastApplyResult.conflicts}</span>
-                  </div>
-                )}
-              </div>
-
+              
               {undoData && undoTimeLeft > 0 && (
-                <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 w-full text-center">
-                  <p className="text-sm mb-2">يمكنك التراجع خلال {formatUndoTimeLeft()}</p>
-                  <Button variant="outline" size="sm" onClick={handleUndo} className="gap-1">
-                    <Undo2 className="h-3.5 w-3.5" />
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <Button variant="outline" onClick={handleUndo} className="gap-2">
+                    <Undo2 className="h-4 w-4" />
                     تراجع عن التغييرات
                   </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    متاح لمدة {formatUndoTimeLeft()}
+                  </p>
                 </div>
               )}
 
-              <Button onClick={() => { setOpen(false); resetForm(); }} className="w-full">
-                تم
+              <Button onClick={() => {
+                resetForm();
+                setShowSuccessDialog(false);
+                setOpen(false);
+              }} className="w-full">
+                إغلاق
               </Button>
             </div>
           )}
