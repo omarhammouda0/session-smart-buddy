@@ -893,7 +893,7 @@ export const BulkEditSessionsDialog = ({
                       className="w-[min(360px,88vw)] p-0 flex flex-col" 
                       align="start" 
                       dir="rtl"
-                      style={{ maxHeight: '60vh' }}
+                      style={{ maxHeight: '65vh' }}
                     >
                       {/* Fixed Header */}
                       <div className="p-3 border-b bg-muted/30 shrink-0">
@@ -902,8 +902,15 @@ export const BulkEditSessionsDialog = ({
                       
                       {/* Scrollable Content */}
                       <div 
-                        className="overflow-y-auto overflow-x-hidden" 
-                        style={{ maxHeight: '45vh' }}
+                        className="overflow-y-auto overflow-x-hidden scroll-smooth [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-muted [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50"
+                        style={{ 
+                          maxHeight: 'calc(60vh - 140px)',
+                          WebkitOverflowScrolling: 'touch',
+                          scrollbarWidth: 'thin'
+                        }}
+                        onWheel={(e) => {
+                          e.currentTarget.scrollTop += e.deltaY;
+                        }}
                       >
                         <div className="p-4 space-y-4">
                           {!showCustomRange ? (
