@@ -240,6 +240,8 @@ export type Database = {
       }
       reminder_settings: {
         Row: {
+          cancellation_reminder_template: string
+          cancellation_reminders_enabled: boolean
           created_at: string
           id: string
           payment_reminder_days_before: number
@@ -253,6 +255,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancellation_reminder_template?: string
+          cancellation_reminders_enabled?: boolean
           created_at?: string
           id?: string
           payment_reminder_days_before?: number
@@ -266,6 +270,8 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          cancellation_reminder_template?: string
+          cancellation_reminders_enabled?: boolean
           created_at?: string
           id?: string
           payment_reminder_days_before?: number

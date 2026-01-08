@@ -8,6 +8,8 @@ export interface ReminderSettings {
   payment_reminders_enabled: boolean;
   payment_reminder_days_before: number;
   payment_reminder_template: string;
+  cancellation_reminders_enabled: boolean;
+  cancellation_reminder_template: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -40,6 +42,11 @@ export const DEFAULT_PAYMENT_TEMPLATE = `عزيزي ولي الأمر،
 عدد الجلسات: {sessions}
 المبلغ المستحق: {amount} جنيه
 شكراً لتعاونكم`;
+
+export const DEFAULT_CANCELLATION_TEMPLATE = `عزيزي ولي الأمر،
+نود إعلامكم بأن {student_name} قد وصل إلى الحد الأقصى للإلغاءات ({limit} مرات) لشهر {month}.
+الإلغاءات الإضافية ستُحتسب من الرصيد.
+شكراً لتفهمكم`;
 
 export const REMINDER_HOURS_OPTIONS = [1, 2, 6, 12, 24, 48];
 export const PAYMENT_DAYS_OPTIONS = [1, 2, 3, 5, 7];

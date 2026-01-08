@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ReminderSettings, ReminderLog, DEFAULT_SESSION_TEMPLATE, DEFAULT_PAYMENT_TEMPLATE } from '@/types/reminder';
+import { ReminderSettings, ReminderLog, DEFAULT_SESSION_TEMPLATE, DEFAULT_PAYMENT_TEMPLATE, DEFAULT_CANCELLATION_TEMPLATE } from '@/types/reminder';
 import { toast } from '@/hooks/use-toast';
 
 const DEFAULT_SETTINGS: ReminderSettings = {
@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS: ReminderSettings = {
   payment_reminders_enabled: false,
   payment_reminder_days_before: 3,
   payment_reminder_template: DEFAULT_PAYMENT_TEMPLATE,
+  cancellation_reminders_enabled: false,
+  cancellation_reminder_template: DEFAULT_CANCELLATION_TEMPLATE,
 };
 
 export const useReminderSettings = () => {
