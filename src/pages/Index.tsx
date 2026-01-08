@@ -6,6 +6,7 @@ import { useConflictDetection, ConflictResult } from '@/hooks/useConflictDetecti
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
 import { StudentCard } from '@/components/StudentCard';
+import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { PaymentsDashboard } from '@/components/PaymentsDashboard';
 import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
@@ -327,6 +328,17 @@ const Index = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
+                            <EditStudentDialog
+                              student={student}
+                              students={students}
+                              onUpdateName={(name) => updateStudentName(student.id, name)}
+                              onUpdateTime={(time) => updateStudentTime(student.id, time)}
+                              onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
+                              onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
+                              onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
+                              onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
+                              onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
+                            />
                             <StudentNotesHistory studentId={student.id} studentName={student.name} />
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
