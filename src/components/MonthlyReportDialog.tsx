@@ -83,8 +83,75 @@ export const MonthlyReportDialog = ({
   const [tutorName, setTutorName] = useState('');
   const [tutorPhone, setTutorPhone] = useState('');
   const [tutorEmail, setTutorEmail] = useState('');
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // Fetch tutor profile on dialog open
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!open || profileLoaded) return;
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile) {
+          setTutorName(profile.name || '');
+          setTutorPhone(profile.phone || '');
+          setTutorEmail(profile.email || user.email || '');
+        } else {
+          // Create profile if doesn't exist
+          setTutorEmail(user.email || '');
+          await supabase.from('profiles').insert({
+            user_id: user.id,
+            email: user.email
+          });
+        }
+        setProfileLoaded(true);
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    fetchProfile();
+  }, [open, profileLoaded]);
+
+  // Save profile when tutor info changes
+  const saveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: user.id,
+          name: tutorName,
+          phone: tutorPhone,
+          email: tutorEmail
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+      
+      toast({
+        title: "تم الحفظ",
+        description: "تم حفظ بياناتك بنجاح",
+      });
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   
@@ -581,7 +648,26 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
                 {/* Tutor Info */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">معلومات المعلم</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">معلومات المعلم</CardTitle>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={saveProfile}
+                        disabled={isSavingProfile}
+                        className="gap-1.5"
+                      >
+                        {isSavingProfile ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                        حفظ البيانات
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      سيتم حفظ هذه البيانات وتعبئتها تلقائياً في التقارير القادمة
+                    </p>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
