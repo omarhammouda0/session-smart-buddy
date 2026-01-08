@@ -18,7 +18,8 @@ import { Student, Session } from "@/types/student";
 import { formatShortDateAr, MONTH_NAMES_AR } from "@/lib/arabicConstants";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
+
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -769,7 +770,13 @@ export const BulkEditSessionsDialog = ({
           </DialogHeader>
 
           {!showPreview && !showSuccessDialog && (
-            <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
+            <div
+              className="flex-1 min-h-0 -mx-6 px-6 overflow-y-auto overflow-x-hidden"
+              style={{
+                overscrollBehavior: "contain",
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
               <div className="space-y-4 pb-2 pr-2">
                 {undoData && undoTimeLeft > 0 && (
                   <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center justify-between">
@@ -824,7 +831,7 @@ export const BulkEditSessionsDialog = ({
                       className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[80vh] bg-popover pointer-events-auto"
                       align="start"
                       dir="rtl"
-                      onWheel={(e) => e.stopPropagation()}
+                      onWheelCapture={(e) => e.stopPropagation()}
                     >
                       <div className="p-3 border-b bg-muted/30 shrink-0">
                         <p className="font-medium text-sm mb-2">اختر فترات</p>
@@ -862,6 +869,7 @@ export const BulkEditSessionsDialog = ({
 
                       <div 
                         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+                        onWheelCapture={(e) => e.stopPropagation()}
                         style={{ 
                           maxHeight: "50vh",
                           overscrollBehavior: "contain"
@@ -1204,7 +1212,7 @@ export const BulkEditSessionsDialog = ({
                   <ArrowDown className="h-4 w-4 -rotate-90" />
                 </Button>
               </div>
-            </ScrollArea>
+            </div>
           )}
 
           {showPreview && !showSuccessDialog && (
@@ -1231,7 +1239,13 @@ export const BulkEditSessionsDialog = ({
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 -mx-6 px-6">
+              <div
+                className="flex-1 min-h-0 -mx-6 px-6 overflow-y-auto overflow-x-hidden"
+                style={{
+                  overscrollBehavior: "contain",
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
                 <div className="space-y-4 pb-4">
                   {Object.entries(sessionsByWeek).map(([weekLabel, sessions]) => (
                     <div key={weekLabel} className="space-y-2">
@@ -1298,7 +1312,7 @@ export const BulkEditSessionsDialog = ({
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
 
               <div className="flex flex-col gap-2 pt-4 border-t">
                 {categorizedSessions.conflicts.length > 0 && (
