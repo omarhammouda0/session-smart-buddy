@@ -11,7 +11,12 @@ import {
   ChevronRight,
   Users,
   Loader2,
-  MessageSquare
+  MessageSquare,
+  ArrowRight,
+  ArrowLeft,
+  X,
+  Check,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,16 +25,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Student, MonthlyPayment, AppSettings } from '@/types/student';
 import { SessionNote, Homework } from '@/types/notes';
 import { MonthlyReportPreview } from './MonthlyReportPreview';
@@ -49,6 +52,8 @@ const ARABIC_MONTHS = [
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
 ];
 
+type Step = 'select' | 'edit' | 'preview';
+
 export const MonthlyReportDialog = ({
   students,
   payments,
@@ -59,7 +64,7 @@ export const MonthlyReportDialog = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [activeTab, setActiveTab] = useState<'generate' | 'preview' | 'edit'>('generate');
+  const [currentStep, setCurrentStep] = useState<Step>('select');
   const [isSending, setIsSending] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   
@@ -136,7 +141,6 @@ export const MonthlyReportDialog = ({
       const endDate = format(monthEnd, 'yyyy-MM-dd');
       
       try {
-        // Fetch notes
         const { data: notesData, error: notesError } = await supabase
           .from('session_notes')
           .select('*')
@@ -147,7 +151,6 @@ export const MonthlyReportDialog = ({
         
         if (notesError) throw notesError;
         
-        // Fetch homework
         const { data: homeworkData, error: homeworkError } = await supabase
           .from('homework')
           .select('*')
@@ -193,26 +196,45 @@ export const MonthlyReportDialog = ({
     return months;
   }, []);
 
-  const handleGenerateReport = () => {
-    if (!selectedStudentId) {
-      toast({
-        title: "اختر طالب",
-        description: "الرجاء اختيار طالب لإنشاء التقرير",
-        variant: "destructive",
-      });
-      return;
+  // Reset when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setCurrentStep('select');
     }
-    
-    if (monthSessions.length === 0) {
-      toast({
-        title: "لا توجد جلسات",
-        description: "لم تتم جدولة أي جلسات لهذا الطالب في هذا الشهر",
-        variant: "destructive",
-      });
-      return;
+  }, [open]);
+
+  const handleNext = () => {
+    if (currentStep === 'select') {
+      if (!selectedStudentId) {
+        toast({
+          title: "اختر طالب",
+          description: "الرجاء اختيار طالب لإنشاء التقرير",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (monthSessions.length === 0) {
+        toast({
+          title: "لا توجد جلسات",
+          description: "لم تتم جدولة أي جلسات لهذا الطالب في هذا الشهر",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setCurrentStep('edit');
+    } else if (currentStep === 'edit') {
+      setCurrentStep('preview');
     }
-    
-    setActiveTab('preview');
+  };
+
+  const handleBack = () => {
+    if (currentStep === 'edit') {
+      setCurrentStep('select');
+    } else if (currentStep === 'preview') {
+      setCurrentStep('edit');
+    }
   };
 
   const handlePrint = () => {
@@ -225,7 +247,6 @@ export const MonthlyReportDialog = ({
     setIsGeneratingPdf(true);
     
     try {
-      // Dynamic imports to avoid TypeScript server issues
       const html2canvasModule = await import('html2canvas');
       const jsPDFModule = await import('jspdf');
       const html2canvas = html2canvasModule.default;
@@ -233,7 +254,6 @@ export const MonthlyReportDialog = ({
       
       const element = reportRef.current;
       
-      // Create canvas from the report element
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -242,19 +262,17 @@ export const MonthlyReportDialog = ({
       });
       
       const imgData = canvas.toDataURL('image/png');
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
+      const imgWidth = 210;
+      const pageHeight = 297;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
       let position = 0;
       
       const pdf = new jsPDF('p', 'mm', 'a4');
       
-      // Add first page
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
       
-      // Add additional pages if content overflows
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
@@ -294,7 +312,6 @@ export const MonthlyReportDialog = ({
     setIsSending(true);
     
     try {
-      // Create a summary message
       const message = `📊 تقرير التقدم الشهري
 
 الطالب: ${selectedStudent.name}
@@ -366,6 +383,14 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
     homework: studentHomework,
   } : null;
 
+  const steps = [
+    { id: 'select' as Step, label: 'اختر الطالب', icon: Users },
+    { id: 'edit' as Step, label: 'تعديل التقييم', icon: Edit },
+    { id: 'preview' as Step, label: 'معاينة', icon: Eye },
+  ];
+
+  const currentStepIndex = steps.findIndex(s => s.id === currentStep);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -376,40 +401,77 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
-        <DialogHeader>
-          <DialogTitle className="font-heading flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            التقارير الشهرية
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0" dir="rtl">
+        {/* Header with step indicator */}
+        <div className="border-b bg-muted/30 px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <DialogTitle className="font-heading flex items-center gap-2 text-lg">
+              <FileText className="h-5 w-5" />
+              التقارير الشهرية
+            </DialogTitle>
+            {selectedStudent && currentStep !== 'select' && (
+              <Badge variant="secondary" className="text-sm">
+                {selectedStudent.name} - {ARABIC_MONTHS[selectedMonth]} {selectedYear}
+              </Badge>
+            )}
+          </div>
+          
+          {/* Step indicator */}
+          <div className="flex items-center justify-center gap-2">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = currentStep === step.id;
+              const isCompleted = currentStepIndex > index;
+              
+              return (
+                <div key={step.id} className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (isCompleted || (index === 0)) {
+                        setCurrentStep(step.id);
+                      }
+                    }}
+                    disabled={!isCompleted && index > 0 && currentStep !== step.id}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all",
+                      isActive && "bg-primary text-primary-foreground",
+                      isCompleted && !isActive && "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30",
+                      !isActive && !isCompleted && "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {isCompleted && !isActive ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Icon className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">{step.label}</span>
+                    <span className="sm:hidden">{index + 1}</span>
+                  </button>
+                  {index < steps.length - 1 && (
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid grid-cols-3 shrink-0">
-            <TabsTrigger value="generate" className="gap-1.5 text-xs">
-              <Users className="h-3.5 w-3.5" />
-              إنشاء
-            </TabsTrigger>
-            <TabsTrigger value="preview" className="gap-1.5 text-xs" disabled={!selectedStudent || monthSessions.length === 0}>
-              <FileText className="h-3.5 w-3.5" />
-              معاينة
-            </TabsTrigger>
-            <TabsTrigger value="edit" className="gap-1.5 text-xs" disabled={!selectedStudent}>
-              <Edit className="h-3.5 w-3.5" />
-              تعديل
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex-1 overflow-hidden">
-            {/* Generate Tab */}
-            <TabsContent value="generate" className="mt-4 h-full overflow-auto">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Student Select */}
-                  <div className="space-y-2">
-                    <Label>اختر الطالب</Label>
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          {/* Step 1: Select Student */}
+          {currentStep === 'select' && (
+            <div className="p-6 space-y-6 overflow-auto h-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      اختر الطالب
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
                     <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="اختر طالب..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -420,11 +482,17 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Month Select */}
-                  <div className="space-y-2">
-                    <Label>اختر الشهر</Label>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      اختر الشهر
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
                     <Select 
                       value={`${selectedMonth}-${selectedYear}`} 
                       onValueChange={(v) => {
@@ -433,7 +501,7 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
                         setSelectedYear(y);
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -444,202 +512,251 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
-
-                {/* Info box */}
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      ℹ️ سيتم تضمين:
-                    </p>
-                    <ul className="text-sm space-y-1 mr-4 list-disc list-inside">
-                      <li>ملخص الحضور</li>
-                      <li>ملاحظات الجلسات</li>
-                      <li>الواجبات المنزلية</li>
-                      <li>تقييم عام</li>
-                      <li>حالة الدفع</li>
-                    </ul>
                   </CardContent>
                 </Card>
+              </div>
 
-                {/* Quick preview if student selected */}
-                {selectedStudent && monthSessions.length > 0 && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="font-medium mb-3">{selectedStudent.name} - {ARABIC_MONTHS[selectedMonth]} {selectedYear}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary">
-                          {monthSessions.length} جلسة
+              {/* Quick preview if student selected */}
+              {selectedStudent && (
+                <Card className={cn(
+                  monthSessions.length === 0 && "border-yellow-300 bg-yellow-50/50"
+                )}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">
+                      ملخص سريع: {selectedStudent.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {monthSessions.length > 0 ? (
+                      <div className="flex flex-wrap gap-3">
+                        <Badge variant="secondary" className="text-sm py-1 px-3">
+                          📅 {monthSessions.length} جلسة
                         </Badge>
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          الحضور: {stats.attendanceRate}%
+                        <Badge variant="outline" className="text-sm py-1 px-3 bg-green-50 text-green-700 border-green-200">
+                          ✓ الحضور: {stats.attendanceRate}%
                         </Badge>
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          الواجبات: {stats.homeworkRate}%
+                        <Badge variant="outline" className="text-sm py-1 px-3 bg-blue-50 text-blue-700 border-blue-200">
+                          📚 الواجبات: {stats.homeworkRate}%
                         </Badge>
-                        <Badge variant={monthPayment?.isPaid ? "default" : "destructive"}>
-                          {monthPayment?.isPaid ? '✓ مدفوع' : '⚠️ غير مدفوع'}
+                        <Badge variant={monthPayment?.isPaid ? "default" : "destructive"} className="text-sm py-1 px-3">
+                          {monthPayment?.isPaid ? '💰 مدفوع' : '⚠️ غير مدفوع'}
                         </Badge>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {selectedStudent && monthSessions.length === 0 && (
-                  <Card className="border-yellow-200 bg-yellow-50">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-yellow-800">
-                        ⚠️ لا توجد جلسات لـ {selectedStudent.name} في {ARABIC_MONTHS[selectedMonth]} {selectedYear}
+                    ) : (
+                      <p className="text-yellow-800 text-sm">
+                        ⚠️ لا توجد جلسات لهذا الطالب في {ARABIC_MONTHS[selectedMonth]} {selectedYear}
                       </p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <Button 
-                  onClick={handleGenerateReport} 
-                  className="w-full"
-                  disabled={!selectedStudentId || monthSessions.length === 0}
-                >
-                  إنشاء التقرير
-                </Button>
-              </div>
-            </TabsContent>
-
-            {/* Preview Tab */}
-            <TabsContent value="preview" className="mt-4 h-full overflow-hidden flex flex-col">
-              {reportData && (
-                <>
-                  <ScrollArea className="flex-1 border rounded-lg bg-white">
-                    <MonthlyReportPreview ref={reportRef} data={reportData} />
-                  </ScrollArea>
-                  
-                  <div className="flex flex-wrap gap-2 mt-4 justify-end">
-                    <Button variant="outline" onClick={() => setActiveTab('edit')} className="gap-1.5">
-                      <Edit className="h-4 w-4" />
-                      تعديل التقييم
-                    </Button>
-                    <Button variant="outline" onClick={handlePrint} className="gap-1.5">
-                      <Printer className="h-4 w-4" />
-                      طباعة
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={handleDownloadPdf} 
-                      disabled={isGeneratingPdf}
-                      className="gap-1.5"
-                    >
-                      {isGeneratingPdf ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4" />
-                      )}
-                      تحميل PDF
-                    </Button>
-                    <Button 
-                      onClick={handleSendWhatsApp} 
-                      disabled={isSending || !selectedStudent?.phone}
-                      className="gap-1.5"
-                    >
-                      {isSending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <MessageSquare className="h-4 w-4" />
-                      )}
-                      إرسال ملخص واتساب
-                    </Button>
-                  </div>
-                </>
+                    )}
+                  </CardContent>
+                </Card>
               )}
-            </TabsContent>
 
-            {/* Edit Tab */}
-            <TabsContent value="edit" className="mt-4 h-full overflow-auto">
-              <div className="space-y-4">
+              {/* Info */}
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground mb-2 font-medium">
+                    ℹ️ سيتم تضمين في التقرير:
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+                    <span className="flex items-center gap-1">✓ ملخص الحضور</span>
+                    <span className="flex items-center gap-1">✓ ملاحظات الجلسات</span>
+                    <span className="flex items-center gap-1">✓ الواجبات المنزلية</span>
+                    <span className="flex items-center gap-1">✓ تقييم عام</span>
+                    <span className="flex items-center gap-1">✓ حالة الدفع</span>
+                    <span className="flex items-center gap-1">✓ معلومات المعلم</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Step 2: Edit Assessment */}
+          {currentStep === 'edit' && (
+            <ScrollArea className="h-full">
+              <div className="p-6 space-y-6">
                 <p className="text-sm text-muted-foreground">
-                  أضف تقييمك ومعلومات التواصل لتظهر في التقرير
+                  أضف تقييمك ومعلومات التواصل لتظهر في التقرير (اختياري)
                 </p>
 
                 {/* Tutor Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>اسم المعلم</Label>
-                    <Input
-                      value={tutorName}
-                      onChange={(e) => setTutorName(e.target.value)}
-                      placeholder="اسمك"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>رقم الواتساب</Label>
-                    <Input
-                      value={tutorPhone}
-                      onChange={(e) => setTutorPhone(e.target.value)}
-                      placeholder="01012345678"
-                      dir="ltr"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>البريد الإلكتروني</Label>
-                    <Input
-                      value={tutorEmail}
-                      onChange={(e) => setTutorEmail(e.target.value)}
-                      placeholder="email@example.com"
-                      dir="ltr"
-                    />
-                  </div>
-                </div>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">معلومات المعلم</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>اسم المعلم</Label>
+                      <Input
+                        value={tutorName}
+                        onChange={(e) => setTutorName(e.target.value)}
+                        placeholder="اسمك"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>رقم الواتساب</Label>
+                      <Input
+                        value={tutorPhone}
+                        onChange={(e) => setTutorPhone(e.target.value)}
+                        placeholder="01012345678"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>البريد الإلكتروني</Label>
+                      <Input
+                        value={tutorEmail}
+                        onChange={(e) => setTutorEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        dir="ltr"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Assessment */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-green-700">نقاط القوة</Label>
-                    <Textarea
-                      value={strengths}
-                      onChange={(e) => setStrengths(e.target.value)}
-                      placeholder="• فهم ممتاز للمفاهيم الأساسية&#10;• التزام جيد بالحضور&#10;• تحسن مستمر خلال الشهر"
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-orange-700">المجالات التي تحتاج تحسين</Label>
-                    <Textarea
-                      value={improvements}
-                      onChange={(e) => setImprovements(e.target.value)}
-                      placeholder="• إكمال الواجبات المنزلية بانتظام&#10;• المزيد من التدريب على الهندسة"
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-blue-700">التوصيات</Label>
-                    <Textarea
-                      value={recommendations}
-                      onChange={(e) => setRecommendations(e.target.value)}
-                      placeholder="• الاستمرار في التدريب المنتظم&#10;• تخصيص وقت إضافي للواجبات"
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-purple-700">الهدف للشهر القادم</Label>
-                    <Textarea
-                      value={nextMonthGoal}
-                      onChange={(e) => setNextMonthGoal(e.target.value)}
-                      placeholder="• تحسين نسبة إكمال الواجبات إلى 100%&#10;• إتقان موضوعات الهندسة"
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                </div>
-
-                <Button onClick={() => setActiveTab('preview')} className="w-full">
-                  حفظ ومعاينة التقرير
-                </Button>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">التقييم الشهري</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-green-700 flex items-center gap-2">
+                        ⭐ نقاط القوة
+                      </Label>
+                      <Textarea
+                        value={strengths}
+                        onChange={(e) => setStrengths(e.target.value)}
+                        placeholder="• فهم ممتاز للمفاهيم الأساسية&#10;• التزام جيد بالحضور"
+                        className="min-h-[80px]"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-orange-700 flex items-center gap-2">
+                        📝 المجالات التي تحتاج تحسين
+                      </Label>
+                      <Textarea
+                        value={improvements}
+                        onChange={(e) => setImprovements(e.target.value)}
+                        placeholder="• إكمال الواجبات المنزلية بانتظام"
+                        className="min-h-[80px]"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 flex items-center gap-2">
+                        💡 التوصيات
+                      </Label>
+                      <Textarea
+                        value={recommendations}
+                        onChange={(e) => setRecommendations(e.target.value)}
+                        placeholder="• الاستمرار في التدريب المنتظم"
+                        className="min-h-[80px]"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-purple-700 flex items-center gap-2">
+                        🎯 الهدف للشهر القادم
+                      </Label>
+                      <Textarea
+                        value={nextMonthGoal}
+                        onChange={(e) => setNextMonthGoal(e.target.value)}
+                        placeholder="• تحسين نسبة إكمال الواجبات إلى 100%"
+                        className="min-h-[80px]"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </TabsContent>
+            </ScrollArea>
+          )}
+
+          {/* Step 3: Preview */}
+          {currentStep === 'preview' && reportData && (
+            <div className="h-full flex flex-col">
+              <ScrollArea className="flex-1 border-y bg-white">
+                <MonthlyReportPreview ref={reportRef} data={reportData} />
+              </ScrollArea>
+            </div>
+          )}
+        </div>
+
+        {/* Footer with navigation */}
+        <div className="border-t bg-muted/30 px-6 py-4">
+          <div className="flex items-center justify-between gap-3">
+            {/* Back button */}
+            <div>
+              {currentStep !== 'select' && (
+                <Button variant="outline" onClick={handleBack} className="gap-2">
+                  <ArrowRight className="h-4 w-4" />
+                  رجوع
+                </Button>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {currentStep === 'select' && (
+                <Button 
+                  onClick={handleNext} 
+                  disabled={!selectedStudentId || monthSessions.length === 0}
+                  className="gap-2"
+                >
+                  التالي
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
+
+              {currentStep === 'edit' && (
+                <>
+                  <Button variant="outline" onClick={() => setCurrentStep('preview')} className="gap-2">
+                    <Eye className="h-4 w-4" />
+                    تخطي للمعاينة
+                  </Button>
+                  <Button onClick={handleNext} className="gap-2">
+                    حفظ ومعاينة
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+
+              {currentStep === 'preview' && (
+                <>
+                  <Button variant="outline" onClick={handlePrint} className="gap-2">
+                    <Printer className="h-4 w-4" />
+                    <span className="hidden sm:inline">طباعة</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleDownloadPdf} 
+                    disabled={isGeneratingPdf}
+                    className="gap-2"
+                  >
+                    {isGeneratingPdf ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">تحميل PDF</span>
+                  </Button>
+                  <Button 
+                    onClick={handleSendWhatsApp} 
+                    disabled={isSending || !selectedStudent?.phone}
+                    className="gap-2"
+                  >
+                    {isSending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <MessageSquare className="h-4 w-4" />
+                    )}
+                    إرسال واتساب
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-        </Tabs>
+        </div>
       </DialogContent>
 
       {/* Print styles */}
