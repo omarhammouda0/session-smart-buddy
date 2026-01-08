@@ -34,14 +34,31 @@ const getStudentMonthStats = (student: Student, month: number, year: number) => 
 
 // Helper to get session price for a student
 const getStudentSessionPrice = (student: Student, settings?: AppSettings): number => {
+  // Default prices if not set
+  const defaultOnsite = 150;
+  const defaultOnline = 120;
+  
   if (student.useCustomSettings) {
-    return student.sessionType === 'online' 
-      ? (student.customPriceOnline ?? 0)
-      : (student.customPriceOnsite ?? 0);
+    // For custom settings, use custom prices if set, otherwise fall back to defaults
+    if (student.sessionType === 'online') {
+      return typeof student.customPriceOnline === 'number' && student.customPriceOnline > 0 
+        ? student.customPriceOnline 
+        : (settings?.defaultPriceOnline ?? defaultOnline);
+    }
+    return typeof student.customPriceOnsite === 'number' && student.customPriceOnsite > 0 
+      ? student.customPriceOnsite 
+      : (settings?.defaultPriceOnsite ?? defaultOnsite);
   }
-  return student.sessionType === 'online'
-    ? (settings?.defaultPriceOnline ?? 0)
-    : (settings?.defaultPriceOnsite ?? 0);
+  
+  // Use global settings with fallback to defaults
+  if (student.sessionType === 'online') {
+    return typeof settings?.defaultPriceOnline === 'number' && settings.defaultPriceOnline > 0
+      ? settings.defaultPriceOnline
+      : defaultOnline;
+  }
+  return typeof settings?.defaultPriceOnsite === 'number' && settings.defaultPriceOnsite > 0
+    ? settings.defaultPriceOnsite
+    : defaultOnsite;
 };
 
 // Helper to calculate total price for a student in a month
