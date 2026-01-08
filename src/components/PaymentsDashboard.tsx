@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2 } from 'lucide-react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,6 +12,21 @@ import { cn } from '@/lib/utils';
 import { subMonths } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+// Helper to count session stats for a student in a given month
+const getStudentMonthStats = (student: Student, month: number, year: number) => {
+  const sessions = student.sessions.filter(s => {
+    const sessionDate = new Date(s.date);
+    return sessionDate.getMonth() === month && sessionDate.getFullYear() === year;
+  });
+  
+  const completed = sessions.filter(s => s.status === 'completed').length;
+  const vacation = sessions.filter(s => s.status === 'vacation').length;
+  const cancelled = sessions.filter(s => s.status === 'cancelled').length;
+  const scheduled = sessions.filter(s => s.status === 'scheduled').length;
+  
+  return { completed, vacation, cancelled, scheduled, total: sessions.length };
+};
 interface PaymentsDashboardProps {
   students: Student[];
   payments: StudentPayments[];
@@ -215,6 +230,7 @@ export const PaymentsDashboard = ({
             filteredStudents.map(student => {
               const isPaid = getPaymentStatus(student.id);
               const isSending = sendingReminder === student.id;
+              const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
               return (
                 <div key={student.id} className={cn("flex items-center justify-between p-3 rounded-lg border transition-all", isPaid ? "bg-success/10 border-success/30" : "bg-card border-border")}>
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -223,10 +239,31 @@ export const PaymentsDashboard = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="font-medium block truncate">{student.name}</span>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{student.sessionTime || '16:00'}</span>
                         <span>•</span>
                         <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join('، ')}</span>
+                        {monthStats.completed > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-success">{monthStats.completed} مكتملة</span>
+                          </>
+                        )}
+                        {monthStats.vacation > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-warning flex items-center gap-0.5">
+                              <Palmtree className="h-3 w-3" />
+                              {monthStats.vacation} إجازة
+                            </span>
+                          </>
+                        )}
+                        {monthStats.cancelled > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-destructive">{monthStats.cancelled} ملغاة</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
