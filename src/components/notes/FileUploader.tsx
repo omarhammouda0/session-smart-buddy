@@ -160,6 +160,16 @@ export function FileUploader({ onUpload, onCancel, maxSize = MAX_FILE_SIZE, acce
 
   return (
     <div className="space-y-4 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Upload className="h-4 w-4" />
+          رفع ملف
+        </div>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          رجوع
+        </Button>
+      </div>
+      
       {error && (
         <div className="text-destructive text-sm text-center bg-destructive/10 p-2 rounded-lg">
           ❌ {error}
@@ -204,10 +214,6 @@ export function FileUploader({ onUpload, onCancel, maxSize = MAX_FILE_SIZE, acce
           صورة
         </Button>
       </div>
-
-      <Button variant="ghost" size="sm" onClick={onCancel} className="w-full">
-        إلغاء
-      </Button>
     </div>
   );
 }
