@@ -889,32 +889,38 @@ export const BulkEditSessionsDialog = ({
                         إضافة فترة
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="w-[min(380px,90vw)] p-0 max-h-[60vh] overflow-hidden flex flex-col"
-                      align="start"
+                    <PopoverContent 
+                      className="w-[min(360px,88vw)] p-0 flex flex-col" 
+                      align="start" 
                       dir="rtl"
+                      style={{ maxHeight: '60vh' }}
                     >
-                      <div className="p-3 border-b bg-muted/30">
+                      {/* Fixed Header */}
+                      <div className="p-3 border-b bg-muted/30 shrink-0">
                         <p className="font-medium text-sm">اختر فترات (تحديد متعدد)</p>
                       </div>
-
-                      <ScrollArea className="flex-1 max-h-[50vh]">
-                        <div className="p-3 space-y-3">
+                      
+                      {/* Scrollable Content */}
+                      <div 
+                        className="overflow-y-auto overflow-x-hidden" 
+                        style={{ maxHeight: '45vh' }}
+                      >
+                        <div className="p-4 space-y-4">
                           {!showCustomRange ? (
                             <>
-                              {/* Weeks Section - 4 weeks only */}
+                              {/* Weeks Section */}
                               <div className="space-y-2">
-                                <p className="text-xs font-medium text-muted-foreground px-1">📅 الأسابيع:</p>
+                                <p className="text-xs font-medium text-muted-foreground">📅 الأسابيع:</p>
                                 <div className="space-y-1">
-                                  {weekOptions.map((week) => {
-                                    const isAlreadyAdded = selectedPeriods.some((p) => p.id === week.id);
+                                  {weekOptions.map(week => {
+                                    const isAlreadyAdded = selectedPeriods.some(p => p.id === week.id);
                                     return (
                                       <label
                                         key={week.id}
                                         className={cn(
-                                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
-                                          checkedPeriodIds.has(week.id) && "bg-primary/10",
-                                          isAlreadyAdded && "opacity-50 cursor-not-allowed",
+                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                          checkedPeriodIds.has(week.id) && 'bg-primary/10',
+                                          isAlreadyAdded && 'opacity-50 cursor-not-allowed'
                                         )}
                                       >
                                         <Checkbox
@@ -934,17 +940,17 @@ export const BulkEditSessionsDialog = ({
 
                               {/* Months Section */}
                               <div className="space-y-2">
-                                <p className="text-xs font-medium text-muted-foreground px-1">📆 الأشهر:</p>
+                                <p className="text-xs font-medium text-muted-foreground">📆 الأشهر:</p>
                                 <div className="space-y-1">
-                                  {monthOptions.map((month) => {
-                                    const isAlreadyAdded = selectedPeriods.some((p) => p.id === month.id);
+                                  {monthOptions.map(month => {
+                                    const isAlreadyAdded = selectedPeriods.some(p => p.id === month.id);
                                     return (
                                       <label
                                         key={month.id}
                                         className={cn(
-                                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted",
-                                          checkedPeriodIds.has(month.id) && "bg-primary/10",
-                                          isAlreadyAdded && "opacity-50 cursor-not-allowed",
+                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                          checkedPeriodIds.has(month.id) && 'bg-primary/10',
+                                          isAlreadyAdded && 'opacity-50 cursor-not-allowed'
                                         )}
                                       >
                                         <Checkbox
@@ -960,21 +966,11 @@ export const BulkEditSessionsDialog = ({
                               </div>
 
                               {/* Quick Actions */}
-                              <div className="flex gap-2 pt-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="flex-1 h-8 text-xs"
-                                  onClick={selectAllPeriods}
-                                >
+                              <div className="flex gap-2">
+                                <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs" onClick={selectAllPeriods}>
                                   تحديد الكل
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="flex-1 h-8 text-xs"
-                                  onClick={deselectAllPeriods}
-                                >
+                                <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs" onClick={deselectAllPeriods}>
                                   إلغاء التحديد
                                 </Button>
                               </div>
@@ -982,7 +978,7 @@ export const BulkEditSessionsDialog = ({
                           ) : (
                             /* Custom Range */
                             <div className="space-y-3">
-                              <p className="text-xs font-medium text-muted-foreground px-1">📋 نطاق مخصص:</p>
+                              <p className="text-xs font-medium text-muted-foreground">📋 نطاق مخصص:</p>
                               <div className="space-y-2">
                                 <Label className="text-xs">من:</Label>
                                 <Popover>
@@ -991,7 +987,7 @@ export const BulkEditSessionsDialog = ({
                                       variant="outline"
                                       className="w-full justify-start text-right font-normal text-sm"
                                     >
-                                      {customDateFrom ? format(customDateFrom, "dd/MM/yyyy") : "اختر تاريخ"}
+                                      {customDateFrom ? format(customDateFrom, 'dd/MM/yyyy') : 'اختر تاريخ'}
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
@@ -1012,7 +1008,7 @@ export const BulkEditSessionsDialog = ({
                                       variant="outline"
                                       className="w-full justify-start text-right font-normal text-sm"
                                     >
-                                      {customDateTo ? format(customDateTo, "dd/MM/yyyy") : "اختر تاريخ"}
+                                      {customDateTo ? format(customDateTo, 'dd/MM/yyyy') : 'اختر تاريخ'}
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
@@ -1028,10 +1024,10 @@ export const BulkEditSessionsDialog = ({
                             </div>
                           )}
                         </div>
-                      </ScrollArea>
+                      </div>
 
-                      {/* Bottom Actions */}
-                      <div className="p-3 border-t bg-muted/30 space-y-2">
+                      {/* Fixed Footer */}
+                      <div className="p-3 border-t bg-muted/30 space-y-2 shrink-0">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1041,14 +1037,14 @@ export const BulkEditSessionsDialog = ({
                             setCheckedPeriodIds(new Set());
                           }}
                         >
-                          {showCustomRange ? "← العودة للقائمة" : "نطاق مخصص..."}
+                          {showCustomRange ? '← العودة للقائمة' : 'نطاق مخصص...'}
                         </Button>
-
+                        
                         <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex-1" 
                             onClick={() => {
                               setShowPeriodPicker(false);
                               setShowCustomRange(false);
@@ -1057,10 +1053,12 @@ export const BulkEditSessionsDialog = ({
                           >
                             إلغاء
                           </Button>
-                          <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
-                            {showCustomRange
-                              ? "إضافة"
-                              : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ""}`}
+                          <Button 
+                            size="sm" 
+                            className="flex-1" 
+                            onClick={addCheckedPeriods}
+                          >
+                            {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
                           </Button>
                         </div>
                       </div>
