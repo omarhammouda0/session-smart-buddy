@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Clock, Banknote, MessageCircle, Loader2, CheckCircle, XCircle, Info } from 'lucide-react';
+import { Bell, Clock, Banknote, MessageCircle, Loader2, CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
 import { useReminderSettings } from '@/hooks/useReminderSettings';
 import { REMINDER_HOURS_OPTIONS, PAYMENT_DAYS_OPTIONS, SEND_TIME_OPTIONS } from '@/types/reminder';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +26,8 @@ export const ReminderSettingsDialog = () => {
   const [paymentEnabled, setPaymentEnabled] = useState(false);
   const [paymentDays, setPaymentDays] = useState(3);
   const [paymentTemplate, setPaymentTemplate] = useState('');
+  const [cancellationEnabled, setCancellationEnabled] = useState(false);
+  const [cancellationTemplate, setCancellationTemplate] = useState('');
 
   // Sync local state with fetched settings
   useEffect(() => {
@@ -37,6 +39,8 @@ export const ReminderSettingsDialog = () => {
       setPaymentEnabled(settings.payment_reminders_enabled);
       setPaymentDays(settings.payment_reminder_days_before);
       setPaymentTemplate(settings.payment_reminder_template);
+      setCancellationEnabled(settings.cancellation_reminders_enabled);
+      setCancellationTemplate(settings.cancellation_reminder_template);
     }
   }, [settings]);
 
@@ -49,6 +53,8 @@ export const ReminderSettingsDialog = () => {
       setPaymentEnabled(settings.payment_reminders_enabled);
       setPaymentDays(settings.payment_reminder_days_before);
       setPaymentTemplate(settings.payment_reminder_template);
+      setCancellationEnabled(settings.cancellation_reminders_enabled);
+      setCancellationTemplate(settings.cancellation_reminder_template);
     }
     setOpen(isOpen);
   };
@@ -92,6 +98,8 @@ export const ReminderSettingsDialog = () => {
       payment_reminders_enabled: paymentEnabled,
       payment_reminder_days_before: paymentDays,
       payment_reminder_template: paymentTemplate,
+      cancellation_reminders_enabled: cancellationEnabled,
+      cancellation_reminder_template: cancellationTemplate,
     });
 
     if (success) {
@@ -269,6 +277,41 @@ export const ReminderSettingsDialog = () => {
                     <div className="flex justify-between text-[10px] text-muted-foreground">
                       <span>المتغيرات: {'{student_name}'}, {'{month}'}, {'{sessions}'}, {'{amount}'}</span>
                       <span>{paymentTemplate.length} / 1600</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Cancellation Reminders */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">تذكيرات الإلغاء</span>
+                </div>
+                <Switch
+                  checked={cancellationEnabled}
+                  onCheckedChange={setCancellationEnabled}
+                />
+              </div>
+
+              {cancellationEnabled && (
+                <div className="space-y-4 pr-6 border-r-2 border-primary/20">
+                  <div className="space-y-2">
+                    <Label className="text-xs">نص الرسالة:</Label>
+                    <Textarea
+                      value={cancellationTemplate}
+                      onChange={(e) => setCancellationTemplate(e.target.value)}
+                      rows={5}
+                      className="text-sm resize-none"
+                      maxLength={1600}
+                    />
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>المتغيرات: {'{student_name}'}, {'{month}'}, {'{limit}'}</span>
+                      <span>{cancellationTemplate.length} / 1600</span>
                     </div>
                   </div>
                 </div>
