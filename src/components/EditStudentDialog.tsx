@@ -30,9 +30,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Student, SessionType } from '@/types/student';
-import { DAY_NAMES_AR } from '@/lib/arabicConstants';
+import { DAY_NAMES_AR, formatDurationAr, calculateEndTime } from '@/lib/arabicConstants';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
 import { generateSessionsForSchedule } from '@/lib/dateUtils';
+import { DURATION_OPTIONS, DEFAULT_DURATION } from '@/types/student';
 
 interface EditStudentDialogProps {
   student: Student;
@@ -42,6 +43,7 @@ interface EditStudentDialogProps {
   onUpdatePhone: (phone: string) => void;
   onUpdateSessionType: (type: SessionType) => void;
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
+  onUpdateDuration?: (duration: number) => void;
 }
 
 export const EditStudentDialog = ({
@@ -52,12 +54,14 @@ export const EditStudentDialog = ({
   onUpdatePhone,
   onUpdateSessionType,
   onUpdateSchedule,
+  onUpdateDuration,
 }: EditStudentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(student.name);
   const [phone, setPhone] = useState(student.phone || '');
   const [sessionTime, setSessionTime] = useState(student.sessionTime || '16:00');
   const [sessionType, setSessionType] = useState<SessionType>(student.sessionType || 'onsite');
+  const [sessionDuration, setSessionDuration] = useState<number>(student.sessionDuration || DEFAULT_DURATION);
   const [selectedDays, setSelectedDays] = useState<number[]>(
     student.scheduleDays.map(d => d.dayOfWeek)
   );
@@ -164,6 +168,9 @@ export const EditStudentDialog = ({
     if (sessionType !== student.sessionType) {
       onUpdateSessionType(sessionType);
     }
+    if (sessionDuration !== (student.sessionDuration || DEFAULT_DURATION)) {
+      onUpdateDuration?.(sessionDuration);
+    }
     
     const currentDays = student.scheduleDays.map(d => d.dayOfWeek).sort().join(',');
     const newDays = selectedDays.sort().join(',');
@@ -182,6 +189,7 @@ export const EditStudentDialog = ({
       setPhone(student.phone || '');
       setSessionTime(student.sessionTime || '16:00');
       setSessionType(student.sessionType || 'onsite');
+      setSessionDuration(student.sessionDuration || DEFAULT_DURATION);
       setSelectedDays(student.scheduleDays.map(d => d.dayOfWeek));
       setConflictResults(new Map());
     }
@@ -258,6 +266,34 @@ export const EditStudentDialog = ({
                   </div>
                 )}
               </div>
+              
+              {/* End time display */}
+              <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                وقت النهاية: {calculateEndTime(sessionTime, sessionDuration).endTime}
+                {calculateEndTime(sessionTime, sessionDuration).crossesMidnight && (
+                  <span className="text-destructive mr-1">(الغد)</span>
+                )}
+              </div>
+            </div>
+            
+            {/* Session Duration */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                مدة الحصة
+              </Label>
+              <Select value={sessionDuration.toString()} onValueChange={(v) => setSessionDuration(Number(v))}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DURATION_OPTIONS.map((d) => (
+                    <SelectItem key={d} value={d.toString()}>
+                      {formatDurationAr(d)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             {/* Conflict Warning Box */}

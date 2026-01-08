@@ -28,6 +28,7 @@ interface StudentCardProps {
   onUpdatePhone: (phone: string) => void;
   onUpdateSessionType: (type: SessionType) => void;
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
+  onUpdateDuration?: (duration: number) => void;
 }
 
 export const StudentCard = ({
@@ -40,6 +41,7 @@ export const StudentCard = ({
   onUpdatePhone,
   onUpdateSessionType,
   onUpdateSchedule,
+  onUpdateDuration,
 }: StudentCardProps) => {
 
   return (
@@ -59,6 +61,7 @@ export const StudentCard = ({
                 onUpdatePhone={onUpdatePhone}
                 onUpdateSessionType={onUpdateSessionType}
                 onUpdateSchedule={onUpdateSchedule}
+                onUpdateDuration={onUpdateDuration}
               />
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
