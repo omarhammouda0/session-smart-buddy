@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote, AlertTriangle } from 'lucide-react';
 import { useReminderSettings } from '@/hooks/useReminderSettings';
 import { ReminderLog } from '@/types/reminder';
@@ -12,16 +11,16 @@ import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
-type FilterType = 'all' | 'session' | 'payment' | 'cancellation';
-type FilterStatus = 'all' | 'sent' | 'failed';
-type FilterTime = 'all' | 'week' | 'month';
+type FilterType = 'session' | 'payment' | 'cancellation';
+type FilterStatus = 'sent' | 'failed';
+type FilterTime = 'week' | 'month';
 
 export const ReminderHistoryDialog = () => {
   const { logs, fetchLogs, retryFailedReminders } = useReminderSettings();
   const [open, setOpen] = useState(false);
-  const [filterType, setFilterType] = useState<FilterType>('all');
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
-  const [filterTime, setFilterTime] = useState<FilterTime>('all');
+  const [filterTypes, setFilterTypes] = useState<FilterType[]>([]);
+  const [filterStatuses, setFilterStatuses] = useState<FilterStatus[]>([]);
+  const [filterTime, setFilterTime] = useState<FilterTime | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [selectedLog, setSelectedLog] = useState<ReminderLog | null>(null);
 
@@ -45,10 +44,14 @@ export const ReminderHistoryDialog = () => {
   };
 
   const filteredLogs = logs.filter(log => {
-    if (filterType !== 'all' && log.type !== filterType) return false;
-    if (filterStatus !== 'all' && log.status !== filterStatus) return false;
+    // Type filter - if any selected, log must match one
+    if (filterTypes.length > 0 && !filterTypes.includes(log.type as FilterType)) return false;
     
-    if (filterTime !== 'all') {
+    // Status filter - if any selected, log must match one
+    if (filterStatuses.length > 0 && !filterStatuses.includes(log.status as FilterStatus)) return false;
+    
+    // Time filter
+    if (filterTime) {
       const logDate = parseISO(log.sent_at);
       const now = new Date();
       
@@ -61,6 +64,30 @@ export const ReminderHistoryDialog = () => {
     
     return true;
   });
+
+  const toggleTypeFilter = (type: FilterType) => {
+    setFilterTypes(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
+  const toggleStatusFilter = (status: FilterStatus) => {
+    setFilterStatuses(prev => 
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    );
+  };
+
+  const toggleTimeFilter = (time: FilterTime) => {
+    setFilterTime(prev => prev === time ? null : time);
+  };
+
+  const clearFilters = () => {
+    setFilterTypes([]);
+    setFilterStatuses([]);
+    setFilterTime(null);
+  };
+
+  const hasActiveFilters = filterTypes.length > 0 || filterStatuses.length > 0 || filterTime !== null;
 
   const failedCount = logs.filter(l => l.status === 'failed').length;
 
@@ -89,57 +116,131 @@ export const ReminderHistoryDialog = () => {
         </DialogHeader>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-2 py-2">
-          <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
-            <SelectTrigger className="w-28 h-8 text-xs">
-              <SelectValue placeholder="النوع" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover z-50">
-              <SelectItem value="all">الكل</SelectItem>
-              <SelectItem value="session">جلسات</SelectItem>
-              <SelectItem value="payment">دفع</SelectItem>
-              <SelectItem value="cancellation">إلغاء</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)}>
-            <SelectTrigger className="w-28 h-8 text-xs">
-              <SelectValue placeholder="الحالة" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">الكل</SelectItem>
-              <SelectItem value="sent">تم الإرسال</SelectItem>
-              <SelectItem value="failed">فشل</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={filterTime} onValueChange={(v) => setFilterTime(v as FilterTime)}>
-            <SelectTrigger className="w-28 h-8 text-xs">
-              <SelectValue placeholder="الفترة" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">الكل</SelectItem>
-              <SelectItem value="week">آخر أسبوع</SelectItem>
-              <SelectItem value="month">آخر شهر</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {failedCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1 text-xs border-warning text-warning hover:bg-warning/10"
-              onClick={handleRetryFailed}
-              disabled={retrying}
-            >
-              {retrying ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
+        <div className="space-y-2 py-2">
+          <div className="flex flex-wrap gap-1.5">
+            {/* Type Filters */}
+            <button
+              onClick={() => toggleTypeFilter('session')}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                filterTypes.includes('session')
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card border-border hover:border-primary/50"
               )}
-              إعادة ({failedCount})
-            </Button>
-          )}
+            >
+              <MessageCircle className="h-3 w-3 inline ml-1" />
+              جلسات
+            </button>
+            <button
+              onClick={() => toggleTypeFilter('payment')}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                filterTypes.includes('payment')
+                  ? "bg-warning text-warning-foreground border-warning"
+                  : "bg-card border-border hover:border-warning/50"
+              )}
+            >
+              <Banknote className="h-3 w-3 inline ml-1" />
+              دفع
+            </button>
+            <button
+              onClick={() => toggleTypeFilter('cancellation')}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                filterTypes.includes('cancellation')
+                  ? "bg-destructive text-destructive-foreground border-destructive"
+                  : "bg-card border-border hover:border-destructive/50"
+              )}
+            >
+              <AlertTriangle className="h-3 w-3 inline ml-1" />
+              إلغاء
+            </button>
+
+            <div className="w-px bg-border mx-1" />
+
+            {/* Status Filters */}
+            <button
+              onClick={() => toggleStatusFilter('sent')}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                filterStatuses.includes('sent')
+                  ? "bg-success text-success-foreground border-success"
+                  : "bg-card border-border hover:border-success/50"
+              )}
+            >
+              <CheckCircle className="h-3 w-3 inline ml-1" />
+              نجح
+            </button>
+            <button
+              onClick={() => toggleStatusFilter('failed')}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                filterStatuses.includes('failed')
+                  ? "bg-destructive text-destructive-foreground border-destructive"
+                  : "bg-card border-border hover:border-destructive/50"
+              )}
+            >
+              <XCircle className="h-3 w-3 inline ml-1" />
+              فشل
+            </button>
+
+            <div className="w-px bg-border mx-1" />
+
+            {/* Time Filters */}
+            <button
+              onClick={() => toggleTimeFilter('week')}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                filterTime === 'week'
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card border-border hover:border-primary/50"
+              )}
+            >
+              <Clock className="h-3 w-3 inline ml-1" />
+              أسبوع
+            </button>
+            <button
+              onClick={() => toggleTimeFilter('month')}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                filterTime === 'month'
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card border-border hover:border-primary/50"
+              )}
+            >
+              <Clock className="h-3 w-3 inline ml-1" />
+              شهر
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between">
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground"
+                onClick={clearFilters}
+              >
+                مسح الفلاتر
+              </Button>
+            )}
+            {failedCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 text-xs border-warning text-warning hover:bg-warning/10 mr-auto"
+                onClick={handleRetryFailed}
+                disabled={retrying}
+              >
+                {retrying ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                إعادة ({failedCount})
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Log List */}
