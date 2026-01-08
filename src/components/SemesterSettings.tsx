@@ -26,8 +26,8 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
   const [start, setStart] = useState(settings.defaultSemesterStart);
   const [end, setEnd] = useState(settings.defaultSemesterEnd);
   const [duration, setDuration] = useState(settings.defaultSessionDuration || DEFAULT_DURATION);
-  const [priceOnsite, setPriceOnsite] = useState<string>(settings.defaultPriceOnsite?.toString() || '');
-  const [priceOnline, setPriceOnline] = useState<string>(settings.defaultPriceOnline?.toString() || '');
+  const [priceOnsite, setPriceOnsite] = useState<string>((settings.defaultPriceOnsite ?? 150).toString());
+  const [priceOnline, setPriceOnline] = useState<string>((settings.defaultPriceOnline ?? 120).toString());
 
   const handleSave = () => {
     const onsitePrice = priceOnsite.trim() === ''
@@ -67,8 +67,8 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
       setStart(settings.defaultSemesterStart);
       setEnd(settings.defaultSemesterEnd);
       setDuration(settings.defaultSessionDuration || DEFAULT_DURATION);
-      setPriceOnsite(settings.defaultPriceOnsite?.toString() || '');
-      setPriceOnline(settings.defaultPriceOnline?.toString() || '');
+      setPriceOnsite((settings.defaultPriceOnsite ?? 150).toString());
+      setPriceOnline((settings.defaultPriceOnline ?? 120).toString());
     }
     setOpen(isOpen);
   };
