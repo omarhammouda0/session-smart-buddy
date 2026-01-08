@@ -315,39 +315,78 @@ export const useCancellationTracking = (students: Student[]) => {
   );
 
   // Remove a cancellation (when restoring a session)
+  // Important: compute the new count from the backend (never trust local state)
   const removeCancellation = useCallback(
     async (studentId: string, sessionDate: string): Promise<boolean> => {
       const month = format(new Date(sessionDate), 'yyyy-MM');
 
       try {
-        // Delete the cancellation record
+        const userId = await getUserId();
+        if (!userId) {
+          console.error('removeCancellation: no authenticated user');
+          return false;
+        }
+
+        // Find the most recent cancellation entry for this exact session date
+        const { data: rowToDelete, error: findError } = await supabase
+          .from('session_cancellations')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('student_id', studentId)
+          .eq('month', month)
+          .eq('session_date', sessionDate)
+          .order('cancelled_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (findError) {
+          console.error('Error finding cancellation to delete:', findError);
+          return false;
+        }
+
+        if (!rowToDelete?.id) {
+          // Nothing to delete; treat as success to avoid blocking restore flow
+          await loadData();
+          return true;
+        }
+
         const { error: deleteError } = await supabase
           .from('session_cancellations')
           .delete()
-          .eq('student_id', studentId)
-          .eq('session_date', sessionDate);
+          .eq('id', rowToDelete.id)
+          .eq('user_id', userId);
 
         if (deleteError) {
           console.error('Error deleting cancellation:', deleteError);
           return false;
         }
 
-        // Update monthly tracking
-        const currentCount = getCancellationCount(studentId, month);
-        const newCount = Math.max(0, currentCount - 1);
+        // Recompute count from DB
+        const { count, error: countError } = await supabase
+          .from('session_cancellations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('student_id', studentId)
+          .eq('month', month);
+
+        if (countError) {
+          console.error('Error counting cancellations after delete:', countError);
+        }
+
+        const newCount = Math.max(0, count ?? 0);
 
         if (newCount === 0) {
-          // Delete tracking record if count is 0
           await supabase
             .from('student_cancellation_tracking')
             .delete()
+            .eq('user_id', userId)
             .eq('student_id', studentId)
             .eq('month', month);
         } else {
-          // Update count
           await supabase
             .from('student_cancellation_tracking')
             .update({ cancellation_count: newCount })
+            .eq('user_id', userId)
             .eq('student_id', studentId)
             .eq('month', month);
         }
@@ -359,7 +398,7 @@ export const useCancellationTracking = (students: Student[]) => {
         return false;
       }
     },
-    [getCancellationCount, loadData]
+    [getUserId, loadData]
   );
 
   // Mark parent as notified

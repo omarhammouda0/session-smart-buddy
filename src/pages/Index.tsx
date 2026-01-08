@@ -477,8 +477,8 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
-        {/* Attendance Alerts Widget */}
-        {studentsAtRisk.length > 0 && (
+        {/* Attendance Alerts Widget (management only) */}
+        {activeTab === 'history' && studentsAtRisk.length > 0 && (
           <AttendanceAlertsWidget
             studentsAtRisk={studentsAtRisk}
             onNotifyParent={async (studentId) => {
