@@ -83,6 +83,7 @@ const Index = () => {
     deleteSession,
     restoreSession,
     rescheduleSession,
+    updateSessionDateTime,
     toggleSessionComplete,
     togglePaymentStatus,
     bulkUpdateSessionTime,
@@ -456,6 +457,7 @@ const Index = () => {
               <BulkEditSessionsDialog
                 students={students}
                 onBulkUpdateTime={bulkUpdateSessionTime}
+                onUpdateSessionDate={updateSessionDateTime}
                 onBulkMarkAsVacation={bulkMarkAsVacation}
               />
               <MonthlyReportDialog 

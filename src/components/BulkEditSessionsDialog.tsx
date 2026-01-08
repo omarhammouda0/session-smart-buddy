@@ -10,10 +10,12 @@ import {
   startOfMonth,
   addMonths,
   parseISO,
+  getDay,
+  addDays,
 } from 'date-fns';
-import { Calendar, Clock, User, ChevronLeft, Undo2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, User, ChevronLeft, Undo2, CheckCircle2, XCircle, AlertCircle, ArrowDown } from 'lucide-react';
 import { Student, Session } from '@/types/student';
-import { formatShortDateAr } from '@/lib/arabicConstants';
+import { formatShortDateAr, DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,6 +47,12 @@ interface BulkEditSessionsDialogProps {
     sessionIds: string[],
     newTime: string
   ) => { success: boolean; updatedCount: number; conflicts: ConflictInfo[] };
+  onUpdateSessionDate?: (
+    studentId: string,
+    sessionId: string,
+    newDate: string,
+    newTime: string
+  ) => void;
   onBulkMarkAsVacation?: (
     studentIds: string[],
     sessionIds: string[]
@@ -56,6 +64,8 @@ interface SessionWithStudent {
   student: Student;
   originalTime: string;
   newTime: string;
+  originalDate: string;
+  newDate: string;
 }
 
 interface ConflictInfo {
@@ -76,7 +86,7 @@ interface CategorizedSessions {
 }
 
 interface UndoData {
-  sessionUpdates: { sessionId: string; studentId: string; originalTime: string }[];
+  sessionUpdates: { sessionId: string; studentId: string; originalTime: string; originalDate: string }[];
   timestamp: number;
   count: number;
   studentName: string;
@@ -111,11 +121,48 @@ const formatTimeAr = (time: string): string => {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
+// Generate time options for dropdown (every 30 mins)
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hour = Math.floor(i / 2);
+  const min = (i % 2) * 30;
+  return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+});
+
+// Day of week options (0 = Sunday, 6 = Saturday)
+const DAY_OPTIONS = [
+  { value: 0, label: 'الأحد' },
+  { value: 1, label: 'الاثنين' },
+  { value: 2, label: 'الثلاثاء' },
+  { value: 3, label: 'الأربعاء' },
+  { value: 4, label: 'الخميس' },
+  { value: 5, label: 'الجمعة' },
+  { value: 6, label: 'السبت' },
+];
+
 type TimePeriod = 'this-week' | 'next-week' | 'this-month' | 'next-month' | 'custom';
+type ModificationType = 'offset' | 'specific' | 'day-change';
+
+// Calculate new date when changing day of week
+const calculateNewDate = (originalDate: string, originalDay: number, newDay: number): string => {
+  const date = parseISO(originalDate);
+  const currentDay = getDay(date);
+  
+  // Calculate day difference
+  let dayDiff = newDay - currentDay;
+  
+  // If new day is before or same as original day in the week, move to next week
+  if (dayDiff <= 0) {
+    dayDiff += 7;
+  }
+  
+  const newDate = addDays(date, dayDiff);
+  return format(newDate, 'yyyy-MM-dd');
+};
 
 export const BulkEditSessionsDialog = ({
   students,
   onBulkUpdateTime,
+  onUpdateSessionDate,
 }: BulkEditSessionsDialogProps) => {
   const [open, setOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -129,12 +176,22 @@ export const BulkEditSessionsDialog = ({
   const [dateFrom, setDateFrom] = useState<Date | undefined>(today);
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(today));
 
-  // Time modification
-  const [timeModType, setTimeModType] = useState<'offset' | 'specific'>('offset');
+  // Modification type
+  const [modType, setModType] = useState<ModificationType>('offset');
+
+  // Offset modification
   const [offsetDirection, setOffsetDirection] = useState<'+' | '-'>('+');
   const [offsetHours, setOffsetHours] = useState<number>(4);
   const [offsetMinutes, setOffsetMinutes] = useState<number>(0);
+
+  // Specific time modification
   const [specificTime, setSpecificTime] = useState<string>('');
+
+  // Day change modification
+  const [originalDay, setOriginalDay] = useState<number>(1); // Monday
+  const [originalTime, setOriginalTime] = useState<string>('16:00');
+  const [newDay, setNewDay] = useState<number>(5); // Friday
+  const [newTime, setNewTime] = useState<string>('13:00');
 
   // Undo state
   const [undoData, setUndoData] = useState<UndoData | null>(null);
@@ -163,7 +220,6 @@ export const BulkEditSessionsDialog = ({
         setDateTo(endOfMonth(nextMonth));
         break;
       case 'custom':
-        // Keep current values
         break;
     }
   };
@@ -209,18 +265,13 @@ export const BulkEditSessionsDialog = ({
     return () => clearInterval(interval);
   }, [undoData]);
 
-  // Calculate new time based on modification type
-  const calculateNewTime = (originalTime: string): string => {
-    if (timeModType === 'specific') {
-      return specificTime || originalTime;
-    }
-
-    const originalMinutes = timeToMinutes(originalTime);
+  // Calculate new time based on offset modification
+  const calculateOffsetTime = (sessionTime: string): string => {
+    const originalMinutes = timeToMinutes(sessionTime);
     const offsetTotalMinutes = offsetHours * 60 + offsetMinutes;
     const newMinutes = offsetDirection === '+'
       ? originalMinutes + offsetTotalMinutes
       : originalMinutes - offsetTotalMinutes;
-
     return minutesToTime(newMinutes);
   };
 
@@ -229,7 +280,7 @@ export const BulkEditSessionsDialog = ({
     return students.find(s => s.id === selectedStudentId);
   }, [students, selectedStudentId]);
 
-  // Calculate matching sessions with new times
+  // Calculate matching sessions with new times/dates
   const matchingSessions = useMemo(() => {
     const sessions: SessionWithStudent[] = [];
     
@@ -247,19 +298,44 @@ export const BulkEditSessionsDialog = ({
       if (session.date < fromStr) return;
       if (toStr && session.date > toStr) return;
 
-      const originalTime = session.time || selectedStudent.sessionTime || '16:00';
-      const newTime = calculateNewTime(originalTime);
+      const sessionTime = session.time || selectedStudent.sessionTime || '16:00';
+
+      // For day-change mode, filter by original day and time
+      if (modType === 'day-change') {
+        const sessionDay = getDay(parseISO(session.date));
+        if (sessionDay !== originalDay) return;
+        
+        // Check if time matches (within 30 min tolerance for matching)
+        const sessionMinutes = timeToMinutes(sessionTime);
+        const originalMinutes = timeToMinutes(originalTime);
+        if (Math.abs(sessionMinutes - originalMinutes) > 30) return;
+      }
+
+      let calculatedNewTime: string;
+      let calculatedNewDate: string = session.date;
+
+      if (modType === 'offset') {
+        calculatedNewTime = calculateOffsetTime(sessionTime);
+      } else if (modType === 'specific') {
+        calculatedNewTime = specificTime || sessionTime;
+      } else {
+        // day-change
+        calculatedNewTime = newTime;
+        calculatedNewDate = calculateNewDate(session.date, originalDay, newDay);
+      }
 
       sessions.push({
         session,
         student: selectedStudent,
-        originalTime,
-        newTime,
+        originalTime: sessionTime,
+        newTime: calculatedNewTime,
+        originalDate: session.date,
+        newDate: calculatedNewDate,
       });
     });
 
     return sessions.sort((a, b) => a.session.date.localeCompare(b.session.date));
-  }, [selectedStudent, selectedStudentId, dateFrom, dateTo, timeModType, offsetDirection, offsetHours, offsetMinutes, specificTime, today]);
+  }, [selectedStudent, selectedStudentId, dateFrom, dateTo, modType, offsetDirection, offsetHours, offsetMinutes, specificTime, originalDay, originalTime, newDay, newTime, today]);
 
   // Categorize sessions by conflict status
   const categorizedSessions = useMemo((): CategorizedSessions => {
@@ -268,19 +344,18 @@ export const BulkEditSessionsDialog = ({
     const minGap = 15;
 
     matchingSessions.forEach(sessionData => {
-      const { session, student, newTime } = sessionData;
-      const sessionDate = session.date;
-      const newStartMinutes = timeToMinutes(newTime);
+      const { session, student, newTime: sessNewTime, newDate: sessNewDate } = sessionData;
+      const newStartMinutes = timeToMinutes(sessNewTime);
       const newEndMinutes = newStartMinutes + sessionDuration;
 
       let conflictType = 'none' as 'none' | 'close' | 'overlap';
 
-      // Check against all other sessions on same date from OTHER students
+      // Check against all other sessions on the NEW date from OTHER students
       students.forEach(otherStudent => {
         if (otherStudent.id === student.id) return; // Skip same student
         
         otherStudent.sessions.forEach(otherSession => {
-          if (otherSession.date !== sessionDate) return;
+          if (otherSession.date !== sessNewDate) return;
           if (otherSession.status === 'cancelled' || otherSession.status === 'vacation') return;
 
           const otherTime = otherSession.time || otherStudent.sessionTime || '16:00';
@@ -339,16 +414,33 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
-    if (matchingSessions.length === 0) {
+    if (modType === 'day-change' && originalDay === newDay) {
       toast({
-        title: 'لا توجد جلسات',
-        description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || 'الطالب'} في هذه الفترة`,
+        title: 'اليوم متطابق',
+        description: 'اليوم الأصلي والجديد متطابقان. استخدم "تحويل بمقدار زمني" بدلاً من ذلك',
         variant: 'destructive',
       });
       return;
     }
 
-    if (timeModType === 'specific' && !specificTime) {
+    if (matchingSessions.length === 0) {
+      if (modType === 'day-change') {
+        toast({
+          title: 'لا توجد جلسات',
+          description: `لا توجد جلسات لـ ${selectedStudent?.name} في ${DAY_OPTIONS.find(d => d.value === originalDay)?.label} الساعة ${formatTimeAr(originalTime)} خلال الفترة المحددة`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'لا توجد جلسات',
+          description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || 'الطالب'} في هذه الفترة`,
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    if (modType === 'specific' && !specificTime) {
       toast({
         title: 'خطأ',
         description: 'الرجاء تحديد الوقت الجديد',
@@ -357,7 +449,7 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
-    if (timeModType === 'offset' && offsetHours === 0 && offsetMinutes === 0) {
+    if (modType === 'offset' && offsetHours === 0 && offsetMinutes === 0) {
       toast({
         title: 'خطأ',
         description: 'الرجاء تحديد مقدار التعديل',
@@ -367,14 +459,16 @@ export const BulkEditSessionsDialog = ({
     }
 
     // Validate offset range (-12h to +12h)
-    const totalOffset = offsetHours * 60 + offsetMinutes;
-    if (totalOffset > 12 * 60) {
-      toast({
-        title: 'خطأ',
-        description: 'الحد الأقصى للتعديل 12 ساعة',
-        variant: 'destructive',
-      });
-      return;
+    if (modType === 'offset') {
+      const totalOffset = offsetHours * 60 + offsetMinutes;
+      if (totalOffset > 12 * 60) {
+        toast({
+          title: 'خطأ',
+          description: 'الحد الأقصى للتعديل 12 ساعة',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     setShowPreview(true);
@@ -400,6 +494,7 @@ export const BulkEditSessionsDialog = ({
         sessionId: s.session.id,
         studentId: s.student.id,
         originalTime: s.originalTime,
+        originalDate: s.originalDate,
       })),
       timestamp: Date.now(),
       count: sessionsToApply.length,
@@ -408,9 +503,15 @@ export const BulkEditSessionsDialog = ({
     localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoInfo));
     setUndoData(undoInfo);
 
-    // Apply changes - update each session with its own new time
+    // Apply changes
     sessionsToApply.forEach(s => {
-      onBulkUpdateTime([s.student.id], [s.session.id], s.newTime);
+      if (modType === 'day-change' && onUpdateSessionDate) {
+        // Update both date and time
+        onUpdateSessionDate(s.student.id, s.session.id, s.newDate, s.newTime);
+      } else {
+        // Just update time
+        onBulkUpdateTime([s.student.id], [s.session.id], s.newTime);
+      }
     });
 
     setLastApplyResult({
@@ -426,9 +527,13 @@ export const BulkEditSessionsDialog = ({
   const handleUndo = () => {
     if (!undoData) return;
 
-    // Restore original times
+    // Restore original times and dates
     undoData.sessionUpdates.forEach(update => {
-      onBulkUpdateTime([update.studentId], [update.sessionId], update.originalTime);
+      if (onUpdateSessionDate) {
+        onUpdateSessionDate(update.studentId, update.sessionId, update.originalDate, update.originalTime);
+      } else {
+        onBulkUpdateTime([update.studentId], [update.sessionId], update.originalTime);
+      }
     });
 
     toast({
@@ -446,11 +551,15 @@ export const BulkEditSessionsDialog = ({
     setSelectedPeriod('this-month');
     setDateFrom(today);
     setDateTo(endOfMonth(today));
-    setTimeModType('offset');
+    setModType('offset');
     setOffsetDirection('+');
     setOffsetHours(4);
     setOffsetMinutes(0);
     setSpecificTime('');
+    setOriginalDay(1);
+    setOriginalTime('16:00');
+    setNewDay(5);
+    setNewTime('13:00');
     setShowPreview(false);
   };
 
@@ -458,6 +567,14 @@ export const BulkEditSessionsDialog = ({
     const minutes = Math.floor(undoTimeLeft / 60000);
     const seconds = Math.floor((undoTimeLeft % 60000) / 1000);
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  };
+
+  // Format date with day name in Arabic
+  const formatDateWithDay = (dateStr: string): string => {
+    const date = parseISO(dateStr);
+    const dayIndex = getDay(date);
+    const dayName = DAY_OPTIONS.find(d => d.value === dayIndex)?.label || '';
+    return `${dayName} ${formatShortDateAr(dateStr)}`;
   };
 
   return (
@@ -632,38 +749,21 @@ export const BulkEditSessionsDialog = ({
                     </div>
                   </div>
 
-                  {/* Step 3: Session Count */}
-                  {selectedStudentId && (
-                    <div className={cn(
-                      'rounded-lg p-3 text-center',
-                      matchingSessions.length > 0 ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
-                    )}>
-                      <p className="text-lg font-bold">
-                        {matchingSessions.length} جلسة محددة
-                      </p>
-                      {matchingSessions.length === 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          لا توجد جلسات مجدولة لـ {selectedStudent?.name} في هذه الفترة
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Step 4: Time Modification */}
+                  {/* Step 3: Modification Type */}
                   <div className="space-y-3">
                     <Label className="flex items-center gap-1.5">
                       <Clock className="h-4 w-4" />
-                      تغيير الوقت
+                      نوع التعديل
                     </Label>
 
-                    <RadioGroup value={timeModType} onValueChange={(v) => setTimeModType(v as 'offset' | 'specific')}>
+                    <RadioGroup value={modType} onValueChange={(v) => setModType(v as ModificationType)}>
                       {/* Offset Option */}
-                      <div className={cn('border rounded-lg p-3 transition-colors', timeModType === 'offset' && 'border-primary bg-primary/5')}>
+                      <div className={cn('border rounded-lg p-3 transition-colors', modType === 'offset' && 'border-primary bg-primary/5')}>
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="offset" id="offset" />
                           <Label htmlFor="offset" className="font-medium cursor-pointer">تحويل بمقدار زمني</Label>
                         </div>
-                        {timeModType === 'offset' && (
+                        {modType === 'offset' && (
                           <div className="mt-3 flex items-center gap-2 flex-wrap">
                             <Select value={offsetDirection} onValueChange={(v) => setOffsetDirection(v as '+' | '-')}>
                               <SelectTrigger className="w-16">
@@ -695,19 +795,91 @@ export const BulkEditSessionsDialog = ({
                               </SelectContent>
                             </Select>
                             <span className="text-xs text-muted-foreground">
-                              (مثال: 4:00 م → {formatTimeAr(calculateNewTime('16:00'))})
+                              (مثال: 4:00 م → {formatTimeAr(calculateOffsetTime('16:00'))})
                             </span>
                           </div>
                         )}
                       </div>
 
+                      {/* Day + Time Change Option (NEW) */}
+                      <div className={cn('border rounded-lg p-3 transition-colors', modType === 'day-change' && 'border-primary bg-primary/5')}>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="day-change" id="day-change" />
+                          <Label htmlFor="day-change" className="font-medium cursor-pointer">تغيير اليوم والوقت</Label>
+                        </div>
+                        {modType === 'day-change' && (
+                          <div className="mt-3 space-y-3">
+                            {/* Original Day + Time */}
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">من:</p>
+                              <div className="flex gap-2">
+                                <Select value={String(originalDay)} onValueChange={(v) => setOriginalDay(Number(v))}>
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {DAY_OPTIONS.map(d => (
+                                      <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <span className="text-xs text-muted-foreground self-center">في</span>
+                                <Select value={originalTime} onValueChange={setOriginalTime}>
+                                  <SelectTrigger className="w-28">
+                                    <SelectValue>{formatTimeAr(originalTime)}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_OPTIONS.map(t => (
+                                      <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            {/* Arrow */}
+                            <div className="flex justify-center">
+                              <ArrowDown className="h-4 w-4 text-muted-foreground" />
+                            </div>
+
+                            {/* New Day + Time */}
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">إلى:</p>
+                              <div className="flex gap-2">
+                                <Select value={String(newDay)} onValueChange={(v) => setNewDay(Number(v))}>
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {DAY_OPTIONS.map(d => (
+                                      <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <span className="text-xs text-muted-foreground self-center">في</span>
+                                <Select value={newTime} onValueChange={setNewTime}>
+                                  <SelectTrigger className="w-28">
+                                    <SelectValue>{formatTimeAr(newTime)}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_OPTIONS.map(t => (
+                                      <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Specific Time Option */}
-                      <div className={cn('border rounded-lg p-3 transition-colors', timeModType === 'specific' && 'border-primary bg-primary/5')}>
+                      <div className={cn('border rounded-lg p-3 transition-colors', modType === 'specific' && 'border-primary bg-primary/5')}>
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="specific" id="specific" />
                           <Label htmlFor="specific" className="font-medium cursor-pointer">تحديد وقت معين</Label>
                         </div>
-                        {timeModType === 'specific' && (
+                        {modType === 'specific' && (
                           <div className="mt-3">
                             <Input
                               type="time"
@@ -725,6 +897,28 @@ export const BulkEditSessionsDialog = ({
                       </div>
                     </RadioGroup>
                   </div>
+
+                  {/* Session Count */}
+                  {selectedStudentId && (
+                    <div className={cn(
+                      'rounded-lg p-3 text-center',
+                      matchingSessions.length > 0 ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
+                    )}>
+                      <p className="text-lg font-bold">
+                        {matchingSessions.length} جلسة محددة
+                      </p>
+                      {matchingSessions.length === 0 && modType === 'day-change' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          لا توجد جلسات لـ {selectedStudent?.name} في {DAY_OPTIONS.find(d => d.value === originalDay)?.label} الساعة {formatTimeAr(originalTime)}
+                        </p>
+                      )}
+                      {matchingSessions.length === 0 && modType !== 'day-change' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          لا توجد جلسات مجدولة لـ {selectedStudent?.name} في هذه الفترة
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Quick Summary */}
                   {selectedStudentId && matchingSessions.length > 0 && (
@@ -798,16 +992,25 @@ export const BulkEditSessionsDialog = ({
                         <p className="font-medium text-sm">آمنة ({categorizedSessions.safe.length})</p>
                       </div>
                       <div className="space-y-1">
-                        {categorizedSessions.safe.map(({ session, originalTime, newTime }) => (
+                        {categorizedSessions.safe.map(({ session, originalTime: origTime, newTime: nTime, originalDate, newDate }) => (
                           <div key={session.id} className="bg-success/5 border border-success/20 rounded p-2 text-sm">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">✓</span>
-                              <span className="text-xs">{formatShortDateAr(session.date)}</span>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>✓</span>
                             </div>
-                            <div className="flex items-center justify-center gap-2 mt-1">
-                              <span className="text-muted-foreground">{formatTimeAr(originalTime)}</span>
-                              <ChevronLeft className="h-3 w-3 text-success" />
-                              <span className="text-success font-medium">{formatTimeAr(newTime)}</span>
+                            <div className="text-center space-y-1 mt-1">
+                              <div className="text-muted-foreground">
+                                {modType === 'day-change' 
+                                  ? `${formatDateWithDay(originalDate)}، ${formatTimeAr(origTime)}`
+                                  : `${formatShortDateAr(originalDate)}، ${formatTimeAr(origTime)}`
+                                }
+                              </div>
+                              <ArrowDown className="h-3 w-3 mx-auto text-success" />
+                              <div className="text-success font-medium">
+                                {modType === 'day-change'
+                                  ? `${formatDateWithDay(newDate)}، ${formatTimeAr(nTime)}`
+                                  : `${formatShortDateAr(newDate)}، ${formatTimeAr(nTime)}`
+                                }
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -824,16 +1027,25 @@ export const BulkEditSessionsDialog = ({
                       </div>
                       <p className="text-xs text-muted-foreground">جلسات قريبة من طلاب آخرين (أقل من 15 دقيقة)</p>
                       <div className="space-y-1">
-                        {categorizedSessions.warnings.map(({ session, originalTime, newTime }) => (
+                        {categorizedSessions.warnings.map(({ session, originalTime: origTime, newTime: nTime, originalDate, newDate }) => (
                           <div key={session.id} className="bg-warning/5 border border-warning/20 rounded p-2 text-sm">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">⚠️</span>
-                              <span className="text-xs">{formatShortDateAr(session.date)}</span>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>⚠️</span>
                             </div>
-                            <div className="flex items-center justify-center gap-2 mt-1">
-                              <span className="text-muted-foreground">{formatTimeAr(originalTime)}</span>
-                              <ChevronLeft className="h-3 w-3 text-warning" />
-                              <span className="text-warning font-medium">{formatTimeAr(newTime)}</span>
+                            <div className="text-center space-y-1 mt-1">
+                              <div className="text-muted-foreground">
+                                {modType === 'day-change'
+                                  ? `${formatDateWithDay(originalDate)}، ${formatTimeAr(origTime)}`
+                                  : `${formatShortDateAr(originalDate)}، ${formatTimeAr(origTime)}`
+                                }
+                              </div>
+                              <ArrowDown className="h-3 w-3 mx-auto text-warning" />
+                              <div className="text-warning font-medium">
+                                {modType === 'day-change'
+                                  ? `${formatDateWithDay(newDate)}، ${formatTimeAr(nTime)}`
+                                  : `${formatShortDateAr(newDate)}، ${formatTimeAr(nTime)}`
+                                }
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -850,16 +1062,25 @@ export const BulkEditSessionsDialog = ({
                       </div>
                       <p className="text-xs text-muted-foreground">هذه الجلسات لن يتم تعديلها</p>
                       <div className="space-y-1">
-                        {categorizedSessions.conflicts.map(({ session, originalTime, newTime }) => (
+                        {categorizedSessions.conflicts.map(({ session, originalTime: origTime, newTime: nTime, originalDate, newDate }) => (
                           <div key={session.id} className="bg-destructive/5 border border-destructive/20 rounded p-2 text-sm opacity-60">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">❌</span>
-                              <span className="text-xs">{formatShortDateAr(session.date)}</span>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>❌</span>
                             </div>
-                            <div className="flex items-center justify-center gap-2 mt-1">
-                              <span className="text-muted-foreground">{formatTimeAr(originalTime)}</span>
-                              <ChevronLeft className="h-3 w-3 text-destructive" />
-                              <span className="text-destructive font-medium line-through">{formatTimeAr(newTime)}</span>
+                            <div className="text-center space-y-1 mt-1">
+                              <div className="text-muted-foreground">
+                                {modType === 'day-change'
+                                  ? `${formatDateWithDay(originalDate)}، ${formatTimeAr(origTime)}`
+                                  : `${formatShortDateAr(originalDate)}، ${formatTimeAr(origTime)}`
+                                }
+                              </div>
+                              <ArrowDown className="h-3 w-3 mx-auto text-destructive" />
+                              <div className="text-destructive font-medium line-through">
+                                {modType === 'day-change'
+                                  ? `${formatDateWithDay(newDate)}، ${formatTimeAr(nTime)}`
+                                  : `${formatShortDateAr(newDate)}، ${formatTimeAr(nTime)}`
+                                }
+                              </div>
                             </div>
                           </div>
                         ))}
