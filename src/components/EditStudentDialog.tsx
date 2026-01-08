@@ -29,15 +29,17 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Student, SessionType } from '@/types/student';
+import { Student, SessionType, CancellationPolicy } from '@/types/student';
 import { DAY_NAMES_AR, formatDurationAr, calculateEndTime } from '@/lib/arabicConstants';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
 import { generateSessionsForSchedule } from '@/lib/dateUtils';
 import { DURATION_OPTIONS, DEFAULT_DURATION } from '@/types/student';
+import { CancellationPolicySettings } from '@/components/CancellationPolicySettings';
 
 interface EditStudentDialogProps {
   student: Student;
   students?: Student[];
+  currentCancellationCount?: number;
   onUpdateName: (name: string) => void;
   onUpdateTime: (time: string) => void;
   onUpdatePhone: (phone: string) => void;
@@ -50,11 +52,13 @@ interface EditStudentDialogProps {
     customPriceOnsite?: number;
     customPriceOnline?: number;
   }) => void;
+  onUpdateCancellationPolicy?: (policy: CancellationPolicy) => void;
 }
 
 export const EditStudentDialog = ({
   student,
   students = [],
+  currentCancellationCount = 0,
   onUpdateName,
   onUpdateTime,
   onUpdatePhone,
@@ -62,6 +66,7 @@ export const EditStudentDialog = ({
   onUpdateSchedule,
   onUpdateDuration,
   onUpdateCustomSettings,
+  onUpdateCancellationPolicy,
 }: EditStudentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(student.name);
@@ -490,6 +495,15 @@ export const EditStudentDialog = ({
                 </div>
               )}
             </div>
+
+            {/* Cancellation Policy Section */}
+            {onUpdateCancellationPolicy && (
+              <CancellationPolicySettings
+                student={student}
+                currentCount={currentCancellationCount}
+                onSave={onUpdateCancellationPolicy}
+              />
+            )}
           </div>
 
           <DialogFooter className="flex-row-reverse gap-2">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Student, StudentPayments, AppSettings, Session, SessionStatus, HomeworkStatus } from '@/types/student';
+import { Student, StudentPayments, AppSettings, Session, SessionStatus, HomeworkStatus, CancellationPolicy } from '@/types/student';
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from '@/lib/dateUtils';
 
 const STUDENTS_KEY = 'teacher-students-v2';
@@ -188,6 +188,15 @@ export const useStudents = () => {
           customPriceOnsite: customSettings.customPriceOnsite,
           customPriceOnline: customSettings.customPriceOnline,
         };
+      })
+    );
+  };
+
+  const updateStudentCancellationPolicy = (studentId: string, policy: CancellationPolicy) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== studentId) return s;
+        return { ...s, cancellationPolicy: policy };
       })
     );
   };
@@ -602,6 +611,7 @@ export const useStudents = () => {
     updateStudentSessionType,
     updateStudentDuration,
     updateStudentCustomSettings,
+    updateStudentCancellationPolicy,
     updateStudentSchedule,
     addExtraSession,
     removeSession,

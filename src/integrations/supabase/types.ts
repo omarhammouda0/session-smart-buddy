@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      cancellation_notifications: {
+        Row: {
+          created_at: string
+          delivery_status: string
+          error_message: string | null
+          id: string
+          message_text: string
+          month: string
+          parent_phone: string
+          sent_at: string
+          student_id: string
+          triggered_by: string
+          twilio_message_sid: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_status?: string
+          error_message?: string | null
+          id?: string
+          message_text: string
+          month: string
+          parent_phone: string
+          sent_at?: string
+          student_id: string
+          triggered_by?: string
+          twilio_message_sid?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_status?: string
+          error_message?: string | null
+          id?: string
+          message_text?: string
+          month?: string
+          parent_phone?: string
+          sent_at?: string
+          student_id?: string
+          triggered_by?: string
+          twilio_message_sid?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       homework: {
         Row: {
           completed_at: string | null
@@ -202,6 +247,42 @@ export type Database = {
         }
         Relationships: []
       }
+      session_cancellations: {
+        Row: {
+          cancelled_at: string
+          created_at: string
+          id: string
+          month: string
+          reason: string | null
+          session_date: string
+          session_time: string | null
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string
+          created_at?: string
+          id?: string
+          month: string
+          reason?: string | null
+          session_date: string
+          session_time?: string | null
+          student_id: string
+          user_id?: string
+        }
+        Update: {
+          cancelled_at?: string
+          created_at?: string
+          id?: string
+          month?: string
+          reason?: string | null
+          session_date?: string
+          session_time?: string | null
+          student_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       session_notes: {
         Row: {
           category: Database["public"]["Enums"]["note_category"]
@@ -254,6 +335,48 @@ export type Database = {
           student_id?: string
           title?: string | null
           type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      student_cancellation_tracking: {
+        Row: {
+          cancellation_count: number
+          created_at: string
+          id: string
+          limit_at_time: number | null
+          limit_reached_date: string | null
+          month: string
+          parent_notified: boolean
+          parent_notified_at: string | null
+          student_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancellation_count?: number
+          created_at?: string
+          id?: string
+          limit_at_time?: number | null
+          limit_reached_date?: string | null
+          month: string
+          parent_notified?: boolean
+          parent_notified_at?: string | null
+          student_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          cancellation_count?: number
+          created_at?: string
+          id?: string
+          limit_at_time?: number | null
+          limit_reached_date?: string | null
+          month?: string
+          parent_notified?: boolean
+          parent_notified_at?: string | null
+          student_id?: string
           updated_at?: string
           user_id?: string
         }

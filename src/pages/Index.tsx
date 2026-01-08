@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
+import { useCancellationTracking } from '@/hooks/useCancellationTracking';
 import { useConflictDetection, ConflictResult } from '@/hooks/useConflictDetection';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { SemesterSettings } from '@/components/SemesterSettings';
@@ -19,6 +20,7 @@ import { ReminderSettingsDialog } from '@/components/ReminderSettingsDialog';
 import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
 import { MonthlyReportDialog } from '@/components/MonthlyReportDialog';
 import { StudentNotesHistory } from '@/components/StudentNotesHistory';
+import { AttendanceAlertsWidget } from '@/components/AttendanceAlertsWidget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -75,6 +77,7 @@ const Index = () => {
     updateStudentSchedule,
     updateStudentDuration,
     updateStudentCustomSettings,
+    updateStudentCancellationPolicy,
     addExtraSession,
     removeSession,
     deleteSession,
@@ -87,6 +90,9 @@ const Index = () => {
     bulkMarkAsVacation,
     updateSessionDetails,
   } = useStudents();
+
+  // Cancellation tracking
+  const { getCancellationCount, studentsAtRisk } = useCancellationTracking(students);
 
   // Conflict detection
   const { checkConflict } = useConflictDetection(students);
@@ -349,6 +355,7 @@ const Index = () => {
                             <EditStudentDialog
                               student={student}
                               students={students}
+                              currentCancellationCount={getCancellationCount(student.id)}
                               onUpdateName={(name) => updateStudentName(student.id, name)}
                               onUpdateTime={(time) => updateStudentTime(student.id, time)}
                               onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
@@ -356,6 +363,7 @@ const Index = () => {
                               onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
                               onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
                               onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
+                              onUpdateCancellationPolicy={(policy) => updateStudentCancellationPolicy(student.id, policy)}
                             />
                             <StudentNotesHistory studentId={student.id} studentName={student.name} />
                             <AlertDialog>
@@ -417,6 +425,23 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
+        {/* Attendance Alerts Widget */}
+        {studentsAtRisk.length > 0 && (
+          <AttendanceAlertsWidget
+            studentsAtRisk={studentsAtRisk}
+            onNotifyParent={(studentId) => {
+              const student = students.find(s => s.id === studentId);
+              if (student?.phone) {
+                window.open(`https://wa.me/${student.phone.replace(/\D/g, '')}`, '_blank');
+              }
+            }}
+            onViewDetails={(studentId) => {
+              // Could open student edit dialog
+              console.log('View details for', studentId);
+            }}
+          />
+        )}
+
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-3 mb-3 sm:mb-4 h-11">

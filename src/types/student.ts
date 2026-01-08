@@ -32,6 +32,13 @@ export interface ScheduleDay {
 
 export type SessionType = 'online' | 'onsite';
 
+// Cancellation policy settings per student
+export interface CancellationPolicy {
+  monthlyLimit: number | null; // null = unlimited
+  alertTutor: boolean; // Notify tutor when limit reached
+  autoNotifyParent: boolean; // Auto-send WhatsApp to parent
+}
+
 export interface Student {
   id: string;
   sessionTime: string; // HH:mm format like "16:30"
@@ -47,6 +54,8 @@ export interface Student {
   semesterEnd: string; // YYYY-MM-DD
   sessions: Session[];
   createdAt: string;
+  // Cancellation policy
+  cancellationPolicy?: CancellationPolicy;
 }
 
 export interface MonthlyPayment {
