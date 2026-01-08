@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History, FileText } from 'lucide-react';
+import { GraduationCap, BookOpen, CreditCard, ChevronLeft, ChevronRight, Users, X, Trash2, Clock, Monitor, MapPin, History, FileText, CalendarDays } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useStudents } from '@/hooks/useStudents';
 import { useCancellationTracking } from '@/hooks/useCancellationTracking';
@@ -21,6 +21,7 @@ import { ReminderSettingsDialog } from '@/components/ReminderSettingsDialog';
 import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
 import { MonthlyReportDialog } from '@/components/MonthlyReportDialog';
 import { StudentNotesHistory } from '@/components/StudentNotesHistory';
+import { CalendarView } from '@/components/CalendarView';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -497,6 +498,10 @@ const Index = () => {
               <BookOpen className="h-4 w-4" />
               <span className="hidden xs:inline">الحصص</span>
             </TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-1.5 text-sm">
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden xs:inline">التقويم</span>
+            </TabsTrigger>
             <TabsTrigger value="history" className="gap-1.5 text-sm">
               <History className="h-4 w-4" />
               <span className="hidden xs:inline">السجل</span>
@@ -651,6 +656,13 @@ const Index = () => {
                 )}
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-0">
+            <CalendarView 
+              students={students}
+              onRescheduleSession={rescheduleSession}
+            />
           </TabsContent>
 
           <TabsContent value="history" className="mt-0">
