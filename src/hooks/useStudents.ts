@@ -296,17 +296,80 @@ export const useStudents = () => {
           sessions: s.sessions.map(sess => {
             if (sess.id !== sessionId) return sess;
             const now = new Date().toISOString();
+            const previousStatus = sess.status;
             return {
               ...sess,
               status: 'scheduled' as SessionStatus,
               completed: false,
               cancelledAt: undefined,
-              history: [...(sess.history || []), { status: 'scheduled' as SessionStatus, timestamp: now, note: 'Restored from cancelled' }],
+              vacationAt: undefined,
+              history: [...(sess.history || []), { status: 'scheduled' as SessionStatus, timestamp: now, note: `Restored from ${previousStatus}` }],
             };
           }),
         };
       })
     );
+  };
+
+  // Mark session as vacation
+  const markSessionAsVacation = (studentId: string, sessionId: string) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== studentId) return s;
+        return {
+          ...s,
+          sessions: s.sessions.map(sess => {
+            if (sess.id !== sessionId) return sess;
+            // Only scheduled sessions can become vacation
+            if (sess.status !== 'scheduled') return sess;
+            const now = new Date().toISOString();
+            return {
+              ...sess,
+              status: 'vacation' as SessionStatus,
+              completed: false,
+              vacationAt: now,
+              history: [...(sess.history || []), { status: 'vacation' as SessionStatus, timestamp: now }],
+            };
+          }),
+        };
+      })
+    );
+  };
+
+  // Bulk mark sessions as vacation
+  const bulkMarkAsVacation = (
+    studentIds: string[],
+    sessionIds: string[]
+  ): { success: boolean; updatedCount: number } => {
+    let updatedCount = 0;
+    const now = new Date().toISOString();
+
+    setStudents(prev =>
+      prev.map(student => {
+        if (!studentIds.includes(student.id)) return student;
+
+        const updatedSessions = student.sessions.map(session => {
+          if (!sessionIds.includes(session.id)) return session;
+          // Only mark scheduled sessions as vacation
+          if (session.status !== 'scheduled') return session;
+          updatedCount++;
+          return {
+            ...session,
+            status: 'vacation' as SessionStatus,
+            completed: false,
+            vacationAt: now,
+            history: [...(session.history || []), { status: 'vacation' as SessionStatus, timestamp: now, note: 'Bulk vacation' }],
+          };
+        });
+
+        return {
+          ...student,
+          sessions: updatedSessions,
+        };
+      })
+    );
+
+    return { success: true, updatedCount };
   };
 
   const rescheduleSession = (studentId: string, sessionId: string, newDate: string) => {
@@ -450,5 +513,7 @@ export const useStudents = () => {
     getStudentPayments,
     isStudentPaidForMonth,
     bulkUpdateSessionTime,
+    markSessionAsVacation,
+    bulkMarkAsVacation,
   };
 };

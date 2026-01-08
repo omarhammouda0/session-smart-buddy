@@ -12,7 +12,7 @@ import {
   parseISO,
   getDay,
 } from 'date-fns';
-import { Calendar, Clock, Users, AlertTriangle, Check, ChevronLeft, Undo2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Users, AlertTriangle, Check, ChevronLeft, Undo2, CheckCircle2, XCircle, AlertCircle, Palmtree } from 'lucide-react';
 import { Student, Session } from '@/types/student';
 import { DAY_NAMES_SHORT_AR, formatShortDateAr } from '@/lib/arabicConstants';
 import { Button } from '@/components/ui/button';
@@ -57,6 +57,10 @@ interface BulkEditSessionsDialogProps {
     sessionIds: string[],
     newTime: string
   ) => { success: boolean; updatedCount: number; conflicts: ConflictInfo[] };
+  onBulkMarkAsVacation?: (
+    studentIds: string[],
+    sessionIds: string[]
+  ) => { success: boolean; updatedCount: number };
 }
 
 interface SessionWithStudent {
@@ -121,6 +125,7 @@ const formatTimeAr = (time: string): string => {
 export const BulkEditSessionsDialog = ({
   students,
   onBulkUpdateTime,
+  onBulkMarkAsVacation,
 }: BulkEditSessionsDialogProps) => {
   const [open, setOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);

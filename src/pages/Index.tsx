@@ -63,6 +63,8 @@ const Index = () => {
     toggleSessionComplete,
     togglePaymentStatus,
     bulkUpdateSessionTime,
+    markSessionAsVacation,
+    bulkMarkAsVacation,
   } = useStudents();
 
   // Wrapper functions with toast notifications
@@ -111,6 +113,13 @@ const Index = () => {
     });
   };
 
+  const handleMarkAsVacation = (studentId: string, sessionId: string) => {
+    markSessionAsVacation(studentId, sessionId);
+    toast({
+      title: "تم تحديد الحصة كإجازة",
+      description: "لن يتم احتساب هذه الحصة في المدفوعات",
+    });
+  };
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
 
@@ -278,6 +287,7 @@ const Index = () => {
               <BulkEditSessionsDialog
                 students={students}
                 onBulkUpdateTime={bulkUpdateSessionTime}
+                onBulkMarkAsVacation={bulkMarkAsVacation}
               />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
@@ -460,6 +470,7 @@ const Index = () => {
               onToggleComplete={handleToggleComplete}
               onRescheduleSession={rescheduleSession}
               onAddSession={handleAddSession}
+              onMarkAsVacation={handleMarkAsVacation}
             />
           </TabsContent>
 

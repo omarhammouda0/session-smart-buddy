@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO, isBefore, isAfter, startOfToday } from 'date-fns';
-import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2 } from 'lucide-react';
+import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2, Palmtree, RotateCcw } from 'lucide-react';
 import { Student } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,9 +32,10 @@ interface SessionHistoryBarProps {
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onRescheduleSession?: (studentId: string, sessionId: string, newDate: string) => void;
   onAddSession?: (studentId: string, date: string) => void;
+  onMarkAsVacation?: (studentId: string, sessionId: string) => void;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession, onMarkAsVacation }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
@@ -56,20 +57,23 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
   };
 
   const getHistoryStats = () => {
-    if (!selectedStudent) return { completed: 0, cancelled: 0, total: 0, completionRate: 0 };
-    let completed = 0, cancelled = 0;
+    if (!selectedStudent) return { completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0 };
+    let completed = 0, cancelled = 0, vacation = 0;
     selectedStudent.sessions.forEach(session => {
       if (session.status === 'completed') completed++;
       else if (session.status === 'cancelled') cancelled++;
+      else if (session.status === 'vacation') vacation++;
     });
-    const total = completed + cancelled;
-    return { completed, cancelled, total, completionRate: total > 0 ? Math.round((completed / total) * 100) : 0 };
+    const total = completed + cancelled + vacation;
+    // Completion rate excludes vacation sessions
+    const rateTotal = completed + cancelled;
+    return { completed, cancelled, vacation, total, completionRate: rateTotal > 0 ? Math.round((completed / rateTotal) * 100) : 0 };
   };
 
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
     return selectedStudent.sessions
-      .filter(s => s.status === 'completed' || s.status === 'cancelled')
+      .filter(s => s.status === 'completed' || s.status === 'cancelled' || s.status === 'vacation')
       .sort((a, b) => b.date.localeCompare(a.date))
       .map(s => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
@@ -161,39 +165,59 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                     scheduledSessions.map(session => (
                       <div key={session.id} className={cn("flex items-center justify-between p-2.5 rounded-lg text-xs border",
                         session.status === 'cancelled' && "bg-destructive/5 border-destructive/20",
+                        session.status === 'vacation' && "bg-warning/10 border-warning/30",
                         session.status === 'scheduled' && "bg-card"
                       )}>
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <div className={cn("w-5 h-5 rounded-full flex items-center justify-center shrink-0",
                             session.status === 'cancelled' && "bg-destructive/20 text-destructive",
+                            session.status === 'vacation' && "bg-warning/20 text-warning",
                             session.status === 'scheduled' && "bg-primary/20 text-primary"
                           )}>
-                            {session.status === 'cancelled' ? <Ban className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
+                            {session.status === 'cancelled' ? <Ban className="h-3 w-3" /> : 
+                             session.status === 'vacation' ? <Palmtree className="h-3 w-3" /> : 
+                             <Calendar className="h-3 w-3" />}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className={cn("font-medium truncate", session.status === 'cancelled' && "line-through text-muted-foreground")}>
+                            <p className={cn("font-medium truncate", 
+                              session.status === 'cancelled' && "line-through text-muted-foreground",
+                              session.status === 'vacation' && "text-warning"
+                            )}>
                               {formatShortDateAr(session.date)}
                               <span className="text-muted-foreground font-normal mr-1">
                                 ({session.time || selectedStudent.sessionTime || '16:00'})
                               </span>
                             </p>
                             {session.status === 'cancelled' && <span className="text-[10px] text-destructive">ملغاة</span>}
+                            {session.status === 'vacation' && <span className="text-[10px] text-warning">إجازة</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {session.status === 'cancelled' ? (
                             <>
                               <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
-                                <Check className="h-3.5 w-3.5 ml-1" />استعادة
+                                <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                               </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDeleteSession?.(session.studentId, session.id)} title="حذف نهائي">
                                 <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          ) : session.status === 'vacation' ? (
+                            <>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
+                                <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)} title="إلغاء">
+                                <Ban className="h-3.5 w-3.5" />
                               </Button>
                             </>
                           ) : (
                             <>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => onToggleComplete?.(session.studentId, session.id)} title="إكمال">
                                 <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-warning" onClick={() => onMarkAsVacation?.(session.studentId, session.id)} title="إجازة">
+                                <Palmtree className="h-3.5 w-3.5" />
                               </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)} title="إلغاء">
                                 <Ban className="h-3.5 w-3.5" />
@@ -239,9 +263,10 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
 
               <div className="p-3 rounded-lg bg-muted/50 border">
                 <p className="text-xs text-muted-foreground mb-2 font-medium">{selectedStudent.name} - إحصائيات الفصل</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   <div className="text-center"><p className="text-lg font-bold">{historyStats.total}</p><p className="text-[10px] text-muted-foreground">الإجمالي</p></div>
                   <div className="text-center"><p className="text-lg font-bold text-success">{historyStats.completed}</p><p className="text-[10px] text-success/80">مكتملة</p></div>
+                  <div className="text-center"><p className="text-lg font-bold text-warning">{historyStats.vacation}</p><p className="text-[10px] text-warning/80">إجازة</p></div>
                   <div className="text-center"><p className="text-lg font-bold text-destructive">{historyStats.cancelled}</p><p className="text-[10px] text-destructive/80">ملغاة</p></div>
                 </div>
               </div>
@@ -258,14 +283,18 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                     historySessions.map(session => (
                       <div key={session.id} className={cn("flex items-center justify-between p-2 rounded text-xs border",
                         session.status === 'completed' && "bg-success/5 border-success/20",
+                        session.status === 'vacation' && "bg-warning/5 border-warning/20",
                         session.status === 'cancelled' && "bg-destructive/5 border-destructive/20"
                       )}>
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <div className={cn("w-5 h-5 rounded-full flex items-center justify-center shrink-0",
                             session.status === 'completed' && "bg-success/20 text-success",
+                            session.status === 'vacation' && "bg-warning/20 text-warning",
                             session.status === 'cancelled' && "bg-destructive/20 text-destructive"
                           )}>
-                            {session.status === 'completed' ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                            {session.status === 'completed' ? <Check className="h-3 w-3" /> : 
+                             session.status === 'vacation' ? <Palmtree className="h-3 w-3" /> : 
+                             <X className="h-3 w-3" />}
                           </div>
                           <p className="font-medium truncate">
                             {formatShortDateAr(session.date)}
@@ -279,15 +308,23 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-warning" onClick={() => onToggleComplete?.(session.studentId, session.id)}>
                               <X className="h-3.5 w-3.5 ml-1" />تراجع
                             </Button>
+                          ) : session.status === 'vacation' ? (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
+                              <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
+                            </Button>
                           ) : (
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-success" onClick={() => onRestoreSession?.(session.studentId, session.id)}>
-                              <Check className="h-3.5 w-3.5 ml-1" />استعادة
+                              <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                             </Button>
                           )}
                           <Badge variant="outline" className={cn("text-[10px]",
                             session.status === 'completed' && "border-success/30 text-success",
+                            session.status === 'vacation' && "border-warning/30 text-warning",
                             session.status === 'cancelled' && "border-destructive/30 text-destructive"
-                          )}>{session.status === 'completed' ? 'مكتملة' : 'ملغاة'}</Badge>
+                          )}>
+                            {session.status === 'completed' ? 'مكتملة' : 
+                             session.status === 'vacation' ? 'إجازة' : 'ملغاة'}
+                          </Badge>
                         </div>
                       </div>
                     ))
