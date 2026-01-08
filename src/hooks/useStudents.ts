@@ -72,7 +72,22 @@ export const useStudents = () => {
   }, [settings, isLoaded]);
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings(prev => {
+      // Merge without letting `undefined` wipe existing values
+      const next: AppSettings = { ...prev };
+      (Object.keys(newSettings) as (keyof AppSettings)[]).forEach((key) => {
+        const value = newSettings[key];
+        if (value !== undefined) {
+          (next as any)[key] = value;
+        }
+      });
+
+      // Ensure price defaults always exist
+      if (next.defaultPriceOnsite === undefined) next.defaultPriceOnsite = 150;
+      if (next.defaultPriceOnline === undefined) next.defaultPriceOnline = 120;
+
+      return next;
+    });
   };
 
   const addStudent = (
