@@ -333,7 +333,7 @@ export const AddVacationDialog = ({
           <span className="hidden sm:inline">إضافة إجازة</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" dir="rtl">
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <Palmtree className="h-5 w-5 text-warning" />
