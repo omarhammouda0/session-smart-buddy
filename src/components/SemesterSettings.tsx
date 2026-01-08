@@ -30,17 +30,22 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
   const [priceOnline, setPriceOnline] = useState<string>(settings.defaultPriceOnline?.toString() || '');
 
   const handleSave = () => {
-    const onsitePrice = priceOnsite ? parseFloat(priceOnsite) : undefined;
-    const onlinePrice = priceOnline ? parseFloat(priceOnline) : undefined;
-    
+    const onsitePrice = priceOnsite.trim() === ''
+      ? (settings.defaultPriceOnsite ?? 150)
+      : parseFloat(priceOnsite);
+
+    const onlinePrice = priceOnline.trim() === ''
+      ? (settings.defaultPriceOnline ?? 120)
+      : parseFloat(priceOnline);
+
     // Validate prices
-    if (onsitePrice !== undefined && onsitePrice < 0) {
+    if (Number.isNaN(onsitePrice) || onsitePrice < 0) {
       return;
     }
-    if (onlinePrice !== undefined && onlinePrice < 0) {
+    if (Number.isNaN(onlinePrice) || onlinePrice < 0) {
       return;
     }
-    
+
     onUpdate({
       defaultSemesterStart: start,
       defaultSemesterEnd: end,
