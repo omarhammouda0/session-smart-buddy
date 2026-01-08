@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Student, SessionType, CancellationPolicy } from '@/types/student';
+import { Student, SessionType, CancellationPolicy, AppSettings } from '@/types/student';
 import { DAY_NAMES_AR, formatDurationAr, calculateEndTime } from '@/lib/arabicConstants';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
 import { generateSessionsForSchedule } from '@/lib/dateUtils';
@@ -53,6 +53,7 @@ interface CancellationRecord {
 interface EditStudentDialogProps {
   student: Student;
   students?: Student[];
+  appSettings?: AppSettings;
   currentCancellationCount?: number;
   allCancellations?: CancellationRecord[];
   onRestoreSession?: (studentId: string, sessionId: string) => void;
@@ -75,6 +76,7 @@ interface EditStudentDialogProps {
 export const EditStudentDialog = ({
   student,
   students = [],
+  appSettings,
   currentCancellationCount = 0,
   allCancellations = [],
   onRestoreSession,
@@ -102,6 +104,19 @@ export const EditStudentDialog = ({
   const [useCustomSettings, setUseCustomSettings] = useState(student.useCustomSettings || false);
   const [customPriceOnsite, setCustomPriceOnsite] = useState<string>(student.customPriceOnsite?.toString() || '');
   const [customPriceOnline, setCustomPriceOnline] = useState<string>(student.customPriceOnline?.toString() || '');
+
+  // Effective pricing (for display)
+  const defaultPriceOnsite = appSettings?.defaultPriceOnsite ?? 150;
+  const defaultPriceOnline = appSettings?.defaultPriceOnline ?? 120;
+
+  const customOnsiteNum = Number(customPriceOnsite);
+  const customOnlineNum = Number(customPriceOnline);
+
+  const hasCustomOnsite = useCustomSettings && Number.isFinite(customOnsiteNum) && customOnsiteNum > 0;
+  const hasCustomOnline = useCustomSettings && Number.isFinite(customOnlineNum) && customOnlineNum > 0;
+
+  const effectivePriceOnsite = hasCustomOnsite ? customOnsiteNum : defaultPriceOnsite;
+  const effectivePriceOnline = hasCustomOnline ? customOnlineNum : defaultPriceOnline;
   
   // Conflict detection state
   const [isChecking, setIsChecking] = useState(false);
@@ -456,6 +471,33 @@ export const EditStudentDialog = ({
 
             {/* Custom Pricing Settings */}
             <div className="space-y-3 pt-2 border-t">
+              <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3 text-muted-foreground" />
+                    حضوري
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium">{effectivePriceOnsite} جنيه</span>
+                    <Badge variant={hasCustomOnsite ? 'secondary' : 'outline'} className="text-[10px]">
+                      {hasCustomOnsite ? 'مخصص' : 'افتراضي'}
+                    </Badge>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="flex items-center gap-1">
+                    <Monitor className="h-3 w-3 text-muted-foreground" />
+                    أونلاين
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium">{effectivePriceOnline} جنيه</span>
+                    <Badge variant={hasCustomOnline ? 'secondary' : 'outline'} className="text-[10px]">
+                      {hasCustomOnline ? 'مخصص' : 'افتراضي'}
+                    </Badge>
+                  </span>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="use-custom"

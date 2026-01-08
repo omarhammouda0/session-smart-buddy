@@ -406,6 +406,7 @@ const Index = () => {
                             <EditStudentDialog
                               student={student}
                               students={students}
+                              appSettings={settings}
                               currentCancellationCount={getCancellationCount(student.id)}
                               allCancellations={getAllStudentCancellations(student.id)}
                               onRestoreSession={handleRestoreSession}
@@ -625,6 +626,7 @@ const Index = () => {
                         key={student.id}
                         student={student}
                         students={students}
+                        settings={settings}
                         selectedDayOfWeek={selectedDayOfWeek}
                         onRemove={() => removeStudent(student.id)}
                         onUpdateName={(name) => updateStudentName(student.id, name)}

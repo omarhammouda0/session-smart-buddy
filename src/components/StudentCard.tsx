@@ -1,8 +1,8 @@
-import { Trash2, Clock, Monitor, MapPin, Phone } from 'lucide-react';
+import { Trash2, Clock, Monitor, MapPin, Phone, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Student, SessionType } from '@/types/student';
+import { Student, SessionType, AppSettings } from '@/types/student';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { cn } from '@/lib/utils';
 import { DAY_NAMES_SHORT_AR, formatDurationAr } from '@/lib/arabicConstants';
@@ -21,6 +21,7 @@ import {
 interface StudentCardProps {
   student: Student;
   students?: Student[];
+  settings?: AppSettings;
   selectedDayOfWeek: number;
   onRemove: () => void;
   onUpdateName: (name: string) => void;
@@ -40,6 +41,7 @@ interface StudentCardProps {
 export const StudentCard = ({
   student,
   students = [],
+  settings,
   selectedDayOfWeek,
   onRemove,
   onUpdateName,
@@ -50,6 +52,23 @@ export const StudentCard = ({
   onUpdateDuration,
   onUpdateCustomSettings,
 }: StudentCardProps) => {
+
+  const defaultPriceOnsite = settings?.defaultPriceOnsite ?? 150;
+  const defaultPriceOnline = settings?.defaultPriceOnline ?? 120;
+
+  const effectivePrice = (() => {
+    if (student.useCustomSettings) {
+      if ((student.sessionType || 'onsite') === 'online') {
+        return typeof student.customPriceOnline === 'number' && student.customPriceOnline > 0
+          ? student.customPriceOnline
+          : defaultPriceOnline;
+      }
+      return typeof student.customPriceOnsite === 'number' && student.customPriceOnsite > 0
+        ? student.customPriceOnsite
+        : defaultPriceOnsite;
+    }
+    return (student.sessionType || 'onsite') === 'online' ? defaultPriceOnline : defaultPriceOnsite;
+  })();
 
   return (
     <Card className={cn(
@@ -63,6 +82,7 @@ export const StudentCard = ({
               <EditStudentDialog
                 student={student}
                 students={students}
+                appSettings={settings}
                 onUpdateName={onUpdateName}
                 onUpdateTime={onUpdateTime}
                 onUpdatePhone={onUpdatePhone}
@@ -77,6 +97,10 @@ export const StudentCard = ({
                 <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 {student.sessionTime || '16:00'}
                 <span className="text-muted-foreground">({formatDurationAr(student.sessionDuration || 60)})</span>
+              </span>
+              <span className="text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 bg-muted/50 text-foreground rounded-lg flex items-center gap-1">
+                <Banknote className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
+                {effectivePrice} جنيه
               </span>
               <Badge variant="outline" className={cn(
                 "text-[10px] gap-1",

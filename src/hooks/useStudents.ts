@@ -187,13 +187,23 @@ export const useStudents = () => {
     setStudents(prev =>
       prev.map(s => {
         if (s.id !== studentId) return s;
-        return {
-          ...s,
-          useCustomSettings: customSettings.useCustomSettings,
-          sessionDuration: customSettings.sessionDuration,
-          customPriceOnsite: customSettings.customPriceOnsite,
-          customPriceOnline: customSettings.customPriceOnline,
-        };
+
+        const next = { ...s };
+
+        if (customSettings.useCustomSettings !== undefined) {
+          next.useCustomSettings = customSettings.useCustomSettings;
+        }
+        if (customSettings.sessionDuration !== undefined) {
+          next.sessionDuration = customSettings.sessionDuration;
+        }
+        if (customSettings.customPriceOnsite !== undefined) {
+          next.customPriceOnsite = customSettings.customPriceOnsite;
+        }
+        if (customSettings.customPriceOnline !== undefined) {
+          next.customPriceOnline = customSettings.customPriceOnline;
+        }
+
+        return next;
       })
     );
   };
