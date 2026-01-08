@@ -13,6 +13,8 @@ import { EndOfMonthReminder } from '@/components/EndOfMonthReminder';
 import { SessionHistoryBar } from '@/components/SessionHistoryBar';
 import { BulkEditSessionsDialog } from '@/components/BulkEditSessionsDialog';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
+import { ReminderSettingsDialog } from '@/components/ReminderSettingsDialog';
+import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -357,6 +359,8 @@ const Index = () => {
                 onBulkUpdateTime={bulkUpdateSessionTime}
                 onBulkMarkAsVacation={bulkMarkAsVacation}
               />
+              <ReminderHistoryDialog />
+              <ReminderSettingsDialog />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
                 onAdd={addStudent}
