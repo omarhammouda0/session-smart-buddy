@@ -14,31 +14,31 @@ interface WhatsAppReminderRequest {
   testMode?: boolean;
 }
 
-// Format phone number for Egypt (+20) 
+// Format phone number - preserve international numbers, default to Egypt (+20) for local
 const formatPhoneNumber = (phone: string): string => {
   let cleaned = phone.replace(/\s+/g, '').replace(/-/g, '');
   
-  // Remove leading zeros
+  // If already has + prefix, it's an international number - keep it as is
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+  
+  // Remove leading zeros for local numbers
   while (cleaned.startsWith('0')) {
     cleaned = cleaned.substring(1);
   }
   
-  // Remove any existing country code prefix for re-formatting
-  if (cleaned.startsWith('+')) {
-    cleaned = cleaned.substring(1);
-  }
-  
-  // Handle Egyptian numbers
-  if (cleaned.startsWith('20')) {
+  // Handle numbers that already have country code without +
+  if (cleaned.startsWith('20') && cleaned.length > 10) {
     return `+${cleaned}`;
   }
   
-  // Assume Egyptian number if starts with 1 (e.g., 1012345678)
+  // Egyptian local number (starts with 1, 10 digits)
   if (cleaned.startsWith('1') && cleaned.length === 10) {
     return `+20${cleaned}`;
   }
   
-  // Default: add Egypt country code
+  // Default: assume Egyptian number
   return `+20${cleaned}`;
 };
 
