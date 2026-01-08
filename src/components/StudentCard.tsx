@@ -20,6 +20,7 @@ import {
 
 interface StudentCardProps {
   student: Student;
+  students?: Student[];
   selectedDayOfWeek: number;
   onRemove: () => void;
   onUpdateName: (name: string) => void;
@@ -31,6 +32,7 @@ interface StudentCardProps {
 
 export const StudentCard = ({
   student,
+  students = [],
   selectedDayOfWeek,
   onRemove,
   onUpdateName,
@@ -51,6 +53,7 @@ export const StudentCard = ({
               <h3 className="font-heading font-semibold text-base sm:text-lg truncate">{student.name}</h3>
               <EditStudentDialog
                 student={student}
+                students={students}
                 onUpdateName={onUpdateName}
                 onUpdateTime={onUpdateTime}
                 onUpdatePhone={onUpdatePhone}

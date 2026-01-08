@@ -513,6 +513,7 @@ const Index = () => {
                       <StudentCard
                         key={student.id}
                         student={student}
+                        students={students}
                         selectedDayOfWeek={selectedDayOfWeek}
                         onRemove={() => removeStudent(student.id)}
                         onUpdateName={(name) => updateStudentName(student.id, name)}
