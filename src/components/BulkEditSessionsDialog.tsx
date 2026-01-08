@@ -821,25 +821,70 @@ export const BulkEditSessionsDialog = ({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[85vh]"
+                      className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[80vh] bg-popover"
                       align="start"
                       dir="rtl"
                     >
                       <div className="p-3 border-b bg-muted/30 shrink-0">
-                        <p className="font-medium text-sm">اختر فترات (تحديد متعدد)</p>
+                        <p className="font-medium text-sm mb-2">اختر فترات</p>
+                        {/* Tab buttons */}
+                        <div className="flex gap-1">
+                          <Button
+                            variant={!showCustomRange && checkedPeriodIds.size === 0 || [...checkedPeriodIds].some(id => id.startsWith('week')) ? "default" : "outline"}
+                            size="sm"
+                            className="flex-1 h-7 text-xs"
+                            onClick={() => {
+                              setShowCustomRange(false);
+                              // Show weeks section
+                            }}
+                          >
+                            📅 الأسابيع
+                          </Button>
+                          <Button
+                            variant={[...checkedPeriodIds].some(id => id.startsWith('month')) ? "default" : "outline"}
+                            size="sm"
+                            className="flex-1 h-7 text-xs"
+                            onClick={() => {
+                              setShowCustomRange(false);
+                              // Show months section
+                            }}
+                          >
+                            📆 الأشهر
+                          </Button>
+                          <Button
+                            variant={showCustomRange ? "default" : "outline"}
+                            size="sm"
+                            className="flex-1 h-7 text-xs"
+                            onClick={() => {
+                              setShowCustomRange(true);
+                              setCheckedPeriodIds(new Set());
+                            }}
+                          >
+                            📋 مخصص
+                          </Button>
+                        </div>
                       </div>
 
                       <div
                         className="overflow-y-auto overflow-x-hidden flex-1 min-h-0"
                         style={{
-                          maxHeight: "55vh",
+                          maxHeight: "50vh",
+                          WebkitOverflowScrolling: "touch",
+                          overscrollBehavior: "contain",
                         }}
                       >
-                        <div className="p-3 space-y-3">
+                        <div className="p-3 space-y-3 pb-6">
                           {!showCustomRange ? (
                             <>
                               <div className="space-y-2">
-                                <p className="text-xs font-medium text-muted-foreground">📅 الأسابيع:</p>
+                                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                  📅 الأسابيع
+                                  {weekOptions.filter(w => checkedPeriodIds.has(w.id)).length > 0 && (
+                                    <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                      {weekOptions.filter(w => checkedPeriodIds.has(w.id)).length}
+                                    </Badge>
+                                  )}
+                                </p>
                                 <div className="space-y-1">
                                   {weekOptions.map((week) => {
                                     const isAlreadyAdded = selectedPeriods.some((p) => p.id === week.id);
@@ -868,7 +913,14 @@ export const BulkEditSessionsDialog = ({
                               <Separator />
 
                               <div className="space-y-2">
-                                <p className="text-xs font-medium text-muted-foreground">📆 الأشهر:</p>
+                                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                  📆 الأشهر
+                                  {monthOptions.filter(m => checkedPeriodIds.has(m.id)).length > 0 && (
+                                    <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                      {monthOptions.filter(m => checkedPeriodIds.has(m.id)).length}
+                                    </Badge>
+                                  )}
+                                </p>
                                 <div className="space-y-1">
                                   {monthOptions.map((month) => {
                                     const isAlreadyAdded = selectedPeriods.some((p) => p.id === month.id);
@@ -926,12 +978,13 @@ export const BulkEditSessionsDialog = ({
                                       {customDateFrom ? format(customDateFrom, "dd/MM/yyyy") : "اختر تاريخ"}
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
+                                  <PopoverContent className="w-auto p-0 pointer-events-auto z-[100]" align="start">
                                     <CalendarPicker
                                       mode="single"
                                       selected={customDateFrom}
                                       onSelect={setCustomDateFrom}
                                       initialFocus
+                                      className="pointer-events-auto"
                                     />
                                   </PopoverContent>
                                 </Popover>
@@ -947,36 +1000,23 @@ export const BulkEditSessionsDialog = ({
                                       {customDateTo ? format(customDateTo, "dd/MM/yyyy") : "اختر تاريخ"}
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
+                                  <PopoverContent className="w-auto p-0 pointer-events-auto z-[100]" align="start">
                                     <CalendarPicker
                                       mode="single"
                                       selected={customDateTo}
                                       onSelect={setCustomDateTo}
                                       initialFocus
+                                      className="pointer-events-auto"
                                     />
                                   </PopoverContent>
                                 </Popover>
                               </div>
                             </div>
                           )}
-
-                          <div className="h-2" />
                         </div>
                       </div>
 
                       <div className="p-3 border-t bg-muted/30 space-y-2 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full text-xs h-8"
-                          onClick={() => {
-                            setShowCustomRange(!showCustomRange);
-                            setCheckedPeriodIds(new Set());
-                          }}
-                        >
-                          {showCustomRange ? "← العودة للقائمة" : "نطاق مخصص..."}
-                        </Button>
-
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
