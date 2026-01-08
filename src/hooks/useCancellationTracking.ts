@@ -273,9 +273,23 @@ export const useCancellationTracking = (students: Student[]) => {
           if (!alreadyNotified) {
             console.log('Auto-sending parent notification for:', student.name);
 
-            const studentCancellations = cancellations.filter(
-              (c) => c.studentId === studentId && c.month === month
-            );
+            // Fetch fresh cancellation list directly from DB (state may be stale)
+            const { data: freshCancellations } = await supabase
+              .from('session_cancellations')
+              .select('*')
+              .eq('student_id', studentId)
+              .eq('month', month)
+              .order('session_date', { ascending: true });
+
+            const studentCancellations: CancellationRecord[] = (freshCancellations || []).map((c) => ({
+              id: c.id,
+              studentId: c.student_id,
+              sessionDate: c.session_date,
+              sessionTime: c.session_time || undefined,
+              reason: c.reason || undefined,
+              cancelledAt: c.cancelled_at,
+              month: c.month,
+            }));
 
             const result = await sendParentNotificationInternal(
               studentId,
