@@ -561,6 +561,9 @@ ${cancellationsText}
             studentName,
             phoneNumber: parentPhone,
             customMessage: message,
+            studentId,
+            type: 'cancellation',
+            logToDb: true,
           },
         });
 

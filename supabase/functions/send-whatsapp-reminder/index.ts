@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,12 @@ interface WhatsAppReminderRequest {
   year?: number;
   customMessage?: string;
   testMode?: boolean;
+  // For logging
+  studentId?: string;
+  type?: 'session' | 'payment' | 'cancellation' | 'report';
+  sessionId?: string;
+  sessionDate?: string;
+  logToDb?: boolean;
 }
 
 // Format phone number - preserve international numbers, default to Egypt (+20) for local
@@ -50,9 +57,21 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const body: WhatsAppReminderRequest = await req.json();
-    const { studentName, phoneNumber, month, year, customMessage, testMode } = body;
+    const { 
+      studentName, 
+      phoneNumber, 
+      month, 
+      year, 
+      customMessage, 
+      testMode,
+      studentId,
+      type = 'payment',
+      sessionId,
+      sessionDate,
+      logToDb = true
+    } = body;
 
-    console.log("Received request:", { studentName, phoneNumber, month, year, hasCustomMessage: !!customMessage, testMode });
+    console.log("Received request:", { studentName, phoneNumber, month, year, hasCustomMessage: !!customMessage, testMode, type, logToDb });
 
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -124,10 +143,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     const result = await response.json();
 
+    let status: 'sent' | 'failed' = 'sent';
+    let errorMessage: string | null = null;
+    let messageSid: string | null = null;
+
     if (!response.ok) {
       console.error("Twilio error:", result);
+      status = 'failed';
       // Provide more helpful error messages
-      let errorMessage = result.message || "Failed to send WhatsApp message";
+      errorMessage = result.message || "Failed to send WhatsApp message";
       if (result.code === 21211) {
         errorMessage = "رقم الهاتف غير صحيح";
       } else if (result.code === 21614) {
@@ -135,13 +159,57 @@ const handler = async (req: Request): Promise<Response> => {
       } else if (result.code === 21408) {
         errorMessage = "رصيد Twilio غير كافي";
       }
-      throw new Error(errorMessage);
+    } else {
+      console.log("WhatsApp message sent successfully:", result.sid);
+      messageSid = result.sid;
     }
 
-    console.log("WhatsApp message sent successfully:", result.sid);
+    // Log to database if requested and we have required data
+    if (logToDb && studentId && studentName && type !== 'report') {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL");
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          
+          const logEntry = {
+            user_id: 'default',
+            type: type as 'session' | 'payment' | 'cancellation',
+            student_id: studentId,
+            student_name: studentName,
+            phone_number: formattedPhone,
+            message_text: message,
+            status,
+            twilio_message_sid: messageSid,
+            error_message: errorMessage,
+            session_id: sessionId || null,
+            session_date: sessionDate || null,
+            month: month ? parseInt(month) || null : null,
+            year: year || null,
+          };
+
+          const { error: logError } = await supabase
+            .from('reminder_log')
+            .insert(logEntry);
+
+          if (logError) {
+            console.error("Failed to log reminder:", logError);
+          } else {
+            console.log("Reminder logged to database");
+          }
+        }
+      } catch (logErr) {
+        console.error("Error logging to database:", logErr);
+      }
+    }
+
+    if (status === 'failed') {
+      throw new Error(errorMessage || "Failed to send message");
+    }
 
     return new Response(
-      JSON.stringify({ success: true, messageSid: result.sid }),
+      JSON.stringify({ success: true, messageSid }),
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },

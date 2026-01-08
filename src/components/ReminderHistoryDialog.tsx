@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote } from 'lucide-react';
+import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote, AlertTriangle } from 'lucide-react';
 import { useReminderSettings } from '@/hooks/useReminderSettings';
 import { ReminderLog } from '@/types/reminder';
 import { format, parseISO, isWithinInterval, subDays, subWeeks, subMonths } from 'date-fns';
@@ -12,7 +12,7 @@ import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
-type FilterType = 'all' | 'session' | 'payment';
+type FilterType = 'all' | 'session' | 'payment' | 'cancellation';
 type FilterStatus = 'all' | 'sent' | 'failed';
 type FilterTime = 'all' | 'week' | 'month';
 
@@ -94,10 +94,11 @@ export const ReminderHistoryDialog = () => {
             <SelectTrigger className="w-28 h-8 text-xs">
               <SelectValue placeholder="النوع" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-popover z-50">
               <SelectItem value="all">الكل</SelectItem>
               <SelectItem value="session">جلسات</SelectItem>
               <SelectItem value="payment">دفع</SelectItem>
+              <SelectItem value="cancellation">إلغاء</SelectItem>
             </SelectContent>
           </Select>
 
@@ -175,10 +176,14 @@ export const ReminderHistoryDialog = () => {
                     </div>
                     <Badge variant="outline" className={cn(
                       "shrink-0 text-[10px]",
-                      log.type === 'session' ? "border-primary/50 text-primary" : "border-warning/50 text-warning"
+                      log.type === 'session' ? "border-primary/50 text-primary" : 
+                      log.type === 'cancellation' ? "border-destructive/50 text-destructive" :
+                      "border-warning/50 text-warning"
                     )}>
                       {log.type === 'session' ? (
                         <><MessageCircle className="h-3 w-3 ml-1" />جلسة</>
+                      ) : log.type === 'cancellation' ? (
+                        <><AlertTriangle className="h-3 w-3 ml-1" />إلغاء</>
                       ) : (
                         <><Banknote className="h-3 w-3 ml-1" />دفع</>
                       )}
@@ -206,7 +211,7 @@ export const ReminderHistoryDialog = () => {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground text-xs">النوع</p>
-                    <p className="font-medium">{selectedLog.type === 'session' ? 'تذكير جلسة' : 'تذكير دفع'}</p>
+                    <p className="font-medium">{selectedLog.type === 'session' ? 'تذكير جلسة' : selectedLog.type === 'cancellation' ? 'إشعار إلغاء' : 'تذكير دفع'}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">الحالة</p>
