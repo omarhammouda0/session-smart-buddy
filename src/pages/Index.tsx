@@ -66,6 +66,7 @@ const Index = () => {
     updateStudentPhone,
     updateStudentSessionType,
     updateStudentSchedule,
+    updateStudentDuration,
     addExtraSession,
     removeSession,
     deleteSession,
@@ -522,6 +523,7 @@ const Index = () => {
                         onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
                         onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
                         onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
+                        onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
                       />
                     ))}
                   </div>
