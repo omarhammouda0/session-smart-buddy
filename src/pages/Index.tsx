@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   GraduationCap,
   BookOpen,
@@ -10,7 +10,6 @@ import {
   History,
   CalendarDays,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
 
 import { useStudents } from "@/hooks/useStudents";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
@@ -36,9 +35,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR, formatShortDateAr } from "@/lib/arabicConstants";
+import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { cn } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const now = new Date();
@@ -70,27 +68,21 @@ const Index = () => {
     updateStudentSchedule,
     updateStudentDuration,
     updateStudentCustomSettings,
-    addExtraSession,
-    removeSession,
-    deleteSession,
-    restoreSession,
     rescheduleSession,
     togglePaymentStatus,
     bulkUpdateSessionTime,
-    markSessionAsVacation,
     bulkMarkAsVacation,
     updateSessionDetails,
   } = useStudents();
 
-  const {
-    getCancellationCount,
-    getAllStudentCancellations,
-    recordCancellation,
-    removeCancellation,
-    clearMonthCancellations,
-  } = useCancellationTracking(students);
+  const { getCancellationCount, getAllStudentCancellations, clearMonthCancellations } =
+    useCancellationTracking(students);
 
-  const { checkConflict } = useConflictDetection(students);
+  useConflictDetection(students); // kept for full functionality parity
+
+  if (!isLoaded) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">جاري التحميل...</div>;
+  }
 
   const studentsForDay = students
     .filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === selectedDayOfWeek))
@@ -100,12 +92,8 @@ const Index = () => {
   const weekDays = Array.from({ length: 7 }).map((_, i) => ({
     dayOfWeek: i,
     dayName: DAY_NAMES_SHORT_AR[i],
-    studentCount: students.filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === i)).length,
+    count: students.filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === i)).length,
   }));
-
-  if (!isLoaded) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">جاري التحميل...</div>;
-  }
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -149,20 +137,16 @@ const Index = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-4 bg-muted rounded-xl p-1">
             <TabsTrigger value="sessions">
-              <BookOpen className="h-4 w-4 ml-1" />
-              الحصص
+              <BookOpen className="h-4 w-4 ml-1" /> الحصص
             </TabsTrigger>
             <TabsTrigger value="calendar">
-              <CalendarDays className="h-4 w-4 ml-1" />
-              التقويم
+              <CalendarDays className="h-4 w-4 ml-1" /> التقويم
             </TabsTrigger>
             <TabsTrigger value="history">
-              <History className="h-4 w-4 ml-1" />
-              السجل
+              <History className="h-4 w-4 ml-1" /> السجل
             </TabsTrigger>
             <TabsTrigger value="payments">
-              <CreditCard className="h-4 w-4 ml-1" />
-              المدفوعات
+              <CreditCard className="h-4 w-4 ml-1" /> المدفوعات
             </TabsTrigger>
           </TabsList>
 
@@ -180,7 +164,7 @@ const Index = () => {
                   </p>
                 </div>
 
-                {/* Day selector */}
+                {/* Day Selector */}
                 <div className="flex justify-center gap-1 overflow-x-auto">
                   {weekDays.map((day) => (
                     <button
@@ -190,39 +174,51 @@ const Index = () => {
                         setStudentFilter("all");
                       }}
                       className={cn(
-                        "px-3 py-2 rounded-lg text-sm",
+                        "px-3 py-2 rounded-lg text-sm transition",
                         selectedDayOfWeek === day.dayOfWeek
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted hover:bg-accent",
                       )}
                     >
                       {day.dayName}
-                      {day.studentCount > 0 && <div className="text-[10px] opacity-70">{day.studentCount}</div>}
+                      {day.count > 0 && <div className="text-[10px] opacity-70">{day.count}</div>}
                     </button>
                   ))}
                 </div>
 
                 {/* Filter + List */}
                 <div className="bg-card border rounded-xl p-3 space-y-3">
-                  <Select value={studentFilter} onValueChange={setStudentFilter}>
-                    <SelectTrigger>
-                      <Users className="h-4 w-4 ml-2" />
-                      <SelectValue placeholder="جميع الطلاب" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">جميع الطلاب</SelectItem>
-                      {students.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Select value={studentFilter} onValueChange={setStudentFilter}>
+                      <SelectTrigger className="w-full">
+                        <Users className="h-4 w-4 ml-2" />
+                        <SelectValue placeholder="جميع الطلاب" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">جميع الطلاب</SelectItem>
+                        {students.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
+                    {studentFilter !== "all" && (
+                      <Button variant="ghost" size="icon" onClick={() => setStudentFilter("all")}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* 🔹 ANIMATED STUDENT LIST */}
                   {studentsForDay.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">لا توجد حصص لهذا اليوم</div>
                   ) : (
-                    <div className="grid gap-3">
+                    <div
+                      key={selectedDayOfWeek}
+                      className="grid gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                    >
                       {studentsForDay.map((student) => (
                         <StudentCard
                           key={student.id}
@@ -247,6 +243,7 @@ const Index = () => {
             )}
           </TabsContent>
 
+          {/* ================= OTHER TABS ================= */}
           <TabsContent value="calendar">
             <CalendarView students={students} onRescheduleSession={rescheduleSession} />
           </TabsContent>
