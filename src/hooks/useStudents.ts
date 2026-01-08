@@ -496,6 +496,38 @@ export const useStudents = () => {
     );
   };
 
+  // Update session date AND time together (for bulk day+time changes)
+  const updateSessionDateTime = (studentId: string, sessionId: string, newDate: string, newTime: string) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== studentId) return s;
+        
+        const now = new Date().toISOString();
+        const updatedSessions = s.sessions.map(sess => {
+          if (sess.id !== sessionId) return sess;
+          const oldDate = sess.date;
+          const oldTime = sess.time || s.sessionTime || '16:00';
+          return {
+            ...sess,
+            date: newDate,
+            time: newTime,
+            history: [...(sess.history || []), { 
+              status: sess.status as SessionStatus, 
+              timestamp: now,
+              note: `Moved from ${oldDate} ${oldTime} to ${newDate} ${newTime}`
+            }],
+          };
+        });
+        
+        // Sort sessions by date
+        return { 
+          ...s, 
+          sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)) 
+        };
+      })
+    );
+  };
+
   const toggleSessionComplete = (studentId: string, sessionId: string) => {
     setStudents(prev =>
       prev.map(s => {
@@ -634,6 +666,7 @@ export const useStudents = () => {
     deleteSession,
     restoreSession,
     rescheduleSession,
+    updateSessionDateTime,
     toggleSessionComplete,
     togglePaymentStatus,
     getStudentPayments,
