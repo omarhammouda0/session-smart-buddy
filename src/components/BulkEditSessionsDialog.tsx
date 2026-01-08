@@ -828,7 +828,7 @@ export const BulkEditSessionsDialog = ({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[80vh] bg-popover pointer-events-auto"
+                      className="w-[min(360px,88vw)] p-0 flex flex-col max-h-[70vh] bg-popover pointer-events-auto"
                       align="start"
                       dir="rtl"
                       onWheelCapture={(e) => e.stopPropagation()}
@@ -868,11 +868,11 @@ export const BulkEditSessionsDialog = ({
                       </div>
 
                       <div 
-                        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+                        className="flex-1 overflow-y-auto overflow-x-hidden"
                         onWheelCapture={(e) => e.stopPropagation()}
                         style={{ 
-                          maxHeight: "50vh",
-                          overscrollBehavior: "contain"
+                          overscrollBehavior: "contain",
+                          WebkitOverflowScrolling: "touch"
                         }}
                       >
                         <div className="p-3 space-y-3 pb-6">

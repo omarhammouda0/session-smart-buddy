@@ -360,19 +360,18 @@ export const AddVacationDialog = ({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
-                  className="w-80 p-0 bg-popover z-50 max-h-[80vh] overflow-hidden flex flex-col pointer-events-auto" 
+                  className="w-80 p-0 bg-popover z-50 max-h-[70vh] flex flex-col pointer-events-auto" 
                   align="start"
                   onWheelCapture={(e) => e.stopPropagation()}
                 >
-                  <div className="p-2.5 border-b">
+                  <div className="p-2.5 border-b shrink-0">
                     <h4 className="font-medium text-sm">اختر فترة الإجازة</h4>
                   </div>
                   
                   <div 
-                    className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+                    className="flex-1 overflow-y-auto overflow-x-hidden"
                     onWheelCapture={(e) => e.stopPropagation()}
                     style={{ 
-                      maxHeight: "50vh",
                       overscrollBehavior: "contain",
                       WebkitOverflowScrolling: "touch"
                     }}
