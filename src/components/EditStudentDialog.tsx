@@ -61,6 +61,7 @@ interface EditStudentDialogProps {
   onUpdateName: (name: string) => void;
   onUpdateTime: (time: string) => void;
   onUpdatePhone: (phone: string) => void;
+  onUpdateParentPhone?: (parentPhone: string) => void;
   onUpdateSessionType: (type: SessionType) => void;
   onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
   onUpdateDuration?: (duration: number) => void;
@@ -84,6 +85,7 @@ export const EditStudentDialog = ({
   onUpdateName,
   onUpdateTime,
   onUpdatePhone,
+  onUpdateParentPhone,
   onUpdateSessionType,
   onUpdateSchedule,
   onUpdateDuration,
@@ -93,6 +95,7 @@ export const EditStudentDialog = ({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(student.name);
   const [phone, setPhone] = useState(student.phone || '');
+  const [parentPhone, setParentPhone] = useState(student.parentPhone || '');
   const [sessionTime, setSessionTime] = useState(student.sessionTime || '16:00');
   const [sessionType, setSessionType] = useState<SessionType>(student.sessionType || 'onsite');
   const [sessionDuration, setSessionDuration] = useState<number>(student.sessionDuration || DEFAULT_DURATION);
@@ -214,6 +217,9 @@ export const EditStudentDialog = ({
     if (phone !== (student.phone || '')) {
       onUpdatePhone(phone);
     }
+    if (parentPhone !== (student.parentPhone || '')) {
+      onUpdateParentPhone?.(parentPhone);
+    }
     if (sessionTime !== student.sessionTime) {
       onUpdateTime(sessionTime);
     }
@@ -256,6 +262,7 @@ export const EditStudentDialog = ({
       // Reset to current values when opening
       setName(student.name);
       setPhone(student.phone || '');
+      setParentPhone(student.parentPhone || '');
       setSessionTime(student.sessionTime || '16:00');
       setSessionType(student.sessionType || 'onsite');
       setSessionDuration(student.sessionDuration || DEFAULT_DURATION);
@@ -302,20 +309,37 @@ export const EditStudentDialog = ({
             </div>
 
             {/* Phone */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-phone" className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5" />
-                رقم الهاتف
-              </Label>
-              <Input
-                id="edit-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="رقم الواتساب"
-                dir="ltr"
-                className="text-right"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone" className="flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5" />
+                  رقم الطالب (واتساب)
+                </Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+966xxxxxxxxx"
+                  dir="ltr"
+                  className="text-right"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-parent-phone" className="flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5" />
+                  رقم ولي الأمر (واتساب)
+                </Label>
+                <Input
+                  id="edit-parent-phone"
+                  type="tel"
+                  value={parentPhone}
+                  onChange={(e) => setParentPhone(e.target.value)}
+                  placeholder="+966xxxxxxxxx"
+                  dir="ltr"
+                  className="text-right"
+                />
+              </div>
             </div>
 
             {/* Session Time */}

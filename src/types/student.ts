@@ -47,7 +47,8 @@ export interface Student {
   customPriceOnline?: number; // Custom online price for this student
   useCustomSettings?: boolean; // Whether to use custom settings or global defaults
   name: string;
-  phone?: string; // WhatsApp contact number
+  phone?: string; // Student's WhatsApp contact number
+  parentPhone?: string; // Parent's WhatsApp number for notifications
   sessionType: SessionType; // online or on-site
   scheduleDays: ScheduleDay[]; // Which days of the week they have sessions
   semesterStart: string; // YYYY-MM-DD

@@ -102,6 +102,7 @@ export const useStudents = () => {
     sessionTime: string = '16:00',
     sessionType: 'online' | 'onsite' = 'onsite',
     phone?: string,
+    parentPhone?: string,
     customSemesterStart?: string,
     customSemesterEnd?: string,
     sessionDuration?: number
@@ -124,6 +125,7 @@ export const useStudents = () => {
       id: generateId(),
       name,
       phone,
+      parentPhone,
       sessionTime,
       sessionDuration: duration, // Store default duration for this student
       sessionType,
@@ -160,6 +162,12 @@ export const useStudents = () => {
   const updateStudentPhone = (studentId: string, phone: string) => {
     setStudents(prev =>
       prev.map(s => (s.id === studentId ? { ...s, phone } : s))
+    );
+  };
+
+  const updateStudentParentPhone = (studentId: string, parentPhone: string) => {
+    setStudents(prev =>
+      prev.map(s => (s.id === studentId ? { ...s, parentPhone } : s))
     );
   };
 
@@ -656,6 +664,7 @@ export const useStudents = () => {
     updateStudentName,
     updateStudentTime,
     updateStudentPhone,
+    updateStudentParentPhone,
     updateStudentSessionType,
     updateStudentDuration,
     updateStudentCustomSettings,
