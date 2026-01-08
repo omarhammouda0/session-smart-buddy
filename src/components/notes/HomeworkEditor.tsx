@@ -98,7 +98,12 @@ export function HomeworkEditor({ onSave, onCancel, defaultDueDate }: HomeworkEdi
   if (showVoiceRecorder) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-medium px-4 pt-4">تسجيل تعليمات صوتية</p>
+        <div className="flex items-center justify-between px-4 pt-4">
+          <p className="text-sm font-medium">تسجيل تعليمات صوتية</p>
+          <Button variant="ghost" size="sm" onClick={() => setShowVoiceRecorder(false)}>
+            رجوع
+          </Button>
+        </div>
         <VoiceRecorder
           onSave={handleVoiceSave}
           onCancel={() => setShowVoiceRecorder(false)}
@@ -109,9 +114,14 @@ export function HomeworkEditor({ onSave, onCancel, defaultDueDate }: HomeworkEdi
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <BookOpen className="h-4 w-4" />
-        إضافة واجب منزلي
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <BookOpen className="h-4 w-4" />
+          إضافة واجب منزلي
+        </div>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          رجوع
+        </Button>
       </div>
 
       <div className="space-y-2">
