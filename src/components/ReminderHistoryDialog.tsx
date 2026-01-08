@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote, AlertTriangle } from 'lucide-react';
 import { useReminderSettings } from '@/hooks/useReminderSettings';
 import { ReminderLog } from '@/types/reminder';
@@ -133,11 +133,11 @@ export const ReminderHistoryDialog = () => {
           <div className="grid grid-cols-3 gap-2">
             <Select onValueChange={handleTypeSelect} value="">
               <SelectTrigger className="h-8 text-xs">
-                <SelectValue>
+                <span className="truncate">
                   {filterTypes.length === 0 ? 'النوع' : 
                    filterTypes.length === 1 ? (filterTypes[0] === 'session' ? 'جلسات' : filterTypes[0] === 'payment' ? 'دفع' : 'إلغاء') :
                    `${filterTypes.length} أنواع`}
-                </SelectValue>
+                </span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="session" disabled={filterTypes.includes('session')}>
@@ -163,11 +163,11 @@ export const ReminderHistoryDialog = () => {
 
             <Select onValueChange={handleStatusSelect} value="">
               <SelectTrigger className="h-8 text-xs">
-                <SelectValue>
+                <span className="truncate">
                   {filterStatuses.length === 0 ? 'الحالة' : 
                    filterStatuses.length === 1 ? (filterStatuses[0] === 'sent' ? 'نجح' : 'فشل') :
                    'نجح و فشل'}
-                </SelectValue>
+                </span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="sent" disabled={filterStatuses.includes('sent')}>
@@ -187,9 +187,9 @@ export const ReminderHistoryDialog = () => {
 
             <Select onValueChange={handleTimeSelect} value={filterTime || ""}>
               <SelectTrigger className="h-8 text-xs">
-                <SelectValue>
+                <span className="truncate">
                   {filterTime === null ? 'الفترة' : filterTime === 'week' ? 'أسبوع' : 'شهر'}
-                </SelectValue>
+                </span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="week">
