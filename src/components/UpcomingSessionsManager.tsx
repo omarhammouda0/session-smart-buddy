@@ -225,12 +225,7 @@ export const UpcomingSessionsManager = ({
               <SelectItem value="all">All Students</SelectItem>
               {students.map(student => (
                 <SelectItem key={student.id} value={student.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{student.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      ({student.sessionTime || '16:00'})
-                    </span>
-                  </div>
+                  {student.name}
                 </SelectItem>
               ))}
             </SelectContent>
