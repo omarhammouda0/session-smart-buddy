@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format, parseISO, isBefore, isAfter, startOfToday } from 'date-fns';
-import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2, Palmtree, RotateCcw, AlertTriangle, XCircle, FileText, BookOpen, ClipboardCheck } from 'lucide-react';
+import { ar } from 'date-fns/locale';
+import { History, Users, Check, X, Calendar, Ban, CalendarClock, Plus, Trash2, Palmtree, RotateCcw, AlertTriangle, XCircle, FileText, BookOpen, ClipboardCheck, Loader2 } from 'lucide-react';
 import { Student, Session, HomeworkStatus } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +32,16 @@ import { CancelSessionDialog } from '@/components/CancelSessionDialog';
 import { SessionNotesManager } from '@/components/notes/SessionNotesManager';
 import { toast } from '@/hooks/use-toast';
 
+interface CancellationRecord {
+  id: string;
+  studentId: string;
+  sessionDate: string;
+  sessionTime?: string;
+  reason?: string;
+  cancelledAt: string;
+  month: string;
+}
+
 interface SessionHistoryBarProps {
   students: Student[];
   onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
@@ -47,9 +58,11 @@ interface SessionHistoryBarProps {
     homeworkStatus?: HomeworkStatus;
   }) => void;
   getCancellationCount?: (studentId: string) => number;
+  getAllStudentCancellations?: (studentId: string) => CancellationRecord[];
+  onClearMonthCancellations?: (studentId: string, month: string) => Promise<boolean>;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession, onMarkAsVacation, onUpdateSessionDetails, getCancellationCount }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession, onMarkAsVacation, onUpdateSessionDetails, getCancellationCount, getAllStudentCancellations, onClearMonthCancellations }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
@@ -601,6 +614,16 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                   )}
                 </div>
               </ScrollArea>
+
+              {/* Cancellation History Section */}
+              {getAllStudentCancellations && (
+                <CancellationHistoryInline
+                  student={selectedStudent}
+                  cancellations={getAllStudentCancellations(selectedStudent.id)}
+                  onRestore={handleRestoreWithCheck}
+                  onClearMonth={onClearMonthCancellations}
+                />
+              )}
             </TabsContent>
           </Tabs>
         ) : (
@@ -666,5 +689,190 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
         />
       )}
     </Card>
+  );
+};
+
+// Cancellation History Inline Component for Management Tab
+const CancellationHistoryInline = ({
+  student,
+  cancellations,
+  onRestore,
+  onClearMonth,
+}: {
+  student: Student;
+  cancellations: CancellationRecord[];
+  onRestore?: (studentId: string, sessionId: string) => void;
+  onClearMonth?: (studentId: string, month: string) => Promise<boolean>;
+}) => {
+  const [clearingMonth, setClearingMonth] = useState<string | null>(null);
+  const [confirmClearMonth, setConfirmClearMonth] = useState<string | null>(null);
+
+  // Group cancellations by month
+  const groupedByMonth = useMemo(() => {
+    const groups: Record<string, CancellationRecord[]> = {};
+    cancellations.forEach((c) => {
+      if (!groups[c.month]) {
+        groups[c.month] = [];
+      }
+      groups[c.month].push(c);
+    });
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+  }, [cancellations]);
+
+  const formatMonthLabel = (monthStr: string) => {
+    try {
+      const [year, month] = monthStr.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+      return format(date, 'MMMM yyyy', { locale: ar });
+    } catch {
+      return monthStr;
+    }
+  };
+
+  const formatSessionDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return format(date, 'EEEE d MMMM', { locale: ar });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const handleRestore = (cancellation: CancellationRecord) => {
+    const session = student.sessions.find(
+      (s) => s.date === cancellation.sessionDate && s.status === 'cancelled'
+    );
+    if (session && onRestore) {
+      onRestore(student.id, session.id);
+    }
+  };
+
+  const handleClearMonth = async (month: string) => {
+    if (!onClearMonth) return;
+    setClearingMonth(month);
+    setConfirmClearMonth(null);
+    try {
+      await onClearMonth(student.id, month);
+    } finally {
+      setClearingMonth(null);
+    }
+  };
+
+  const canRestore = (cancellation: CancellationRecord) => {
+    return student.sessions.some(
+      (s) => s.date === cancellation.sessionDate && s.status === 'cancelled'
+    );
+  };
+
+  if (cancellations.length === 0) return null;
+
+  return (
+    <>
+      <div className="space-y-3 p-3 rounded-lg border bg-muted/30 mt-4" dir="rtl">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Ban className="h-4 w-4 text-destructive" />
+          <span>سجل الإلغاءات</span>
+          <Badge variant="secondary" className="text-xs">
+            {cancellations.length}
+          </Badge>
+        </div>
+
+        <div className="space-y-3 max-h-48 overflow-y-auto">
+          {groupedByMonth.map(([month, monthCancellations]) => (
+            <div key={month} className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {formatMonthLabel(month)}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-xs',
+                      monthCancellations.length >= (student.cancellationPolicy?.monthlyLimit ?? 3)
+                        ? 'border-destructive text-destructive'
+                        : ''
+                    )}
+                  >
+                    {monthCancellations.length} / {student.cancellationPolicy?.monthlyLimit ?? 3}
+                  </Badge>
+                </div>
+                {onClearMonth && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 gap-1 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setConfirmClearMonth(month)}
+                    disabled={clearingMonth === month}
+                  >
+                    {clearingMonth === month ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3" />
+                    )}
+                    تصفير
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                {monthCancellations
+                  .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate))
+                  .map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between p-2 rounded-md bg-background text-xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{formatSessionDate(c.sessionDate)}</p>
+                        {c.reason && (
+                          <p className="text-muted-foreground truncate">{c.reason}</p>
+                        )}
+                      </div>
+                      {canRestore(c) && onRestore && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 gap-1 text-xs shrink-0"
+                          onClick={() => handleRestore(c)}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          استعادة
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={!!confirmClearMonth} onOpenChange={(open) => !open && setConfirmClearMonth(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              تأكيد تصفير الإلغاءات
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-right">
+              سيتم حذف جميع سجلات الإلغاء لشهر {confirmClearMonth ? formatMonthLabel(confirmClearMonth) : ''} نهائياً.
+              <br />
+              <span className="text-destructive font-medium">هذا الإجراء لا يمكن التراجع عنه.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmClearMonth && handleClearMonth(confirmClearMonth)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              تصفير
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
