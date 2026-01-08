@@ -65,9 +65,7 @@ export const StudentCard = ({
               <span className="text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 bg-accent/20 text-foreground rounded-lg flex items-center gap-1">
                 <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 {student.sessionTime || '16:00'}
-                {student.sessionDuration && (
-                  <span className="text-muted-foreground">({formatDurationAr(student.sessionDuration)})</span>
-                )}
+                <span className="text-muted-foreground">({formatDurationAr(student.sessionDuration || 60)})</span>
               </span>
               <Badge variant="outline" className={cn(
                 "text-[10px] gap-1",
