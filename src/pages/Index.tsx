@@ -12,8 +12,11 @@ import {
   Monitor,
   MapPin,
   History,
-  FileText,
   CalendarDays,
+  Plus,
+  TrendingUp,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useStudents } from "@/hooks/useStudents";
@@ -40,6 +43,7 @@ import { CalendarView } from "@/components/CalendarView";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR, formatShortDateAr } from "@/lib/arabicConstants";
 import { cn } from "@/lib/utils";
@@ -56,6 +60,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Index = () => {
   const now = new Date();
@@ -319,6 +331,27 @@ const Index = () => {
       });
   }, [students, allStudentsSearch]);
 
+  // Calculate quick stats
+  const todaySessions = students.reduce((count, student) => {
+    return (
+      count + student.sessions.filter((s) => s.date === format(now, "yyyy-MM-dd") && s.status === "scheduled").length
+    );
+  }, 0);
+
+  const completedThisMonth = students.reduce((count, student) => {
+    return (
+      count +
+      student.sessions.filter((s) => {
+        const sessionDate = parseISO(s.date);
+        return (
+          s.status === "completed" &&
+          sessionDate.getMonth() === selectedMonth &&
+          sessionDate.getFullYear() === selectedYear
+        );
+      }).length
+    );
+  }, 0);
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -328,41 +361,29 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background safe-bottom" dir="rtl">
-      {/* Header - BEAUTIFIED */}
-      <header className="bg-gradient-to-br from-card via-card to-primary/5 border-b border-border/50 sticky top-0 z-10 safe-top shadow-md backdrop-blur-sm">
-        <div className="px-3 py-3 sm:px-4 sm:py-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-background safe-bottom" dir="rtl">
+      {/* IMPROVED Header */}
+      <header className="bg-card/95 backdrop-blur-md border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="flex items-center justify-between gap-3">
-            {/* Logo and Title */}
+            {/* Logo */}
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg flex items-center justify-center shrink-0 ring-2 ring-primary/20">
-                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground drop-shadow" />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-md flex items-center justify-center shrink-0">
+                <GraduationCap className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-heading font-bold text-lg sm:text-xl leading-tight truncate bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
-                  متابعة الطلاب
-                </h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block font-medium">
-                  إدارة الحصص والمدفوعات
-                </p>
+                <h1 className="font-bold text-base sm:text-lg leading-tight truncate">متابعة الطلاب</h1>
+                {students.length > 0 && <p className="text-[10px] text-muted-foreground">{students.length} طالب</p>}
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-              {/* All Students Sheet */}
+            {/* Actions */}
+            <div className="flex items-center gap-1.5">
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 px-2.5 sm:px-3.5 gap-1.5 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all hover:scale-105 shadow-sm"
-                  >
+                  <Button variant="outline" size="sm" className="h-9 px-2.5 gap-1.5 rounded-lg hover:bg-accent">
                     <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline text-sm font-medium">الطلاب</span>
-                    <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-bold shadow-sm">
-                      {students.length}
-                    </span>
+                    <span className="hidden xs:inline text-xs">{students.length}</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent className="w-full sm:max-w-md" side="left">
@@ -471,17 +492,59 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
 
-              <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
-              <BulkEditSessionsDialog
-                students={students}
-                onBulkUpdateTime={bulkUpdateSessionTime}
-                onUpdateSessionDate={updateSessionDateTime}
-                onBulkMarkAsVacation={bulkMarkAsVacation}
-              />
-              <MonthlyReportDialog students={students} payments={payments} settings={settings} />
-              <ReminderHistoryDialog />
-              <ReminderSettingsDialog />
-              <SemesterSettings settings={settings} onUpdate={updateSettings} />
+              {/* More Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg hover:bg-accent">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="5" r="1.5" />
+                      <circle cx="12" cy="12" r="1.5" />
+                      <circle cx="12" cy="19" r="1.5" />
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48" dir="rtl">
+                  <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <div>
+                      <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <div>
+                      <BulkEditSessionsDialog
+                        students={students}
+                        onBulkUpdateTime={bulkUpdateSessionTime}
+                        onUpdateSessionDate={updateSessionDateTime}
+                        onBulkMarkAsVacation={bulkMarkAsVacation}
+                      />
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <div>
+                      <MonthlyReportDialog students={students} payments={payments} settings={settings} />
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <div>
+                      <ReminderHistoryDialog />
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <div>
+                      <ReminderSettingsDialog />
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <div>
+                      <SemesterSettings settings={settings} onUpdate={updateSettings} />
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <AddStudentDialog
                 onAdd={addStudent}
                 defaultStart={settings.defaultSemesterStart}
@@ -496,33 +559,78 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
-        {/* Main Tabs - BEAUTIFIED */}
+        {/* Quick Stats - Show always */}
+        {students.length > 0 && (
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <Card className="border-2">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <CalendarDays className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">اليوم</p>
+                    <p className="text-lg sm:text-xl font-bold">{todaySessions}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-2">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">مكتملة</p>
+                    <p className="text-lg sm:text-xl font-bold">{completedThisMonth}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-2">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Users className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">الطلاب</p>
+                    <p className="text-lg sm:text-xl font-bold">{students.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-4 mb-4 h-12 bg-muted/50 p-1.5 rounded-2xl shadow-sm">
+          <TabsList className="w-full grid grid-cols-4 mb-4 h-11 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger
               value="sessions"
-              className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md transition-all font-medium"
+              className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow"
             >
               <BookOpen className="h-4 w-4" />
               <span className="hidden xs:inline">الحصص</span>
             </TabsTrigger>
             <TabsTrigger
               value="calendar"
-              className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md transition-all font-medium"
+              className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow"
             >
               <CalendarDays className="h-4 w-4" />
               <span className="hidden xs:inline">التقويم</span>
             </TabsTrigger>
             <TabsTrigger
               value="history"
-              className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md transition-all font-medium"
+              className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow"
             >
               <History className="h-4 w-4" />
               <span className="hidden xs:inline">السجل</span>
             </TabsTrigger>
             <TabsTrigger
               value="payments"
-              className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md transition-all font-medium"
+              className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow"
             >
               <CreditCard className="h-4 w-4" />
               <span className="hidden xs:inline">المدفوعات</span>
@@ -653,14 +761,24 @@ const Index = () => {
                 </div>
 
                 {filteredStudents.length === 0 ? (
-                  <div className="text-center py-12 animate-fade-in">
-                    <p className="text-muted-foreground">
-                      {studentFilter !== "all"
-                        ? `لا توجد حصص لهذا الطالب يوم ${DAY_NAMES_AR[selectedDayOfWeek]}`
-                        : `لا توجد حصص مجدولة ليوم ${DAY_NAMES_AR[selectedDayOfWeek]}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">اضغط على أيام أخرى لعرض الحصص</p>
-                  </div>
+                  <Card className="border-2 border-dashed">
+                    <CardContent className="p-8 text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="font-bold text-lg mb-2">
+                        {studentFilter !== "all" ? `لا توجد حصص لهذا الطالب` : `لا توجد حصص مجدولة`}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">يوم {DAY_NAMES_AR[selectedDayOfWeek]}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => (studentFilter === "all" ? {} : setStudentFilter("all"))}
+                      >
+                        {studentFilter === "all" ? "اختر يوماً آخر" : "عرض جميع الطلاب"}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:gap-4">
                     {filteredStudents.map((student) => (
