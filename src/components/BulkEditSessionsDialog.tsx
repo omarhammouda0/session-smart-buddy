@@ -1,14 +1,22 @@
 import { useState, useMemo } from 'react';
-import { format, parseISO, isBefore, isAfter, startOfDay, addDays, addWeeks, endOfMonth, startOfMonth, addMonths } from 'date-fns';
+import {
+  format,
+  isBefore,
+  startOfDay,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  endOfMonth,
+  startOfMonth,
+  addMonths,
+} from 'date-fns';
 import { Calendar, Clock, Users, AlertTriangle, Check, ChevronLeft } from 'lucide-react';
 import { Student, Session } from '@/types/student';
-import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR, formatShortDateAr } from '@/lib/arabicConstants';
+import { formatShortDateAr } from '@/lib/arabicConstants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -64,14 +72,6 @@ interface ConflictInfo {
   gap?: number;
 }
 
-// Helper to add minutes to time string
-const addMinutesToTime = (time: string, minutes: number): string => {
-  const [h, m] = time.split(':').map(Number);
-  const totalMinutes = h * 60 + m + minutes;
-  const newH = Math.floor(totalMinutes / 60) % 24;
-  const newM = totalMinutes % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-};
 
 // Helper to parse time to minutes
 const timeToMinutes = (time: string): number => {
@@ -100,7 +100,6 @@ export const BulkEditSessionsDialog = ({
   const [dateFrom, setDateFrom] = useState<Date | undefined>(today);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
-  const [currentTimeFilter, setCurrentTimeFilter] = useState<string>('all');
   const [newTime, setNewTime] = useState<string>('');
 
   // Calculate matching sessions
@@ -123,14 +122,10 @@ export const BulkEditSessionsDialog = ({
         if (dateFrom && session.date < format(dateFrom, 'yyyy-MM-dd')) return;
         if (dateTo && session.date > format(dateTo, 'yyyy-MM-dd')) return;
 
-        // Filter by current time (if specified)
-        const sessionTime = session.time || student.sessionTime;
-        if (currentTimeFilter !== 'all' && sessionTime !== currentTimeFilter) return;
-
         sessions.push({
           session,
           student,
-          newTime: newTime || student.sessionTime,
+          newTime: newTime || session.time || student.sessionTime,
         });
       });
     });
@@ -139,18 +134,11 @@ export const BulkEditSessionsDialog = ({
     return sessions.sort((a, b) => {
       const dateCompare = a.session.date.localeCompare(b.session.date);
       if (dateCompare !== 0) return dateCompare;
-      return (a.student.sessionTime || '16:00').localeCompare(b.student.sessionTime || '16:00');
+      return (a.session.time || a.student.sessionTime || '16:00').localeCompare(
+        b.session.time || b.student.sessionTime || '16:00'
+      );
     });
-  }, [students, selectedStudentId, dateFrom, dateTo, currentTimeFilter, newTime, today]);
-
-  // Get unique times from students for filter
-  const uniqueTimes = useMemo(() => {
-    const times = new Set<string>();
-    students.forEach(s => {
-      if (s.sessionTime) times.add(s.sessionTime);
-    });
-    return Array.from(times).sort();
-  }, [students]);
+  }, [students, selectedStudentId, dateFrom, dateTo, newTime, today]);
 
   // Check for conflicts when applying
   const checkConflicts = (): ConflictInfo[] => {
@@ -180,7 +168,9 @@ export const BulkEditSessionsDialog = ({
             ms => ms.session.id === otherSession.id
           );
 
-          const otherTime = isAlsoBeingUpdated ? newTime : otherStudent.sessionTime;
+          const otherTime = isAlsoBeingUpdated
+            ? newTime
+            : (otherSession.time || otherStudent.sessionTime);
           const otherStartMinutes = timeToMinutes(otherTime);
           const otherEndMinutes = otherStartMinutes + sessionDuration;
 
@@ -297,7 +287,6 @@ export const BulkEditSessionsDialog = ({
     setDateFrom(today);
     setDateTo(undefined);
     setSelectedStudentId('all');
-    setCurrentTimeFilter('all');
     setNewTime('');
     setConflicts([]);
   };
@@ -336,8 +325,9 @@ export const BulkEditSessionsDialog = ({
                     size="sm"
                     className="text-xs h-7"
                     onClick={() => {
+                      // From today until end of this week
                       setDateFrom(today);
-                      setDateTo(addDays(today, 6));
+                      setDateTo(endOfWeek(today, { weekStartsOn: 0 }));
                     }}
                   >
                     هذا الأسبوع
@@ -348,9 +338,10 @@ export const BulkEditSessionsDialog = ({
                     size="sm"
                     className="text-xs h-7"
                     onClick={() => {
-                      const nextWeekStart = addWeeks(today, 1);
-                      setDateFrom(nextWeekStart);
-                      setDateTo(addDays(nextWeekStart, 6));
+                      // Full next week
+                      const start = startOfWeek(addWeeks(today, 1), { weekStartsOn: 0 });
+                      setDateFrom(start);
+                      setDateTo(endOfWeek(start, { weekStartsOn: 0 }));
                     }}
                   >
                     الأسبوع القادم
@@ -361,23 +352,14 @@ export const BulkEditSessionsDialog = ({
                     size="sm"
                     className="text-xs h-7"
                     onClick={() => {
-                      setDateFrom(today);
-                      setDateTo(addWeeks(today, 2));
+                      // Next two full weeks
+                      const start = startOfWeek(addWeeks(today, 1), { weekStartsOn: 0 });
+                      const end = endOfWeek(addWeeks(today, 2), { weekStartsOn: 0 });
+                      setDateFrom(start);
+                      setDateTo(end);
                     }}
                   >
-                    أسبوعين
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={() => {
-                      setDateFrom(today);
-                      setDateTo(endOfMonth(today));
-                    }}
-                  >
-                    هذا الشهر
+                    الأسبوعين القادمين
                   </Button>
                   <Button
                     type="button"
@@ -485,23 +467,6 @@ export const BulkEditSessionsDialog = ({
                 </Select>
               </div>
 
-              {/* Current Time Filter */}
-              <div className="space-y-2">
-                <Label>الوقت الحالي (اختياري)</Label>
-              <Select value={currentTimeFilter} onValueChange={setCurrentTimeFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="جميع الأوقات" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">جميع الأوقات</SelectItem>
-                    {uniqueTimes.map(time => (
-                      <SelectItem key={time} value={time}>
-                        {formatTimeAr(time)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               {/* New Time */}
               <div className="space-y-2">
