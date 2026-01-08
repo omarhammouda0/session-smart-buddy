@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Student, StudentPayments, AppSettings, Session, SessionStatus } from '@/types/student';
+import { Student, StudentPayments, AppSettings, Session, SessionStatus, HomeworkStatus } from '@/types/student';
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from '@/lib/dateUtils';
 
 const STUDENTS_KEY = 'teacher-students-v2';
@@ -494,6 +494,37 @@ export const useStudents = () => {
     return { success: true, updatedCount, conflicts: [] };
   };
 
+  // Update session notes and details
+  const updateSessionDetails = (
+    studentId: string,
+    sessionId: string,
+    details: {
+      topic?: string;
+      notes?: string;
+      homework?: string;
+      homeworkStatus?: HomeworkStatus;
+    }
+  ) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== studentId) return s;
+        return {
+          ...s,
+          sessions: s.sessions.map(sess => {
+            if (sess.id !== sessionId) return sess;
+            return {
+              ...sess,
+              topic: details.topic !== undefined ? details.topic : sess.topic,
+              notes: details.notes !== undefined ? details.notes : sess.notes,
+              homework: details.homework !== undefined ? details.homework : sess.homework,
+              homeworkStatus: details.homeworkStatus !== undefined ? details.homeworkStatus : sess.homeworkStatus,
+            };
+          }),
+        };
+      })
+    );
+  };
+
   const togglePaymentStatus = (studentId: string, month: number, year: number) => {
     setPayments(prev =>
       prev.map(p => {
@@ -551,5 +582,6 @@ export const useStudents = () => {
     bulkUpdateSessionTime,
     markSessionAsVacation,
     bulkMarkAsVacation,
+    updateSessionDetails,
   };
 };

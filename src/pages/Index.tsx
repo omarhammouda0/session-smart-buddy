@@ -15,6 +15,7 @@ import { BulkEditSessionsDialog } from '@/components/BulkEditSessionsDialog';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
 import { ReminderSettingsDialog } from '@/components/ReminderSettingsDialog';
 import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
+import { MonthlyReportDialog } from '@/components/MonthlyReportDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -358,6 +359,11 @@ const Index = () => {
                 students={students}
                 onBulkUpdateTime={bulkUpdateSessionTime}
                 onBulkMarkAsVacation={bulkMarkAsVacation}
+              />
+              <MonthlyReportDialog 
+                students={students} 
+                payments={payments} 
+                settings={settings} 
               />
               <ReminderHistoryDialog />
               <ReminderSettingsDialog />
