@@ -143,24 +143,32 @@ export function SessionNotesManager({ session, studentId, studentName, trigger }
           </div>
         ) : (
           <>
-            {/* Add buttons */}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => setAddMode('text')}>
-                <FileText className="h-3.5 w-3.5" />
-                ملاحظة نصية
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => setAddMode('voice')}>
-                <Mic className="h-3.5 w-3.5" />
-                تسجيل صوتي
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => setAddMode('file')}>
-                <Paperclip className="h-3.5 w-3.5" />
-                إرفاق ملف
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => setAddMode('homework')}>
-                <BookOpen className="h-3.5 w-3.5" />
-                واجب منزلي
-              </Button>
+            {/* Add buttons - grouped by type */}
+            <div className="space-y-2">
+              {/* Notes buttons */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-muted-foreground w-full">إضافة ملاحظة:</span>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => { setAddMode('text'); setActiveTab('notes'); }}>
+                  <FileText className="h-3.5 w-3.5" />
+                  نصية
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => { setAddMode('voice'); setActiveTab('notes'); }}>
+                  <Mic className="h-3.5 w-3.5" />
+                  صوتية
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => { setAddMode('file'); setActiveTab('notes'); }}>
+                  <Paperclip className="h-3.5 w-3.5" />
+                  ملف
+                </Button>
+              </div>
+              {/* Homework button */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-muted-foreground w-full">إضافة واجب (مع مرفقات):</span>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => { setAddMode('homework'); setActiveTab('homework'); }}>
+                  <BookOpen className="h-3.5 w-3.5" />
+                  واجب منزلي
+                </Button>
+              </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'notes' | 'homework')} className="flex-1 flex flex-col min-h-0">
