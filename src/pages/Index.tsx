@@ -15,6 +15,7 @@ import { StatsBar } from '@/components/StatsBar';
 import { EndOfMonthReminder } from '@/components/EndOfMonthReminder';
 import { SessionHistoryBar } from '@/components/SessionHistoryBar';
 import { BulkEditSessionsDialog } from '@/components/BulkEditSessionsDialog';
+import { AddVacationDialog } from '@/components/AddVacationDialog';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
 import { ReminderSettingsDialog } from '@/components/ReminderSettingsDialog';
 import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
@@ -454,6 +455,10 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
               
+              <AddVacationDialog
+                students={students}
+                onBulkMarkAsVacation={bulkMarkAsVacation}
+              />
               <BulkEditSessionsDialog
                 students={students}
                 onBulkUpdateTime={bulkUpdateSessionTime}
