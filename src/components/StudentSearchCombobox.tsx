@@ -42,9 +42,11 @@ export const StudentSearchCombobox = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredStudents = students.filter(student =>
-    inputValue.trim() === '' || student.name.toLowerCase().includes(inputValue.trim().toLowerCase())
-  );
+  const filteredStudents = inputValue.trim() === '' 
+    ? [] 
+    : students.filter(student =>
+        student.name.toLowerCase().includes(inputValue.trim().toLowerCase())
+      );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
