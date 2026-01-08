@@ -182,10 +182,10 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
                     value={priceOnsite}
                     onChange={(e) => setPriceOnsite(e.target.value)}
                     placeholder="100"
-                    className="pl-12"
+                    className="pl-14"
                   />
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                    ريال
+                    جنيه
                   </span>
                 </div>
               </div>
@@ -203,10 +203,10 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
                     value={priceOnline}
                     onChange={(e) => setPriceOnline(e.target.value)}
                     placeholder="80"
-                    className="pl-12"
+                    className="pl-14"
                   />
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                    ريال
+                    جنيه
                   </span>
                 </div>
               </div>

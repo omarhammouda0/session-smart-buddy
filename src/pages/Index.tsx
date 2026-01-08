@@ -564,6 +564,7 @@ const Index = () => {
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               onTogglePayment={togglePaymentStatus}
+              settings={settings}
             />
           </TabsContent>
         </Tabs>

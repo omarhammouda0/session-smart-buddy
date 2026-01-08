@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree } from 'lucide-react';
+import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Student, StudentPayments } from '@/types/student';
+import { Student, StudentPayments, AppSettings } from '@/types/student';
 import { formatMonthYearAr, DAY_NAMES_SHORT_AR, MONTH_NAMES_AR } from '@/lib/arabicConstants';
 import { cn } from '@/lib/utils';
 import { subMonths } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+const CURRENCY = 'جنيه';
 
 // Helper to count session stats for a student in a given month
 const getStudentMonthStats = (student: Student, month: number, year: number) => {
@@ -27,12 +29,33 @@ const getStudentMonthStats = (student: Student, month: number, year: number) => 
   
   return { completed, vacation, cancelled, scheduled, total: sessions.length };
 };
+
+// Helper to get session price for a student
+const getStudentSessionPrice = (student: Student, settings?: AppSettings): number => {
+  if (student.useCustomSettings) {
+    return student.sessionType === 'online' 
+      ? (student.customPriceOnline ?? 0)
+      : (student.customPriceOnsite ?? 0);
+  }
+  return student.sessionType === 'online'
+    ? (settings?.defaultPriceOnline ?? 0)
+    : (settings?.defaultPriceOnsite ?? 0);
+};
+
+// Helper to calculate total price for a student in a month
+const getStudentMonthTotal = (student: Student, month: number, year: number, settings?: AppSettings): number => {
+  const stats = getStudentMonthStats(student, month, year);
+  const pricePerSession = getStudentSessionPrice(student, settings);
+  return stats.completed * pricePerSession;
+};
+
 interface PaymentsDashboardProps {
   students: Student[];
   payments: StudentPayments[];
   selectedMonth: number;
   selectedYear: number;
   onTogglePayment: (studentId: string, month: number, year: number) => void;
+  settings?: AppSettings;
 }
 
 type PaymentFilter = 'all' | 'paid' | 'unpaid';
@@ -43,6 +66,7 @@ export const PaymentsDashboard = ({
   selectedMonth: initialMonth,
   selectedYear: initialYear,
   onTogglePayment,
+  settings,
 }: PaymentsDashboardProps) => {
   const now = new Date();
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
@@ -71,6 +95,19 @@ export const PaymentsDashboard = ({
   const paidCount = students.filter(s => getPaymentStatus(s.id)).length;
   const unpaidCount = students.length - paidCount;
   const unpaidStudents = students.filter(s => !getPaymentStatus(s.id));
+
+  // Calculate totals
+  const totalExpected = students.reduce((sum, student) => {
+    return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+  }, 0);
+  
+  const totalCollected = students
+    .filter(s => getPaymentStatus(s.id))
+    .reduce((sum, student) => {
+      return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+    }, 0);
+  
+  const totalPending = totalExpected - totalCollected;
 
   const getRecentMonths = () => {
     const months = [];
@@ -196,6 +233,30 @@ export const PaymentsDashboard = ({
         </div>
       </div>
 
+      {/* Pricing Summary */}
+      <Card className="card-shadow bg-gradient-to-br from-primary/5 to-primary/10">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Coins className="h-5 w-5 text-primary" />
+            <span className="font-heading font-semibold">ملخص المدفوعات</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-card rounded-lg p-2">
+              <p className="text-lg font-heading font-bold">{totalExpected.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{CURRENCY} متوقع</p>
+            </div>
+            <div className="bg-success/10 rounded-lg p-2">
+              <p className="text-lg font-heading font-bold text-success">{totalCollected.toLocaleString()}</p>
+              <p className="text-[10px] text-success/80">{CURRENCY} محصّل</p>
+            </div>
+            <div className="bg-warning/10 rounded-lg p-2">
+              <p className="text-lg font-heading font-bold text-warning">{totalPending.toLocaleString()}</p>
+              <p className="text-[10px] text-warning/80">{CURRENCY} متبقي</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex gap-2">
         <button onClick={() => setPaymentFilter('all')} className={cn("flex-1 rounded-lg p-3 card-shadow transition-all text-center", paymentFilter === 'all' ? "ring-2 ring-primary bg-card" : "bg-card")}>
           <p className="text-xl font-heading font-bold">{students.length}</p>
@@ -231,6 +292,8 @@ export const PaymentsDashboard = ({
               const isPaid = getPaymentStatus(student.id);
               const isSending = sendingReminder === student.id;
               const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+              const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+              const pricePerSession = getStudentSessionPrice(student, settings);
               return (
                 <div key={student.id} className={cn("flex items-center justify-between p-3 rounded-lg border transition-all", isPaid ? "bg-success/10 border-success/30" : "bg-card border-border")}>
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -238,7 +301,14 @@ export const PaymentsDashboard = ({
                       {isPaid ? <Check className="h-4 w-4" /> : <X className="h-4 w-4 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <span className="font-medium block truncate">{student.name}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium truncate">{student.name}</span>
+                        {studentTotal > 0 && (
+                          <span className={cn("text-sm font-medium shrink-0", isPaid ? "text-success" : "text-foreground")}>
+                            {studentTotal.toLocaleString()} {CURRENCY}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{student.sessionTime || '16:00'}</span>
                         <span>•</span>
@@ -246,7 +316,7 @@ export const PaymentsDashboard = ({
                         {monthStats.completed > 0 && (
                           <>
                             <span>•</span>
-                            <span className="text-success">{monthStats.completed} مكتملة</span>
+                            <span className="text-success">{monthStats.completed} × {pricePerSession} {CURRENCY}</span>
                           </>
                         )}
                         {monthStats.vacation > 0 && (
