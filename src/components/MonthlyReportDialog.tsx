@@ -36,9 +36,6 @@ import { MonthlyReportPreview } from './MonthlyReportPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-// PDF generation with html2canvas
 
 interface MonthlyReportDialogProps {
   students: Student[];
@@ -228,6 +225,12 @@ export const MonthlyReportDialog = ({
     setIsGeneratingPdf(true);
     
     try {
+      // Dynamic imports to avoid TypeScript server issues
+      const html2canvasModule = await import('html2canvas');
+      const jsPDFModule = await import('jspdf');
+      const html2canvas = html2canvasModule.default;
+      const jsPDF = jsPDFModule.default;
+      
       const element = reportRef.current;
       
       // Create canvas from the report element
