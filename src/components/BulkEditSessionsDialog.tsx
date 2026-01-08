@@ -39,7 +39,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface BulkEditSessionsDialogProps {
   students: Student[];
@@ -243,7 +243,7 @@ export const BulkEditSessionsDialog = ({
   // Period selection using chips
   const [selectedPeriods, setSelectedPeriods] = useState<PeriodOption[]>([]);
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
-  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
+  const [checkedPeriodIds, setCheckedPeriodIds] = useState<Set<string>>(new Set());
   const [showCustomRange, setShowCustomRange] = useState(false);
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(today);
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>(endOfMonth(today));
@@ -270,8 +270,32 @@ export const BulkEditSessionsDialog = ({
   const [undoData, setUndoData] = useState<UndoData | null>(null);
   const [undoTimeLeft, setUndoTimeLeft] = useState<number>(0);
 
-  // Add period
-  const addPeriod = () => {
+  // Toggle period checkbox
+  const togglePeriodCheck = (periodId: string) => {
+    setCheckedPeriodIds(prev => {
+      const next = new Set(prev);
+      if (next.has(periodId)) {
+        next.delete(periodId);
+      } else {
+        next.add(periodId);
+      }
+      return next;
+    });
+  };
+
+  // Select all periods
+  const selectAllPeriods = () => {
+    const allIds = [...weekOptions, ...monthOptions].map(p => p.id);
+    setCheckedPeriodIds(new Set(allIds));
+  };
+
+  // Deselect all periods
+  const deselectAllPeriods = () => {
+    setCheckedPeriodIds(new Set());
+  };
+
+  // Add checked periods
+  const addCheckedPeriods = () => {
     if (showCustomRange && customDateFrom && customDateTo) {
       // Add custom range
       const customPeriod: PeriodOption = {
@@ -305,33 +329,33 @@ export const BulkEditSessionsDialog = ({
       return;
     }
     
-    if (!selectedPeriodId) {
+    if (checkedPeriodIds.size === 0) {
       toast({
         title: 'اختر فترة',
-        description: 'الرجاء اختيار فترة من القائمة',
+        description: 'الرجاء اختيار فترة واحدة على الأقل',
         variant: 'destructive',
       });
       return;
     }
     
-    // Find the period from week or month options
-    const period = [...weekOptions, ...monthOptions].find(p => p.id === selectedPeriodId);
-    if (!period) return;
+    // Find all checked periods that aren't already selected
+    const allOptions = [...weekOptions, ...monthOptions];
+    const periodsToAdd = allOptions.filter(p => 
+      checkedPeriodIds.has(p.id) && !selectedPeriods.some(sp => sp.id === p.id)
+    );
     
-    // Check for duplicates
-    const exists = selectedPeriods.some(p => p.id === period.id);
-    if (exists) {
+    if (periodsToAdd.length === 0) {
       toast({
-        title: 'فترة مكررة',
-        description: `${period.label} مضافة بالفعل`,
+        title: 'فترات مكررة',
+        description: 'جميع الفترات المختارة مضافة بالفعل',
         variant: 'destructive',
       });
       return;
     }
     
-    setSelectedPeriods([...selectedPeriods, period]);
+    setSelectedPeriods([...selectedPeriods, ...periodsToAdd]);
     setShowPeriodPicker(false);
-    setSelectedPeriodId('');
+    setCheckedPeriodIds(new Set());
   };
 
   // Remove period
@@ -410,6 +434,60 @@ export const BulkEditSessionsDialog = ({
 
   // Check if any period is selected
   const hasSelectedPeriod = selectedPeriods.length > 0;
+
+  // Calculate available days and times for the student in selected periods
+  const availableDaysAndTimes = useMemo(() => {
+    const dayCount: { [key: number]: number } = {};
+    const timeCount: { [key: string]: number } = {};
+    
+    if (!selectedStudent || !hasSelectedPeriod) {
+      return { days: [], times: [] };
+    }
+
+    selectedStudent.sessions.forEach(session => {
+      if (session.status !== 'scheduled') return;
+      
+      const { inPeriod } = isDateInSelectedPeriods(session.date);
+      if (!inPeriod) return;
+
+      const sessionDay = getDay(parseISO(session.date));
+      const sessionTime = session.time || selectedStudent.sessionTime || '16:00';
+      
+      dayCount[sessionDay] = (dayCount[sessionDay] || 0) + 1;
+      timeCount[sessionTime] = (timeCount[sessionTime] || 0) + 1;
+    });
+
+    // Sort days by day of week order (0=Sunday to 6=Saturday)
+    const days = Object.entries(dayCount)
+      .map(([day, count]) => ({ day: Number(day), count }))
+      .sort((a, b) => a.day - b.day);
+
+    // Sort times chronologically
+    const times = Object.entries(timeCount)
+      .map(([time, count]) => ({ time, count }))
+      .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+
+    return { days, times };
+  }, [selectedStudent, hasSelectedPeriod, selectedPeriods]);
+
+  // Auto-select first available day/time when options change
+  useEffect(() => {
+    if (modType === 'day-change' && availableDaysAndTimes.days.length > 0) {
+      const currentDayValid = availableDaysAndTimes.days.some(d => d.day === originalDay);
+      if (!currentDayValid) {
+        setOriginalDay(availableDaysAndTimes.days[0].day);
+      }
+    }
+  }, [availableDaysAndTimes.days, modType]);
+
+  useEffect(() => {
+    if (modType === 'day-change' && availableDaysAndTimes.times.length > 0) {
+      const currentTimeValid = availableDaysAndTimes.times.some(t => t.time === originalTime);
+      if (!currentTimeValid) {
+        setOriginalTime(availableDaysAndTimes.times[0].time);
+      }
+    }
+  }, [availableDaysAndTimes.times, modType]);
 
   // Calculate matching sessions with new times/dates
   const matchingSessions = useMemo(() => {
@@ -691,7 +769,7 @@ export const BulkEditSessionsDialog = ({
     setSelectedStudentId('');
     setSelectedPeriods([]);
     setShowPeriodPicker(false);
-    setSelectedPeriodId('');
+    setCheckedPeriodIds(new Set());
     setShowCustomRange(false);
     setCustomDateFrom(today);
     setCustomDateTo(endOfMonth(today));
@@ -800,32 +878,52 @@ export const BulkEditSessionsDialog = ({
                         إضافة فترة
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-72 p-0" align="start" dir="rtl">
+                    <PopoverContent className="w-80 p-0" align="start" dir="rtl">
                       <div className="p-3 space-y-3">
-                        <p className="font-medium text-sm">اختر فترة:</p>
+                        <p className="font-medium text-sm">اختر فترات (يمكن اختيار أكثر من واحدة):</p>
                         
                         {!showCustomRange ? (
-                          <RadioGroup value={selectedPeriodId} onValueChange={setSelectedPeriodId}>
+                          <>
                             {/* Weeks */}
                             <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground font-medium">الأسابيع القادمة:</p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground font-medium">الأسابيع القادمة:</p>
+                              </div>
                               <ScrollArea className="h-32">
                                 <div className="space-y-1 pr-2">
-                                  {weekOptions.map(week => (
-                                    <label
-                                      key={week.id}
-                                      className={cn(
-                                        'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
-                                        selectedPeriodId === week.id && 'bg-primary/10'
-                                      )}
-                                    >
-                                      <RadioGroupItem value={week.id} />
-                                      <span>{week.label}</span>
-                                      <span className="text-muted-foreground text-xs mr-auto">({week.dateRange})</span>
-                                    </label>
-                                  ))}
+                                  {weekOptions.map(week => {
+                                    const isAlreadyAdded = selectedPeriods.some(p => p.id === week.id);
+                                    return (
+                                      <label
+                                        key={week.id}
+                                        className={cn(
+                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                          checkedPeriodIds.has(week.id) && 'bg-primary/10',
+                                          isAlreadyAdded && 'opacity-50 cursor-not-allowed'
+                                        )}
+                                      >
+                                        <Checkbox
+                                          checked={checkedPeriodIds.has(week.id) || isAlreadyAdded}
+                                          disabled={isAlreadyAdded}
+                                          onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(week.id)}
+                                        />
+                                        <span>{week.label}</span>
+                                        <span className="text-muted-foreground text-xs mr-auto">({week.dateRange})</span>
+                                      </label>
+                                    );
+                                  })}
                                 </div>
                               </ScrollArea>
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={selectAllPeriods}>
+                                تحديد الكل
+                              </Button>
+                              <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={deselectAllPeriods}>
+                                إلغاء التحديد
+                              </Button>
                             </div>
 
                             <Separator />
@@ -835,22 +933,30 @@ export const BulkEditSessionsDialog = ({
                               <p className="text-xs text-muted-foreground font-medium">الأشهر:</p>
                               <ScrollArea className="h-24">
                                 <div className="space-y-1 pr-2">
-                                  {monthOptions.map(month => (
-                                    <label
-                                      key={month.id}
-                                      className={cn(
-                                        'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
-                                        selectedPeriodId === month.id && 'bg-primary/10'
-                                      )}
-                                    >
-                                      <RadioGroupItem value={month.id} />
-                                      <span>{month.label}</span>
-                                    </label>
-                                  ))}
+                                  {monthOptions.map(month => {
+                                    const isAlreadyAdded = selectedPeriods.some(p => p.id === month.id);
+                                    return (
+                                      <label
+                                        key={month.id}
+                                        className={cn(
+                                          'flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-muted',
+                                          checkedPeriodIds.has(month.id) && 'bg-primary/10',
+                                          isAlreadyAdded && 'opacity-50 cursor-not-allowed'
+                                        )}
+                                      >
+                                        <Checkbox
+                                          checked={checkedPeriodIds.has(month.id) || isAlreadyAdded}
+                                          disabled={isAlreadyAdded}
+                                          onCheckedChange={() => !isAlreadyAdded && togglePeriodCheck(month.id)}
+                                        />
+                                        <span>{month.label}</span>
+                                      </label>
+                                    );
+                                  })}
                                 </div>
                               </ScrollArea>
                             </div>
-                          </RadioGroup>
+                          </>
                         ) : (
                           <div className="space-y-3">
                             <div className="space-y-2">
@@ -909,7 +1015,7 @@ export const BulkEditSessionsDialog = ({
                           className="w-full text-xs"
                           onClick={() => {
                             setShowCustomRange(!showCustomRange);
-                            setSelectedPeriodId('');
+                            setCheckedPeriodIds(new Set());
                           }}
                         >
                           {showCustomRange ? 'العودة للقائمة' : 'نطاق مخصص...'}
@@ -920,12 +1026,12 @@ export const BulkEditSessionsDialog = ({
                           <Button variant="outline" size="sm" className="flex-1" onClick={() => {
                             setShowPeriodPicker(false);
                             setShowCustomRange(false);
-                            setSelectedPeriodId('');
+                            setCheckedPeriodIds(new Set());
                           }}>
                             إلغاء
                           </Button>
-                          <Button size="sm" className="flex-1" onClick={addPeriod}>
-                            إضافة
+                          <Button size="sm" className="flex-1" onClick={addCheckedPeriods}>
+                            {showCustomRange ? 'إضافة' : `إضافة${checkedPeriodIds.size > 0 ? ` (${checkedPeriodIds.size})` : ''}`}
                           </Button>
                         </div>
                       </div>
@@ -1018,66 +1124,105 @@ export const BulkEditSessionsDialog = ({
                   {/* Day Change Options */}
                   {modType === 'day-change' && (
                     <div className="space-y-3">
-                      {/* Original Day + Time */}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">من:</p>
-                        <div className="flex gap-2">
-                          <Select value={String(originalDay)} onValueChange={(v) => setOriginalDay(Number(v))}>
-                            <SelectTrigger className="flex-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DAY_OPTIONS.map(d => (
-                                <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <span className="text-xs text-muted-foreground self-center">في</span>
-                          <Select value={originalTime} onValueChange={setOriginalTime}>
-                            <SelectTrigger className="w-24">
-                              <SelectValue>{formatTimeAr(originalTime)}</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {TIME_OPTIONS.map(t => (
-                                <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      {/* No sessions warning */}
+                      {hasSelectedPeriod && selectedStudentId && availableDaysAndTimes.days.length === 0 && (
+                        <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg text-center">
+                          لا توجد جلسات مجدولة لـ {selectedStudent?.name} في الفترات المختارة
                         </div>
-                      </div>
+                      )}
+
+                      {/* Original Day + Time (Dynamic) */}
+                      {(availableDaysAndTimes.days.length > 0 || !hasSelectedPeriod || !selectedStudentId) && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">من:</p>
+                          <div className="flex gap-2">
+                            <Select 
+                              value={String(originalDay)} 
+                              onValueChange={(v) => setOriginalDay(Number(v))}
+                              disabled={availableDaysAndTimes.days.length === 0}
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue>
+                                  {DAY_OPTIONS.find(d => d.value === originalDay)?.label || 'اختر يوم'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableDaysAndTimes.days.length > 0 ? (
+                                  availableDaysAndTimes.days.map(({ day, count }) => (
+                                    <SelectItem key={day} value={String(day)}>
+                                      {DAY_OPTIONS.find(d => d.value === day)?.label} ({count} جلسة)
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  DAY_OPTIONS.map(d => (
+                                    <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-xs text-muted-foreground self-center">في</span>
+                            <Select 
+                              value={originalTime} 
+                              onValueChange={setOriginalTime}
+                              disabled={availableDaysAndTimes.times.length === 0}
+                            >
+                              <SelectTrigger className="w-28">
+                                <SelectValue>{formatTimeAr(originalTime)}</SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableDaysAndTimes.times.length > 0 ? (
+                                  availableDaysAndTimes.times.map(({ time, count }) => (
+                                    <SelectItem key={time} value={time}>
+                                      {formatTimeAr(time)} ({count} جلسة)
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  TIME_OPTIONS.map(t => (
+                                    <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Arrow */}
-                      <div className="flex justify-center">
-                        <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                      </div>
-
-                      {/* New Day + Time */}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">إلى:</p>
-                        <div className="flex gap-2">
-                          <Select value={String(newDay)} onValueChange={(v) => setNewDay(Number(v))}>
-                            <SelectTrigger className="flex-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DAY_OPTIONS.map(d => (
-                                <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <span className="text-xs text-muted-foreground self-center">في</span>
-                          <Select value={newTime} onValueChange={setNewTime}>
-                            <SelectTrigger className="w-24">
-                              <SelectValue>{formatTimeAr(newTime)}</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {TIME_OPTIONS.map(t => (
-                                <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      {availableDaysAndTimes.days.length > 0 && (
+                        <div className="flex justify-center">
+                          <ArrowDown className="h-4 w-4 text-muted-foreground" />
                         </div>
-                      </div>
+                      )}
+
+                      {/* New Day + Time (All options) */}
+                      {availableDaysAndTimes.days.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">إلى:</p>
+                          <div className="flex gap-2">
+                            <Select value={String(newDay)} onValueChange={(v) => setNewDay(Number(v))}>
+                              <SelectTrigger className="flex-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {DAY_OPTIONS.map(d => (
+                                  <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-xs text-muted-foreground self-center">في</span>
+                            <Select value={newTime} onValueChange={setNewTime}>
+                              <SelectTrigger className="w-28">
+                                <SelectValue>{formatTimeAr(newTime)}</SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map(t => (
+                                  <SelectItem key={t} value={t}>{formatTimeAr(t)}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
