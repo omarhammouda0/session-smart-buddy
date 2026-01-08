@@ -41,11 +41,15 @@ export const useStudents = () => {
     if (storedPayments) setPayments(JSON.parse(storedPayments));
     if (storedSettings) {
       const parsed = JSON.parse(storedSettings);
-      // Ensure default prices exist (for existing users who didn't have them)
+
+      // Normalize + enforce non-zero defaults for pricing
+      const onsite = Number(parsed.defaultPriceOnsite);
+      const online = Number(parsed.defaultPriceOnline);
+
       setSettings({
         ...parsed,
-        defaultPriceOnsite: parsed.defaultPriceOnsite ?? 150,
-        defaultPriceOnline: parsed.defaultPriceOnline ?? 120,
+        defaultPriceOnsite: Number.isFinite(onsite) && onsite > 0 ? onsite : 150,
+        defaultPriceOnline: Number.isFinite(online) && online > 0 ? online : 120,
       });
     }
     
@@ -82,9 +86,11 @@ export const useStudents = () => {
         }
       });
 
-      // Ensure price defaults always exist
-      if (next.defaultPriceOnsite === undefined) next.defaultPriceOnsite = 150;
-      if (next.defaultPriceOnline === undefined) next.defaultPriceOnline = 120;
+      // Ensure price defaults always exist + are valid numbers
+      const onsite = Number((next as any).defaultPriceOnsite);
+      const online = Number((next as any).defaultPriceOnline);
+      next.defaultPriceOnsite = Number.isFinite(onsite) && onsite > 0 ? onsite : 150;
+      next.defaultPriceOnline = Number.isFinite(online) && online > 0 ? online : 120;
 
       return next;
     });
@@ -121,6 +127,8 @@ export const useStudents = () => {
       sessionTime,
       sessionDuration: duration, // Store default duration for this student
       sessionType,
+      // Pricing: new students should always start on global defaults
+      useCustomSettings: false,
       scheduleDays: scheduleDays.map(d => ({ dayOfWeek: d })),
       semesterStart,
       semesterEnd,
