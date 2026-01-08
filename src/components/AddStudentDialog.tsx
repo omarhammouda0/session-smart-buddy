@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, customStart?: string, customEnd?: string, sessionDuration?: number) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number) => void;
   defaultStart: string;
   defaultEnd: string;
   students?: Student[];
@@ -34,9 +34,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [parentPhone, setParentPhone] = useState('');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [sessionTime, setSessionTime] = useState('');
-  const [sessionDuration, setSessionDuration] = useState<number | undefined>(undefined);
+  const [sessionDuration, setSessionDuration] = useState<number>(60); // Default to 1 hour
   const [sessionType, setSessionType] = useState<SessionType | null>(null);
   const [showCustomDates, setShowCustomDates] = useState(false);
   const [customStart, setCustomStart] = useState(defaultStart);
@@ -144,6 +145,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       sessionTime,
       sessionType,
       phone.trim() || undefined,
+      parentPhone.trim() || undefined,
       useCustom ? customStart : undefined,
       useCustom ? customEnd : undefined,
       sessionDuration
@@ -156,9 +158,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const resetForm = () => {
     setName('');
     setPhone('');
+    setParentPhone('');
     setSelectedDays([]);
     setSessionTime('');
-    setSessionDuration(undefined);
+    setSessionDuration(60); // Reset to default 1 hour
     setSessionType(null);
     setShowCustomDates(false);
     setCustomStart(defaultStart);
@@ -186,7 +189,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
             <DialogTitle className="font-heading text-xl">إضافة طالب جديد</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-5 pt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">اسم الطالب</Label>
                 <Input
@@ -197,18 +200,35 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                   autoFocus
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5" />
-                  رقم الواتساب
-                </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+966xxxxxxxxx"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    رقم الطالب (واتساب)
+                  </Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+966xxxxxxxxx"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="parentPhone" className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    رقم ولي الأمر (واتساب)
+                  </Label>
+                  <Input
+                    id="parentPhone"
+                    type="tel"
+                    value={parentPhone}
+                    onChange={(e) => setParentPhone(e.target.value)}
+                    placeholder="+966xxxxxxxxx"
+                    dir="ltr"
+                  />
+                </div>
               </div>
             </div>
 
