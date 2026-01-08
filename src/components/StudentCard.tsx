@@ -98,10 +98,6 @@ export const StudentCard = ({
                 {student.sessionTime || '16:00'}
                 <span className="text-muted-foreground">({formatDurationAr(student.sessionDuration || 60)})</span>
               </span>
-              <span className="text-xs sm:text-sm font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 bg-muted/50 text-foreground rounded-lg flex items-center gap-1">
-                <Banknote className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-                {effectivePrice} جنيه
-              </span>
               <Badge variant="outline" className={cn(
                 "text-[10px] gap-1",
                 (student.sessionType || 'onsite') === 'online' 
