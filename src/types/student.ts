@@ -9,6 +9,7 @@ export interface SessionHistory {
 export interface Session {
   id: string;
   date: string; // YYYY-MM-DD format
+  time?: string; // HH:mm format - overrides student's default sessionTime
   completed: boolean;
   status: SessionStatus;
   history: SessionHistory[];

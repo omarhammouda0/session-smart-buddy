@@ -321,7 +321,7 @@ export const UpcomingSessionsManager = ({
                                       <MapPin className="h-3 w-3 text-orange-500 shrink-0" />
                                     )}
                                   </div>
-                                  <span className="text-[10px] text-muted-foreground">{student.sessionTime}</span>
+                                  <span className="text-[10px] text-muted-foreground">{session?.time || student.sessionTime}</span>
                                 </>
                               ) : (
                                 <div className="flex flex-col">
@@ -336,7 +336,7 @@ export const UpcomingSessionsManager = ({
                                       <MapPin className="h-2.5 w-2.5 text-orange-500 shrink-0" />
                                     )}
                                   </div>
-                                  <span className="text-[9px] text-muted-foreground">{student.sessionTime}</span>
+                                  <span className="text-[9px] text-muted-foreground">{session?.time || student.sessionTime}</span>
                                 </div>
                               )}
                             </div>
