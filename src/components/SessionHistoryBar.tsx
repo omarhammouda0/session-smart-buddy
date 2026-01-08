@@ -55,6 +55,14 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
     conflictResult: ConflictResult;
     sessionInfo: { studentName: string; date: string; time: string };
   } | null>(null);
+  
+  // Vacation confirmation dialog
+  const [vacationDialog, setVacationDialog] = useState<{
+    open: boolean;
+    studentId: string;
+    sessionId: string;
+    sessionInfo: { studentName: string; date: string; time: string };
+  } | null>(null);
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   
@@ -90,6 +98,32 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
     if (restoreConflictDialog) {
       onRestoreSession?.(restoreConflictDialog.studentId, restoreConflictDialog.sessionId);
       setRestoreConflictDialog(null);
+    }
+  };
+  
+  // Handle vacation with confirmation
+  const handleMarkAsVacation = (studentId: string, sessionId: string) => {
+    const student = students.find(s => s.id === studentId);
+    const session = student?.sessions.find(s => s.id === sessionId);
+    if (!student || !session) return;
+    
+    // Show confirmation dialog
+    setVacationDialog({
+      open: true,
+      studentId,
+      sessionId,
+      sessionInfo: {
+        studentName: student.name,
+        date: formatShortDateAr(session.date),
+        time: session.time || student.sessionTime || '16:00',
+      },
+    });
+  };
+  
+  const handleConfirmVacation = () => {
+    if (vacationDialog) {
+      onMarkAsVacation?.(vacationDialog.studentId, vacationDialog.sessionId);
+      setVacationDialog(null);
     }
   };
 
@@ -327,7 +361,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => onToggleComplete?.(session.studentId, session.id)} title="إكمال">
                                     <Check className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-warning" onClick={() => onMarkAsVacation?.(session.studentId, session.id)} title="إجازة">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-warning" onClick={() => handleMarkAsVacation(session.studentId, session.id)} title="إجازة">
                                     <Palmtree className="h-3.5 w-3.5" />
                                   </Button>
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onCancelSession?.(session.studentId, session.id)} title="إلغاء">
@@ -473,6 +507,37 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
           onConfirm={handleConfirmRestore}
         />
       )}
+      
+      {/* Vacation Confirmation Dialog */}
+      <AlertDialog open={vacationDialog?.open ?? false} onOpenChange={(open) => !open && setVacationDialog(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-warning">
+              <Palmtree className="h-5 w-5" />
+              تحديد كإجازة؟
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>هل تريد تحديد هذه الجلسة كإجازة؟</p>
+              {vacationDialog && (
+                <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mt-2">
+                  <p className="font-medium text-foreground">{vacationDialog.sessionInfo.studentName}</p>
+                  <p className="text-sm text-muted-foreground">{vacationDialog.sessionInfo.date} - {formatTimeAr(vacationDialog.sessionInfo.time)}</p>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg mt-2">
+                💡 لن يتم احتساب هذه الجلسة في الدفعات أو نسبة الإنجاز
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmVacation} className="bg-warning text-warning-foreground hover:bg-warning/90">
+              <Palmtree className="h-4 w-4 ml-1" />
+              نعم، حدد كإجازة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
