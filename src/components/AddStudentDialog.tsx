@@ -184,11 +184,11 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
             إضافة طالب
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl">إضافة طالب جديد</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-5 pt-4">
+          <form onSubmit={handleSubmit} className="space-y-5 pt-4 pb-2">
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">اسم الطالب</Label>
