@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { 
@@ -31,6 +31,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Student, MonthlyPayment, AppSettings } from '@/types/student';
+import { SessionNote, Homework } from '@/types/notes';
 import { MonthlyReportPreview } from './MonthlyReportPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -60,6 +61,11 @@ export const MonthlyReportDialog = ({
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [activeTab, setActiveTab] = useState<'generate' | 'preview' | 'edit'>('generate');
   const [isSending, setIsSending] = useState(false);
+  
+  // Notes and homework from database
+  const [studentNotes, setStudentNotes] = useState<SessionNote[]>([]);
+  const [studentHomework, setStudentHomework] = useState<Homework[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   
   // Assessment fields
   const [strengths, setStrengths] = useState('');
@@ -111,6 +117,65 @@ export const MonthlyReportDialog = ({
     
     return { completed, cancelled, vacation, attendanceRate, homeworkRate };
   }, [monthSessions]);
+
+  // Fetch notes and homework for selected student and month
+  useEffect(() => {
+    const fetchNotesAndHomework = async () => {
+      if (!selectedStudentId) {
+        setStudentNotes([]);
+        setStudentHomework([]);
+        return;
+      }
+      
+      setIsLoadingData(true);
+      
+      const monthStart = startOfMonth(new Date(selectedYear, selectedMonth));
+      const monthEnd = endOfMonth(new Date(selectedYear, selectedMonth));
+      const startDate = format(monthStart, 'yyyy-MM-dd');
+      const endDate = format(monthEnd, 'yyyy-MM-dd');
+      
+      try {
+        // Fetch notes
+        const { data: notesData, error: notesError } = await supabase
+          .from('session_notes')
+          .select('*')
+          .eq('student_id', selectedStudentId)
+          .gte('session_date', startDate)
+          .lte('session_date', endDate)
+          .order('session_date', { ascending: true });
+        
+        if (notesError) throw notesError;
+        
+        // Fetch homework
+        const { data: homeworkData, error: homeworkError } = await supabase
+          .from('homework')
+          .select('*')
+          .eq('student_id', selectedStudentId)
+          .gte('session_date', startDate)
+          .lte('session_date', endDate)
+          .order('session_date', { ascending: true });
+        
+        if (homeworkError) throw homeworkError;
+        
+        setStudentNotes((notesData || []).map(n => ({
+          ...n,
+          include_in_report: n.include_in_report ?? true
+        })) as SessionNote[]);
+        
+        setStudentHomework((homeworkData || []).map(h => ({
+          ...h,
+          include_in_report: h.include_in_report ?? true
+        })) as Homework[]);
+        
+      } catch (error) {
+        console.error('Error fetching notes/homework:', error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    
+    fetchNotesAndHomework();
+  }, [selectedStudentId, selectedMonth, selectedYear]);
 
   // Generate available months (last 6 months + current)
   const availableMonths = useMemo(() => {
@@ -234,6 +299,8 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
     tutorName,
     tutorPhone,
     tutorEmail,
+    notes: studentNotes,
+    homework: studentHomework,
   } : null;
 
   return (
