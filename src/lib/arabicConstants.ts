@@ -27,3 +27,62 @@ export const formatShortDateAr = (dateStr: string): string => {
   const month = MONTH_NAMES_AR[date.getMonth()];
   return `${dayName}، ${day} ${month}`;
 };
+
+// Duration formatting
+export const formatDurationAr = (minutes: number): string => {
+  if (minutes < 60) {
+    return `${minutes} د`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes === 0) {
+    return hours === 1 ? 'ساعة' : `${hours} ساعات`;
+  }
+  return `${hours}:${String(remainingMinutes).padStart(2, '0')} س`;
+};
+
+export const formatDurationFullAr = (minutes: number): string => {
+  if (minutes < 60) {
+    return `${minutes} دقيقة`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes === 0) {
+    return hours === 1 ? 'ساعة واحدة' : `${hours} ساعات`;
+  }
+  return `${hours} ساعة و ${remainingMinutes} دقيقة`;
+};
+
+// Calculate end time from start time and duration
+export const calculateEndTime = (startTime: string, durationMinutes: number): { endTime: string; crossesMidnight: boolean } => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + durationMinutes;
+  
+  const crossesMidnight = endMinutes >= 24 * 60;
+  const normalizedEndMinutes = endMinutes % (24 * 60);
+  
+  const endHours = Math.floor(normalizedEndMinutes / 60);
+  const endMins = normalizedEndMinutes % 60;
+  
+  return {
+    endTime: `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`,
+    crossesMidnight,
+  };
+};
+
+// Calculate duration from start and end time
+export const calculateDurationFromTimes = (startTime: string, endTime: string): number => {
+  const [startHours, startMinutes] = startTime.split(':').map(Number);
+  const [endHours, endMinutes] = endTime.split(':').map(Number);
+  
+  const startTotal = startHours * 60 + startMinutes;
+  let endTotal = endHours * 60 + endMinutes;
+  
+  // Handle midnight crossing
+  if (endTotal <= startTotal) {
+    endTotal += 24 * 60;
+  }
+  
+  return endTotal - startTotal;
+};

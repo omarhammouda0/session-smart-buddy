@@ -24,6 +24,7 @@ export const useStudents = () => {
       defaultSemesterMonths: 4,
       defaultSemesterStart: start,
       defaultSemesterEnd: end,
+      defaultSessionDuration: 60,
     };
   });
   const [isLoaded, setIsLoaded] = useState(false);
@@ -71,15 +72,18 @@ export const useStudents = () => {
     sessionType: 'online' | 'onsite' = 'onsite',
     phone?: string,
     customSemesterStart?: string,
-    customSemesterEnd?: string
+    customSemesterEnd?: string,
+    sessionDuration?: number
   ) => {
     const semesterStart = customSemesterStart || settings.defaultSemesterStart;
     const semesterEnd = customSemesterEnd || settings.defaultSemesterEnd;
+    const duration = sessionDuration || settings.defaultSessionDuration || 60;
 
     const sessionDates = generateSessionsForSchedule(scheduleDays, semesterStart, semesterEnd);
     const sessions: Session[] = sessionDates.map(date => ({
       id: generateId(),
       date,
+      duration, // Include duration in each session
       completed: false,
       status: 'scheduled' as SessionStatus,
       history: [{ status: 'scheduled' as SessionStatus, timestamp: new Date().toISOString() }],
@@ -90,6 +94,7 @@ export const useStudents = () => {
       name,
       phone,
       sessionTime,
+      sessionDuration: duration, // Store default duration for this student
       sessionType,
       scheduleDays: scheduleDays.map(d => ({ dayOfWeek: d })),
       semesterStart,
@@ -122,6 +127,12 @@ export const useStudents = () => {
   const updateStudentSessionType = (studentId: string, sessionType: 'online' | 'onsite') => {
     setStudents(prev =>
       prev.map(s => (s.id === studentId ? { ...s, sessionType } : s))
+    );
+  };
+
+  const updateStudentDuration = (studentId: string, sessionDuration: number) => {
+    setStudents(prev =>
+      prev.map(s => (s.id === studentId ? { ...s, sessionDuration } : s))
     );
   };
 
@@ -502,6 +513,7 @@ export const useStudents = () => {
     updateStudentTime,
     updateStudentPhone,
     updateStudentSessionType,
+    updateStudentDuration,
     updateStudentSchedule,
     addExtraSession,
     removeSession,

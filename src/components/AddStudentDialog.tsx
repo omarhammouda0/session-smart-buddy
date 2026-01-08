@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2 } from 'lucide-react';
-import { SessionType, Student } from '@/types/student';
+import { SessionType, Student, DEFAULT_DURATION } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateSessionsForSchedule } from '@/lib/dateUtils';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
+import { DurationPicker } from '@/components/DurationPicker';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,18 +23,20 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, customStart?: string, customEnd?: string) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, customStart?: string, customEnd?: string, sessionDuration?: number) => void;
   defaultStart: string;
   defaultEnd: string;
   students?: Student[];
+  defaultDuration?: number;
 }
 
-export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [] }: AddStudentDialogProps) => {
+export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [], defaultDuration = DEFAULT_DURATION }: AddStudentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedDays, setSelectedDays] = useState<number[]>([1]); // Monday by default
   const [sessionTime, setSessionTime] = useState('16:00');
+  const [sessionDuration, setSessionDuration] = useState(defaultDuration);
   const [sessionType, setSessionType] = useState<SessionType>('onsite');
   const [showCustomDates, setShowCustomDates] = useState(false);
   const [customStart, setCustomStart] = useState(defaultStart);
@@ -141,7 +144,8 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       sessionType,
       phone.trim() || undefined,
       useCustom ? customStart : undefined,
-      useCustom ? customEnd : undefined
+      useCustom ? customEnd : undefined,
+      sessionDuration
     );
     resetForm();
     setOpen(false);
@@ -153,6 +157,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     setPhone('');
     setSelectedDays([1]);
     setSessionTime('16:00');
+    setSessionDuration(defaultDuration);
     setSessionType('onsite');
     setShowCustomDates(false);
     setCustomStart(defaultStart);
@@ -261,6 +266,14 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                 </div>
               </div>
             </div>
+
+            {/* Duration Picker */}
+            <DurationPicker
+              startTime={sessionTime}
+              duration={sessionDuration}
+              onDurationChange={setSessionDuration}
+              showEndTime={true}
+            />
 
             {/* Conflict Warning Box */}
             {!isChecking && conflictSummary.hasErrors && (
