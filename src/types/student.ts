@@ -1,4 +1,4 @@
-export type SessionStatus = 'scheduled' | 'completed' | 'cancelled';
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'vacation';
 
 export interface SessionHistory {
   status: SessionStatus;
@@ -15,6 +15,7 @@ export interface Session {
   history: SessionHistory[];
   cancelledAt?: string;
   completedAt?: string;
+  vacationAt?: string;
 }
 
 export interface ScheduleDay {
