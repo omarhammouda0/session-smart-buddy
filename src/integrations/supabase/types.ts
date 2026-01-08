@@ -14,7 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      reminder_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          message_text: string
+          month: number | null
+          phone_number: string
+          sent_at: string
+          session_date: string | null
+          session_id: string | null
+          status: string
+          student_id: string
+          student_name: string
+          twilio_message_sid: string | null
+          type: string
+          user_id: string
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_text: string
+          month?: number | null
+          phone_number: string
+          sent_at?: string
+          session_date?: string | null
+          session_id?: string | null
+          status: string
+          student_id: string
+          student_name: string
+          twilio_message_sid?: string | null
+          type: string
+          user_id?: string
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_text?: string
+          month?: number | null
+          phone_number?: string
+          sent_at?: string
+          session_date?: string | null
+          session_id?: string | null
+          status?: string
+          student_id?: string
+          student_name?: string
+          twilio_message_sid?: string | null
+          type?: string
+          user_id?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
+      reminder_settings: {
+        Row: {
+          created_at: string
+          id: string
+          payment_reminder_days_before: number
+          payment_reminder_template: string
+          payment_reminders_enabled: boolean
+          session_reminder_hours: number
+          session_reminder_send_time: string
+          session_reminder_template: string
+          session_reminders_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payment_reminder_days_before?: number
+          payment_reminder_template?: string
+          payment_reminders_enabled?: boolean
+          session_reminder_hours?: number
+          session_reminder_send_time?: string
+          session_reminder_template?: string
+          session_reminders_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payment_reminder_days_before?: number
+          payment_reminder_template?: string
+          payment_reminders_enabled?: boolean
+          session_reminder_hours?: number
+          session_reminder_send_time?: string
+          session_reminder_template?: string
+          session_reminders_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
