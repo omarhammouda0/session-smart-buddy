@@ -36,6 +36,8 @@ import { MonthlyReportPreview } from './MonthlyReportPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface MonthlyReportDialogProps {
   students: Student[];
@@ -61,6 +63,7 @@ export const MonthlyReportDialog = ({
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [activeTab, setActiveTab] = useState<'generate' | 'preview' | 'edit'>('generate');
   const [isSending, setIsSending] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   
   // Notes and homework from database
   const [studentNotes, setStudentNotes] = useState<SessionNote[]>([]);
@@ -216,6 +219,62 @@ export const MonthlyReportDialog = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!reportRef.current || !selectedStudent) return;
+    
+    setIsGeneratingPdf(true);
+    
+    try {
+      const element = reportRef.current;
+      
+      // Create canvas from the report element
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Add additional pages if content overflows
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      const fileName = `تقرير_${selectedStudent.name}_${ARABIC_MONTHS[selectedMonth]}_${selectedYear}.pdf`;
+      pdf.save(fileName);
+      
+      toast({
+        title: "تم التحميل",
+        description: "تم تحميل التقرير بصيغة PDF بنجاح",
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء إنشاء ملف PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleSendWhatsApp = async () => {
@@ -458,7 +517,20 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
                     </Button>
                     <Button variant="outline" onClick={handlePrint} className="gap-1.5">
                       <Printer className="h-4 w-4" />
-                      طباعة / PDF
+                      طباعة
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleDownloadPdf} 
+                      disabled={isGeneratingPdf}
+                      className="gap-1.5"
+                    >
+                      {isGeneratingPdf ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      تحميل PDF
                     </Button>
                     <Button 
                       onClick={handleSendWhatsApp} 
