@@ -104,8 +104,16 @@ export const ReminderHistoryDialog = () => {
     }
   };
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      // Reset filters when dialog closes
+      clearFilters();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <History className="h-4 w-4" />
@@ -243,10 +251,15 @@ export const ReminderHistoryDialog = () => {
 
         {/* Log List */}
         <ScrollArea className="flex-1 -mx-6 px-6">
-          {filteredLogs.length === 0 ? (
+          {!hasActiveFilters ? (
             <div className="py-12 text-center">
               <History className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">لا توجد تذكيرات مسجلة</p>
+              <p className="text-muted-foreground">اختر فلتر لعرض التذكيرات</p>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="py-12 text-center">
+              <History className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">لا توجد تذكيرات مطابقة</p>
             </div>
           ) : (
             <div className="space-y-2 pb-4">
