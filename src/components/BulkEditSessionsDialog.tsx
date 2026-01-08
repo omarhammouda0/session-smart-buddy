@@ -173,7 +173,7 @@ const generateWeekOptions = (today: Date): PeriodOption[] => {
 const generateMonthOptions = (today: Date): PeriodOption[] => {
   const months: PeriodOption[] = [];
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 2; i++) {
     const monthDate = addMonths(today, i);
     const monthStart = i === 0 ? today : startOfMonth(monthDate);
     const monthEnd = endOfMonth(monthDate);
