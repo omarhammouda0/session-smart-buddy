@@ -34,10 +34,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [selectedDays, setSelectedDays] = useState<number[]>([1]); // Monday by default
-  const [sessionTime, setSessionTime] = useState('16:00');
-  const [sessionDuration, setSessionDuration] = useState(defaultDuration);
-  const [sessionType, setSessionType] = useState<SessionType>('onsite');
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [sessionTime, setSessionTime] = useState('');
+  const [sessionDuration, setSessionDuration] = useState<number | undefined>(undefined);
+  const [sessionType, setSessionType] = useState<SessionType | null>(null);
   const [showCustomDates, setShowCustomDates] = useState(false);
   const [customStart, setCustomStart] = useState(defaultStart);
   const [customEnd, setCustomEnd] = useState(defaultEnd);
@@ -51,7 +51,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
 
   // Check conflicts when time or days change (debounced)
   useEffect(() => {
-    if (!open || selectedDays.length === 0) {
+    if (!open || selectedDays.length === 0 || !sessionTime) {
       setConflictResults(new Map());
       return;
     }
@@ -118,7 +118,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || selectedDays.length === 0) return;
+    if (!name.trim() || selectedDays.length === 0 || !sessionTime || !sessionDuration || !sessionType) return;
     
     // If there are error conflicts, block submission
     if (conflictSummary.hasErrors) {
@@ -136,6 +136,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   };
   
   const proceedWithAdd = () => {
+    if (!sessionType || !sessionDuration || !sessionTime) return;
     const useCustom = showCustomDates && (customStart !== defaultStart || customEnd !== defaultEnd);
     onAdd(
       name.trim(),
@@ -155,10 +156,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const resetForm = () => {
     setName('');
     setPhone('');
-    setSelectedDays([1]);
-    setSessionTime('16:00');
-    setSessionDuration(defaultDuration);
-    setSessionType('onsite');
+    setSelectedDays([]);
+    setSessionTime('');
+    setSessionDuration(undefined);
+    setSessionType(null);
     setShowCustomDates(false);
     setCustomStart(defaultStart);
     setCustomEnd(defaultEnd);
@@ -269,10 +270,11 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
 
             {/* Duration Picker */}
             <DurationPicker
-              startTime={sessionTime}
+              startTime={sessionTime || '00:00'}
               duration={sessionDuration}
               onDurationChange={setSessionDuration}
-              showEndTime={true}
+              showEndTime={!!sessionTime && !!sessionDuration}
+              placeholder="اختر المدة"
             />
 
             {/* Conflict Warning Box */}
@@ -315,7 +317,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               </div>
             )}
             
-            {!isChecking && !conflictSummary.hasErrors && !conflictSummary.hasWarnings && selectedDays.length > 0 && (
+            {!isChecking && !conflictSummary.hasErrors && !conflictSummary.hasWarnings && selectedDays.length > 0 && sessionTime && (
               <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-500">
                 <Check className="h-4 w-4" />
                 <span>✓ الوقت متاح</span>
@@ -387,7 +389,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               <Button 
                 type="submit" 
                 className="flex-1 gradient-primary"
-                disabled={!name.trim() || selectedDays.length === 0 || conflictSummary.hasErrors || isChecking}
+                disabled={!name.trim() || selectedDays.length === 0 || !sessionTime || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
               >
                 {isChecking ? (
                   <>
