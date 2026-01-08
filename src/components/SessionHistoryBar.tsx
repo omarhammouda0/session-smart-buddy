@@ -27,12 +27,13 @@ import { useConflictDetection, ConflictResult, formatTimeAr } from '@/hooks/useC
 import { GapIndicator } from '@/components/GapIndicator';
 import { ConflictWarning } from '@/components/ConflictWarning';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
+import { CancelSessionDialog } from '@/components/CancelSessionDialog';
 import { SessionNotesManager } from '@/components/notes/SessionNotesManager';
 import { toast } from '@/hooks/use-toast';
 
 interface SessionHistoryBarProps {
   students: Student[];
-  onCancelSession?: (studentId: string, sessionId: string) => void;
+  onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
   onDeleteSession?: (studentId: string, sessionId: string) => void;
   onRestoreSession?: (studentId: string, sessionId: string) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
@@ -45,9 +46,10 @@ interface SessionHistoryBarProps {
     homework?: string;
     homeworkStatus?: HomeworkStatus;
   }) => void;
+  getCancellationCount?: (studentId: string) => number;
 }
 
-export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession, onMarkAsVacation, onUpdateSessionDetails }: SessionHistoryBarProps) => {
+export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, onRestoreSession, onToggleComplete, onRescheduleSession, onAddSession, onMarkAsVacation, onUpdateSessionDetails, getCancellationCount }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [historyTab, setHistoryTab] = useState<'upcoming' | 'history'>('upcoming');
   const today = startOfToday();
@@ -70,6 +72,13 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
     studentId: string;
     sessionId: string;
     sessionInfo: { studentName: string; date: string; time: string };
+  } | null>(null);
+  
+  // Cancel session dialog
+  const [cancelDialog, setCancelDialog] = useState<{
+    open: boolean;
+    student: Student;
+    session: Session & { studentId: string };
   } | null>(null);
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
@@ -155,12 +164,33 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
     });
   };
 
-  const handleCancelSession = (studentId: string, sessionId: string) => {
+  // Open cancel dialog instead of direct cancel
+  const openCancelDialog = (studentId: string, sessionId: string) => {
     const student = students.find(s => s.id === studentId);
-    if (!student) return;
+    const session = student?.sessions.find(s => s.id === sessionId);
+    if (!student || !session) return;
     
-    onCancelSession?.(studentId, sessionId);
-    toast({ title: "تم الإلغاء", description: `تم إلغاء الجلسة` });
+    setCancelDialog({
+      open: true,
+      student,
+      session: { ...session, studentId },
+    });
+  };
+  
+  const handleConfirmCancel = (reason?: string) => {
+    if (cancelDialog) {
+      onCancelSession?.(cancelDialog.session.studentId, cancelDialog.session.id, reason);
+      toast({ title: "تم الإلغاء", description: `تم إلغاء الجلسة` });
+      setCancelDialog(null);
+    }
+  };
+  
+  const handleCancelAsVacation = () => {
+    if (cancelDialog) {
+      onMarkAsVacation?.(cancelDialog.session.studentId, cancelDialog.session.id);
+      toast({ title: "تم التحديد", description: `تم تحديد الجلسة كإجازة` });
+      setCancelDialog(null);
+    }
   };
 
   const handleDeleteSession = (studentId: string, sessionId: string) => {
@@ -406,7 +436,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                   <Button variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => handleRestoreWithCheck(session.studentId, session.id)}>
                                     <RotateCcw className="h-3.5 w-3.5 ml-1" />استعادة
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleCancelSession(session.studentId, session.id)} title="إلغاء">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => openCancelDialog(session.studentId, session.id)} title="إلغاء">
                                     <Ban className="h-3.5 w-3.5" />
                                   </Button>
                                 </>
@@ -418,7 +448,7 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-warning" onClick={() => handleMarkAsVacation(session.studentId, session.id)} title="إجازة">
                                     <Palmtree className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleCancelSession(session.studentId, session.id)} title="إلغاء">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => openCancelDialog(session.studentId, session.id)} title="إلغاء">
                                     <Ban className="h-3.5 w-3.5" />
                                   </Button>
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteSession(session.studentId, session.id)} title="حذف نهائي">
@@ -622,6 +652,19 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Cancel Session Dialog */}
+      {cancelDialog && (
+        <CancelSessionDialog
+          open={cancelDialog.open}
+          onOpenChange={(open) => !open && setCancelDialog(null)}
+          student={cancelDialog.student}
+          session={cancelDialog.session}
+          currentCount={getCancellationCount?.(cancelDialog.student.id) ?? 0}
+          onConfirm={handleConfirmCancel}
+          onMarkAsVacation={handleCancelAsVacation}
+        />
+      )}
     </Card>
   );
 };

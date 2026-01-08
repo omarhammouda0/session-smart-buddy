@@ -159,11 +159,17 @@ const Index = () => {
     setAddConflictDialog(null);
   };
 
-  const handleCancelSession = (studentId: string, sessionId: string) => {
-    removeSession(studentId, sessionId);
+  const handleCancelSession = async (studentId: string, sessionId: string, reason?: string) => {
+    // Record cancellation with reason (using cancellation tracking)
+    const student = students.find(s => s.id === studentId);
+    const session = student?.sessions.find(s => s.id === sessionId);
+    if (session) {
+      // For now, just cancel the session - cancellation tracking integration will be done later
+      removeSession(studentId, sessionId);
+    }
     toast({
       title: "تم إلغاء الحصة",
-      description: "تم إلغاء الحصة بنجاح",
+      description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح",
       variant: "destructive",
     });
   };
@@ -615,6 +621,7 @@ const Index = () => {
               onAddSession={handleAddSession}
               onMarkAsVacation={handleMarkAsVacation}
               onUpdateSessionDetails={updateSessionDetails}
+              getCancellationCount={getCancellationCount}
             />
           </TabsContent>
 
