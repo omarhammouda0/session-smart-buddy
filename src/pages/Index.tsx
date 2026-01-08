@@ -20,7 +20,7 @@ import { ReminderSettingsDialog } from '@/components/ReminderSettingsDialog';
 import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
 import { MonthlyReportDialog } from '@/components/MonthlyReportDialog';
 import { StudentNotesHistory } from '@/components/StudentNotesHistory';
-import { AttendanceAlertsWidget } from '@/components/AttendanceAlertsWidget';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -94,9 +94,6 @@ const Index = () => {
   // Cancellation tracking
   const { 
     getCancellationCount, 
-    studentsAtRisk, 
-    sendParentNotification, 
-    getStudentCancellations,
     recordCancellation,
     removeCancellation,
   } = useCancellationTracking(students);
@@ -477,57 +474,6 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
-        {/* Attendance Alerts Widget (management only) */}
-        {activeTab === 'history' && studentsAtRisk.length > 0 && (
-          <AttendanceAlertsWidget
-            studentsAtRisk={studentsAtRisk}
-            onNotifyParent={async (studentId) => {
-              const riskData = studentsAtRisk.find(s => s.student.id === studentId);
-              const student = riskData?.student;
-              if (!student?.phone) {
-                toast({
-                  title: "لا يوجد رقم هاتف",
-                  description: "يرجى إضافة رقم هاتف الوالد أولاً",
-                  variant: "destructive",
-                });
-                return;
-              }
-              
-              const cancellations = getStudentCancellations(studentId);
-              toast({
-                title: "جاري الإرسال...",
-                description: `إرسال تنبيه لوالد ${student.name}`,
-              });
-              
-              const result = await sendParentNotification(
-                studentId,
-                student.phone,
-                student.name,
-                riskData.count,
-                riskData.limit,
-                cancellations
-              );
-              
-              if (result.success) {
-                toast({
-                  title: "✓ تم الإرسال",
-                  description: `تم إرسال تنبيه لوالد ${student.name} عبر WhatsApp`,
-                });
-              } else {
-                toast({
-                  title: "فشل الإرسال",
-                  description: result.error || "حدث خطأ أثناء الإرسال",
-                  variant: "destructive",
-                });
-              }
-            }}
-            onViewDetails={(studentId) => {
-              // Navigate to student filter
-              setStudentFilter(studentId);
-              setActiveTab('history');
-            }}
-          />
-        )}
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
