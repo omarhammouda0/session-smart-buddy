@@ -27,7 +27,7 @@ import { useConflictDetection, ConflictResult, formatTimeAr } from '@/hooks/useC
 import { GapIndicator } from '@/components/GapIndicator';
 import { ConflictWarning } from '@/components/ConflictWarning';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
-import { SessionNotesDialog } from '@/components/SessionNotesDialog';
+import { SessionNotesManager } from '@/components/notes/SessionNotesManager';
 
 interface SessionHistoryBarProps {
   students: Student[];
@@ -474,11 +474,11 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {session.status === 'completed' && onUpdateSessionDetails && (
-                              <SessionNotesDialog
+                            {session.status === 'completed' && (
+                              <SessionNotesManager
                                 session={session}
+                                studentId={session.studentId}
                                 studentName={session.studentName}
-                                onSave={(details) => onUpdateSessionDetails(session.studentId, session.id, details)}
                               />
                             )}
                             {session.status === 'completed' ? (

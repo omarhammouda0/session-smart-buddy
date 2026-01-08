@@ -14,6 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      homework: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string
+          due_date: string
+          id: string
+          priority: Database["public"]["Enums"]["homework_priority"]
+          session_date: string
+          session_id: string
+          status: Database["public"]["Enums"]["homework_status_type"]
+          student_id: string
+          updated_at: string
+          user_id: string
+          voice_instruction_duration: number | null
+          voice_instruction_url: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description: string
+          due_date: string
+          id?: string
+          priority?: Database["public"]["Enums"]["homework_priority"]
+          session_date: string
+          session_id: string
+          status?: Database["public"]["Enums"]["homework_status_type"]
+          student_id: string
+          updated_at?: string
+          user_id?: string
+          voice_instruction_duration?: number | null
+          voice_instruction_url?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string
+          due_date?: string
+          id?: string
+          priority?: Database["public"]["Enums"]["homework_priority"]
+          session_date?: string
+          session_id?: string
+          status?: Database["public"]["Enums"]["homework_status_type"]
+          student_id?: string
+          updated_at?: string
+          user_id?: string
+          voice_instruction_duration?: number | null
+          voice_instruction_url?: string | null
+        }
+        Relationships: []
+      }
+      homework_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          homework_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          homework_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          homework_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "homework_attachments_homework_id_fkey"
+            columns: ["homework_id"]
+            isOneToOne: false
+            referencedRelation: "homework"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reminder_log: {
         Row: {
           created_at: string
@@ -113,6 +202,63 @@ export type Database = {
         }
         Relationships: []
       }
+      session_notes: {
+        Row: {
+          category: Database["public"]["Enums"]["note_category"]
+          content: string | null
+          created_at: string
+          duration: number | null
+          file_name: string | null
+          file_size: number | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          session_date: string
+          session_id: string
+          student_id: string
+          title: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["note_category"]
+          content?: string | null
+          created_at?: string
+          duration?: number | null
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          session_date: string
+          session_id: string
+          student_id: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["note_category"]
+          content?: string | null
+          created_at?: string
+          duration?: number | null
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          session_date?: string
+          session_id?: string
+          student_id?: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -121,7 +267,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      homework_priority: "normal" | "important" | "urgent"
+      homework_status_type: "pending" | "completed" | "not_completed"
+      note_category: "general" | "progress" | "challenge" | "achievement"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -248,6 +396,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      homework_priority: ["normal", "important", "urgent"],
+      homework_status_type: ["pending", "completed", "not_completed"],
+      note_category: ["general", "progress", "challenge", "achievement"],
+    },
   },
 } as const
