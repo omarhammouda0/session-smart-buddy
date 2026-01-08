@@ -29,7 +29,8 @@ import { GapIndicator } from '@/components/GapIndicator';
 import { ConflictWarning } from '@/components/ConflictWarning';
 import { RestoreConflictDialog } from '@/components/RestoreConflictDialog';
 import { CancelSessionDialog } from '@/components/CancelSessionDialog';
-import { SessionNotesManager } from '@/components/notes/SessionNotesManager';
+import { SessionNotesDialog } from '@/components/notes/SessionNotesDialog';
+import { SessionHomeworkDialog } from '@/components/notes/SessionHomeworkDialog';
 import { toast } from '@/hooks/use-toast';
 
 interface CancellationRecord {
@@ -429,8 +430,14 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              {/* Notes button - available for all session statuses */}
-                              <SessionNotesManager
+                              {/* Notes button */}
+                              <SessionNotesDialog
+                                session={session}
+                                studentId={session.studentId}
+                                studentName={session.studentName}
+                              />
+                              {/* Homework button */}
+                              <SessionHomeworkDialog
                                 session={session}
                                 studentId={session.studentId}
                                 studentName={session.studentName}
@@ -561,8 +568,14 @@ export const SessionHistoryBar = ({ students, onCancelSession, onDeleteSession, 
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Notes button - available for all session statuses */}
-                            <SessionNotesManager
+                            {/* Notes button */}
+                            <SessionNotesDialog
+                              session={session}
+                              studentId={session.studentId}
+                              studentName={session.studentName}
+                            />
+                            {/* Homework button */}
+                            <SessionHomeworkDialog
                               session={session}
                               studentId={session.studentId}
                               studentName={session.studentName}
