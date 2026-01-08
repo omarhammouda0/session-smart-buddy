@@ -92,7 +92,12 @@ const Index = () => {
   } = useStudents();
 
   // Cancellation tracking
-  const { getCancellationCount, studentsAtRisk } = useCancellationTracking(students);
+  const { 
+    getCancellationCount, 
+    studentsAtRisk, 
+    sendParentNotification, 
+    getStudentCancellations 
+  } = useCancellationTracking(students);
 
   // Conflict detection
   const { checkConflict } = useConflictDetection(students);
@@ -435,15 +440,51 @@ const Index = () => {
         {studentsAtRisk.length > 0 && (
           <AttendanceAlertsWidget
             studentsAtRisk={studentsAtRisk}
-            onNotifyParent={(studentId) => {
-              const student = students.find(s => s.id === studentId);
-              if (student?.phone) {
-                window.open(`https://wa.me/${student.phone.replace(/\D/g, '')}`, '_blank');
+            onNotifyParent={async (studentId) => {
+              const riskData = studentsAtRisk.find(s => s.student.id === studentId);
+              const student = riskData?.student;
+              if (!student?.phone) {
+                toast({
+                  title: "لا يوجد رقم هاتف",
+                  description: "يرجى إضافة رقم هاتف الوالد أولاً",
+                  variant: "destructive",
+                });
+                return;
+              }
+              
+              const cancellations = getStudentCancellations(studentId);
+              toast({
+                title: "جاري الإرسال...",
+                description: `إرسال تنبيه لوالد ${student.name}`,
+              });
+              
+              const result = await sendParentNotification(
+                studentId,
+                student.phone,
+                student.name,
+                riskData.count,
+                riskData.limit,
+                cancellations,
+                'manual'
+              );
+              
+              if (result.success) {
+                toast({
+                  title: "✓ تم الإرسال",
+                  description: `تم إرسال تنبيه لوالد ${student.name} عبر WhatsApp`,
+                });
+              } else {
+                toast({
+                  title: "فشل الإرسال",
+                  description: result.error || "حدث خطأ أثناء الإرسال",
+                  variant: "destructive",
+                });
               }
             }}
             onViewDetails={(studentId) => {
-              // Could open student edit dialog
-              console.log('View details for', studentId);
+              // Navigate to student filter
+              setStudentFilter(studentId);
+              setActiveTab('history');
             }}
           />
         )}

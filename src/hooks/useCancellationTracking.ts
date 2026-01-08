@@ -353,6 +353,96 @@ export const useCancellationTracking = (students: Student[]) => {
     [loadData]
   );
 
+  // Send WhatsApp notification to parent
+  const sendParentNotification = useCallback(
+    async (
+      studentId: string,
+      parentPhone: string,
+      studentName: string,
+      count: number,
+      limit: number,
+      cancellationList: CancellationRecord[],
+      triggeredBy: 'auto' | 'manual' = 'manual'
+    ): Promise<{ success: boolean; error?: string }> => {
+      const month = getCurrentMonth();
+      const monthName = new Date().toLocaleDateString('ar-EG', { month: 'long' });
+
+      // Build cancellation list text
+      const cancellationsText = cancellationList
+        .slice(0, 5)
+        .map((c) => `• ${c.sessionDate}${c.reason ? ` - ${c.reason}` : ''}`)
+        .join('\n');
+
+      // Build message
+      const message = `عزيزي ولي الأمر،
+
+نود إعلامكم بأن ${studentName} قد ألغى ${count} جلسات هذا الشهر (${monthName})، وقد وصل للحد المسموح به (${limit} جلسات).
+
+الجلسات الملغاة كانت:
+${cancellationsText}
+
+الإلغاءات المتكررة تؤثر على التقدم الدراسي. نأمل متابعة الأمر لضمان الاستفادة الكاملة من الجلسات.
+
+للاستفسار، نحن في الخدمة.
+شكراً لتعاونكم`;
+
+      try {
+        console.log('Sending cancellation alert to parent:', { studentName, parentPhone });
+
+        const { data, error } = await supabase.functions.invoke('send-whatsapp-reminder', {
+          body: {
+            studentName,
+            phoneNumber: parentPhone,
+            customMessage: message,
+          },
+        });
+
+        if (error) {
+          console.error('Error sending notification:', error);
+          // Log failed notification
+          await logNotification(
+            studentId,
+            parentPhone,
+            message,
+            triggeredBy,
+            undefined,
+            'failed',
+            error.message
+          );
+          return { success: false, error: error.message };
+        }
+
+        // Log successful notification
+        await logNotification(
+          studentId,
+          parentPhone,
+          message,
+          triggeredBy,
+          data?.messageSid,
+          'sent'
+        );
+
+        // Mark parent as notified
+        await markParentNotified(studentId, month);
+
+        return { success: true };
+      } catch (error: any) {
+        console.error('Error sending parent notification:', error);
+        await logNotification(
+          studentId,
+          parentPhone,
+          message,
+          triggeredBy,
+          undefined,
+          'failed',
+          error.message
+        );
+        return { success: false, error: error.message };
+      }
+    },
+    [logNotification, markParentNotified]
+  );
+
   // Get students at or near limit for current month
   const studentsAtRisk = useMemo(() => {
     const currentMonth = getCurrentMonth();
@@ -396,6 +486,7 @@ export const useCancellationTracking = (students: Student[]) => {
     removeCancellation,
     markParentNotified,
     logNotification,
+    sendParentNotification,
     studentsAtRisk,
     reload: loadData,
   };
