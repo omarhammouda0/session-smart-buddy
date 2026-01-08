@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote, AlertTriangle, X } from 'lucide-react';
+import { History, CheckCircle, XCircle, Clock, RefreshCw, Loader2, MessageCircle, Banknote, AlertTriangle } from 'lucide-react';
 import { useReminderSettings } from '@/hooks/useReminderSettings';
 import { ReminderLog } from '@/types/reminder';
 import { format, parseISO, isWithinInterval, subWeeks, subMonths } from 'date-fns';
@@ -133,22 +133,26 @@ export const ReminderHistoryDialog = () => {
           <div className="grid grid-cols-3 gap-2">
             <Select onValueChange={handleTypeSelect} value="">
               <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="النوع" />
+                <SelectValue>
+                  {filterTypes.length === 0 ? 'النوع' : 
+                   filterTypes.length === 1 ? (filterTypes[0] === 'session' ? 'جلسات' : filterTypes[0] === 'payment' ? 'دفع' : 'إلغاء') :
+                   `${filterTypes.length} أنواع`}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="session">
+                <SelectItem value="session" disabled={filterTypes.includes('session')}>
                   <span className="flex items-center gap-1">
                     <MessageCircle className="h-3 w-3" />
                     جلسات
                   </span>
                 </SelectItem>
-                <SelectItem value="payment">
+                <SelectItem value="payment" disabled={filterTypes.includes('payment')}>
                   <span className="flex items-center gap-1">
                     <Banknote className="h-3 w-3" />
                     دفع
                   </span>
                 </SelectItem>
-                <SelectItem value="cancellation">
+                <SelectItem value="cancellation" disabled={filterTypes.includes('cancellation')}>
                   <span className="flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     إلغاء
@@ -159,16 +163,20 @@ export const ReminderHistoryDialog = () => {
 
             <Select onValueChange={handleStatusSelect} value="">
               <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="الحالة" />
+                <SelectValue>
+                  {filterStatuses.length === 0 ? 'الحالة' : 
+                   filterStatuses.length === 1 ? (filterStatuses[0] === 'sent' ? 'نجح' : 'فشل') :
+                   'نجح و فشل'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="sent">
+                <SelectItem value="sent" disabled={filterStatuses.includes('sent')}>
                   <span className="flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" />
                     نجح
                   </span>
                 </SelectItem>
-                <SelectItem value="failed">
+                <SelectItem value="failed" disabled={filterStatuses.includes('failed')}>
                   <span className="flex items-center gap-1">
                     <XCircle className="h-3 w-3" />
                     فشل
@@ -179,7 +187,9 @@ export const ReminderHistoryDialog = () => {
 
             <Select onValueChange={handleTimeSelect} value={filterTime || ""}>
               <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="الفترة" />
+                <SelectValue>
+                  {filterTime === null ? 'الفترة' : filterTime === 'week' ? 'أسبوع' : 'شهر'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="week">
@@ -198,37 +208,11 @@ export const ReminderHistoryDialog = () => {
             </Select>
           </div>
 
-          {/* Active Filters */}
+          {/* Clear Filters */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {filterTypes.map(type => (
-                <Badge key={type} variant="secondary" className="gap-1 text-xs">
-                  {type === 'session' ? 'جلسات' : type === 'payment' ? 'دفع' : 'إلغاء'}
-                  <button onClick={() => removeTypeFilter(type)} className="hover:text-destructive">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {filterStatuses.map(status => (
-                <Badge key={status} variant="secondary" className="gap-1 text-xs">
-                  {status === 'sent' ? 'نجح' : 'فشل'}
-                  <button onClick={() => removeStatusFilter(status)} className="hover:text-destructive">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {filterTime && (
-                <Badge variant="secondary" className="gap-1 text-xs">
-                  {filterTime === 'week' ? 'أسبوع' : 'شهر'}
-                  <button onClick={() => setFilterTime(null)} className="hover:text-destructive">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={clearFilters}>
-                مسح الكل
-              </Button>
-            </div>
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground w-full" onClick={clearFilters}>
+              مسح الفلاتر
+            </Button>
           )}
 
           {failedCount > 0 && (
