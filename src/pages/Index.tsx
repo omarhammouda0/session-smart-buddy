@@ -7,10 +7,6 @@ import {
   ChevronRight,
   Users,
   X,
-  Trash2,
-  Clock,
-  Monitor,
-  MapPin,
   History,
   CalendarDays,
 } from "lucide-react";
@@ -25,7 +21,6 @@ import { SemesterSettings } from "@/components/SemesterSettings";
 import { StudentCard } from "@/components/StudentCard";
 import { PaymentsDashboard } from "@/components/PaymentsDashboard";
 import { EmptyState } from "@/components/EmptyState";
-import { StudentSearchCombobox } from "@/components/StudentSearchCombobox";
 import { StatsBar } from "@/components/StatsBar";
 import { EndOfMonthReminder } from "@/components/EndOfMonthReminder";
 import { SessionHistoryBar } from "@/components/SessionHistoryBar";
@@ -35,36 +30,22 @@ import { RestoreConflictDialog } from "@/components/RestoreConflictDialog";
 import { ReminderSettingsDialog } from "@/components/ReminderSettingsDialog";
 import { ReminderHistoryDialog } from "@/components/ReminderHistoryDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
-import { StudentNotesHistory } from "@/components/StudentNotesHistory";
 import { CalendarView } from "@/components/CalendarView";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR, formatShortDateAr } from "@/lib/arabicConstants";
+
+import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR, formatShortDateAr } from "@/lib/arabicConstants";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const Index = () => {
   const now = new Date();
 
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
   const [activeTab, setActiveTab] = useState("sessions");
-  const [studentFilter, setStudentFilter] = useState<string>("all");
-  const [allStudentsSearch, setAllStudentsSearch] = useState("");
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
+  const [studentFilter, setStudentFilter] = useState("all");
 
   const [addConflictDialog, setAddConflictDialog] = useState<{
     open: boolean;
@@ -85,19 +66,15 @@ const Index = () => {
     updateStudentName,
     updateStudentTime,
     updateStudentPhone,
-    updateStudentParentPhone,
     updateStudentSessionType,
     updateStudentSchedule,
     updateStudentDuration,
     updateStudentCustomSettings,
-    updateStudentCancellationPolicy,
     addExtraSession,
     removeSession,
     deleteSession,
     restoreSession,
     rescheduleSession,
-    updateSessionDateTime,
-    toggleSessionComplete,
     togglePaymentStatus,
     bulkUpdateSessionTime,
     markSessionAsVacation,
@@ -115,69 +92,41 @@ const Index = () => {
 
   const { checkConflict } = useConflictDetection(students);
 
-  /* =========================
-     Helpers (UNCHANGED)
-  ========================== */
-
-  const getStudentsForDay = () =>
-    students.filter((student) => student.scheduleDays.some((d) => d.dayOfWeek === selectedDayOfWeek));
-
-  const studentsForDay = getStudentsForDay();
-
-  const filteredStudents = studentsForDay
+  const studentsForDay = students
+    .filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === selectedDayOfWeek))
     .filter((s) => studentFilter === "all" || s.id === studentFilter)
-    .sort((a, b) => {
-      const timeA = a.sessionTime || "16:00";
-      const timeB = b.sessionTime || "16:00";
-      return timeA.localeCompare(timeB);
-    });
+    .sort((a, b) => (a.sessionTime || "16:00").localeCompare(b.sessionTime || "16:00"));
 
-  const weekDays = Array.from({ length: 7 }).map((_, i) => {
-    const studentsOnDay = students.filter((student) => student.scheduleDays.some((d) => d.dayOfWeek === i));
-
-    return {
-      dayOfWeek: i,
-      dayName: DAY_NAMES_SHORT_AR[i],
-      isToday: now.getDay() === i,
-      studentCount: studentsOnDay.length,
-    };
-  });
-
-  const goToPrevDay = () => setSelectedDayOfWeek((prev) => (prev === 0 ? 6 : prev - 1));
-
-  const goToNextDay = () => setSelectedDayOfWeek((prev) => (prev === 6 ? 0 : prev + 1));
-
-  const goToToday = () => setSelectedDayOfWeek(now.getDay());
+  const weekDays = Array.from({ length: 7 }).map((_, i) => ({
+    dayOfWeek: i,
+    dayName: DAY_NAMES_SHORT_AR[i],
+    studentCount: students.filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === i)).length,
+  }));
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <span className="text-muted-foreground animate-pulse">جاري التحميل...</span>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">جاري التحميل...</div>;
   }
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
       {/* ================= HEADER ================= */}
-      <header className="sticky top-0 z-10 border-b bg-card/90 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-10 bg-card border-b">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
               <GraduationCap className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="font-heading font-bold text-lg">متابعة الطلاب</h1>
+              <h1 className="font-bold">متابعة الطلاب</h1>
               <p className="text-xs text-muted-foreground">إدارة الحصص والمدفوعات</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex items-center gap-2 flex-wrap">
             <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
             <BulkEditSessionsDialog
               students={students}
               onBulkUpdateTime={bulkUpdateSessionTime}
-              onUpdateSessionDate={updateSessionDateTime}
               onBulkMarkAsVacation={bulkMarkAsVacation}
             />
             <MonthlyReportDialog students={students} payments={payments} settings={settings} />
@@ -198,7 +147,7 @@ const Index = () => {
       {/* ================= MAIN ================= */}
       <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 rounded-xl bg-muted p-1">
+          <TabsList className="grid grid-cols-4 bg-muted rounded-xl p-1">
             <TabsTrigger value="sessions">
               <BookOpen className="h-4 w-4 ml-1" />
               الحصص
@@ -223,100 +172,77 @@ const Index = () => {
               <EmptyState />
             ) : (
               <>
-                {/* Context header */}
-                <div className="text-center">
-                  <h2 className="font-heading font-bold text-xl">حصص يوم {DAY_NAMES_AR[selectedDayOfWeek]}</h2>
-                  <p className="text-sm text-muted-foreground">{filteredStudents.length} طلاب مجدولين</p>
+                {/* Title + Summary */}
+                <div className="text-center space-y-1">
+                  <h2 className="font-bold text-xl">حصص يوم {DAY_NAMES_AR[selectedDayOfWeek]}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    👤 {studentsForDay.length} طالب • ⏱️ {studentsForDay.length} حصة
+                  </p>
                 </div>
 
-                {/* Day navigation */}
-                <div className="flex items-center justify-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={goToNextDay}>
-                    <ChevronRight />
-                  </Button>
-
-                  <div className="flex gap-1 overflow-x-auto">
-                    {weekDays.map((day) => (
-                      <button
-                        key={day.dayOfWeek}
-                        onClick={() => {
-                          setSelectedDayOfWeek(day.dayOfWeek);
-                          setStudentFilter("all");
-                        }}
-                        className={cn(
-                          "px-3 py-2 rounded-lg text-sm transition",
-                          selectedDayOfWeek === day.dayOfWeek
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted hover:bg-accent",
-                        )}
-                      >
-                        {day.dayName}
-                        {day.studentCount > 0 && (
-                          <span className="block text-[10px] opacity-80">{day.studentCount}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-
-                  <Button variant="ghost" size="icon" onClick={goToPrevDay}>
-                    <ChevronLeft />
-                  </Button>
-
-                  {selectedDayOfWeek !== now.getDay() && (
-                    <Button variant="outline" size="sm" onClick={goToToday}>
-                      اليوم
-                    </Button>
-                  )}
+                {/* Day selector */}
+                <div className="flex justify-center gap-1 overflow-x-auto">
+                  {weekDays.map((day) => (
+                    <button
+                      key={day.dayOfWeek}
+                      onClick={() => {
+                        setSelectedDayOfWeek(day.dayOfWeek);
+                        setStudentFilter("all");
+                      }}
+                      className={cn(
+                        "px-3 py-2 rounded-lg text-sm",
+                        selectedDayOfWeek === day.dayOfWeek
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted hover:bg-accent",
+                      )}
+                    >
+                      {day.dayName}
+                      {day.studentCount > 0 && <div className="text-[10px] opacity-70">{day.studentCount}</div>}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Filters */}
-                <div className="bg-card rounded-xl border p-3 flex items-center gap-2">
-                  <Select value={studentFilter} onValueChange={(value) => setStudentFilter(value)}>
-                    <SelectTrigger className="w-full">
+                {/* Filter + List */}
+                <div className="bg-card border rounded-xl p-3 space-y-3">
+                  <Select value={studentFilter} onValueChange={setStudentFilter}>
+                    <SelectTrigger>
                       <Users className="h-4 w-4 ml-2" />
                       <SelectValue placeholder="جميع الطلاب" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">جميع الطلاب</SelectItem>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.name}
+                      {students.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
 
-                  {studentFilter !== "all" && (
-                    <Button variant="ghost" size="icon" onClick={() => setStudentFilter("all")}>
-                      <X className="h-4 w-4" />
-                    </Button>
+                  {studentsForDay.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">لا توجد حصص لهذا اليوم</div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {studentsForDay.map((student) => (
+                        <StudentCard
+                          key={student.id}
+                          student={student}
+                          students={students}
+                          settings={settings}
+                          selectedDayOfWeek={selectedDayOfWeek}
+                          onRemove={() => removeStudent(student.id)}
+                          onUpdateName={(n) => updateStudentName(student.id, n)}
+                          onUpdateTime={(t) => updateStudentTime(student.id, t)}
+                          onUpdatePhone={(p) => updateStudentPhone(student.id, p)}
+                          onUpdateSessionType={(t) => updateStudentSessionType(student.id, t)}
+                          onUpdateSchedule={(d, s, e) => updateStudentSchedule(student.id, d, s, e)}
+                          onUpdateDuration={(d) => updateStudentDuration(student.id, d)}
+                          onUpdateCustomSettings={(s) => updateStudentCustomSettings(student.id, s)}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
-
-                {/* Student list */}
-                {filteredStudents.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">لا توجد حصص مجدولة لهذا اليوم</div>
-                ) : (
-                  <div className="grid gap-3">
-                    {filteredStudents.map((student) => (
-                      <StudentCard
-                        key={student.id}
-                        student={student}
-                        students={students}
-                        settings={settings}
-                        selectedDayOfWeek={selectedDayOfWeek}
-                        onRemove={() => removeStudent(student.id)}
-                        onUpdateName={(name) => updateStudentName(student.id, name)}
-                        onUpdateTime={(time) => updateStudentTime(student.id, time)}
-                        onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
-                        onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
-                        onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                        onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
-                        onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
-                      />
-                    ))}
-                  </div>
-                )}
               </>
             )}
           </TabsContent>
