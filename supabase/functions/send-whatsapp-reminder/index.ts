@@ -158,6 +158,8 @@ const handler = async (req: Request): Promise<Response> => {
         errorMessage = "رقم الواتساب غير نشط";
       } else if (result.code === 21408) {
         errorMessage = "رصيد Twilio غير كافي";
+      } else if (result.code === 63038) {
+        errorMessage = "تم تجاوز الحد اليومي للرسائل (50 رسالة). يرجى الترقية إلى حساب Twilio مدفوع أو الانتظار حتى الغد.";
       }
     } else {
       console.log("WhatsApp message sent successfully:", result.sid);
