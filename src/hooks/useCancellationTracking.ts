@@ -176,10 +176,12 @@ export const useCancellationTracking = (students: Student[]) => {
       limitReached: boolean;
       limitExceeded: boolean;
       limit: number | null;
+      autoNotificationSent?: boolean;
     }> => {
       const month = format(new Date(sessionDate), 'yyyy-MM');
       const student = students.find((s) => s.id === studentId);
       const limit = student?.cancellationPolicy?.monthlyLimit ?? null;
+      const autoNotifyParent = student?.cancellationPolicy?.autoNotifyParent ?? false;
 
       try {
         // Insert cancellation record
@@ -223,16 +225,63 @@ export const useCancellationTracking = (students: Student[]) => {
           console.error('Error upserting tracking:', upsertError);
         }
 
-        // Reload data
+        // Reload data to get fresh cancellation list
         await loadData();
 
-        return { success: true, newCount, limitReached, limitExceeded, limit };
+        // Check if we should auto-notify parent
+        let autoNotificationSent = false;
+        if ((limitReached || limitExceeded) && autoNotifyParent && student?.phone) {
+          // Check if parent was already notified this month
+          const alreadyNotified = wasParentNotified(studentId, month);
+          
+          if (!alreadyNotified) {
+            console.log('Auto-sending parent notification for:', student.name);
+            
+            // Get fresh cancellation list for this month
+            const studentCancellations = cancellations.filter(
+              (c) => c.studentId === studentId && c.month === month
+            );
+            
+            // Add the current cancellation to the list for the message
+            const allCancellations = [
+              ...studentCancellations,
+              {
+                id: 'pending',
+                studentId,
+                sessionDate,
+                sessionTime,
+                reason,
+                cancelledAt: new Date().toISOString(),
+                month,
+              },
+            ];
+
+            const result = await sendParentNotificationInternal(
+              studentId,
+              student.phone,
+              student.name,
+              newCount,
+              limit!,
+              allCancellations,
+              'auto'
+            );
+
+            autoNotificationSent = result.success;
+            if (result.success) {
+              console.log('Auto-notification sent successfully');
+            } else {
+              console.error('Auto-notification failed:', result.error);
+            }
+          }
+        }
+
+        return { success: true, newCount, limitReached, limitExceeded, limit, autoNotificationSent };
       } catch (error) {
         console.error('Error recording cancellation:', error);
         return { success: false, newCount: 0, limitReached: false, limitExceeded: false, limit };
       }
     },
-    [students, getCancellationCount, loadData]
+    [students, getCancellationCount, loadData, wasParentNotified, cancellations]
   );
 
   // Remove a cancellation (when restoring a session)
@@ -353,8 +402,8 @@ export const useCancellationTracking = (students: Student[]) => {
     [loadData]
   );
 
-  // Send WhatsApp notification to parent
-  const sendParentNotification = useCallback(
+  // Internal function to send WhatsApp notification (used by auto-notify and manual)
+  const sendParentNotificationInternal = useCallback(
     async (
       studentId: string,
       parentPhone: string,
@@ -387,7 +436,7 @@ ${cancellationsText}
 شكراً لتعاونكم`;
 
       try {
-        console.log('Sending cancellation alert to parent:', { studentName, parentPhone });
+        console.log('Sending cancellation alert to parent:', { studentName, parentPhone, triggeredBy });
 
         const { data, error } = await supabase.functions.invoke('send-whatsapp-reminder', {
           body: {
@@ -441,6 +490,19 @@ ${cancellationsText}
       }
     },
     [logNotification, markParentNotified]
+  );
+
+  // Public function for manual notifications
+  const sendParentNotification = useCallback(
+    (
+      studentId: string,
+      parentPhone: string,
+      studentName: string,
+      count: number,
+      limit: number,
+      cancellationList: CancellationRecord[]
+    ) => sendParentNotificationInternal(studentId, parentPhone, studentName, count, limit, cancellationList, 'manual'),
+    [sendParentNotificationInternal]
   );
 
   // Get students at or near limit for current month
