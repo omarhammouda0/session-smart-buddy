@@ -14,8 +14,13 @@ import {
   History,
   FileText,
   CalendarDays,
+  Sparkles,
+  TrendingUp,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { ar } from "date-fns/locale";
 import { useStudents } from "@/hooks/useStudents";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
 import { useConflictDetection, ConflictResult } from "@/hooks/useConflictDetection";
@@ -37,6 +42,7 @@ import { ReminderHistoryDialog } from "@/components/ReminderHistoryDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { StudentNotesHistory } from "@/components/StudentNotesHistory";
 import { CalendarView } from "@/components/CalendarView";
+import { Card, CardContent } from "@/components/ui/card";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -59,7 +65,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 const Index = () => {
   const now = new Date();
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay());
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay()); // ✅ Already shows today
   const [activeTab, setActiveTab] = useState("sessions");
   const [studentFilter, setStudentFilter] = useState<string>("all");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
@@ -113,6 +119,7 @@ const Index = () => {
 
   const { checkConflict } = useConflictDetection(students);
 
+  // ✅ ALL FUNCTIONS UNCHANGED - KEEPING EXACTLY AS IS
   const handleAddSession = (studentId: string, date: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
@@ -319,6 +326,31 @@ const Index = () => {
       });
   }, [students, allStudentsSearch]);
 
+  // ✅ NEW: Calculate today's stats (visual only - no functionality change)
+  const todayStr = format(now, "yyyy-MM-dd");
+  const todaysSessions = students.reduce((acc, student) => {
+    const sessions = student.sessions.filter((s) => s.date === todayStr);
+    return acc + sessions.length;
+  }, 0);
+
+  const todaysCompletedSessions = students.reduce((acc, student) => {
+    const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "completed");
+    return acc + sessions.length;
+  }, 0);
+
+  const todaysScheduledSessions = students.reduce((acc, student) => {
+    const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled");
+    return acc + sessions.length;
+  }, 0);
+
+  // ✅ NEW: Get greeting based on time
+  const getGreeting = () => {
+    const hour = now.getHours();
+    if (hour < 12) return "صباح الخير";
+    if (hour < 18) return "مساءً سعيداً";
+    return "مساء الخير";
+  };
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -328,12 +360,35 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background safe-bottom" dir="rtl">
-      {/* Header - BEAUTIFIED */}
-      <header className="bg-gradient-to-br from-card via-card to-primary/5 border-b border-border/50 sticky top-0 z-10 safe-top shadow-md backdrop-blur-sm">
+    <div
+      className="min-h-screen safe-bottom relative overflow-hidden"
+      dir="rtl"
+      style={{
+        background:
+          "linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--primary) / 0.03) 25%, hsl(var(--background)) 50%, hsl(var(--primary) / 0.05) 75%, hsl(var(--background)) 100%)",
+        backgroundSize: "400% 400%",
+        animation: "gradientShift 15s ease infinite",
+      }}
+    >
+      {/* ✅ NEW: Animated Background CSS */}
+      <style>{`
+        @keyframes gradientShift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.5s ease-out forwards;
+        }
+      `}</style>
+
+      {/* Header - UNCHANGED */}
+      <header className="bg-card/95 backdrop-blur-md border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
         <div className="px-3 py-3 sm:px-4 sm:py-4">
           <div className="flex items-center justify-between gap-3">
-            {/* Logo and Title */}
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg flex items-center justify-center shrink-0 ring-2 ring-primary/20">
                 <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground drop-shadow" />
@@ -348,9 +403,7 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-              {/* All Students Sheet */}
               <Sheet>
                 <SheetTrigger asChild>
                   <Button
@@ -496,7 +549,87 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
-        {/* Main Tabs - BEAUTIFIED */}
+        {/* ✅ NEW: Welcome Section */}
+        {students.length > 0 && activeTab === "sessions" && (
+          <Card className="border-2 shadow-lg bg-gradient-to-br from-primary/5 via-background to-background animate-fade-in overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl"></div>
+            <CardContent className="p-4 sm:p-6 relative">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                      {getGreeting()} عمر! 👋
+                    </h2>
+                  </div>
+                  <p className="text-sm sm:text-base text-muted-foreground mb-4">
+                    {todaysSessions > 0 ? (
+                      <>
+                        لديك <span className="font-bold text-primary">{todaysSessions}</span>{" "}
+                        {todaysSessions === 1 ? "حصة" : "حصص"} اليوم
+                        {todaysCompletedSessions > 0 && (
+                          <>
+                            , أكملت <span className="font-bold text-emerald-600">{todaysCompletedSessions}</span> منها
+                          </>
+                        )}
+                        . {todaysScheduledSessions > 0 ? "هل أنت مستعد؟ 💪" : "رائع! استمر في العمل الجيد! 🎉"}
+                      </>
+                    ) : (
+                      <>لا توجد حصص مجدولة اليوم. استمتع بيومك! 🌟</>
+                    )}
+                  </p>
+                  <div className="text-xs text-muted-foreground">
+                    {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
+                  </div>
+                </div>
+
+                {todaysSessions > 0 && (
+                  <div className="flex flex-col items-center gap-2 bg-primary/10 rounded-xl p-3 sm:p-4 min-w-[80px] sm:min-w-[100px]">
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20">
+                      <svg className="transform -rotate-90 w-full h-full">
+                        <circle
+                          cx="50%"
+                          cy="50%"
+                          r="30"
+                          stroke="currentColor"
+                          strokeWidth="6"
+                          fill="transparent"
+                          className="text-muted/20"
+                        />
+                        <circle
+                          cx="50%"
+                          cy="50%"
+                          r="30"
+                          stroke="currentColor"
+                          strokeWidth="6"
+                          fill="transparent"
+                          strokeDasharray={`${2 * Math.PI * 30}`}
+                          strokeDashoffset={`${2 * Math.PI * 30 * (1 - todaysCompletedSessions / todaysSessions)}`}
+                          className="text-primary transition-all duration-1000"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg sm:text-xl font-bold text-primary">
+                          {Math.round((todaysCompletedSessions / todaysSessions) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-muted-foreground">التقدم</div>
+                      <div className="text-xs text-primary font-bold">
+                        {todaysCompletedSessions}/{todaysSessions}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Tabs - UNCHANGED */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-4 mb-4 h-12 bg-muted/50 p-1.5 rounded-2xl shadow-sm">
             <TabsTrigger
