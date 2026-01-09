@@ -280,29 +280,24 @@ const Index = () => {
   }, [students, allStudentsSearch]);
 
   // ✅ Calculate today's sessions dynamically
-  // ✅ FIXED: Exclude cancelled sessions from counts
-
   const todaysSessions = useMemo(() => {
     return students.reduce((acc, student) => {
-      const sessions = student.sessions.filter((s) => s.date === todayStr && s.status !== "cancelled");
+      const sessions = student.sessions.filter((s) => s.date === todayStr);
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
-
   const todaysCompletedSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "completed");
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
-
   const todaysScheduledSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled");
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
-
   const getGreeting = () => {
     const hour = now.getHours();
     if (hour < 12) return "صباح الخير";
@@ -729,7 +724,7 @@ const Index = () => {
               className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]"
             >
               <History className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="hidden xs:inline">السجل</span>
+              <span className="hidden xs:inline">إدارة الطلبة</span>
             </TabsTrigger>
             <TabsTrigger
               value="payments"

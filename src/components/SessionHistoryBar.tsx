@@ -259,7 +259,7 @@ export const SessionHistoryBar = ({
         const sessionDate = parseISO(session.date);
         return !isBefore(sessionDate, semesterStart) && session.status !== "completed";
       })
-      .sort((a, b) => a.date.localeCompare(b.date)) // Already ascending
+      .sort((a, b) => a.date.localeCompare(b.date))
       .map((session) => ({ ...session, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
 
@@ -289,7 +289,7 @@ export const SessionHistoryBar = ({
     if (!selectedStudent) return [];
     return selectedStudent.sessions
       .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
-      .sort((a, b) => a.date.localeCompare(b.date)) // Changed to ascending
+      .sort((a, b) => b.date.localeCompare(a.date))
       .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
 
@@ -357,7 +357,7 @@ export const SessionHistoryBar = ({
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-1.5 text-xs">
                 <History className="h-3.5 w-3.5" />
-                السجل
+                إدارة الطلبة
               </TabsTrigger>
             </TabsList>
 
@@ -396,222 +396,255 @@ export const SessionHistoryBar = ({
                   {scheduledSessions.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص مجدولة</p>
                   ) : (
-                    scheduledSessions.map((session) => {
-                      // Get sessions with gaps for the current date
-                      const sessionsWithGaps = getSessionsWithGaps(session.date);
-                      const sessionGapInfo = sessionsWithGaps.find((s) => s.session.id === session.id);
+                    (() => {
+                      // Group sessions by date to show gaps
+                      const sessionsByDate = scheduledSessions.reduce(
+                        (acc, session) => {
+                          const date = session.date;
+                          if (!acc[date]) acc[date] = [];
+                          acc[date].push(session);
+                          return acc;
+                        },
+                        {} as Record<string, typeof scheduledSessions>,
+                      );
 
-                      // Check if this session has conflicts
-                      const hasConflict = sessionGapInfo?.hasConflict || false;
-                      const conflictType = sessionGapInfo?.conflictType;
-                      const gapAfter = sessionGapInfo?.gapAfter;
-                      const gapSeverity = sessionGapInfo?.gapSeverity;
+                      const elements: React.ReactNode[] = [];
+                      let lastDate: string | null = null;
 
-                      return (
-                        <div
-                          key={session.id}
-                          className={cn(
-                            "relative flex items-center justify-between p-2.5 rounded-lg text-xs border transition-all mb-1",
-                            session.status === "cancelled" && "bg-destructive/5 border-destructive/20",
-                            session.status === "vacation" && "bg-warning/10 border-warning/30",
-                            session.status === "scheduled" && !hasConflict && "bg-card",
-                            session.status === "scheduled" &&
-                              hasConflict &&
-                              conflictType === "exact" &&
-                              "bg-destructive/5 border-destructive/30",
-                            session.status === "scheduled" &&
-                              hasConflict &&
-                              conflictType === "partial" &&
-                              "bg-destructive/5 border-destructive/30",
-                            session.status === "scheduled" &&
-                              hasConflict &&
-                              conflictType === "close" &&
-                              "bg-warning/5 border-warning/30",
-                          )}
-                        >
-                          {/* Conflict badge */}
-                          {session.status === "scheduled" && hasConflict && (
-                            <div
-                              className={cn(
-                                "absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-sm z-10",
-                                (conflictType === "exact" || conflictType === "partial") &&
-                                  "bg-destructive text-destructive-foreground",
-                                conflictType === "close" && "bg-warning text-warning-foreground",
-                              )}
-                            >
-                              {conflictType === "exact" || conflictType === "partial" ? (
-                                <XCircle className="h-3 w-3" />
-                              ) : (
-                                <AlertTriangle className="h-3 w-3" />
-                              )}
-                            </div>
-                          )}
+                      scheduledSessions.forEach((session, idx) => {
+                        // Get sessions with gaps for the current date
+                        const sessionsWithGaps = getSessionsWithGaps(session.date);
+                        const sessionGapInfo = sessionsWithGaps.find((s) => s.session.id === session.id);
 
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <div
-                              className={cn(
-                                "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                                session.status === "cancelled" && "bg-destructive/20 text-destructive",
-                                session.status === "vacation" && "bg-warning/20 text-warning",
-                                session.status === "scheduled" && !hasConflict && "bg-primary/20 text-primary",
-                                session.status === "scheduled" &&
-                                  hasConflict &&
-                                  (conflictType === "exact" || conflictType === "partial") &&
-                                  "bg-destructive/20 text-destructive",
-                                session.status === "scheduled" &&
-                                  hasConflict &&
-                                  conflictType === "close" &&
-                                  "bg-warning/20 text-warning",
-                              )}
-                            >
-                              {session.status === "cancelled" ? (
-                                <Ban className="h-3 w-3" />
-                              ) : session.status === "vacation" ? (
-                                <Palmtree className="h-3 w-3" />
-                              ) : hasConflict && (conflictType === "exact" || conflictType === "partial") ? (
-                                <XCircle className="h-3 w-3" />
-                              ) : hasConflict && conflictType === "close" ? (
-                                <AlertTriangle className="h-3 w-3" />
-                              ) : (
-                                <Calendar className="h-3 w-3" />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p
+                        // Check if this session has conflicts
+                        const hasConflict = sessionGapInfo?.hasConflict || false;
+                        const conflictType = sessionGapInfo?.conflictType;
+                        const gapAfter = sessionGapInfo?.gapAfter;
+                        const gapSeverity = sessionGapInfo?.gapSeverity;
+
+                        // Show date separator if new date
+                        if (session.date !== lastDate) {
+                          if (lastDate !== null) {
+                            elements.push(
+                              <div
+                                key={`sep-${session.date}`}
+                                className="border-t border-dashed border-border/50 my-2"
+                              />,
+                            );
+                          }
+                          lastDate = session.date;
+                        }
+
+                        elements.push(
+                          <div
+                            key={session.id}
+                            className={cn(
+                              "relative flex items-center justify-between p-2.5 rounded-lg text-xs border transition-all",
+                              session.status === "cancelled" && "bg-destructive/5 border-destructive/20",
+                              session.status === "vacation" && "bg-warning/10 border-warning/30",
+                              session.status === "scheduled" && !hasConflict && "bg-card",
+                              session.status === "scheduled" &&
+                                hasConflict &&
+                                conflictType === "exact" &&
+                                "bg-destructive/5 border-destructive/30",
+                              session.status === "scheduled" &&
+                                hasConflict &&
+                                conflictType === "partial" &&
+                                "bg-destructive/5 border-destructive/30",
+                              session.status === "scheduled" &&
+                                hasConflict &&
+                                conflictType === "close" &&
+                                "bg-warning/5 border-warning/30",
+                            )}
+                          >
+                            {/* Conflict badge */}
+                            {session.status === "scheduled" && hasConflict && (
+                              <div
                                 className={cn(
-                                  "font-medium truncate",
-                                  session.status === "cancelled" && "line-through text-muted-foreground",
-                                  session.status === "vacation" && "text-warning",
+                                  "absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-sm z-10",
+                                  (conflictType === "exact" || conflictType === "partial") &&
+                                    "bg-destructive text-destructive-foreground",
+                                  conflictType === "close" && "bg-warning text-warning-foreground",
                                 )}
                               >
-                                {formatShortDateAr(session.date)}
-                                <span className="text-muted-foreground font-normal mr-1">
-                                  ({session.time || selectedStudent.sessionTime || "16:00"})
-                                  <span className="text-muted-foreground/70 mr-1">
-                                    ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
-                                  </span>
-                                </span>
-                              </p>
-                              {session.status === "cancelled" && (
-                                <span className="text-[10px] text-destructive">ملغاة</span>
-                              )}
-                              {session.status === "vacation" && <span className="text-[10px] text-warning">إجازة</span>}
-                              {session.status === "scheduled" &&
-                                hasConflict &&
-                                (conflictType === "exact" || conflictType === "partial") && (
-                                  <span className="text-[10px] text-destructive">❌ تعارض</span>
+                                {conflictType === "exact" || conflictType === "partial" ? (
+                                  <XCircle className="h-3 w-3" />
+                                ) : (
+                                  <AlertTriangle className="h-3 w-3" />
                                 )}
-                              {session.status === "scheduled" && hasConflict && conflictType === "close" && (
-                                <span className="text-[10px] text-warning">⚠️ قريب جداً</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div
+                                className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                                  session.status === "cancelled" && "bg-destructive/20 text-destructive",
+                                  session.status === "vacation" && "bg-warning/20 text-warning",
+                                  session.status === "scheduled" && !hasConflict && "bg-primary/20 text-primary",
+                                  session.status === "scheduled" &&
+                                    hasConflict &&
+                                    (conflictType === "exact" || conflictType === "partial") &&
+                                    "bg-destructive/20 text-destructive",
+                                  session.status === "scheduled" &&
+                                    hasConflict &&
+                                    conflictType === "close" &&
+                                    "bg-warning/20 text-warning",
+                                )}
+                              >
+                                {session.status === "cancelled" ? (
+                                  <Ban className="h-3 w-3" />
+                                ) : session.status === "vacation" ? (
+                                  <Palmtree className="h-3 w-3" />
+                                ) : hasConflict && (conflictType === "exact" || conflictType === "partial") ? (
+                                  <XCircle className="h-3 w-3" />
+                                ) : hasConflict && conflictType === "close" ? (
+                                  <AlertTriangle className="h-3 w-3" />
+                                ) : (
+                                  <Calendar className="h-3 w-3" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className={cn(
+                                    "font-medium truncate",
+                                    session.status === "cancelled" && "line-through text-muted-foreground",
+                                    session.status === "vacation" && "text-warning",
+                                  )}
+                                >
+                                  {formatShortDateAr(session.date)}
+                                  <span className="text-muted-foreground font-normal mr-1">
+                                    ({session.time || selectedStudent.sessionTime || "16:00"})
+                                    <span className="text-muted-foreground/70 mr-1">
+                                      ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                                    </span>
+                                  </span>
+                                </p>
+                                {session.status === "cancelled" && (
+                                  <span className="text-[10px] text-destructive">ملغاة</span>
+                                )}
+                                {session.status === "vacation" && (
+                                  <span className="text-[10px] text-warning">إجازة</span>
+                                )}
+                                {session.status === "scheduled" &&
+                                  hasConflict &&
+                                  (conflictType === "exact" || conflictType === "partial") && (
+                                    <span className="text-[10px] text-destructive">❌ تعارض</span>
+                                  )}
+                                {session.status === "scheduled" && hasConflict && conflictType === "close" && (
+                                  <span className="text-[10px] text-warning">⚠️ قريب جداً</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* Notes button */}
+                              <SessionNotesDialog
+                                session={session}
+                                studentId={session.studentId}
+                                studentName={session.studentName}
+                              />
+                              {/* Homework button */}
+                              <SessionHomeworkDialog
+                                session={session}
+                                studentId={session.studentId}
+                                studentName={session.studentName}
+                              />
+                              {session.status === "cancelled" ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-success"
+                                    onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5 ml-1" />
+                                    استعادة
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => handleDeleteSession(session.studentId, session.id)}
+                                    title="حذف نهائي"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              ) : session.status === "vacation" ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-primary"
+                                    onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5 ml-1" />
+                                    استعادة
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => openCancelDialog(session.studentId, session.id)}
+                                    title="إلغاء"
+                                  >
+                                    <Ban className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-success"
+                                    onClick={() => handleToggleComplete(session.studentId, session.id)}
+                                    title="إكمال"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-warning"
+                                    onClick={() => handleMarkAsVacation(session.studentId, session.id)}
+                                    title="إجازة"
+                                  >
+                                    <Palmtree className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => openCancelDialog(session.studentId, session.id)}
+                                    title="إلغاء"
+                                  >
+                                    <Ban className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleDeleteSession(session.studentId, session.id)}
+                                    title="حذف نهائي"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
                               )}
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {/* Notes button */}
-                            <SessionNotesDialog
-                              session={session}
-                              studentId={session.studentId}
-                              studentName={session.studentName}
-                            />
-                            {/* Homework button */}
-                            <SessionHomeworkDialog
-                              session={session}
-                              studentId={session.studentId}
-                              studentName={session.studentName}
-                            />
-                            {session.status === "cancelled" ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-success"
-                                  onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                                  استعادة
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive"
-                                  onClick={() => handleDeleteSession(session.studentId, session.id)}
-                                  title="حذف نهائي"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            ) : session.status === "vacation" ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-primary"
-                                  onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                                  استعادة
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive"
-                                  onClick={() => openCancelDialog(session.studentId, session.id)}
-                                  title="إلغاء"
-                                >
-                                  <Ban className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-success"
-                                  onClick={() => handleToggleComplete(session.studentId, session.id)}
-                                  title="إكمال"
-                                >
-                                  <Check className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-warning"
-                                  onClick={() => handleMarkAsVacation(session.studentId, session.id)}
-                                  title="إجازة"
-                                >
-                                  <Palmtree className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive"
-                                  onClick={() => openCancelDialog(session.studentId, session.id)}
-                                  title="إلغاء"
-                                >
-                                  <Ban className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                  onClick={() => handleDeleteSession(session.studentId, session.id)}
-                                  title="حذف نهائي"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                          </div>,
+                        );
 
-                          {/* Show gap indicator after this session if there's a gap */}
-                          {session.status === "scheduled" && gapAfter !== null && gapAfter !== undefined && (
-                            <div className="absolute -bottom-2 left-0 right-0">
-                              <GapIndicator gapMinutes={gapAfter} className="my-0.5" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
+                        // Show gap indicator after this session if there's a next session on the same date
+                        if (session.status === "scheduled" && gapAfter !== null && gapAfter !== undefined) {
+                          elements.push(
+                            <GapIndicator key={`gap-${session.id}`} gapMinutes={gapAfter} className="my-0.5" />,
+                          );
+                        }
+                      });
+
+                      return elements;
+                    })()
                   )}
                 </div>
               </ScrollArea>
@@ -680,7 +713,7 @@ export const SessionHistoryBar = ({
                       <div
                         key={session.id}
                         className={cn(
-                          "flex flex-col p-2 rounded text-xs border mb-1",
+                          "flex flex-col p-2 rounded text-xs border",
                           session.status === "completed" && "bg-success/5 border-success/20",
                           session.status === "vacation" && "bg-warning/5 border-warning/20",
                           session.status === "cancelled" && "bg-destructive/5 border-destructive/20",
@@ -906,7 +939,7 @@ const CancellationHistoryInline = ({
       }
       groups[c.month].push(c);
     });
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)); // Changed to ascending
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
   }, [cancellations]);
 
   const formatMonthLabel = (monthStr: string) => {
@@ -1001,7 +1034,7 @@ const CancellationHistoryInline = ({
 
               <div className="space-y-1">
                 {monthCancellations
-                  .sort((a, b) => a.sessionDate.localeCompare(b.sessionDate)) // Changed to ascending
+                  .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate))
                   .map((c) => (
                     <div key={c.id} className="flex items-center justify-between p-2 rounded-md bg-background text-xs">
                       <div className="min-w-0 flex-1">
