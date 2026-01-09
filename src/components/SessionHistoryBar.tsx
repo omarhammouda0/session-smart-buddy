@@ -780,125 +780,152 @@ export const SessionHistoryBar = ({
                   <p className="text-sm font-medium text-success">نسبة الإنجاز: {historyStats.completionRate}%</p>
                 </div>
               )}
+
               <ScrollArea className="h-[180px]">
                 <div className="space-y-1.5 pl-2">
                   {historySessions.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص سابقة</p>
                   ) : (
-                    historySessions.map((session) => (
-                      <div
-                        key={session.id}
-                        className={cn(
-                          "flex flex-col p-2 rounded text-xs border",
-                          session.status === "completed" && "bg-success/5 border-success/20",
-                          session.status === "vacation" && "bg-warning/5 border-warning/20",
-                          session.status === "cancelled" && "bg-destructive/5 border-destructive/20",
-                        )}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <div
-                              className={cn(
-                                "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                                session.status === "completed" && "bg-success/20 text-success",
-                                session.status === "vacation" && "bg-warning/20 text-warning",
-                                session.status === "cancelled" && "bg-destructive/20 text-destructive",
-                              )}
-                            >
-                              {session.status === "completed" ? (
-                                <Check className="h-3 w-3" />
-                              ) : session.status === "vacation" ? (
-                                <Palmtree className="h-3 w-3" />
+                    historySessions.map((session) => {
+                      // ✅ Check if this is a past session
+                      const todayStr = format(today, "yyyy-MM-dd");
+                      const isPastSession = session.date < todayStr;
+
+                      return (
+                        <div
+                          key={session.id}
+                          className={cn(
+                            "flex flex-col p-2 rounded text-xs border",
+                            session.status === "completed" && "bg-success/5 border-success/20",
+                            session.status === "vacation" && "bg-warning/5 border-warning/20",
+                            session.status === "cancelled" && "bg-destructive/5 border-destructive/20",
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div
+                                className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                                  session.status === "completed" && "bg-success/20 text-success",
+                                  session.status === "vacation" && "bg-warning/20 text-warning",
+                                  session.status === "cancelled" && "bg-destructive/20 text-destructive",
+                                )}
+                              >
+                                {session.status === "completed" ? (
+                                  <Check className="h-3 w-3" />
+                                ) : session.status === "vacation" ? (
+                                  <Palmtree className="h-3 w-3" />
+                                ) : (
+                                  <X className="h-3 w-3" />
+                                )}
+                              </div>
+                              <p className="font-medium truncate">
+                                {formatShortDateAr(session.date)}
+                                <span className="text-muted-foreground font-normal mr-1">
+                                  ({session.time || selectedStudent.sessionTime || "16:00"})
+                                  <span className="text-muted-foreground/70 mr-1">
+                                    ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
+                                  </span>
+                                </span>
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <SessionNotesDialog
+                                session={session}
+                                studentId={session.studentId}
+                                studentName={session.studentName}
+                              />
+                              <SessionHomeworkDialog
+                                session={session}
+                                studentId={session.studentId}
+                                studentName={session.studentName}
+                              />
+
+                              {/* ✅ PAST SESSIONS: Only DELETE button (no تراجع or استعادة) */}
+                              {isPastSession ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
+                                  title="حذف نهائي"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                               ) : (
-                                <X className="h-3 w-3" />
+                                /* ✅ FUTURE SESSIONS: Show تراجع/استعادة + DELETE */
+                                <>
+                                  {session.status === "completed" ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-warning"
+                                      onClick={() => handleToggleComplete(session.studentId, session.id)}
+                                      title="التراجع عن الإكمال"
+                                    >
+                                      <X className="h-3.5 w-3.5 ml-1" />
+                                      تراجع
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-success"
+                                      onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
+                                      title="استعادة الجلسة"
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5 ml-1" />
+                                      استعادة
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
+                                    title="حذف نهائي"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              )}
+
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px]",
+                                  session.status === "completed" && "border-success/30 text-success",
+                                  session.status === "vacation" && "border-warning/30 text-warning",
+                                  session.status === "cancelled" && "border-destructive/30 text-destructive",
+                                )}
+                              >
+                                {getStatusLabel(session.status)}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Show session details for completed sessions */}
+                          {session.status === "completed" && (session.topic || session.notes || session.homework) && (
+                            <div className="mt-2 mr-7 text-[10px] text-muted-foreground space-y-0.5 bg-muted/30 rounded p-1.5">
+                              {session.topic && (
+                                <p className="flex items-center gap-1">
+                                  <BookOpen className="h-2.5 w-2.5" />
+                                  {session.topic}
+                                </p>
+                              )}
+                              {session.homework && (
+                                <p className="flex items-center gap-1">
+                                  <ClipboardCheck className="h-2.5 w-2.5" />
+                                  {session.homework}
+                                  {session.homeworkStatus === "completed" && " ✓"}
+                                  {session.homeworkStatus === "incomplete" && " ❌"}
+                                </p>
                               )}
                             </div>
-                            <p className="font-medium truncate">
-                              {formatShortDateAr(session.date)}
-                              <span className="text-muted-foreground font-normal mr-1">
-                                ({session.time || selectedStudent.sessionTime || "16:00"})
-                                <span className="text-muted-foreground/70 mr-1">
-                                  ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
-                                </span>
-                              </span>
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <SessionNotesDialog
-                              session={session}
-                              studentId={session.studentId}
-                              studentName={session.studentName}
-                            />
-                            <SessionHomeworkDialog
-                              session={session}
-                              studentId={session.studentId}
-                              studentName={session.studentName}
-                            />
-                            {session.status === "completed" ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-warning"
-                                onClick={() => handleToggleComplete(session.studentId, session.id)}
-                                title="التراجع عن الإكمال"
-                              >
-                                <X className="h-3.5 w-3.5 ml-1" />
-                                تراجع
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-success"
-                                onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
-                                title="استعادة الجلسة"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                                استعادة
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                              title="حذف نهائي"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-[10px]",
-                                session.status === "completed" && "border-success/30 text-success",
-                                session.status === "vacation" && "border-warning/30 text-warning",
-                                session.status === "cancelled" && "border-destructive/30 text-destructive",
-                              )}
-                            >
-                              {getStatusLabel(session.status)}
-                            </Badge>
-                          </div>
+                          )}
                         </div>
-                        {session.status === "completed" && (session.topic || session.notes || session.homework) && (
-                          <div className="mt-2 mr-7 text-[10px] text-muted-foreground space-y-0.5 bg-muted/30 rounded p-1.5">
-                            {session.topic && (
-                              <p className="flex items-center gap-1">
-                                <BookOpen className="h-2.5 w-2.5" />
-                                {session.topic}
-                              </p>
-                            )}
-                            {session.homework && (
-                              <p className="flex items-center gap-1">
-                                <ClipboardCheck className="h-2.5 w-2.5" />
-                                {session.homework}
-                                {session.homeworkStatus === "completed" && " ✓"}
-                                {session.homeworkStatus === "incomplete" && " ❌"}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
