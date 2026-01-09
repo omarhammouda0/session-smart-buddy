@@ -311,7 +311,7 @@ export const SessionHistoryBar = ({
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-heading flex items-center gap-2">
           <History className="h-4 w-4" />
-          إدارة الحصص
+          السجل
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">اختر طالب لإضافة حصص جديدة أو عرض السجل</p>
       </CardHeader>
@@ -357,7 +357,7 @@ export const SessionHistoryBar = ({
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-1.5 text-xs">
                 <History className="h-3.5 w-3.5" />
-                إدارة الطلبة
+                السجل
               </TabsTrigger>
             </TabsList>
 
