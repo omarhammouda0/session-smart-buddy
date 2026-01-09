@@ -890,6 +890,7 @@ const Index = () => {
                       onCancelSession={handleCancelSession}
                       onQuickPayment={handleQuickPayment} {/* ✅ ADDED THIS PROP */}
                     />
+                    />
                   </div>
                 ))}
               </div>
