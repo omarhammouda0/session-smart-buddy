@@ -1174,3 +1174,119 @@ export const PaymentsDashboard = ({
     </div>
   );
 };
+
+// ============================================
+// ✅ QUICK PAYMENT DIALOG COMPONENT
+// ============================================
+
+interface QuickPaymentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  student: Student | null;
+  sessionDate: string;
+  settings: AppSettings;
+  onConfirm: (amount: number, method: PaymentMethod) => void;
+}
+
+export const QuickPaymentDialog = ({
+  open,
+  onOpenChange,
+  student,
+  sessionDate,
+  settings,
+  onConfirm,
+}: QuickPaymentDialogProps) => {
+  const [amount, setAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+
+  const sessionPrice = student
+    ? student.useCustomSettings
+      ? student.sessionType === "online"
+        ? student.customPriceOnline || settings.defaultPriceOnline || 120
+        : student.customPriceOnsite || settings.defaultPriceOnsite || 150
+      : student.sessionType === "online"
+        ? settings.defaultPriceOnline || 120
+        : settings.defaultPriceOnsite || 150
+    : 0;
+
+  useState(() => {
+    if (open && student) {
+      setAmount(sessionPrice.toString());
+      setPaymentMethod("cash");
+    }
+  }, [open, student, sessionPrice]);
+
+  const handleConfirm = () => {
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      alert("الرجاء إدخال مبلغ صحيح");
+      return;
+    }
+    onConfirm(amountNum, paymentMethod);
+    onOpenChange(false);
+  };
+
+  if (!student) return null;
+
+  const isFullPayment = parseFloat(amount) >= sessionPrice;
+  const isPartialPayment = parseFloat(amount) > 0 && parseFloat(amount) < sessionPrice;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent dir="rtl" className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-600/10">
+              <DollarSign className="h-5 w-5 text-amber-600" />
+            </div>
+            تسجيل دفع - {student.name}
+          </DialogTitle>
+          <DialogDescription className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4" />
+            {formatDateAr(sessionDate)}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">سعر الحصة:</span>
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-primary" />
+                <span className="font-bold text-lg text-primary">
+                  {sessionPrice.toLocaleString()} {CURRENCY}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quick-amount" className="text-base font-semibold">
+              المبلغ المدفوع
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="quick-amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+                className="text-left text-lg font-semibold"
+                dir="ltr"
+                min="0"
+                step="0.01"
+              />
+              <span className="flex items-center px-4 rounded-md border bg-muted text-sm font-medium whitespace-nowrap">
+                {CURRENCY}
+              </span>
+            </div>
+
+            {amount && (
+              <div className="mt-2">
+                {isFullPayment ? (
+                  <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-500/10 px-3 py-2 rounded-lg">
+                    ✅ دفع كامل
+                  </div>
+                ) : isPartialPayment ? (
+                  <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-500/10 px-3 py-2 rounded-lg">
+                    ⚠️ دفع ج
