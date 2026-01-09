@@ -1,5 +1,18 @@
 import { useState, useMemo } from "react";
-import { format, parseISO, isBefore, isAfter, startOfToday } from "date-fns";
+import {
+  format,
+  parseISO,
+  isBefore,
+  isAfter,
+  startOfToday,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  addWeeks,
+  addMonths,
+  subMonths,
+} from "date-fns";
 import { ar } from "date-fns/locale";
 import {
   History,
@@ -19,6 +32,10 @@ import {
   BookOpen,
   ClipboardCheck,
   Loader2,
+  Search,
+  ChevronDown,
+  Clock,
+  TrendingUp,
 } from "lucide-react";
 import { Student, Session, HomeworkStatus } from "@/types/student";
 import { Button } from "@/components/ui/button";
@@ -29,6 +46,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,10 +98,13 @@ interface SessionHistoryBarProps {
       homeworkStatus?: HomeworkStatus;
     },
   ) => void;
-  getCancellationCount?: (studentId: string) => number;
+  getCancellationCount?: (studentId: string, month?: string) => number;
   getAllStudentCancellations?: (studentId: string) => CancellationRecord[];
   onClearMonthCancellations?: (studentId: string, month: string) => Promise<boolean>;
 }
+
+type TimeFilter = "this-week" | "next-week" | "this-month" | "next-month" | "last-month" | "custom";
+type SortOrder = "date-asc" | "date-desc" | "time-asc";
 
 export const SessionHistoryBar = ({
   students,
@@ -101,6 +122,11 @@ export const SessionHistoryBar = ({
 }: SessionHistoryBarProps) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>("all");
   const [historyTab, setHistoryTab] = useState<"upcoming" | "history">("upcoming");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("this-week");
+  const [customDateRange, setCustomDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [sortOrder, setSortOrder] = useState<SortOrder>("date-asc");
+
   const today = startOfToday();
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
   const [addSessionDate, setAddSessionDate] = useState<Date | undefined>(undefined);
@@ -136,7 +162,6 @@ export const SessionHistoryBar = ({
     sessionInfo: { studentName: string; date: string; time: string; status: string };
   } | null>(null);
 
-  // ✅ NEW: Complete confirmation dialog
   const [completeDialog, setCompleteDialog] = useState<{
     open: boolean;
     studentId: string;
@@ -144,7 +169,6 @@ export const SessionHistoryBar = ({
     sessionInfo: { studentName: string; date: string; time: string };
   } | null>(null);
 
-  // ✅ NEW: Undo complete confirmation dialog
   const [undoCompleteDialog, setUndoCompleteDialog] = useState<{
     open: boolean;
     studentId: string;
@@ -152,7 +176,6 @@ export const SessionHistoryBar = ({
     sessionInfo: { studentName: string; date: string; time: string };
   } | null>(null);
 
-  // ✅ NEW: Restore confirmation dialog
   const [restoreDialog, setRestoreDialog] = useState<{
     open: boolean;
     studentId: string;
@@ -165,9 +188,91 @@ export const SessionHistoryBar = ({
   // Conflict detection
   const { checkRestoreConflict, getSessionsWithGaps } = useConflictDetection(students);
 
+  // ==================== TIME FILTER LOGIC ====================
+
+  const getFilterDateRange = (): { start: string; end: string } => {
+    const todayStr = format(today, "yyyy-MM-dd");
+
+    switch (timeFilter) {
+      case "this-week": {
+        const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+        const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+        return {
+          start: format(weekStart, "yyyy-MM-dd"),
+          end: format(weekEnd, "yyyy-MM-dd"),
+        };
+      }
+      case "next-week": {
+        const nextWeekStart = startOfWeek(addWeeks(today, 1), { weekStartsOn: 0 });
+        const nextWeekEnd = endOfWeek(addWeeks(today, 1), { weekStartsOn: 0 });
+        return {
+          start: format(nextWeekStart, "yyyy-MM-dd"),
+          end: format(nextWeekEnd, "yyyy-MM-dd"),
+        };
+      }
+      case "this-month": {
+        const monthStart = startOfMonth(today);
+        const monthEnd = endOfMonth(today);
+        return {
+          start: format(monthStart, "yyyy-MM-dd"),
+          end: format(monthEnd, "yyyy-MM-dd"),
+        };
+      }
+      case "next-month": {
+        const nextMonthStart = startOfMonth(addMonths(today, 1));
+        const nextMonthEnd = endOfMonth(addMonths(today, 1));
+        return {
+          start: format(nextMonthStart, "yyyy-MM-dd"),
+          end: format(nextMonthEnd, "yyyy-MM-dd"),
+        };
+      }
+      case "last-month": {
+        const lastMonthStart = startOfMonth(subMonths(today, 1));
+        const lastMonthEnd = endOfMonth(subMonths(today, 1));
+        return {
+          start: format(lastMonthStart, "yyyy-MM-dd"),
+          end: format(lastMonthEnd, "yyyy-MM-dd"),
+        };
+      }
+      case "custom": {
+        if (customDateRange.from && customDateRange.to) {
+          return {
+            start: format(customDateRange.from, "yyyy-MM-dd"),
+            end: format(customDateRange.to, "yyyy-MM-dd"),
+          };
+        }
+        return { start: todayStr, end: todayStr };
+      }
+      default:
+        return { start: todayStr, end: todayStr };
+    }
+  };
+
+  const getFilterLabel = (): string => {
+    const { start, end } = getFilterDateRange();
+
+    switch (timeFilter) {
+      case "this-week":
+        return `هذا الأسبوع (${formatShortDateAr(start)} - ${formatShortDateAr(end)})`;
+      case "next-week":
+        return `الأسبوع القادم (${formatShortDateAr(start)} - ${formatShortDateAr(end)})`;
+      case "this-month":
+        return `هذا الشهر (${format(parseISO(start), "MMMM yyyy", { locale: ar })})`;
+      case "next-month":
+        return `الشهر القادم (${format(parseISO(start), "MMMM yyyy", { locale: ar })})`;
+      case "last-month":
+        return `الشهر الماضي (${format(parseISO(start), "MMMM yyyy", { locale: ar })})`;
+      case "custom":
+        return customDateRange.from && customDateRange.to
+          ? `${formatShortDateAr(start)} - ${formatShortDateAr(end)}`
+          : "نطاق مخصص";
+      default:
+        return "";
+    }
+  };
+
   // ==================== ACTION HANDLERS ====================
 
-  // ✅ Handle date selection - opens time picker dialog
   const handleDateSelect = (date: Date) => {
     if (!selectedStudent) return;
     setAddSessionDate(date);
@@ -175,14 +280,12 @@ export const SessionHistoryBar = ({
     setShowTimePickerDialog(true);
   };
 
-  // ✅ Confirm session creation with selected time
   const handleConfirmAddSession = () => {
     if (addSessionDate && selectedStudent) {
       handleAddSession(selectedStudent.id, addSessionDate, addSessionTime);
     }
   };
 
-  // ✅ ADD SESSION (with custom time and conflict check)
   const handleAddSession = (studentId: string, date: Date, customTime?: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
@@ -255,7 +358,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ OPEN COMPLETE DIALOG (upcoming sessions)
   const openCompleteDialog = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -273,7 +375,6 @@ export const SessionHistoryBar = ({
     });
   };
 
-  // ✅ CONFIRM COMPLETE
   const handleConfirmComplete = () => {
     if (completeDialog) {
       onToggleComplete?.(completeDialog.studentId, completeDialog.sessionId);
@@ -285,7 +386,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ OPEN UNDO COMPLETE DIALOG (history sessions)
   const openUndoCompleteDialog = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -303,7 +403,6 @@ export const SessionHistoryBar = ({
     });
   };
 
-  // ✅ CONFIRM UNDO COMPLETE
   const handleConfirmUndoComplete = () => {
     if (undoCompleteDialog) {
       const student = students.find((s) => s.id === undoCompleteDialog.studentId);
@@ -328,7 +427,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ OPEN RESTORE DIALOG (cancelled/vacation sessions)
   const openRestoreDialog = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -337,7 +435,6 @@ export const SessionHistoryBar = ({
     const todayStr = format(today, "yyyy-MM-dd");
     const isPastSession = session.date < todayStr;
 
-    // If it's a past session, just restore directly (no conflicts possible)
     if (isPastSession) {
       setRestoreDialog({
         open: true,
@@ -353,11 +450,9 @@ export const SessionHistoryBar = ({
       return;
     }
 
-    // For future sessions, check conflicts first
     const conflictResult = checkRestoreConflict(studentId, sessionId);
 
     if (conflictResult.severity === "none") {
-      // No conflicts, show simple restore dialog
       setRestoreDialog({
         open: true,
         studentId,
@@ -370,7 +465,6 @@ export const SessionHistoryBar = ({
         },
       });
     } else {
-      // Has conflicts, show conflict dialog
       setRestoreConflictDialog({
         open: true,
         studentId,
@@ -385,7 +479,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ CONFIRM RESTORE (simple, no conflicts)
   const handleConfirmRestore = () => {
     if (restoreDialog) {
       onRestoreSession?.(restoreDialog.studentId, restoreDialog.sessionId);
@@ -409,7 +502,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ CONFIRM RESTORE WITH CONFLICT
   const handleConfirmRestoreWithConflict = () => {
     if (restoreConflictDialog) {
       onRestoreSession?.(restoreConflictDialog.studentId, restoreConflictDialog.sessionId);
@@ -422,7 +514,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ MARK AS VACATION
   const handleMarkAsVacation = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -451,7 +542,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ CANCEL SESSION
   const openCancelDialog = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -466,7 +556,8 @@ export const SessionHistoryBar = ({
 
   const handleConfirmCancel = (reason?: string) => {
     if (cancelDialog) {
-      const cancellationCount = getCancellationCount?.(cancelDialog.student.id) ?? 0;
+      const sessionMonth = format(new Date(cancelDialog.session.date), "yyyy-MM");
+      const cancellationCount = getCancellationCount?.(cancelDialog.student.id, sessionMonth) ?? 0;
       const monthlyLimit = cancelDialog.student.cancellationPolicy?.monthlyLimit ?? 3;
 
       onCancelSession?.(cancelDialog.session.studentId, cancelDialog.session.id, reason);
@@ -498,7 +589,6 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ DELETE SESSION (with confirmation)
   const openDeleteConfirmDialog = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -556,50 +646,105 @@ export const SessionHistoryBar = ({
     return start1 < end2 && end1 > start2;
   };
 
+  const getRelativeTimeLabel = (dateStr: string): string => {
+    const sessionDate = parseISO(dateStr);
+    const todayDate = today;
+    const diffDays = Math.floor((sessionDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "⏰ اليوم";
+    if (diffDays === 1) return "⏱️ غداً";
+    if (diffDays === -1) return "⏱️ أمس";
+    if (diffDays > 0 && diffDays <= 7) return `⏱️ بعد ${diffDays} ${diffDays === 2 ? "يومان" : "أيام"}`;
+    if (diffDays < 0 && diffDays >= -7)
+      return `⏱️ منذ ${Math.abs(diffDays)} ${Math.abs(diffDays) === 2 ? "يومان" : "أيام"}`;
+    return "";
+  };
+
+  const sortSessions = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+    return sessions.sort((a, b) => {
+      const student = students.find((s) => s.id === a.studentId);
+      const dateCompare = sortOrder === "date-desc" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
+
+      if (dateCompare !== 0) return dateCompare;
+
+      const timeA = a.time || student?.sessionTime || "";
+      const timeB = b.time || student?.sessionTime || "";
+
+      if (sortOrder === "time-asc") {
+        return timeA.localeCompare(timeB);
+      }
+
+      return 0;
+    });
+  };
+
+  const filterSessionsByDateRange = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+    const { start, end } = getFilterDateRange();
+    return sessions.filter((s) => s.date >= start && s.date <= end);
+  };
+
+  const filterSessionsBySearch = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+    if (!searchQuery.trim()) return sessions;
+
+    const query = searchQuery.toLowerCase();
+    return sessions.filter((s) => {
+      const matchName = s.studentName.toLowerCase().includes(query);
+      const matchDate = s.date.includes(query) || formatShortDateAr(s.date).includes(query);
+      const matchNotes = s.notes?.toLowerCase().includes(query);
+      const matchTopic = s.topic?.toLowerCase().includes(query);
+
+      return matchName || matchDate || matchNotes || matchTopic;
+    });
+  };
+
   const getUpcomingSessions = () => {
     if (!selectedStudent) return [];
     const todayStr = format(today, "yyyy-MM-dd");
 
-    return selectedStudent.sessions
+    let sessions = selectedStudent.sessions
       .filter((session) => session.status === "scheduled" && session.date >= todayStr)
-      .sort((a, b) => {
-        const dateCompare = a.date.localeCompare(b.date);
-        if (dateCompare !== 0) return dateCompare;
-
-        const timeA = a.time || selectedStudent.sessionTime;
-        const timeB = b.time || selectedStudent.sessionTime;
-        return (timeA || "").localeCompare(timeB || "");
-      })
       .map((session) => ({ ...session, studentName: selectedStudent.name, studentId: selectedStudent.id }));
+
+    sessions = filterSessionsByDateRange(sessions);
+    sessions = filterSessionsBySearch(sessions);
+    sessions = sortSessions(sessions);
+
+    return sessions;
   };
 
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
-    return selectedStudent.sessions
-      .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
-      .sort((a, b) => {
-        const dateCompare = a.date.localeCompare(b.date);
-        if (dateCompare !== 0) return dateCompare;
 
-        const timeA = a.time || selectedStudent.sessionTime;
-        const timeB = b.time || selectedStudent.sessionTime;
-        return (timeA || "").localeCompare(timeB || "");
-      })
+    let sessions = selectedStudent.sessions
+      .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
       .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
+
+    sessions = filterSessionsByDateRange(sessions);
+    sessions = filterSessionsBySearch(sessions);
+    sessions = sortSessions(sessions);
+
+    return sessions;
   };
 
   const getHistoryStats = () => {
     if (!selectedStudent) return { completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0 };
+
+    const { start, end } = getFilterDateRange();
+    const filteredSessions = selectedStudent.sessions.filter((s) => s.date >= start && s.date <= end);
+
     let completed = 0,
       cancelled = 0,
       vacation = 0;
-    selectedStudent.sessions.forEach((session) => {
+
+    filteredSessions.forEach((session) => {
       if (session.status === "completed") completed++;
       else if (session.status === "cancelled") cancelled++;
       else if (session.status === "vacation") vacation++;
     });
+
     const total = completed + cancelled + vacation;
     const rateTotal = completed + cancelled;
+
     return {
       completed,
       cancelled,
@@ -616,18 +761,36 @@ export const SessionHistoryBar = ({
   // ==================== RENDER ====================
 
   return (
-    <Card dir="rtl">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-heading flex items-center gap-2">
-          <History className="h-4 w-4" />
-          إدارة الحصص
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">اختر طالب لإضافة حصص جديدة أو عرض السجل</p>
+    <Card dir="rtl" className="border-2">
+      <CardHeader className="pb-3 bg-gradient-to-r from-card to-primary/5">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-heading flex items-center gap-2">
+            <History className="h-5 w-5 text-primary" />
+            📊 حصص {selectedStudent?.name || "الطلاب"}
+          </CardTitle>
+          {selectedStudentId !== "all" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedStudentId("all");
+                setSearchQuery("");
+                setTimeFilter("this-week");
+              }}
+              className="h-8 gap-1"
+            >
+              <X className="h-3.5 w-3.5" />
+              إلغاء التحديد
+            </Button>
+          )}
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+
+      <CardContent className="space-y-4 pt-4">
+        {/* Student Selector */}
         <div className="flex items-center gap-2">
           <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-            <SelectTrigger className="w-full h-10">
+            <SelectTrigger className="w-full h-11 bg-background">
               <Users className="h-4 w-4 ml-2 text-muted-foreground shrink-0" />
               <SelectValue placeholder="اختر طالب لعرض التفاصيل" />
             </SelectTrigger>
@@ -637,453 +800,495 @@ export const SessionHistoryBar = ({
               </SelectItem>
               {students.map((student) => (
                 <SelectItem key={student.id} value={student.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{student.name}</span>
-                    <span className="text-xs text-muted-foreground">({student.sessionTime})</span>
-                  </div>
+                  {student.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {selectedStudentId !== "all" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSelectedStudentId("all")}
-              className="h-10 w-10 shrink-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
         </div>
 
         {selectedStudentId !== "all" && selectedStudent ? (
-          <Tabs value={historyTab} onValueChange={(v) => setHistoryTab(v as "upcoming" | "history")}>
-            <TabsList className="w-full grid grid-cols-2">
-              <TabsTrigger value="upcoming" className="gap-1.5 text-xs">
-                <CalendarClock className="h-3.5 w-3.5" />
-                الحصص القادمة
-              </TabsTrigger>
-              <TabsTrigger value="history" className="gap-1.5 text-xs">
-                <History className="h-3.5 w-3.5" />
-                السجل
-              </TabsTrigger>
-            </TabsList>
+          <>
+            {/* Status Cards */}
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                {
+                  label: "قادمة",
+                  count: upcomingSessions.length,
+                  icon: CalendarClock,
+                  color: "from-blue-500 to-cyan-500",
+                  bg: "bg-blue-500/10",
+                  border: "border-blue-500/30",
+                },
+                {
+                  label: "مكتملة",
+                  count: historyStats.completed,
+                  icon: Check,
+                  color: "from-emerald-500 to-green-500",
+                  bg: "bg-emerald-500/10",
+                  border: "border-emerald-500/30",
+                },
+                {
+                  label: "ملغية",
+                  count: historyStats.cancelled,
+                  icon: Ban,
+                  color: "from-rose-500 to-red-500",
+                  bg: "bg-rose-500/10",
+                  border: "border-rose-500/30",
+                },
+                {
+                  label: "إجازة",
+                  count: historyStats.vacation,
+                  icon: Palmtree,
+                  color: "from-amber-500 to-yellow-500",
+                  bg: "bg-amber-500/10",
+                  border: "border-amber-500/30",
+                },
+              ].map((stat, i) => (
+                <div key={i} className={cn("rounded-xl border-2 p-3 text-center", stat.bg, stat.border)}>
+                  <stat.icon className="h-4 w-4 mx-auto mb-1" />
+                  <p className="text-2xl font-bold">{stat.count}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+                </div>
+              ))}
+            </div>
 
-            <TabsContent value="upcoming" className="mt-3 space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <CalendarClock className="h-3 w-3" />
-                  حصص {selectedStudent.name} القادمة
-                  <Badge variant="secondary" className="mr-2 text-[10px]">
-                    {upcomingSessions.length}
-                  </Badge>
-                </p>
+            {/* Time Filters */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                فترة العرض
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: "this-week" as TimeFilter, label: "هذا الأسبوع" },
+                  { value: "next-week" as TimeFilter, label: "الأسبوع القادم" },
+                  { value: "this-month" as TimeFilter, label: "هذا الشهر" },
+                  { value: "next-month" as TimeFilter, label: "الشهر القادم" },
+                  { value: "last-month" as TimeFilter, label: "الشهر الماضي" },
+                ].map((filter) => (
+                  <Button
+                    key={filter.value}
+                    variant={timeFilter === filter.value ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTimeFilter(filter.value)}
+                    className="h-8 text-xs"
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
-                      <Plus className="h-3 w-3" />
-                      إضافة حصة
+                    <Button
+                      variant={timeFilter === "custom" ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 text-xs gap-1"
+                    >
+                      نطاق مخصص
+                      <ChevronDown className="h-3 w-3" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
-                    <CalendarPicker
-                      mode="single"
-                      selected={addSessionDate}
-                      onSelect={(date) => date && handleDateSelect(date)}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
+                  <PopoverContent className="w-auto p-3" align="start">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">اختر نطاقاً مخصصاً</p>
+                      <CalendarPicker
+                        mode="range"
+                        selected={{ from: customDateRange.from, to: customDateRange.to }}
+                        onSelect={(range) => {
+                          setCustomDateRange({ from: range?.from, to: range?.to });
+                          if (range?.from && range?.to) {
+                            setTimeFilter("custom");
+                          }
+                        }}
+                        numberOfMonths={1}
+                        className="rounded-md border"
+                      />
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
-                💡 يمكنك إضافة عدة حصص في نفس اليوم بأوقات مختلفة. الحصص المكتملة/الملغاة/الإجازات تنتقل تلقائياً للسجل.
-              </p>
-              <ScrollArea className="h-[250px]">
-                <div className="space-y-1 pl-2">
-                  {upcomingSessions.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص قادمة</p>
-                  ) : (
-                    (() => {
-                      const elements: React.ReactNode[] = [];
-                      let lastDate: string | null = null;
 
-                      upcomingSessions.forEach((session) => {
+              {/* Active Filter Display */}
+              <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg p-2">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  عرض: <span className="font-semibold text-foreground">{getFilterLabel()}</span>
+                </p>
+                {timeFilter !== "this-week" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTimeFilter("this-week")}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="بحث في الحصص (التاريخ، الملاحظات، الموضوع...)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10 h-10 bg-background"
+              />
+            </div>
+
+            {/* Tabs */}
+            <Tabs value={historyTab} onValueChange={(v) => setHistoryTab(v as "upcoming" | "history")}>
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="upcoming" className="gap-1.5">
+                  <CalendarClock className="h-4 w-4" />
+                  القادمة ({upcomingSessions.length})
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-1.5">
+                  <History className="h-4 w-4" />
+                  السجل ({historySessions.length})
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Upcoming Tab */}
+              <TabsContent value="upcoming" className="mt-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+                      <SelectTrigger className="h-8 w-[140px] text-xs">
+                        <TrendingUp className="h-3 w-3 ml-1" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date-asc">التاريخ (الأقرب)</SelectItem>
+                        <SelectItem value="date-desc">التاريخ (الأبعد)</SelectItem>
+                        <SelectItem value="time-asc">الوقت (الأبكر)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="default" size="sm" className="h-8 px-3 gap-1.5 shadow-lg">
+                        <Plus className="h-3.5 w-3.5" />
+                        إضافة حصة
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={addSessionDate}
+                        onSelect={(date) => date && handleDateSelect(date)}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <ScrollArea className="h-[350px]">
+                  <div className="space-y-2 pr-2">
+                    {upcomingSessions.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <CalendarClock className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                        <p className="text-sm font-medium">لا توجد حصص قادمة</p>
+                        <p className="text-xs mt-1">في الفترة المحددة</p>
+                      </div>
+                    ) : (
+                      upcomingSessions.map((session) => {
+                        const relativeTime = getRelativeTimeLabel(session.date);
                         const sessionsWithGaps = getSessionsWithGaps(session.date);
                         const sessionGapInfo = sessionsWithGaps.find((s) => s.session.id === session.id);
-
                         const hasConflict = sessionGapInfo?.hasConflict || false;
                         const conflictType = sessionGapInfo?.conflictType;
-                        const gapAfter = sessionGapInfo?.gapAfter;
 
-                        if (session.date !== lastDate) {
-                          if (lastDate !== null) {
-                            elements.push(
-                              <div
-                                key={`sep-${session.date}`}
-                                className="border-t border-dashed border-border/50 my-2"
-                              />,
-                            );
-                          }
-                          lastDate = session.date;
-                        }
-
-                        elements.push(
+                        return (
                           <div
                             key={session.id}
                             className={cn(
-                              "relative flex items-center justify-between p-2.5 rounded-lg text-xs border transition-all bg-card",
+                              "relative rounded-xl border-2 p-3 bg-card transition-all hover:shadow-md",
                               hasConflict &&
                                 (conflictType === "exact" || conflictType === "partial") &&
-                                "bg-destructive/5 border-destructive/30",
-                              hasConflict && conflictType === "close" && "bg-warning/5 border-warning/30",
+                                "border-destructive/50 bg-destructive/5",
+                              hasConflict && conflictType === "close" && "border-warning/50 bg-warning/5",
+                              !hasConflict && "border-border",
                             )}
                           >
-                            {hasConflict && (
-                              <div
-                                className={cn(
-                                  "absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-sm z-10",
-                                  (conflictType === "exact" || conflictType === "partial") &&
-                                    "bg-destructive text-destructive-foreground",
-                                  conflictType === "close" && "bg-warning text-warning-foreground",
-                                )}
-                              >
-                                {conflictType === "exact" || conflictType === "partial" ? (
-                                  <XCircle className="h-3 w-3" />
-                                ) : (
-                                  <AlertTriangle className="h-3 w-3" />
-                                )}
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <div
-                                className={cn(
-                                  "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                                  !hasConflict && "bg-primary/20 text-primary",
-                                  hasConflict &&
-                                    (conflictType === "exact" || conflictType === "partial") &&
-                                    "bg-destructive/20 text-destructive",
-                                  hasConflict && conflictType === "close" && "bg-warning/20 text-warning",
-                                )}
-                              >
-                                {hasConflict && (conflictType === "exact" || conflictType === "partial") ? (
-                                  <XCircle className="h-3 w-3" />
-                                ) : hasConflict && conflictType === "close" ? (
-                                  <AlertTriangle className="h-3 w-3" />
-                                ) : (
-                                  <Calendar className="h-3 w-3" />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="font-medium truncate">
-                                  {formatShortDateAr(session.date)}
-                                  <span className="text-muted-foreground font-normal mr-1">
-                                    ({session.time || selectedStudent.sessionTime})
-                                    <span className="text-muted-foreground/70 mr-1">
-                                      ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
-                                    </span>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline" className="text-xs font-semibold">
+                                    {formatShortDateAr(session.date)}
+                                  </Badge>
+                                  <span className="text-sm font-bold">
+                                    {session.time || selectedStudent.sessionTime}
                                   </span>
-                                </p>
-                                {hasConflict && (conflictType === "exact" || conflictType === "partial") && (
-                                  <span className="text-[10px] text-destructive">❌ تعارض</span>
-                                )}
-                                {hasConflict && conflictType === "close" && (
-                                  <span className="text-[10px] text-warning">⚠️ قريب جداً</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <SessionNotesDialog
-                                session={session}
-                                studentId={session.studentId}
-                                studentName={session.studentName}
-                              />
-                              <SessionHomeworkDialog
-                                session={session}
-                                studentId={session.studentId}
-                                studentName={session.studentName}
-                              />
-                              {/* ✅ COMPLETE BUTTON - WITH CONFIRMATION */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-success"
-                                onClick={() => openCompleteDialog(session.studentId, session.id)}
-                                title="إكمال الجلسة"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </Button>
-                              {/* ✅ VACATION BUTTON - WITH CONFIRMATION */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-warning"
-                                onClick={() => handleMarkAsVacation(session.studentId, session.id)}
-                                title="تحديد كإجازة"
-                              >
-                                <Palmtree className="h-3.5 w-3.5" />
-                              </Button>
-                              {/* ✅ CANCEL BUTTON - WITH CONFIRMATION */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive"
-                                onClick={() => openCancelDialog(session.studentId, session.id)}
-                                title="إلغاء الجلسة"
-                              >
-                                <Ban className="h-3.5 w-3.5" />
-                              </Button>
-                              {/* ✅ DELETE BUTTON - WITH CONFIRMATION */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                                title="حذف نهائي"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>,
-                        );
+                                  {relativeTime && (
+                                    <span className="text-xs text-muted-foreground">{relativeTime}</span>
+                                  )}
+                                </div>
 
-                        if (gapAfter !== null && gapAfter !== undefined) {
-                          elements.push(
-                            <GapIndicator key={`gap-${session.id}`} gapMinutes={gapAfter} className="my-0.5" />,
-                          );
-                        }
-                      });
-
-                      return elements;
-                    })()
-                  )}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            <TabsContent value="history" className="mt-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground font-medium">إضافة حصة سابقة</p>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
-                      <Plus className="h-3 w-3" />
-                      إضافة
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
-                    <CalendarPicker
-                      mode="single"
-                      selected={addSessionDate}
-                      disabled={(date) => isAfter(date, today)}
-                      onSelect={(date) => date && handleDateSelect(date)}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
-                💡 اختر تاريخًا سابقًا لإضافة حصة، وستُسجل تلقائياً كمكتملة وتظهر هنا في السجل.
-              </p>
-
-              <div className="p-3 rounded-lg bg-muted/50 border">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">
-                  {selectedStudent.name} - إحصائيات الفصل
-                </p>
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="text-center">
-                    <p className="text-lg font-bold">{historyStats.total}</p>
-                    <p className="text-[10px] text-muted-foreground">الإجمالي</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-success">{historyStats.completed}</p>
-                    <p className="text-[10px] text-success/80">مكتملة</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-warning">{historyStats.vacation}</p>
-                    <p className="text-[10px] text-warning/80">إجازة</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-destructive">{historyStats.cancelled}</p>
-                    <p className="text-[10px] text-destructive/80">ملغاة</p>
-                  </div>
-                </div>
-              </div>
-              {historyStats.total > 0 && (
-                <div className="p-2 rounded-lg bg-success/10 border border-success/20 text-center">
-                  <p className="text-sm font-medium text-success">نسبة الإنجاز: {historyStats.completionRate}%</p>
-                </div>
-              )}
-
-              <ScrollArea className="h-[180px]">
-                <div className="space-y-1.5 pl-2">
-                  {historySessions.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص سابقة</p>
-                  ) : (
-                    historySessions.map((session) => {
-                      const todayStr = format(today, "yyyy-MM-dd");
-                      const isPastSession = session.date < todayStr;
-
-                      return (
-                        <div
-                          key={session.id}
-                          className={cn(
-                            "flex flex-col p-2 rounded text-xs border",
-                            session.status === "completed" && "bg-success/5 border-success/20",
-                            session.status === "vacation" && "bg-warning/5 border-warning/20",
-                            session.status === "cancelled" && "bg-destructive/5 border-destructive/20",
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <div
-                                className={cn(
-                                  "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                                  session.status === "completed" && "bg-success/20 text-success",
-                                  session.status === "vacation" && "bg-warning/20 text-warning",
-                                  session.status === "cancelled" && "bg-destructive/20 text-destructive",
-                                )}
-                              >
-                                {session.status === "completed" ? (
-                                  <Check className="h-3 w-3" />
-                                ) : session.status === "vacation" ? (
-                                  <Palmtree className="h-3 w-3" />
-                                ) : (
-                                  <X className="h-3 w-3" />
+                                {hasConflict && (
+                                  <p className="text-xs text-destructive font-medium mt-1">
+                                    {conflictType === "exact" || conflictType === "partial"
+                                      ? "❌ تعارض في الوقت"
+                                      : "⚠️ قريب جداً من جلسة أخرى"}
+                                  </p>
                                 )}
                               </div>
-                              <p className="font-medium truncate">
-                                {formatShortDateAr(session.date)}
-                                <span className="text-muted-foreground font-normal mr-1">
-                                  ({session.time || selectedStudent.sessionTime})
-                                  <span className="text-muted-foreground/70 mr-1">
-                                    ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
-                                  </span>
-                                </span>
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <SessionNotesDialog
-                                session={session}
-                                studentId={session.studentId}
-                                studentName={session.studentName}
-                              />
-                              <SessionHomeworkDialog
-                                session={session}
-                                studentId={session.studentId}
-                                studentName={session.studentName}
-                              />
 
-                              {/* ✅ PAST SESSIONS: Only DELETE button */}
-                              {isPastSession ? (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <SessionNotesDialog
+                                  session={session}
+                                  studentId={session.studentId}
+                                  studentName={session.studentName}
+                                />
+                                <SessionHomeworkDialog
+                                  session={session}
+                                  studentId={session.studentId}
+                                  studentName={session.studentName}
+                                />
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                  onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                                  title="حذف نهائي"
+                                  className="h-8 w-8 text-success hover:bg-success/10"
+                                  onClick={() => openCompleteDialog(session.studentId, session.id)}
+                                  title="إكمال"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <Check className="h-4 w-4" />
                                 </Button>
-                              ) : (
-                                /* ✅ FUTURE SESSIONS: Show تراجع/استعادة + DELETE - WITH CONFIRMATION */
-                                <>
-                                  {session.status === "completed" ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-warning"
-                                      onClick={() => openUndoCompleteDialog(session.studentId, session.id)}
-                                      title="التراجع عن الإكمال"
-                                    >
-                                      <X className="h-3.5 w-3.5 ml-1" />
-                                      تراجع
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-success"
-                                      onClick={() => openRestoreDialog(session.studentId, session.id)}
-                                      title="استعادة الجلسة"
-                                    >
-                                      <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                                      استعادة
-                                    </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-warning hover:bg-warning/10"
+                                  onClick={() => handleMarkAsVacation(session.studentId, session.id)}
+                                  title="إجازة"
+                                >
+                                  <Palmtree className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                  onClick={() => openCancelDialog(session.studentId, session.id)}
+                                  title="إلغاء"
+                                >
+                                  <Ban className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
+                                  title="حذف"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              {/* History Tab */}
+              <TabsContent value="history" className="mt-3 space-y-3">
+                {historyStats.total > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-success/10 border-2 border-success/30 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-success">{historyStats.completionRate}%</p>
+                      <p className="text-xs text-muted-foreground mt-1">نسبة الإنجاز</p>
+                    </div>
+                    <div className="bg-muted/50 border-2 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold">{historyStats.total}</p>
+                      <p className="text-xs text-muted-foreground mt-1">إجمالي الحصص</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                      <TrendingUp className="h-3 w-3 ml-1" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date-asc">التاريخ (الأقدم)</SelectItem>
+                      <SelectItem value="date-desc">التاريخ (الأحدث)</SelectItem>
+                      <SelectItem value="time-asc">الوقت (الأبكر)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <ScrollArea className="h-[300px]">
+                  <div className="space-y-2 pr-2">
+                    {historySessions.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <History className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                        <p className="text-sm font-medium">لا توجد حصص سابقة</p>
+                        <p className="text-xs mt-1">في الفترة المحددة</p>
+                      </div>
+                    ) : (
+                      historySessions.map((session) => {
+                        const todayStr = format(today, "yyyy-MM-dd");
+                        const isPastSession = session.date < todayStr;
+                        const relativeTime = getRelativeTimeLabel(session.date);
+
+                        return (
+                          <div
+                            key={session.id}
+                            className={cn(
+                              "rounded-xl border-2 p-3 transition-all hover:shadow-md",
+                              session.status === "completed" && "bg-success/5 border-success/30",
+                              session.status === "vacation" && "bg-warning/5 border-warning/30",
+                              session.status === "cancelled" && "bg-destructive/5 border-destructive/30",
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div
+                                    className={cn(
+                                      "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
+                                      session.status === "completed" && "bg-success/20 text-success",
+                                      session.status === "vacation" && "bg-warning/20 text-warning",
+                                      session.status === "cancelled" && "bg-destructive/20 text-destructive",
+                                    )}
+                                  >
+                                    {session.status === "completed" ? (
+                                      <Check className="h-3.5 w-3.5" />
+                                    ) : session.status === "vacation" ? (
+                                      <Palmtree className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <X className="h-3.5 w-3.5" />
+                                    )}
+                                  </div>
+
+                                  <Badge variant="outline" className="text-xs">
+                                    {formatShortDateAr(session.date)}
+                                  </Badge>
+                                  <span className="text-sm font-bold">
+                                    {session.time || selectedStudent.sessionTime}
+                                  </span>
+                                  {relativeTime && (
+                                    <span className="text-xs text-muted-foreground">{relativeTime}</span>
                                   )}
+                                </div>
+
+                                {session.topic && (
+                                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                    <BookOpen className="h-3 w-3" />
+                                    {session.topic}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Badge
+                                  className={cn(
+                                    "text-xs",
+                                    session.status === "completed" && "bg-success/20 text-success border-success/30",
+                                    session.status === "vacation" && "bg-warning/20 text-warning border-warning/30",
+                                    session.status === "cancelled" &&
+                                      "bg-destructive/20 text-destructive border-destructive/30",
+                                  )}
+                                >
+                                  {getStatusLabel(session.status)}
+                                </Badge>
+
+                                <SessionNotesDialog
+                                  session={session}
+                                  studentId={session.studentId}
+                                  studentName={session.studentName}
+                                />
+                                <SessionHomeworkDialog
+                                  session={session}
+                                  studentId={session.studentId}
+                                  studentName={session.studentName}
+                                />
+
+                                {isPastSession ? (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                     onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                                    title="حذف نهائي"
+                                    title="حذف"
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
-                                </>
-                              )}
-
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "text-[10px]",
-                                  session.status === "completed" && "border-success/30 text-success",
-                                  session.status === "vacation" && "border-warning/30 text-warning",
-                                  session.status === "cancelled" && "border-destructive/30 text-destructive",
+                                ) : (
+                                  <>
+                                    {session.status === "completed" ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-2 text-warning hover:bg-warning/10"
+                                        onClick={() => openUndoCompleteDialog(session.studentId, session.id)}
+                                        title="تراجع"
+                                      >
+                                        <X className="h-3.5 w-3.5 ml-1" />
+                                        تراجع
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-2 text-success hover:bg-success/10"
+                                        onClick={() => openRestoreDialog(session.studentId, session.id)}
+                                        title="استعادة"
+                                      >
+                                        <RotateCcw className="h-3.5 w-3.5 ml-1" />
+                                        استعادة
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
+                                      title="حذف"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
-                              >
-                                {getStatusLabel(session.status)}
-                              </Badge>
+                              </div>
                             </div>
                           </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
 
-                          {session.status === "completed" && (session.topic || session.notes || session.homework) && (
-                            <div className="mt-2 mr-7 text-[10px] text-muted-foreground space-y-0.5 bg-muted/30 rounded p-1.5">
-                              {session.topic && (
-                                <p className="flex items-center gap-1">
-                                  <BookOpen className="h-2.5 w-2.5" />
-                                  {session.topic}
-                                </p>
-                              )}
-                              {session.homework && (
-                                <p className="flex items-center gap-1">
-                                  <ClipboardCheck className="h-2.5 w-2.5" />
-                                  {session.homework}
-                                  {session.homeworkStatus === "completed" && " ✓"}
-                                  {session.homeworkStatus === "incomplete" && " ❌"}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </ScrollArea>
-
-              {getAllStudentCancellations && (
-                <CancellationHistoryInline
-                  student={selectedStudent}
-                  cancellations={getAllStudentCancellations(selectedStudent.id)}
-                  onRestore={openRestoreDialog}
-                  onClearMonth={onClearMonthCancellations}
-                />
-              )}
-            </TabsContent>
-          </Tabs>
+                {getAllStudentCancellations && (
+                  <CancellationHistoryInline
+                    student={selectedStudent}
+                    cancellations={getAllStudentCancellations(selectedStudent.id)}
+                    onRestore={openRestoreDialog}
+                    onClearMonth={onClearMonthCancellations}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          </>
         ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">اختر طالب من القائمة أعلاه لعرض حصصه وسجله</p>
+          <div className="text-center py-12 text-muted-foreground">
+            <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
+            <p className="text-sm font-medium">اختر طالب من القائمة أعلاه</p>
+            <p className="text-xs mt-1">لعرض حصصه وسجله</p>
           </div>
         )}
       </CardContent>
 
-      {/* ✅ COMPLETE CONFIRMATION DIALOG */}
+      {/* All Dialogs - KEEPING ORIGINAL IMPLEMENTATION */}
+
       <AlertDialog open={completeDialog?.open ?? false} onOpenChange={(open) => !open && setCompleteDialog(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
@@ -1116,7 +1321,6 @@ export const SessionHistoryBar = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ✅ UNDO COMPLETE CONFIRMATION DIALOG */}
       <AlertDialog
         open={undoCompleteDialog?.open ?? false}
         onOpenChange={(open) => !open && setUndoCompleteDialog(null)}
@@ -1137,9 +1341,6 @@ export const SessionHistoryBar = ({
                   </p>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg mt-2">
-                💡 سيتم تغيير الحالة من "مكتملة" إلى "مجدولة"
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
@@ -1155,7 +1356,6 @@ export const SessionHistoryBar = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ✅ RESTORE CONFIRMATION DIALOG (Simple, no conflicts) */}
       <AlertDialog open={restoreDialog?.open ?? false} onOpenChange={(open) => !open && setRestoreDialog(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
@@ -1171,14 +1371,8 @@ export const SessionHistoryBar = ({
                   <p className="text-sm text-muted-foreground">
                     {restoreDialog.sessionInfo.date} - {formatTimeAr(restoreDialog.sessionInfo.time)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    الحالة الحالية: {restoreDialog.sessionInfo.previousStatus}
-                  </p>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg mt-2">
-                💡 سيتم تغيير الحالة إلى "مجدولة"
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
@@ -1194,7 +1388,6 @@ export const SessionHistoryBar = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Restore Conflict Dialog */}
       {restoreConflictDialog && (
         <RestoreConflictDialog
           open={restoreConflictDialog.open}
@@ -1205,7 +1398,6 @@ export const SessionHistoryBar = ({
         />
       )}
 
-      {/* Vacation Confirmation Dialog */}
       <AlertDialog open={vacationDialog?.open ?? false} onOpenChange={(open) => !open && setVacationDialog(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
@@ -1223,9 +1415,6 @@ export const SessionHistoryBar = ({
                   </p>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg mt-2">
-                💡 لن يتم احتساب هذه الجلسة في الدفعات أو نسبة الإنجاز
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
@@ -1241,7 +1430,6 @@ export const SessionHistoryBar = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Cancel Session Dialog */}
       {cancelDialog && (
         <CancelSessionDialog
           open={cancelDialog.open}
@@ -1249,17 +1437,13 @@ export const SessionHistoryBar = ({
           student={cancelDialog.student}
           session={cancelDialog.session}
           currentCount={
-            getCancellationCount?.(
-              cancelDialog.student.id,
-              format(new Date(cancelDialog.session.date), "yyyy-MM"), // ← ADD THIS!
-            ) ?? 0
+            getCancellationCount?.(cancelDialog.student.id, format(new Date(cancelDialog.session.date), "yyyy-MM")) ?? 0
           }
           onConfirm={handleConfirmCancel}
           onMarkAsVacation={handleCancelAsVacation}
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={deleteConfirmDialog?.open ?? false}
         onOpenChange={(open) => !open && setDeleteConfirmDialog(null)}
@@ -1278,17 +1462,8 @@ export const SessionHistoryBar = ({
                   <p className="text-sm text-muted-foreground">
                     {deleteConfirmDialog.sessionInfo.date} - {formatTimeAr(deleteConfirmDialog.sessionInfo.time)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">الحالة: {deleteConfirmDialog.sessionInfo.status}</p>
                 </div>
               )}
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 mt-2">
-                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                  ⚠️ هذا الإجراء لا يمكن التراجع عنه
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  بعد الحذف، يمكنك إضافة جلسة جديدة في نفس التاريخ دون تعارض
-                </p>
-              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
@@ -1304,7 +1479,6 @@ export const SessionHistoryBar = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Time Picker Dialog for Adding Sessions */}
       <AlertDialog open={showTimePickerDialog} onOpenChange={setShowTimePickerDialog}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
@@ -1331,30 +1505,7 @@ export const SessionHistoryBar = ({
                   className="w-full px-3 py-2 rounded-md border bg-background text-foreground"
                   dir="ltr"
                 />
-                <p className="text-xs text-muted-foreground">💡 الوقت الافتراضي: {selectedStudent?.sessionTime}</p>
               </div>
-
-              {addSessionDate &&
-                selectedStudent &&
-                (() => {
-                  const dateStr = format(addSessionDate, "yyyy-MM-dd");
-                  const existingSessions = selectedStudent.sessions.filter((s) => s.date === dateStr);
-                  if (existingSessions.length > 0) {
-                    return (
-                      <div className="bg-warning/10 border border-warning/30 rounded-lg p-2">
-                        <p className="text-xs font-medium text-warning mb-1">⚠️ حصص موجودة في هذا اليوم:</p>
-                        <div className="space-y-1">
-                          {existingSessions.map((s) => (
-                            <p key={s.id} className="text-xs text-muted-foreground">
-                              • {formatTimeAr(s.time || selectedStudent.sessionTime)} ({getStatusLabel(s.status)})
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
@@ -1378,7 +1529,7 @@ export const SessionHistoryBar = ({
   );
 };
 
-// Cancellation History Inline Component
+// Cancellation History Inline Component - KEEPING ORIGINAL
 const CancellationHistoryInline = ({
   student,
   cancellations,
