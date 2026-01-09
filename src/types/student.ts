@@ -1,4 +1,4 @@
-export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'vacation';
+export type SessionStatus = "scheduled" | "completed" | "cancelled" | "vacation";
 
 export interface SessionHistory {
   status: SessionStatus;
@@ -6,7 +6,7 @@ export interface SessionHistory {
   note?: string;
 }
 
-export type HomeworkStatus = 'none' | 'assigned' | 'completed' | 'incomplete';
+export type HomeworkStatus = "none" | "assigned" | "completed" | "incomplete";
 
 export interface Session {
   id: string;
@@ -30,7 +30,7 @@ export interface ScheduleDay {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
 }
 
-export type SessionType = 'online' | 'onsite';
+export type SessionType = "online" | "onsite";
 
 // Cancellation policy settings per student
 export interface CancellationPolicy {
@@ -59,11 +59,18 @@ export interface Student {
   cancellationPolicy?: CancellationPolicy;
 }
 
+// ✅ ADD THIS TYPE (NEW!)
+export type PaymentMethod = "cash" | "bank" | "wallet";
+
+// ✅ MODIFIED MonthlyPayment interface with NEW fields
 export interface MonthlyPayment {
   month: number; // 0-11
   year: number;
   isPaid: boolean;
   paidAt?: string;
+  amount?: number; // ← NEW: Payment amount
+  method?: PaymentMethod; // ← NEW: Payment method (cash/bank/wallet)
+  notes?: string; // ← NEW: Payment notes
 }
 
 export interface StudentPayments {
@@ -86,5 +93,5 @@ export const DEFAULT_DURATION = 60;
 export const MIN_DURATION = 15;
 export const MAX_DURATION = 240;
 
-export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-export const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
