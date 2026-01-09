@@ -7,6 +7,7 @@ import {
   SessionStatus,
   HomeworkStatus,
   CancellationPolicy,
+  PaymentMethod,
 } from "@/types/student";
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from "@/lib/dateUtils";
 
@@ -294,15 +295,20 @@ export const useStudents = () => {
             if (p.studentId !== studentId) return p;
 
             // Preserve existing payment status
-            const existingPayments = new Map(p.payments.map((pay) => [`${pay.year}-${pay.month}`, pay.isPaid]));
+            const existingPayments = new Map(p.payments.map((pay) => [`${pay.year}-${pay.month}`, pay]));
 
             return {
               ...p,
-              payments: months.map(({ month, year }) => ({
-                month,
-                year,
-                isPaid: existingPayments.get(`${year}-${month}`) || false,
-              })),
+              payments: months.map(({ month, year }) => {
+                const existing = existingPayments.get(`${year}-${month}`);
+                return (
+                  existing || {
+                    month,
+                    year,
+                    isPaid: false,
+                  }
+                );
+              }),
             };
           }),
         );
@@ -649,6 +655,73 @@ export const useStudents = () => {
     );
   };
 
+  // ✅ NEW: Record payment with enhanced details
+  const recordPayment = (
+    studentId: string,
+    paymentData: {
+      month: number;
+      year: number;
+      amount: number;
+      method: PaymentMethod;
+      paidAt: string;
+      notes?: string;
+    },
+  ) => {
+    setPayments((prev) => {
+      const updated = [...prev];
+      const studentPaymentIndex = updated.findIndex((p) => p.studentId === studentId);
+
+      if (studentPaymentIndex === -1) {
+        // Create new payment record for this student
+        updated.push({
+          studentId,
+          payments: [
+            {
+              month: paymentData.month,
+              year: paymentData.year,
+              isPaid: true,
+              paidAt: paymentData.paidAt,
+              amount: paymentData.amount,
+              method: paymentData.method,
+              notes: paymentData.notes,
+            },
+          ],
+        });
+      } else {
+        // Update existing student's payments
+        const studentPayments = updated[studentPaymentIndex];
+        const paymentIndex = studentPayments.payments.findIndex(
+          (p) => p.month === paymentData.month && p.year === paymentData.year,
+        );
+
+        if (paymentIndex === -1) {
+          // Add new payment
+          studentPayments.payments.push({
+            month: paymentData.month,
+            year: paymentData.year,
+            isPaid: true,
+            paidAt: paymentData.paidAt,
+            amount: paymentData.amount,
+            method: paymentData.method,
+            notes: paymentData.notes,
+          });
+        } else {
+          // Update existing payment
+          studentPayments.payments[paymentIndex] = {
+            ...studentPayments.payments[paymentIndex],
+            isPaid: true,
+            paidAt: paymentData.paidAt,
+            amount: paymentData.amount,
+            method: paymentData.method,
+            notes: paymentData.notes,
+          };
+        }
+      }
+
+      return updated;
+    });
+  };
+
   const getStudentPayments = (studentId: string): StudentPayments | undefined => {
     return payments.find((p) => p.studentId === studentId);
   };
@@ -685,6 +758,7 @@ export const useStudents = () => {
     updateSessionDateTime,
     toggleSessionComplete,
     togglePaymentStatus,
+    recordPayment, // ✅ NEW EXPORT
     getStudentPayments,
     isStudentPaidForMonth,
     bulkUpdateSessionTime,
@@ -693,7 +767,3 @@ export const useStudents = () => {
     updateSessionDetails,
   };
 };
-
-// Note: The handleForceAddSession function you mentioned would typically be in a UI component file, not in this hook file.
-// This hook file only contains the data management logic and state functions.
-// The UI component would import this hook and use the addExtraSession function as shown in your example.
