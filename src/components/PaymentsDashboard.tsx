@@ -1,62 +1,95 @@
-import { useState, useMemo } from 'react';
-import { Check, X, CreditCard, Clock, Users, ChevronLeft, ChevronRight, Calendar, Bell, History, MessageCircle, Loader2, Palmtree, Coins, Send } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { StudentSearchCombobox } from '@/components/StudentSearchCombobox';
-import { Student, StudentPayments, AppSettings } from '@/types/student';
-import { formatMonthYearAr, DAY_NAMES_SHORT_AR, MONTH_NAMES_AR } from '@/lib/arabicConstants';
-import { cn } from '@/lib/utils';
-import { subMonths } from 'date-fns';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useMemo } from "react";
+import {
+  Check,
+  X,
+  CreditCard,
+  Clock,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Bell,
+  History,
+  MessageCircle,
+  Loader2,
+  Palmtree,
+  Coins,
+  Send,
+  Download,
+  ChevronDown,
+  DollarSign,
+  FileText,
+  TrendingUp,
+  Filter,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { StudentSearchCombobox } from "@/components/StudentSearchCombobox";
+import { Student, StudentPayments, AppSettings, PaymentMethod } from "@/types/student";
+import { formatMonthYearAr, DAY_NAMES_SHORT_AR, MONTH_NAMES_AR } from "@/lib/arabicConstants";
+import { cn } from "@/lib/utils";
+import { subMonths, format } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
-const CURRENCY = 'جنيه';
+const CURRENCY = "جنيه";
 
 // Helper to count session stats for a student in a given month
 const getStudentMonthStats = (student: Student, month: number, year: number) => {
-  const sessions = student.sessions.filter(s => {
+  const sessions = student.sessions.filter((s) => {
     const sessionDate = new Date(s.date);
     return sessionDate.getMonth() === month && sessionDate.getFullYear() === year;
   });
-  
-  const completed = sessions.filter(s => s.status === 'completed').length;
-  const vacation = sessions.filter(s => s.status === 'vacation').length;
-  const cancelled = sessions.filter(s => s.status === 'cancelled').length;
-  const scheduled = sessions.filter(s => s.status === 'scheduled').length;
-  
+
+  const completed = sessions.filter((s) => s.status === "completed").length;
+  const vacation = sessions.filter((s) => s.status === "vacation").length;
+  const cancelled = sessions.filter((s) => s.status === "cancelled").length;
+  const scheduled = sessions.filter((s) => s.status === "scheduled").length;
+
   return { completed, vacation, cancelled, scheduled, total: sessions.length };
 };
 
 // Helper to get session price for a student
 const getStudentSessionPrice = (student: Student, settings?: AppSettings): number => {
-  // Default prices if not set
   const defaultOnsite = 150;
   const defaultOnline = 120;
-  
+
   if (student.useCustomSettings) {
-    // For custom settings, use custom prices if set, otherwise fall back to defaults
-    if (student.sessionType === 'online') {
-      return typeof student.customPriceOnline === 'number' && student.customPriceOnline > 0 
-        ? student.customPriceOnline 
+    if (student.sessionType === "online") {
+      return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
+        ? student.customPriceOnline
         : (settings?.defaultPriceOnline ?? defaultOnline);
     }
-    return typeof student.customPriceOnsite === 'number' && student.customPriceOnsite > 0 
-      ? student.customPriceOnsite 
+    return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
+      ? student.customPriceOnsite
       : (settings?.defaultPriceOnsite ?? defaultOnsite);
   }
-  
-  // Use global settings with fallback to defaults
-  if (student.sessionType === 'online') {
-    return typeof settings?.defaultPriceOnline === 'number' && settings.defaultPriceOnline > 0
+
+  if (student.sessionType === "online") {
+    return typeof settings?.defaultPriceOnline === "number" && settings.defaultPriceOnline > 0
       ? settings.defaultPriceOnline
       : defaultOnline;
   }
-  return typeof settings?.defaultPriceOnsite === 'number' && settings.defaultPriceOnsite > 0
+  return typeof settings?.defaultPriceOnsite === "number" && settings.defaultPriceOnsite > 0
     ? settings.defaultPriceOnsite
     : defaultOnsite;
 };
@@ -65,10 +98,34 @@ const getStudentSessionPrice = (student: Student, settings?: AppSettings): numbe
 const getStudentMonthTotal = (student: Student, month: number, year: number, settings?: AppSettings): number => {
   const stats = getStudentMonthStats(student, month, year);
   const pricePerSession = getStudentSessionPrice(student, settings);
-
-  // Count sessions that should be paid for (scheduled + completed)
   const billableCount = stats.completed + stats.scheduled;
   return billableCount * pricePerSession;
+};
+
+// Helper to get payment method label in Arabic
+const getPaymentMethodLabel = (method?: PaymentMethod): string => {
+  if (!method) return "غير محدد";
+  switch (method) {
+    case "cash":
+      return "كاش";
+    case "bank":
+      return "تحويل بنكي";
+    case "wallet":
+      return "محفظة إلكترونية";
+    default:
+      return method;
+  }
+};
+
+// Helper to format date in Arabic
+const formatDateAr = (dateStr?: string): string => {
+  if (!dateStr) return "غير محدد";
+  try {
+    const date = new Date(dateStr);
+    return format(date, "dd/MM/yyyy");
+  } catch {
+    return dateStr;
+  }
 };
 
 interface PaymentsDashboardProps {
@@ -77,10 +134,22 @@ interface PaymentsDashboardProps {
   selectedMonth: number;
   selectedYear: number;
   onTogglePayment: (studentId: string, month: number, year: number) => void;
+  onRecordPayment?: (
+    studentId: string,
+    paymentData: {
+      month: number;
+      year: number;
+      amount: number;
+      method: PaymentMethod;
+      paidAt: string;
+      notes?: string;
+    },
+  ) => void;
   settings?: AppSettings;
 }
 
-type PaymentFilter = 'all' | 'paid' | 'unpaid';
+type PaymentFilter = "all" | "paid" | "unpaid";
+type WhatsAppTarget = "overdue" | "upcoming" | "all" | "custom";
 
 export const PaymentsDashboard = ({
   students,
@@ -88,51 +157,77 @@ export const PaymentsDashboard = ({
   selectedMonth: initialMonth,
   selectedYear: initialYear,
   onTogglePayment,
+  onRecordPayment,
   settings,
 }: PaymentsDashboardProps) => {
   const now = new Date();
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
-  const [studentFilter, setStudentFilter] = useState<string>('all');
-  const [studentSearch, setStudentSearch] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [studentFilter, setStudentFilter] = useState<string>("all");
+  const [studentSearch, setStudentSearch] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
   const [selectedYear, setSelectedYear] = useState(initialYear);
   const [selectedStudentHistory, setSelectedStudentHistory] = useState<string | null>(null);
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
-  const [confirmPaymentStudent, setConfirmPaymentStudent] = useState<Student | null>(null);
   const [bulkSendingReminders, setBulkSendingReminders] = useState(false);
   const [bulkSendProgress, setBulkSendProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [whatsappTarget, setWhatsappTarget] = useState<WhatsAppTarget>("overdue");
+
+  // Payment recording dialog state
+  const [recordPaymentDialog, setRecordPaymentDialog] = useState<{
+    open: boolean;
+    student: Student | null;
+  }>({ open: false, student: null });
+  const [paymentAmount, setPaymentAmount] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [paymentDate, setPaymentDate] = useState<string>(format(now, "yyyy-MM-dd"));
+  const [paymentNotes, setPaymentNotes] = useState<string>("");
+
+  // History dialog state
+  const [historyDialog, setHistoryDialog] = useState<{
+    open: boolean;
+    view: "student" | "monthly";
+  }>({ open: false, view: "student" });
 
   const getPaymentStatus = (studentId: string, month?: number, year?: number): boolean => {
-    const studentPayments = payments.find(p => p.studentId === studentId);
+    const studentPayments = payments.find((p) => p.studentId === studentId);
     if (!studentPayments) return false;
     const payment = studentPayments.payments.find(
-      p => p.month === (month ?? selectedMonth) && p.year === (year ?? selectedYear)
+      (p) => p.month === (month ?? selectedMonth) && p.year === (year ?? selectedYear),
     );
     return payment?.isPaid || false;
   };
 
-  const getPaymentHistory = (studentId: string) => {
-    const studentPayments = payments.find(p => p.studentId === studentId);
-    if (!studentPayments) return [];
-    return studentPayments.payments.sort((a, b) => b.year !== a.year ? b.year - a.year : b.month - a.month);
+  const getPaymentDetails = (studentId: string, month?: number, year?: number) => {
+    const studentPayments = payments.find((p) => p.studentId === studentId);
+    if (!studentPayments) return null;
+    return studentPayments.payments.find(
+      (p) => p.month === (month ?? selectedMonth) && p.year === (year ?? selectedYear),
+    );
   };
 
-  const paidCount = students.filter(s => getPaymentStatus(s.id)).length;
-  const unpaidCount = students.length - paidCount;
-  const unpaidStudents = students.filter(s => !getPaymentStatus(s.id));
+  const getPaymentHistory = (studentId: string) => {
+    const studentPayments = payments.find((p) => p.studentId === studentId);
+    if (!studentPayments) return [];
+    return studentPayments.payments
+      .filter((p) => p.isPaid)
+      .sort((a, b) => (b.year !== a.year ? b.year - a.year : b.month - a.month));
+  };
 
-  // Calculate totals
+  const paidCount = students.filter((s) => getPaymentStatus(s.id)).length;
+  const unpaidCount = students.length - paidCount;
+  const unpaidStudents = students.filter((s) => !getPaymentStatus(s.id));
+
   const totalExpected = students.reduce((sum, student) => {
     return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
   }, 0);
-  
+
   const totalCollected = students
-    .filter(s => getPaymentStatus(s.id))
+    .filter((s) => getPaymentStatus(s.id))
     .reduce((sum, student) => {
       return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
     }, 0);
-  
+
   const totalPending = totalExpected - totalCollected;
 
   const getRecentMonths = () => {
@@ -152,13 +247,61 @@ export const PaymentsDashboard = ({
   const recentMonths = getRecentMonths();
 
   const goToPrevMonth = () => {
-    if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); }
-    else setSelectedMonth(selectedMonth - 1);
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else setSelectedMonth(selectedMonth - 1);
   };
 
   const goToNextMonth = () => {
-    if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); }
-    else setSelectedMonth(selectedMonth + 1);
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else setSelectedMonth(selectedMonth + 1);
+  };
+
+  const openRecordPaymentDialog = (student: Student) => {
+    const monthTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+    setPaymentAmount(monthTotal.toString());
+    setPaymentMethod("cash");
+    setPaymentDate(format(now, "yyyy-MM-dd"));
+    setPaymentNotes("");
+    setRecordPaymentDialog({ open: true, student });
+  };
+
+  const handleRecordPayment = () => {
+    if (!recordPaymentDialog.student) return;
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "خطأ", description: "المبلغ غير صحيح", variant: "destructive" });
+      return;
+    }
+
+    if (onRecordPayment) {
+      onRecordPayment(recordPaymentDialog.student.id, {
+        month: selectedMonth,
+        year: selectedYear,
+        amount,
+        method: paymentMethod,
+        paidAt: paymentDate,
+        notes: paymentNotes.trim() || undefined,
+      });
+
+      toast({
+        title: "✅ تم تسجيل الدفعة",
+        description: `تم تسجيل دفعة ${recordPaymentDialog.student.name} بنجاح`,
+      });
+    } else {
+      // Fallback to simple toggle if onRecordPayment not provided
+      onTogglePayment(recordPaymentDialog.student.id, selectedMonth, selectedYear);
+      toast({
+        title: "✅ تم التأكيد",
+        description: `تم تسجيل دفع ${recordPaymentDialog.student.name}`,
+      });
+    }
+
+    setRecordPaymentDialog({ open: false, student: null });
   };
 
   const sendWhatsAppReminder = async (student: Student) => {
@@ -169,14 +312,14 @@ export const PaymentsDashboard = ({
 
     setSendingReminder(student.id);
     try {
-      const { data, error } = await supabase.functions.invoke('send-whatsapp-reminder', {
+      const { data, error } = await supabase.functions.invoke("send-whatsapp-reminder", {
         body: {
           studentName: student.name,
           phoneNumber: student.phone,
           month: MONTH_NAMES_AR[selectedMonth],
           year: selectedYear,
           studentId: student.id,
-          type: 'payment',
+          type: "payment",
           logToDb: true,
         },
       });
@@ -184,33 +327,74 @@ export const PaymentsDashboard = ({
       if (error) throw error;
 
       toast({ title: "تم الإرسال", description: `تم إرسال تذكير WhatsApp إلى ${student.name}` });
-      setConfirmPaymentStudent(student);
     } catch (error: any) {
-      console.error('WhatsApp error:', error);
+      console.error("WhatsApp error:", error);
       toast({ title: "خطأ", description: error.message || "فشل إرسال الرسالة", variant: "destructive" });
     } finally {
       setSendingReminder(null);
     }
   };
 
+  const getWhatsAppTargetStudents = (target: WhatsAppTarget) => {
+    switch (target) {
+      case "overdue":
+        return unpaidStudents;
+      case "upcoming":
+        // Students with upcoming payment (next 3 days)
+        return students.filter((s) => !getPaymentStatus(s.id));
+      case "all":
+        return students;
+      case "custom":
+        return [];
+      default:
+        return [];
+    }
+  };
+
+  const getWhatsAppTargetLabel = (target: WhatsAppTarget): string => {
+    const targetStudents = getWhatsAppTargetStudents(target);
+    const count = targetStudents.filter((s) => s.phone).length;
+
+    switch (target) {
+      case "overdue":
+        return `للمتأخرين (${count})`;
+      case "upcoming":
+        return `للمستحقين قريباً (${count})`;
+      case "all":
+        return `للجميع (${count})`;
+      case "custom":
+        return "رسالة مخصصة...";
+      default:
+        return "";
+    }
+  };
+
   const sendPaymentReminder = () => {
-    if (unpaidStudents.length === 0) {
-      toast({ title: "الكل دفعوا!", description: "جميع الطلاب دفعوا لهذا الشهر." });
+    const targetStudents = getWhatsAppTargetStudents(whatsappTarget);
+
+    if (targetStudents.length === 0) {
+      toast({ title: "لا يوجد طلاب", description: "لا يوجد طلاب لإرسال التذكير إليهم" });
       return;
     }
-    // Show confirmation dialog for bulk send
+
+    if (whatsappTarget === "custom") {
+      toast({ title: "قريباً", description: "ميزة الرسالة المخصصة قيد التطوير", variant: "default" });
+      return;
+    }
+
     setShowBulkConfirm(true);
   };
 
   const sendBulkWhatsAppReminders = async () => {
-    const studentsWithPhone = unpaidStudents.filter(s => s.phone);
-    const studentsWithoutPhone = unpaidStudents.filter(s => !s.phone);
-    
+    const targetStudents = getWhatsAppTargetStudents(whatsappTarget);
+    const studentsWithPhone = targetStudents.filter((s) => s.phone);
+    const studentsWithoutPhone = targetStudents.filter((s) => !s.phone);
+
     if (studentsWithPhone.length === 0) {
-      toast({ 
-        title: "لا يوجد أرقام هاتف", 
-        description: "لا يوجد أرقام هاتف مسجلة للطلاب الذين لم يدفعوا",
-        variant: "destructive" 
+      toast({
+        title: "لا يوجد أرقام هاتف",
+        description: "لا يوجد أرقام هاتف مسجلة للطلاب المحددين",
+        variant: "destructive",
       });
       setShowBulkConfirm(false);
       return;
@@ -227,22 +411,21 @@ export const PaymentsDashboard = ({
       const student = studentsWithPhone[i];
       const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
       const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
-      
-      // Build custom message with student details
-       const message = `عزيزي ولي الأمر،
+
+      const message = `عزيزي ولي الأمر،
 تذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}
 عدد الجلسات: ${monthStats.completed + monthStats.scheduled}
 المبلغ المستحق: ${studentTotal} ${CURRENCY}
 شكراً لتعاونكم`;
 
       try {
-        const { error } = await supabase.functions.invoke('send-whatsapp-reminder', {
+        const { error } = await supabase.functions.invoke("send-whatsapp-reminder", {
           body: {
             studentName: student.name,
             phoneNumber: student.phone,
             customMessage: message,
             studentId: student.id,
-            type: 'payment',
+            type: "payment",
             logToDb: true,
           },
         });
@@ -254,28 +437,26 @@ export const PaymentsDashboard = ({
         failedCount++;
       }
 
-      setBulkSendProgress({ 
-        current: i + 1, 
-        total: studentsWithPhone.length, 
-        success: successCount, 
-        failed: failedCount 
+      setBulkSendProgress({
+        current: i + 1,
+        total: studentsWithPhone.length,
+        success: successCount,
+        failed: failedCount,
       });
 
-      // Small delay between messages to avoid rate limiting
       if (i < studentsWithPhone.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
     setBulkSendingReminders(false);
 
-    // Show results
     let description = `تم إرسال ${successCount} تذكير بنجاح`;
     if (failedCount > 0) {
       description += `، فشل ${failedCount}`;
     }
     if (studentsWithoutPhone.length > 0) {
-      description += `\n${studentsWithoutPhone.length} طالب بدون رقم هاتف: ${studentsWithoutPhone.map(s => s.name).join('، ')}`;
+      description += `\n${studentsWithoutPhone.length} طالب بدون رقم هاتف: ${studentsWithoutPhone.map((s) => s.name).join("، ")}`;
     }
 
     toast({
@@ -286,27 +467,85 @@ export const PaymentsDashboard = ({
     });
   };
 
-  const handleConfirmPayment = () => {
-    if (confirmPaymentStudent) {
-      onTogglePayment(confirmPaymentStudent.id, selectedMonth, selectedYear);
-      toast({ title: "تم التأكيد", description: `تم تسجيل دفع ${confirmPaymentStudent.name}` });
-      setConfirmPaymentStudent(null);
-    }
+  const exportToPDF = () => {
+    // Generate detailed monthly report
+    const reportLines: string[] = [];
+    reportLines.push(`تقرير المدفوعات المفصل - ${formatMonthYearAr(selectedMonth, selectedYear)}`);
+    reportLines.push("━".repeat(50));
+    reportLines.push("");
+
+    students.forEach((student) => {
+      const isPaid = getPaymentStatus(student.id);
+      const paymentDetails = getPaymentDetails(student.id);
+      const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+      const billableCount = monthStats.completed + monthStats.scheduled;
+      const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+      const pricePerSession = getStudentSessionPrice(student, settings);
+
+      const statusIcon = isPaid ? "✅" : "⏳";
+      const statusText = isPaid ? "(مدفوع)" : "(غير مدفوع)";
+
+      reportLines.push(`${statusIcon} ${student.name} ${statusText}`);
+
+      if (billableCount > 0) {
+        reportLines.push(`   ${billableCount} حصص × ${pricePerSession} ${CURRENCY} = ${studentTotal} ${CURRENCY}`);
+      }
+
+      if (isPaid && paymentDetails) {
+        if (paymentDetails.paidAt) {
+          reportLines.push(`   تاريخ الدفع: ${formatDateAr(paymentDetails.paidAt)}`);
+        }
+        if (paymentDetails.method) {
+          reportLines.push(`   الطريقة: ${getPaymentMethodLabel(paymentDetails.method)}`);
+        }
+        if (paymentDetails.notes) {
+          reportLines.push(`   ملاحظات: ${paymentDetails.notes}`);
+        }
+      }
+
+      reportLines.push("");
+    });
+
+    reportLines.push("━".repeat(50));
+    reportLines.push("📊 الملخص:");
+    reportLines.push(`   الإجمالي المتوقع: ${totalExpected.toLocaleString()} ${CURRENCY}`);
+    reportLines.push(
+      `   المحصّل: ${totalCollected.toLocaleString()} ${CURRENCY} (${totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0}%)`,
+    );
+    reportLines.push(`   المتبقي: ${totalPending.toLocaleString()} ${CURRENCY}`);
+
+    const reportText = reportLines.join("\n");
+
+    // Create downloadable text file (PDF generation requires additional library)
+    const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `تقرير-المدفوعات-${formatMonthYearAr(selectedMonth, selectedYear)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "تم التصدير",
+      description: "تم تحميل التقرير بنجاح",
+    });
   };
 
   const filteredStudents = useMemo(() => {
     const searchLower = studentSearch.trim().toLowerCase();
-    return students.filter(student => {
+    return students.filter((student) => {
       const isPaid = getPaymentStatus(student.id);
-      if (paymentFilter === 'paid' && !isPaid) return false;
-      if (paymentFilter === 'unpaid' && isPaid) return false;
-      if (studentFilter !== 'all' && student.id !== studentFilter) return false;
+      if (paymentFilter === "paid" && !isPaid) return false;
+      if (paymentFilter === "unpaid" && isPaid) return false;
+      if (studentFilter !== "all" && student.id !== studentFilter) return false;
       if (searchLower && !student.name.toLowerCase().includes(searchLower)) return false;
       return true;
     });
   }, [students, paymentFilter, studentFilter, studentSearch, payments, selectedMonth, selectedYear]);
 
-  const selectedStudent = students.find(s => s.id === selectedStudentHistory);
+  const selectedStudent = students.find((s) => s.id === selectedStudentHistory);
 
   if (students.length === 0) {
     return (
@@ -318,26 +557,35 @@ export const PaymentsDashboard = ({
       </Card>
     );
   }
-
   return (
     <div className="space-y-4" dir="rtl">
       <div className="space-y-3">
         <div className="flex items-center justify-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-8 w-8"><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-8 w-8">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
           <div className="text-center min-w-[140px]">
             <p className="font-heading font-semibold text-lg">{formatMonthYearAr(selectedMonth, selectedYear)}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="h-8 w-8"><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="h-8 w-8">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
         </div>
         <div className="flex justify-center gap-1.5 overflow-x-auto pb-1">
-          {recentMonths.map(m => (
+          {recentMonths.map((m) => (
             <button
               key={`${m.year}-${m.month}`}
-              onClick={() => { setSelectedMonth(m.month); setSelectedYear(m.year); }}
-              className={cn("flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[56px]",
+              onClick={() => {
+                setSelectedMonth(m.month);
+                setSelectedYear(m.year);
+              }}
+              className={cn(
+                "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[56px]",
                 selectedMonth === m.month && selectedYear === m.year
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : m.isCurrent ? "bg-primary/10 border-2 border-primary/30" : "bg-card border border-border"
+                  : m.isCurrent
+                    ? "bg-primary/10 border-2 border-primary/30"
+                    : "bg-card border border-border",
               )}
             >
               <span className="text-xs font-medium">{m.label}</span>
@@ -371,51 +619,108 @@ export const PaymentsDashboard = ({
         </CardContent>
       </Card>
 
+      {/* Status Cards - Clickable Filters */}
       <div className="flex gap-2">
-        <button onClick={() => setPaymentFilter('all')} className={cn("flex-1 rounded-lg p-3 card-shadow transition-all text-center", paymentFilter === 'all' ? "ring-2 ring-primary bg-card" : "bg-card")}>
+        <button
+          onClick={() => setPaymentFilter("all")}
+          className={cn(
+            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === "all" ? "ring-2 ring-primary bg-card" : "bg-card",
+          )}
+        >
+          <Users className="h-4 w-4 mx-auto mb-1" />
           <p className="text-xl font-heading font-bold">{students.length}</p>
           <p className="text-xs text-muted-foreground">إجمالي الطلاب</p>
         </button>
-        <button onClick={() => setPaymentFilter('paid')} className={cn("flex-1 rounded-lg p-3 card-shadow transition-all text-center", paymentFilter === 'paid' ? "ring-2 ring-success bg-success/10" : "bg-success/10")}>
+        <button
+          onClick={() => setPaymentFilter("paid")}
+          className={cn(
+            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === "paid" ? "ring-2 ring-success bg-success/10" : "bg-success/10",
+          )}
+        >
+          <Check className="h-4 w-4 mx-auto mb-1 text-success" />
           <p className="text-xl font-heading font-bold text-success">{paidCount}</p>
           <p className="text-xs text-success/80">دفعوا</p>
         </button>
-        <button onClick={() => setPaymentFilter('unpaid')} className={cn("flex-1 rounded-lg p-3 card-shadow transition-all text-center", paymentFilter === 'unpaid' ? "ring-2 ring-warning bg-warning/10" : "bg-warning/10")}>
+        <button
+          onClick={() => setPaymentFilter("unpaid")}
+          className={cn(
+            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === "unpaid" ? "ring-2 ring-warning bg-warning/10" : "bg-warning/10",
+          )}
+        >
+          <Clock className="h-4 w-4 mx-auto mb-1 text-warning" />
           <p className="text-xl font-heading font-bold text-warning">{unpaidCount}</p>
           <p className="text-xs text-warning/80">لم يدفعوا</p>
         </button>
       </div>
 
-      {bulkSendingReminders ? (
-        <div className="p-4 rounded-lg border bg-card space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              جاري إرسال التذكيرات...
-            </span>
-            <span className="text-muted-foreground">
-              {bulkSendProgress.current} / {bulkSendProgress.total}
-            </span>
+      {/* Action Buttons Row */}
+      <div className="flex gap-2">
+        {/* WhatsApp Dropdown Button */}
+        {bulkSendingReminders ? (
+          <div className="flex-1 p-4 rounded-lg border bg-card space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                جاري إرسال التذكيرات...
+              </span>
+              <span className="text-muted-foreground">
+                {bulkSendProgress.current} / {bulkSendProgress.total}
+              </span>
+            </div>
+            <Progress value={(bulkSendProgress.current / bulkSendProgress.total) * 100} className="h-2" />
+            <div className="flex gap-4 text-xs">
+              <span className="text-success">✓ نجح: {bulkSendProgress.success}</span>
+              {bulkSendProgress.failed > 0 && (
+                <span className="text-destructive">✗ فشل: {bulkSendProgress.failed}</span>
+              )}
+            </div>
           </div>
-          <Progress value={(bulkSendProgress.current / bulkSendProgress.total) * 100} className="h-2" />
-          <div className="flex gap-4 text-xs">
-            <span className="text-success">✓ نجح: {bulkSendProgress.success}</span>
-            {bulkSendProgress.failed > 0 && (
-              <span className="text-destructive">✗ فشل: {bulkSendProgress.failed}</span>
-            )}
-          </div>
-        </div>
-      ) : (
-        <Button 
-          variant="outline" 
-          className="w-full gap-2 border-green-500/50 text-green-600 hover:bg-green-500/10" 
-          onClick={sendPaymentReminder}
-          disabled={unpaidCount === 0}
-        >
-          <Send className="h-4 w-4" />
-          إرسال تذكير WhatsApp للجميع ({unpaidCount} لم يدفعوا)
+        ) : (
+          <>
+            <Select value={whatsappTarget} onValueChange={(v) => setWhatsappTarget(v as WhatsAppTarget)}>
+              <SelectTrigger className="w-[180px] border-green-500/50 text-green-600">
+                <MessageCircle className="h-4 w-4 ml-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="overdue">⚡ للمتأخرين ({unpaidStudents.filter((s) => s.phone).length})</SelectItem>
+                <SelectItem value="upcoming">
+                  📅 للمستحقين قريباً ({unpaidStudents.filter((s) => s.phone).length})
+                </SelectItem>
+                <SelectItem value="all">👥 للجميع ({students.filter((s) => s.phone).length})</SelectItem>
+                <SelectItem value="custom">✏️ رسالة مخصصة...</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 border-green-500/50 text-green-600 hover:bg-green-500/10"
+              onClick={sendPaymentReminder}
+              disabled={getWhatsAppTargetStudents(whatsappTarget).length === 0}
+            >
+              <Send className="h-4 w-4" />
+              إرسال تذكير واتساب
+            </Button>
+          </>
+        )}
+
+        {/* Export & History Buttons */}
+        <Button variant="outline" size="icon" onClick={exportToPDF} title="تصدير التقرير">
+          <Download className="h-4 w-4" />
         </Button>
-      )}
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setHistoryDialog({ open: true, view: "monthly" })}
+          title="السجل"
+        >
+          <History className="h-4 w-4" />
+        </Button>
+      </div>
 
       <Card className="card-shadow">
         <CardHeader className="pb-3 space-y-3">
@@ -423,7 +728,6 @@ export const PaymentsDashboard = ({
             <Calendar className="h-5 w-5 text-primary" />
             {formatMonthYearAr(selectedMonth, selectedYear)}
           </CardTitle>
-          {/* Search Combobox */}
           <StudentSearchCombobox
             students={students}
             value={studentSearch}
@@ -434,33 +738,47 @@ export const PaymentsDashboard = ({
         <CardContent className="space-y-2">
           {filteredStudents.length === 0 ? (
             <p className="text-center text-muted-foreground py-4 text-sm">
-              {studentSearch.trim() ? 'لا يوجد نتائج' : 'لا يوجد طلاب تطابق الفلتر'}
+              {studentSearch.trim() ? "لا يوجد نتائج" : "لا يوجد طلاب تطابق الفلتر"}
             </p>
           ) : (
-            filteredStudents.map(student => {
+            filteredStudents.map((student) => {
               const isPaid = getPaymentStatus(student.id);
               const isSending = sendingReminder === student.id;
               const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
               const billableCount = monthStats.completed + monthStats.scheduled;
               const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
               const pricePerSession = getStudentSessionPrice(student, settings);
+
               return (
-                <div key={student.id} className={cn("flex items-center justify-between p-3 rounded-lg border transition-all", isPaid ? "bg-success/10 border-success/30" : "bg-card border-border")}>
+                <div
+                  key={student.id}
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border transition-all",
+                    isPaid ? "bg-success/10 border-success/30" : "bg-card border-border",
+                  )}
+                >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", isPaid ? "bg-success text-success-foreground" : "bg-muted")}>
+                    <div
+                      className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                        isPaid ? "bg-success text-success-foreground" : "bg-muted",
+                      )}
+                    >
                       {isPaid ? <Check className="h-4 w-4" /> : <X className="h-4 w-4 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium truncate">{student.name}</span>
                         {billableCount > 0 && (
-                          <span className={cn("text-sm font-medium shrink-0", isPaid ? "text-success" : "text-foreground")}>
+                          <span
+                            className={cn("text-sm font-medium shrink-0", isPaid ? "text-success" : "text-foreground")}
+                          >
                             {studentTotal.toLocaleString()} {CURRENCY}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                        <span>{student.scheduleDays.map(d => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join('، ')}</span>
+                        <span>{student.scheduleDays.map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join("، ")}</span>
                         {billableCount > 0 && (
                           <>
                             <span>•</span>
@@ -486,6 +804,17 @@ export const PaymentsDashboard = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedStudentHistory(student.id);
+                        setHistoryDialog({ open: true, view: "student" });
+                      }}
+                      title="السجل"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
                     {!isPaid && (
                       <Button
                         size="sm"
@@ -494,12 +823,25 @@ export const PaymentsDashboard = ({
                         onClick={() => sendWhatsAppReminder(student)}
                         disabled={isSending}
                       >
-                        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                        {isSending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MessageCircle className="h-4 w-4" />
+                        )}
                         تذكير
                       </Button>
                     )}
-                    <Button size="sm" variant={isPaid ? "outline" : "default"} className={cn(!isPaid && "gradient-accent")} onClick={() => onTogglePayment(student.id, selectedMonth, selectedYear)}>
-                      {isPaid ? 'إلغاء الدفع' : 'تسجيل دفع'}
+                    <Button
+                      size="sm"
+                      variant={isPaid ? "outline" : "default"}
+                      className={cn(!isPaid && "gradient-accent")}
+                      onClick={() =>
+                        isPaid
+                          ? onTogglePayment(student.id, selectedMonth, selectedYear)
+                          : openRecordPaymentDialog(student)
+                      }
+                    >
+                      {isPaid ? "إلغاء الدفع" : "سجل دفع"}
                     </Button>
                   </div>
                 </div>
@@ -509,22 +851,291 @@ export const PaymentsDashboard = ({
         </CardContent>
       </Card>
 
-      {/* Payment Confirmation Dialog */}
-      <Dialog open={!!confirmPaymentStudent} onOpenChange={(open) => !open && setConfirmPaymentStudent(null)}>
-        <DialogContent dir="rtl">
+      {/* Payment Recording Dialog */}
+      <Dialog
+        open={recordPaymentDialog.open}
+        onOpenChange={(open) => !open && setRecordPaymentDialog({ open: false, student: null })}
+      >
+        <DialogContent dir="rtl" className="max-w-md">
           <DialogHeader>
-            <DialogTitle>تأكيد الدفع</DialogTitle>
-            <DialogDescription>
-              هل تم استلام الدفع من {confirmPaymentStudent?.name} لشهر {formatMonthYearAr(selectedMonth, selectedYear)}؟
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-success" />
+              تسجيل دفعة - {recordPaymentDialog.student?.name}
+            </DialogTitle>
+            <DialogDescription>شهر {formatMonthYearAr(selectedMonth, selectedYear)}</DialogDescription>
           </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Amount */}
+            <div className="space-y-2">
+              <Label htmlFor="amount">المبلغ المدفوع</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="amount"
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="0"
+                  className="text-left"
+                  dir="ltr"
+                />
+                <span className="flex items-center px-3 rounded-md border bg-muted text-sm">{CURRENCY}</span>
+              </div>
+              {recordPaymentDialog.student && (
+                <p className="text-xs text-muted-foreground">
+                  المستحق:{" "}
+                  {getStudentMonthTotal(
+                    recordPaymentDialog.student,
+                    selectedMonth,
+                    selectedYear,
+                    settings,
+                  ).toLocaleString()}{" "}
+                  {CURRENCY}
+                </p>
+              )}
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <Label>طريقة الدفع</Label>
+              <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <RadioGroupItem value="cash" id="cash" />
+                  <Label htmlFor="cash" className="cursor-pointer">
+                    💵 كاش
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <RadioGroupItem value="bank" id="bank" />
+                  <Label htmlFor="bank" className="cursor-pointer">
+                    🏦 تحويل بنكي
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <RadioGroupItem value="wallet" id="wallet" />
+                  <Label htmlFor="wallet" className="cursor-pointer">
+                    📱 محفظة إلكترونية
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Payment Date */}
+            <div className="space-y-2">
+              <Label htmlFor="date">تاريخ الدفع</Label>
+              <Input
+                id="date"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="text-left"
+                dir="ltr"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">ملاحظات (اختياري)</Label>
+              <Textarea
+                id="notes"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                placeholder="أي ملاحظات إضافية..."
+                rows={2}
+              />
+            </div>
+          </div>
+
           <DialogFooter className="gap-2 sm:gap-0">
             <DialogClose asChild>
-              <Button variant="outline">لا، لاحقاً</Button>
+              <Button variant="outline">إلغاء</Button>
             </DialogClose>
-            <Button onClick={handleConfirmPayment} className="gradient-accent">
-              نعم، تم الدفع
+            <Button onClick={handleRecordPayment} className="gradient-accent gap-2">
+              <Check className="h-4 w-4" />
+              حفظ الدفعة
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment History Dialog */}
+      <Dialog
+        open={historyDialog.open}
+        onOpenChange={(open) => !open && setHistoryDialog({ open: false, view: "monthly" })}
+      >
+        <DialogContent dir="rtl" className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              سجل المدفوعات
+            </DialogTitle>
+          </DialogHeader>
+
+          <Tabs
+            value={historyDialog.view}
+            onValueChange={(v) => setHistoryDialog({ ...historyDialog, view: v as "student" | "monthly" })}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="monthly">📅 شهري لجميع الطلاب</TabsTrigger>
+              <TabsTrigger value="student">👤 طالب واحد</TabsTrigger>
+            </TabsList>
+
+            {/* Monthly View - All Students */}
+            <TabsContent value="monthly" className="space-y-3">
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="font-medium">{formatMonthYearAr(selectedMonth, selectedYear)}</span>
+              </div>
+
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2 pr-2">
+                  {students.map((student) => {
+                    const isPaid = getPaymentStatus(student.id);
+                    const paymentDetails = getPaymentDetails(student.id);
+                    const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+                    const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+                    const billableCount = monthStats.completed + monthStats.scheduled;
+
+                    return (
+                      <div
+                        key={student.id}
+                        className={cn(
+                          "p-3 rounded-lg border",
+                          isPaid ? "bg-success/5 border-success/30" : "bg-muted/50 border-border",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {isPaid ? (
+                                <Check className="h-4 w-4 text-success" />
+                              ) : (
+                                <Clock className="h-4 w-4 text-warning" />
+                              )}
+                              <span className="font-medium">{student.name}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground space-y-0.5">
+                              {billableCount > 0 && (
+                                <p>
+                                  {billableCount} حصص × {getStudentSessionPrice(student, settings)} {CURRENCY} ={" "}
+                                  {studentTotal} {CURRENCY}
+                                </p>
+                              )}
+                              {isPaid && paymentDetails?.paidAt && (
+                                <p>تاريخ الدفع: {formatDateAr(paymentDetails.paidAt)}</p>
+                              )}
+                              {isPaid && paymentDetails?.method && (
+                                <p>الطريقة: {getPaymentMethodLabel(paymentDetails.method)}</p>
+                              )}
+                              {isPaid && paymentDetails?.notes && (
+                                <p className="text-xs italic">"{paymentDetails.notes}"</p>
+                              )}
+                            </div>
+                          </div>
+                          <Badge variant={isPaid ? "default" : "secondary"} className={cn(isPaid && "bg-success")}>
+                            {isPaid ? "مدفوع" : "معلق"}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+
+              {/* Monthly Summary */}
+              <div className="p-3 bg-primary/5 rounded-lg border-2 border-primary/20">
+                <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                  <div>
+                    <p className="text-lg font-bold">{totalExpected.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">{CURRENCY} متوقع</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-success">{totalCollected.toLocaleString()}</p>
+                    <p className="text-xs text-success/80">{CURRENCY} محصّل</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-warning">{totalPending.toLocaleString()}</p>
+                    <p className="text-xs text-warning/80">{CURRENCY} متبقي</p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Student View - Single Student History */}
+            <TabsContent value="student" className="space-y-3">
+              <Select value={selectedStudentHistory || ""} onValueChange={setSelectedStudentHistory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر طالب..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedStudent ? (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-2 pr-2">
+                    {getPaymentHistory(selectedStudent.id).length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <History className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                        <p className="text-sm">لا يوجد سجل دفعات</p>
+                      </div>
+                    ) : (
+                      getPaymentHistory(selectedStudent.id).map((payment) => {
+                        const studentTotal = getStudentMonthTotal(
+                          selectedStudent,
+                          payment.month,
+                          payment.year,
+                          settings,
+                        );
+                        const monthStats = getStudentMonthStats(selectedStudent, payment.month, payment.year);
+                        const billableCount = monthStats.completed + monthStats.scheduled;
+
+                        return (
+                          <div
+                            key={`${payment.year}-${payment.month}`}
+                            className="p-3 rounded-lg border bg-success/5 border-success/30"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Check className="h-4 w-4 text-success" />
+                                  <span className="font-medium">{formatMonthYearAr(payment.month, payment.year)}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground space-y-0.5">
+                                  <p>
+                                    {billableCount} حصص = {payment.amount || studentTotal} {CURRENCY}
+                                  </p>
+                                  {payment.paidAt && <p>تاريخ الدفع: {formatDateAr(payment.paidAt)}</p>}
+                                  {payment.method && <p>الطريقة: {getPaymentMethodLabel(payment.method)}</p>}
+                                  {payment.notes && <p className="italic">"{payment.notes}"</p>}
+                                </div>
+                              </div>
+                              <Badge className="bg-success">مدفوع</Badge>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm">اختر طالب لعرض سجله</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">إغلاق</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -538,10 +1149,13 @@ export const PaymentsDashboard = ({
               إرسال تذكيرات جماعية
             </DialogTitle>
             <DialogDescription>
-              سيتم إرسال رسالة WhatsApp تذكير بالدفع لـ {unpaidStudents.filter(s => s.phone).length} طالب لم يدفعوا لشهر {formatMonthYearAr(selectedMonth, selectedYear)}.
-              {unpaidStudents.filter(s => !s.phone).length > 0 && (
+              سيتم إرسال رسالة WhatsApp تذكير بالدفع لـ{" "}
+              {getWhatsAppTargetStudents(whatsappTarget).filter((s) => s.phone).length} طالب (
+              {getWhatsAppTargetLabel(whatsappTarget)}) لشهر {formatMonthYearAr(selectedMonth, selectedYear)}.
+              {getWhatsAppTargetStudents(whatsappTarget).filter((s) => !s.phone).length > 0 && (
                 <span className="block mt-2 text-warning">
-                  ⚠️ {unpaidStudents.filter(s => !s.phone).length} طالب بدون رقم هاتف لن يتم إرسال تذكير لهم.
+                  ⚠️ {getWhatsAppTargetStudents(whatsappTarget).filter((s) => !s.phone).length} طالب بدون رقم هاتف لن
+                  يتم إرسال تذكير لهم.
                 </span>
               )}
             </DialogDescription>
