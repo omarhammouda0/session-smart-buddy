@@ -297,8 +297,6 @@ const Index = () => {
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
 
-  const selectedMonth = now.getMonth();
-  const selectedYear = now.getFullYear();
   const todayStr = format(now, "yyyy-MM-dd");
 
   // Get ALL students with today's sessions (no filter)
