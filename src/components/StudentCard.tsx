@@ -1,46 +1,3 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Student, SessionType, AppSettings, Session } from "@/types/student";
-import { EditStudentDialog } from "@/components/EditStudentDialog";
-import { cn } from "@/lib/utils";
-import { DAY_NAMES_SHORT_AR, formatDurationAr } from "@/lib/arabicConstants";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-
-interface StudentCardProps {
-  student: Student;
-  students?: Student[];
-  settings?: AppSettings;
-  selectedDayOfWeek: number;
-  todaySessions?: Session[];
-  onRemove: () => void;
-  onUpdateName: (name: string) => void;
-  onUpdateTime: (time: string) => void;
-  onUpdatePhone: (phone: string) => void;
-  onUpdateSessionType: (type: SessionType) => void;
-  onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
-  onUpdateDuration?: (duration: number) => void;
-  onUpdateCustomSettings?: (settings: {
-    useCustomSettings?: boolean;
-    sessionDuration?: number;
-    customPriceOnsite?: number;
-    customPriceOnline?: number;
-  }) => void;
-  onToggleComplete?: (studentId: string, sessionId: string) => void;
-  onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
-}
-
 export const StudentCard = ({
   student,
   students = [],
@@ -124,18 +81,18 @@ export const StudentCard = ({
               ))}
             </div>
 
-     {student.phone && (
-  
-    href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mt-2"
-  >
-    <Phone className="h-3.5 w-3.5" />
-    {student.phone}
-  </a>
-)}
-          
+            {/* FIXED: Proper anchor tag structure */}
+            {student.phone && (
+              <a
+                href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mt-2"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                {student.phone}
+              </a>
+            )}
           </div>
 
           <AlertDialog>
@@ -167,8 +124,8 @@ export const StudentCard = ({
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </CardHeader>
-
+      </CardHeader>{" "}
+      {/* Added closing tag */}
       {/* Today's Sessions List */}
       {todaySessions && todaySessions.length > 0 && (
         <CardContent className="p-4 sm:p-5 space-y-3">
@@ -311,4 +268,4 @@ export const StudentCard = ({
       )}
     </Card>
   );
-};
+}; // Added closing brace for the component
