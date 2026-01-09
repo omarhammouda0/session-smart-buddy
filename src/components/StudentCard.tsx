@@ -1,4 +1,4 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check, DollarSign } from "lucide-react";
+import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +39,6 @@ interface StudentCardProps {
   }) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
-  onQuickPayment?: (studentId: string, sessionDate: string) => void;
 }
 
 export const StudentCard = ({
@@ -58,10 +57,10 @@ export const StudentCard = ({
   onUpdateCustomSettings,
   onToggleComplete,
   onCancelSession,
-  onQuickPayment,
 }: StudentCardProps) => {
   return (
     <Card className={cn("card-shadow transition-all duration-300 overflow-hidden border-2")} dir="rtl">
+      {/* Student Header */}
       <CardHeader className="p-4 sm:p-5 bg-gradient-to-r from-card to-primary/5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -110,23 +109,25 @@ export const StudentCard = ({
                 )}
               </Badge>
 
-              {student.scheduleDays.map((d) => (
-                <span
-                  key={d.dayOfWeek}
-                  className={cn(
-                    "text-xs px-2.5 py-1 rounded-full font-medium",
-                    d.dayOfWeek === selectedDayOfWeek
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {DAY_NAMES_SHORT_AR[d.dayOfWeek]}
-                </span>
-              ))}
+              {student.scheduleDays &&
+                student.scheduleDays.map((d) => (
+                  <span
+                    key={d.dayOfWeek}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-full font-medium",
+                      d.dayOfWeek === selectedDayOfWeek
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {DAY_NAMES_SHORT_AR[d.dayOfWeek]}
+                  </span>
+                ))}
             </div>
 
+            {/* Phone number link */}
             {student.phone && (
-              
+              <a
                 href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -169,6 +170,7 @@ export const StudentCard = ({
         </div>
       </CardHeader>
 
+      {/* Today's Sessions List */}
       {todaySessions && todaySessions.length > 0 && (
         <CardContent className="p-4 sm:p-5 space-y-3">
           <div className="flex items-center justify-between mb-3">
@@ -193,6 +195,7 @@ export const StudentCard = ({
                   )}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* Status Icon */}
                     <div
                       className={cn(
                         "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
@@ -210,8 +213,11 @@ export const StudentCard = ({
                       )}
                     </div>
 
+                    {/* Session Time */}
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-bold text-base">{sessionTime}</span>
+
+                      {/* Status Badge */}
                       <Badge
                         className={cn(
                           "text-xs",
@@ -225,20 +231,10 @@ export const StudentCard = ({
                     </div>
                   </div>
 
+                  {/* Action Buttons - ONLY for scheduled sessions */}
                   {isScheduled && (
                     <div className="flex items-center gap-1 shrink-0">
-                      {onQuickPayment && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
-                          title="تسجيل دفع"
-                          onClick={() => onQuickPayment(student.id, session.date)}
-                        >
-                          <DollarSign className="h-4 w-4" />
-                        </Button>
-                      )}
-
+                      {/* Complete Button */}
                       {onToggleComplete && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -271,6 +267,7 @@ export const StudentCard = ({
                         </AlertDialog>
                       )}
 
+                      {/* Cancel Button */}
                       {onCancelSession && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
