@@ -3,8 +3,6 @@ import {
   GraduationCap,
   BookOpen,
   CreditCard,
-  ChevronLeft,
-  ChevronRight,
   Users,
   X,
   Trash2,
@@ -66,7 +64,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 const Index = () => {
   const now = new Date();
-  const [selectedDayOfWeek] = useState(now.getDay()); // Locked to today
+  const [selectedDayOfWeek] = useState(now.getDay());
   const [activeTab, setActiveTab] = useState("sessions");
   const [studentFilter, setStudentFilter] = useState<string>("all");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
@@ -265,13 +263,17 @@ const Index = () => {
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
 
-  // ✅ NEW: Today's date string
+  // ✅ Today's date string
   const todayStr = format(now, "yyyy-MM-dd");
 
+  // ✅ FIXED: Get students who actually have sessions TODAY
   const getStudentsForDay = () => {
-    return students.filter((student) => {
-      return student.scheduleDays.some((d) => d.dayOfWeek === selectedDayOfWeek);
-    });
+    return students
+      .map((student) => ({
+        ...student,
+        todaySessions: student.sessions.filter((s) => s.date === todayStr),
+      }))
+      .filter((student) => student.todaySessions.length > 0);
   };
 
   const studentsForDay = getStudentsForDay();
@@ -295,7 +297,7 @@ const Index = () => {
       });
   }, [students, allStudentsSearch]);
 
-  // ✅ NEW: Calculate today's sessions dynamically with useMemo
+  // ✅ Calculate today's sessions dynamically
   const todaysSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr);
@@ -345,7 +347,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen safe-bottom relative" dir="rtl">
-      {/* ✅ Animated Background */}
+      {/* Animated Background */}
       <div
         className="fixed inset-0 -z-10"
         style={{
@@ -569,7 +571,7 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-4 sm:px-4 sm:py-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto">
-        {/* ✅ Welcome Card */}
+        {/* Welcome Card */}
         {students.length > 0 && activeTab === "sessions" && (
           <div className="relative animate-fade-in-up">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-3xl blur-2xl opacity-50" />
@@ -805,7 +807,7 @@ const Index = () => {
                           students={students}
                           settings={settings}
                           selectedDayOfWeek={selectedDayOfWeek}
-                          todaySessions={student.sessions.filter((s) => s.date === todayStr)}
+                          todaySessions={student.todaySessions}
                           onRemove={() => removeStudent(student.id)}
                           onUpdateName={(name) => updateStudentName(student.id, name)}
                           onUpdateTime={(time) => updateStudentTime(student.id, time)}
