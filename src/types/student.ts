@@ -59,18 +59,36 @@ export interface Student {
   cancellationPolicy?: CancellationPolicy;
 }
 
-// ✅ ADD THIS TYPE (NEW!)
+// ✅ NEW: Payment method type
 export type PaymentMethod = "cash" | "bank" | "wallet";
 
-// ✅ MODIFIED MonthlyPayment interface with NEW fields
+// ✅ NEW: Payment status for partial payments
+export type PaymentStatus = "unpaid" | "partial" | "paid";
+
+// ✅ NEW: Individual payment record (for tracking multiple payments in same month)
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  paidAt: string;
+  notes?: string;
+}
+
+// ✅ UPDATED: MonthlyPayment with partial payment support
 export interface MonthlyPayment {
   month: number; // 0-11
   year: number;
-  isPaid: boolean;
+  isPaid: boolean; // Kept for backwards compatibility
   paidAt?: string;
-  amount?: number; // ← NEW: Payment amount
-  method?: PaymentMethod; // ← NEW: Payment method (cash/bank/wallet)
-  notes?: string; // ← NEW: Payment notes
+  // ✅ NEW FIELDS FOR PARTIAL PAYMENTS:
+  amountDue?: number; // Total amount expected for this month
+  amountPaid?: number; // Total amount paid so far
+  paymentStatus?: PaymentStatus; // unpaid | partial | paid
+  paymentRecords?: PaymentRecord[]; // Array of all payments made
+  // Legacy fields (still supported):
+  amount?: number;
+  method?: PaymentMethod;
+  notes?: string;
 }
 
 export interface StudentPayments {
