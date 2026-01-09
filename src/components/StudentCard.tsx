@@ -25,7 +25,7 @@ interface StudentCardProps {
   students?: Student[];
   settings?: AppSettings;
   selectedDayOfWeek: number;
-  todaySessions?: Session[]; // ✅ NEW: Array of today's sessions
+  todaySessions?: Session[];
   onRemove: () => void;
   onUpdateName: (name: string) => void;
   onUpdateTime: (time: string) => void;
@@ -46,7 +46,7 @@ export const StudentCard = ({
   students = [],
   settings,
   selectedDayOfWeek,
-  todaySessions = [], // ✅ NEW
+  todaySessions = [],
   onRemove,
   onUpdateName,
   onUpdateTime,
@@ -183,7 +183,7 @@ export const StudentCard = ({
         </div>
       </CardHeader>
 
-      {/* ✅ NEW: Today's Sessions List */}
+      {/* Today's Sessions List */}
       {todaySessions && todaySessions.length > 0 && (
         <CardContent className="p-4 sm:p-5 space-y-3">
           <div className="flex items-center justify-between mb-3">
