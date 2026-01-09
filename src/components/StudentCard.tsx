@@ -1,3 +1,47 @@
+import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Student, SessionType, AppSettings, Session } from "@/types/student";
+import { EditStudentDialog } from "@/components/EditStudentDialog";
+import { cn } from "@/lib/utils";
+import { DAY_NAMES_SHORT_AR, formatDurationAr } from "@/lib/arabicConstants";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+interface StudentCardProps {
+  student: Student;
+  students?: Student[];
+  settings?: AppSettings;
+  selectedDayOfWeek: number;
+  todaySessions?: Session[];
+  onRemove: () => void;
+  onUpdateName: (name: string) => void;
+  onUpdateTime: (time: string) => void;
+  onUpdatePhone: (phone: string) => void;
+  onUpdateSessionType: (type: SessionType) => void;
+  onUpdateSchedule: (days: number[], start?: string, end?: string) => void;
+  onUpdateDuration?: (duration: number) => void;
+  onUpdateCustomSettings?: (settings: {
+    useCustomSettings?: boolean;
+    sessionDuration?: number;
+    customPriceOnsite?: number;
+    customPriceOnline?: number;
+  }) => void;
+  onToggleComplete?: (studentId: string, sessionId: string) => void;
+  onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
+  onQuickPayment?: (studentId: string, sessionDate: string) => void;
+}
+
 export const StudentCard = ({
   student,
   students = [],
@@ -14,10 +58,10 @@ export const StudentCard = ({
   onUpdateCustomSettings,
   onToggleComplete,
   onCancelSession,
+  onQuickPayment,
 }: StudentCardProps) => {
   return (
     <Card className={cn("card-shadow transition-all duration-300 overflow-hidden border-2")} dir="rtl">
-      {/* Student Header */}
       <CardHeader className="p-4 sm:p-5 bg-gradient-to-r from-card to-primary/5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -81,9 +125,8 @@ export const StudentCard = ({
               ))}
             </div>
 
-            {/* FIXED: Proper anchor tag structure */}
             {student.phone && (
-              <a
+              
                 href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -124,9 +167,8 @@ export const StudentCard = ({
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </CardHeader>{" "}
-      {/* Added closing tag */}
-      {/* Today's Sessions List */}
+      </CardHeader>
+
       {todaySessions && todaySessions.length > 0 && (
         <CardContent className="p-4 sm:p-5 space-y-3">
           <div className="flex items-center justify-between mb-3">
@@ -151,7 +193,6 @@ export const StudentCard = ({
                   )}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* Status Icon */}
                     <div
                       className={cn(
                         "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
@@ -169,11 +210,8 @@ export const StudentCard = ({
                       )}
                     </div>
 
-                    {/* Session Time */}
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-bold text-base">{sessionTime}</span>
-
-                      {/* Status Badge */}
                       <Badge
                         className={cn(
                           "text-xs",
@@ -187,10 +225,20 @@ export const StudentCard = ({
                     </div>
                   </div>
 
-                  {/* Action Buttons - ONLY for scheduled sessions */}
                   {isScheduled && (
                     <div className="flex items-center gap-1 shrink-0">
-                      {/* Complete Button */}
+                      {onQuickPayment && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
+                          title="تسجيل دفع"
+                          onClick={() => onQuickPayment(student.id, session.date)}
+                        >
+                          <DollarSign className="h-4 w-4" />
+                        </Button>
+                      )}
+
                       {onToggleComplete && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -223,7 +271,6 @@ export const StudentCard = ({
                         </AlertDialog>
                       )}
 
-                      {/* Cancel Button */}
                       {onCancelSession && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -268,4 +315,4 @@ export const StudentCard = ({
       )}
     </Card>
   );
-}; // Added closing brace for the component
+};
