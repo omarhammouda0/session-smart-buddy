@@ -311,7 +311,7 @@ export const SessionHistoryBar = ({
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-heading flex items-center gap-2">
           <History className="h-4 w-4" />
-          السجل
+          إدارة الحصصة
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">اختر طالب لإضافة حصص جديدة أو عرض السجل</p>
       </CardHeader>
