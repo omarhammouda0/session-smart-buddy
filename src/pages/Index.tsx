@@ -302,7 +302,7 @@ const Index = () => {
         <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
       </div>;
   }
-  return <div dir="rtl" className="min-h-screen safe-bottom relative text-[sidebar-accent-foreground] text-red-950 mx-px my-0 px-0 py-0 pr-0 pb-0">
+  return <div dir="rtl" className="min-h-screen safe-bottom relative">
       {/* Animated Background */}
       <div className="fixed inset-0 -z-10" style={{
       background: `
@@ -362,27 +362,27 @@ const Index = () => {
       {/* Header */}
       <header className="bg-card/90 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-lg">
         <div className="px-3 py-3 sm:px-4 sm:py-4">
-          <div className="gap-3 bg-lime-600 shadow-sm rounded-full border-dotted border-4 flex-row flex items-center justify-between mx-[10px] my-[10px] px-[102px] py-[11px]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-xl flex items-center justify-center shrink-0 ring-4 ring-primary/10 animate-pulse-slow">
-                <GraduationCap className="h-6 w-6 text-primary-foreground drop-shadow-lg" />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-xl flex items-center justify-center shrink-0 ring-4 ring-primary/10 animate-pulse-slow">
+                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground drop-shadow-lg" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-heading font-bold text-lg sm:text-xl leading-tight truncate bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent">
+                <h1 className="font-heading font-bold text-base sm:text-xl leading-tight truncate bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent">
                   متابعة الطلاب
                 </h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">إدارة احترافية للحصص</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium hidden xs:block">إدارة احترافية للحصص</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1.5">
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-10 px-3 sm:px-4 gap-2 rounded-xl border-2 hover:border-primary hover:bg-primary/10 transition-all hover:scale-105 shadow-md relative overflow-hidden group">
+                  <Button variant="outline" size="sm" className="h-10 w-10 sm:w-auto sm:px-4 gap-2 rounded-xl border-2 hover:border-primary hover:bg-primary/10 transition-all active:scale-95 shadow-md relative overflow-hidden group touch-manipulation">
                     <div className="absolute inset-0 shimmer group-hover:opacity-100 opacity-0 transition-opacity" />
                     <Users className="h-4 w-4 relative z-10" />
                     <span className="hidden sm:inline text-sm font-semibold relative z-10">الطلاب</span>
-                    <Badge className="relative z-10 bg-primary text-primary-foreground shadow-sm">
+                    <Badge className="relative z-10 bg-primary text-primary-foreground shadow-sm hidden sm:flex">
                       {students.length}
                     </Badge>
                   </Button>
@@ -560,21 +560,21 @@ const Index = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-4 mb-5 h-13 bg-gradient-to-br from-muted/80 to-muted/50 p-1.5 rounded-2xl shadow-lg backdrop-blur-md border border-border/50">
-            <TabsTrigger value="sessions" className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105">
-              <BookOpen className="h-4 w-4" />
+          <TabsList className="w-full grid grid-cols-4 mb-5 h-14 bg-gradient-to-br from-muted/80 to-muted/50 p-1.5 rounded-2xl shadow-lg backdrop-blur-md border border-border/50">
+            <TabsTrigger value="sessions" className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]">
+              <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden xs:inline">الحصص</span>
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105">
-              <CalendarDays className="h-4 w-4" />
+            <TabsTrigger value="calendar" className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]">
+              <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden xs:inline">التقويم</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105">
-              <History className="h-4 w-4" />
+            <TabsTrigger value="history" className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]">
+              <History className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden xs:inline">السجل</span>
             </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105">
-              <CreditCard className="h-4 w-4" />
+            <TabsTrigger value="payments" className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden xs:inline">المدفوعات</span>
             </TabsTrigger>
           </TabsList>

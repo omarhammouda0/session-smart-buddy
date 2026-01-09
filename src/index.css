@@ -192,6 +192,14 @@
     padding-top: env(safe-area-inset-top, 0);
   }
 
+  .safe-left {
+    padding-left: env(safe-area-inset-left, 0);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
   /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -199,5 +207,41 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Smooth momentum scrolling for iOS */
+  .scroll-smooth-ios {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+  }
+
+  /* Prevent text selection on interactive elements */
+  .select-none-touch {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Better active states for touch */
+  .active-scale {
+    @apply active:scale-95 transition-transform;
+  }
+
+  /* Minimum touch target size (44x44 is Apple's recommendation) */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Extra small breakpoint */
+@media (min-width: 375px) {
+  .xs\:inline {
+    display: inline !important;
+  }
+  .xs\:block {
+    display: block !important;
+  }
+  .xs\:flex {
+    display: flex !important;
   }
 }
