@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { BookOpen, CalendarDays, History, CreditCard, Users } from "lucide-react";
+import { BookOpen, CalendarDays, History, CreditCard, Users, Clock, MapPin } from "lucide-react";
 
 import { useStudents } from "@/hooks/useStudents";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
@@ -59,6 +59,8 @@ const Index = () => {
       .sort((a, b) => (a.sessionTime || "16:00").localeCompare(b.sessionTime || "16:00"));
   }, [students, selectedDayOfWeek]);
 
+  const nextSession = studentsForDay[0];
+
   const allStudentsFiltered = useMemo(() => {
     const q = allStudentsSearch.trim().toLowerCase();
     return students.filter((s) => q === "" || s.name.toLowerCase().includes(q));
@@ -70,9 +72,9 @@ const Index = () => {
 
   return (
     <div dir="rtl" className="min-h-screen relative bg-background overflow-hidden">
-      {/* 🌈 Animated hero background */}
+      {/* 🌈 Hero background */}
       <div
-        className="absolute top-0 left-0 right-0 h-[280px] -z-10
+        className="absolute top-0 left-0 right-0 h-[260px] -z-10
                    bg-gradient-to-br from-primary/25 via-purple-500/10 to-blue-500/20
                    bg-[length:400%_400%] animate-gradient"
       />
@@ -81,10 +83,8 @@ const Index = () => {
       <div className="sticky top-3 z-50 flex justify-center px-3">
         <div
           className="flex items-center gap-1.5 sm:gap-2 px-3 py-2 rounded-2xl
-                     bg-background/80 backdrop-blur-xl border border-border
-                     shadow-lg"
+                        bg-background/80 backdrop-blur-xl border border-border shadow-lg"
         >
-          {/* ➕ Add Student */}
           <AddStudentDialog
             onAdd={addStudent}
             defaultStart={settings.defaultSemesterStart}
@@ -93,13 +93,11 @@ const Index = () => {
             defaultDuration={settings.defaultSessionDuration}
           />
 
-          {/* 👥 All Students */}
           <Sheet>
             <SheetTrigger asChild>
               <button
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-xl
-                           bg-accent/40 hover:bg-accent transition
-                           text-sm font-medium"
+                                 bg-accent/40 hover:bg-accent transition text-sm font-medium"
               >
                 <Users className="h-4 w-4" />
                 جميع الطلاب
@@ -137,7 +135,6 @@ const Index = () => {
 
           <div className="w-px h-6 bg-border mx-1" />
 
-          {/* Secondary actions */}
           <SemesterSettings settings={settings} onUpdate={updateSettings} />
           <ReminderSettingsDialog />
           <ReminderHistoryDialog />
@@ -152,8 +149,8 @@ const Index = () => {
         </div>
       </div>
 
-      {/* ================= Main Content ================= */}
-      <main className="max-w-4xl mx-auto px-4 pt-10 pb-12 space-y-10">
+      {/* ================= Main ================= */}
+      <main className="max-w-4xl mx-auto px-4 pt-8 pb-12 space-y-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-4 bg-background/70 backdrop-blur rounded-xl p-1 shadow">
             <TabsTrigger value="sessions">
@@ -175,42 +172,72 @@ const Index = () => {
           </TabsList>
 
           {/* ================= TODAY ================= */}
-          <TabsContent value="sessions" className="space-y-8">
+          <TabsContent value="sessions" className="space-y-6">
             {students.length === 0 ? (
               <EmptyState />
             ) : (
               <>
-                <div className="text-center space-y-1 animate-in fade-in slide-in-from-top-4 duration-300">
+                {/* Hero */}
+                <div className="text-center space-y-1">
                   <p className="text-sm text-muted-foreground">⚡ اليوم</p>
                   <h1 className="text-4xl font-heading font-bold">{studentsForDay.length} حصص</h1>
-                  <p className="text-sm text-muted-foreground">{DAY_NAMES_AR[selectedDayOfWeek]} • لنبدأ</p>
+                  <p className="text-sm text-muted-foreground">{DAY_NAMES_AR[selectedDayOfWeek]}</p>
                 </div>
 
-                {studentsForDay.length === 0 ? (
-                  <p className="text-center text-muted-foreground">لا توجد حصص اليوم</p>
-                ) : (
-                  <div className="grid gap-4 animate-in fade-in slide-in-from-bottom-3 duration-300">
-                    {studentsForDay.map((student) => (
-                      <StudentCard
-                        key={student.id}
-                        student={student}
-                        students={students}
-                        settings={settings}
-                        selectedDayOfWeek={selectedDayOfWeek}
-                        onRemove={() => {}}
-                        onUpdateName={() => {}}
-                        onUpdateTime={() => {}}
-                        onUpdatePhone={() => {}}
-                        onUpdateSessionType={() => {}}
-                        onUpdateSchedule={() => {}}
-                        onUpdateDuration={() => {}}
-                        onUpdateCustomSettings={() => {}}
-                      />
-                    ))}
+                {/* Status Strip */}
+                {nextSession && (
+                  <div className="flex justify-center">
+                    <div
+                      className="flex items-center gap-4 px-4 py-2 rounded-xl
+                                    bg-background/70 backdrop-blur border shadow-sm text-sm"
+                    >
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {nextSession.sessionTime}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        {nextSession.name}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        {nextSession.sessionType === "online" ? "أونلاين" : "حضوري"}
+                      </span>
+                    </div>
                   </div>
                 )}
 
-                <div className="pt-6 text-center space-y-2">
+                {/* Sessions Section */}
+                <section className="space-y-3">
+                  <h3 className="text-sm font-medium text-muted-foreground text-center">حصص اليوم</h3>
+
+                  {studentsForDay.length === 0 ? (
+                    <p className="text-center text-muted-foreground">لا توجد حصص اليوم</p>
+                  ) : (
+                    <div className="grid gap-4">
+                      {studentsForDay.map((student) => (
+                        <StudentCard
+                          key={student.id}
+                          student={student}
+                          students={students}
+                          settings={settings}
+                          selectedDayOfWeek={selectedDayOfWeek}
+                          onRemove={() => {}}
+                          onUpdateName={() => {}}
+                          onUpdateTime={() => {}}
+                          onUpdatePhone={() => {}}
+                          onUpdateSessionType={() => {}}
+                          onUpdateSchedule={() => {}}
+                          onUpdateDuration={() => {}}
+                          onUpdateCustomSettings={() => {}}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {/* Day selector */}
+                <div className="pt-4 text-center space-y-2">
                   <p className="text-xs text-muted-foreground">يوم آخر؟</p>
                   <div className="flex justify-center gap-1 flex-wrap">
                     {DAY_NAMES_SHORT_AR.map((day, i) => (
@@ -221,7 +248,7 @@ const Index = () => {
                           "px-3 py-2 rounded-lg text-sm transition",
                           selectedDayOfWeek === i
                             ? "bg-primary text-primary-foreground"
-                            : "bg-background/70 backdrop-blur hover:bg-accent",
+                            : "bg-background/70 hover:bg-accent",
                         )}
                       >
                         {day}
@@ -233,12 +260,10 @@ const Index = () => {
             )}
           </TabsContent>
 
-          {/* ================= CALENDAR ================= */}
           <TabsContent value="calendar">
             <CalendarView students={students} onRescheduleSession={rescheduleSession} />
           </TabsContent>
 
-          {/* ================= HISTORY ================= */}
           <TabsContent value="history">
             <SessionHistoryBar
               students={students}
@@ -256,7 +281,6 @@ const Index = () => {
             />
           </TabsContent>
 
-          {/* ================= PAYMENTS ================= */}
           <TabsContent value="payments" className="space-y-4">
             <StatsBar
               students={students}
@@ -264,7 +288,6 @@ const Index = () => {
               selectedMonth={now.getMonth()}
               selectedYear={now.getFullYear()}
             />
-
             <PaymentsDashboard
               students={students}
               payments={payments}
