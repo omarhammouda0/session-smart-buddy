@@ -56,23 +56,6 @@ export const StudentCard = ({
   onUpdateDuration,
   onUpdateCustomSettings,
 }: StudentCardProps) => {
-  const defaultPriceOnsite = settings?.defaultPriceOnsite ?? 150;
-  const defaultPriceOnline = settings?.defaultPriceOnline ?? 120;
-
-  const effectivePrice = (() => {
-    if (student.useCustomSettings) {
-      if ((student.sessionType || "onsite") === "online") {
-        return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
-          ? student.customPriceOnline
-          : defaultPriceOnline;
-      }
-      return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
-        ? student.customPriceOnsite
-        : defaultPriceOnsite;
-    }
-    return (student.sessionType || "onsite") === "online" ? defaultPriceOnline : defaultPriceOnsite;
-  })();
-
   return (
     <Card className={cn("card-shadow transition-all duration-300 overflow-hidden border-2")} dir="rtl">
       {/* Student Header */}
@@ -140,7 +123,7 @@ export const StudentCard = ({
             </div>
 
             {student.phone && (
-              <a
+              
                 href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -254,7 +237,7 @@ export const StudentCard = ({
                       </div>
                     </div>
 
-                    {/* Session Type & Duration */}
+                    {/* Session Duration */}
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         {formatDurationAr(student.sessionDuration || 60)}
