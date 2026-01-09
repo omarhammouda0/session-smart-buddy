@@ -276,9 +276,9 @@ const Index = () => {
 
   // ✅ ADDED: Quick payment handler
   const handleQuickPayment = (studentId: string, sessionDate: string) => {
-    const student = students.find(s => s.id === studentId);
+    const student = students.find((s) => s.id === studentId);
     if (!student) return;
-    
+
     setQuickPaymentDialog({
       open: true,
       student,
@@ -303,10 +303,7 @@ const Index = () => {
       notes: `دفعة من حصة ${quickPaymentDialog.sessionDate}`,
     });
 
-    const methodLabel = 
-      method === 'cash' ? 'كاش' : 
-      method === 'bank' ? 'تحويل بنكي' : 
-      'محفظة إلكترونية';
+    const methodLabel = method === "cash" ? "كاش" : method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
 
     toast({
       title: "✅ تم تسجيل الدفعة",
@@ -888,9 +885,8 @@ const Index = () => {
                       onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
                       onToggleComplete={handleToggleComplete}
                       onCancelSession={handleCancelSession}
-                      onQuickPayment={handleQuickPayment} {/* ✅ ADDED THIS PROP */}
+                      onQuickPayment={handleQuickPayment}
                     />
-                 
                   </div>
                 ))}
               </div>
