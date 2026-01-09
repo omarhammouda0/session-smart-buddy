@@ -44,8 +44,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DAY_NAMES_SHORT_AR, DAY_NAMES_AR, formatShortDateAr } from "@/lib/arabicConstants";
+import { DAY_NAMES_SHORT_AR, formatShortDateAr } from "@/lib/arabicConstants";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -60,11 +59,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+
 const Index = () => {
   const now = new Date();
   const [selectedDayOfWeek] = useState(now.getDay());
   const [activeTab, setActiveTab] = useState("sessions");
-  const [studentFilter, setStudentFilter] = useState<string>("all");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
   const [addConflictDialog, setAddConflictDialog] = useState<{
     open: boolean;
@@ -77,6 +76,7 @@ const Index = () => {
       time: string;
     };
   } | null>(null);
+
   const {
     students,
     payments,
@@ -107,6 +107,7 @@ const Index = () => {
     bulkMarkAsVacation,
     updateSessionDetails,
   } = useStudents();
+
   const {
     getCancellationCount,
     getAllStudentCancellations,
@@ -114,37 +115,25 @@ const Index = () => {
     removeCancellation,
     clearMonthCancellations,
   } = useCancellationTracking(students);
+
   const { checkConflict } = useConflictDetection(students);
 
   const handleAddSession = (studentId: string, date: string, customTime?: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
-    // ✅ Use custom time if provided, otherwise use student's default time
-    const sessionTime = customTime || student.sessionTime || "16:00";
+    const sessionTime = customTime || student.sessionTime;
 
-    console.log("🔍 DEBUG - Adding session:", {
-      studentId,
-      studentName: student.name,
-      date,
-      sessionTime,
-      customTime,
-    });
-
-    // ✅ Pass studentId as third parameter to skip same student's sessions
     const conflictResult = checkConflict(
       {
         date,
         startTime: sessionTime,
       },
-      undefined, // No session to exclude
-      studentId, // ✅ Skip this student's existing sessions
+      undefined,
+      studentId,
     );
 
-    console.log("🔍 DEBUG - Conflict check result:", conflictResult);
-
     if (conflictResult.severity === "error") {
-      console.log("❌ BLOCKED by error conflict");
       setAddConflictDialog({
         open: true,
         studentId,
@@ -160,7 +149,6 @@ const Index = () => {
     }
 
     if (conflictResult.severity === "warning") {
-      console.log("⚠️ BLOCKED by warning conflict");
       setAddConflictDialog({
         open: true,
         studentId,
@@ -175,11 +163,8 @@ const Index = () => {
       return;
     }
 
-    console.log("✅ Proceeding to add session");
-    // ✅ Pass custom time to addExtraSession
     addExtraSession(studentId, date, sessionTime);
 
-    console.log("✅ Session added, showing toast");
     toast({
       title: "تمت إضافة الحصة",
       description: `حصة جديدة بتاريخ ${format(parseISO(date), "dd/MM/yyyy")} الساعة ${sessionTime}${student ? ` لـ ${student.name}` : ""}`,
@@ -197,6 +182,7 @@ const Index = () => {
     });
     setAddConflictDialog(null);
   };
+
   const handleCancelSession = async (studentId: string, sessionId: string, reason?: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -238,6 +224,7 @@ const Index = () => {
       });
     }
   };
+
   const handleDeleteSession = (studentId: string, sessionId: string) => {
     deleteSession(studentId, sessionId);
     toast({
@@ -245,6 +232,7 @@ const Index = () => {
       description: "تم حذف الحصة نهائياً",
     });
   };
+
   const handleRestoreSession = async (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -257,6 +245,7 @@ const Index = () => {
       description: "تم استعادة الحصة وتحديث عداد الإلغاءات",
     });
   };
+
   const handleToggleComplete = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
@@ -267,6 +256,7 @@ const Index = () => {
       description: wasCompleted ? "تم إرجاع الحصة إلى مجدولة" : "أحسنت! تم تسجيل الحصة كمكتملة",
     });
   };
+
   const handleMarkAsVacation = (studentId: string, sessionId: string) => {
     markSessionAsVacation(studentId, sessionId);
     toast({
@@ -274,65 +264,72 @@ const Index = () => {
       description: "لن يتم احتساب هذه الحصة في المدفوعات",
     });
   };
+
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
-
-  // ✅ Today's date string
   const todayStr = format(now, "yyyy-MM-dd");
 
-  // ✅ FIXED: Get students who actually have sessions TODAY
-  const getStudentsForDay = () => {
+  // Get ALL students with today's sessions (no filter)
+  const studentsForDay = useMemo(() => {
     return students
       .map((student) => ({
         ...student,
-        todaySessions: student.sessions.filter((s) => s.date === todayStr),
+        todaySessions: student.sessions
+          .filter((s) => s.date === todayStr)
+          .sort((a, b) => {
+            const timeA = a.time || student.sessionTime;
+            const timeB = b.time || student.sessionTime;
+            return (timeA || "").localeCompare(timeB || "");
+          }),
       }))
-      .filter((student) => student.todaySessions.length > 0);
-  };
-  const studentsForDay = getStudentsForDay();
-  const filteredStudents = studentsForDay
-    .filter((s) => studentFilter === "all" || s.id === studentFilter)
-    .sort((a, b) => {
-      const timeA = a.sessionTime || "16:00";
-      const timeB = b.sessionTime || "16:00";
-      return timeA.localeCompare(timeB);
-    });
+      .filter((student) => student.todaySessions.length > 0)
+      .sort((a, b) => {
+        // Sort by earliest session time
+        const timeA = a.todaySessions[0]?.time || a.sessionTime;
+        const timeB = b.todaySessions[0]?.time || b.sessionTime;
+        return (timeA || "").localeCompare(timeB || "");
+      });
+  }, [students, todayStr]);
+
   const allStudentsSortedByTime = useMemo(() => {
     const searchLower = allStudentsSearch.trim().toLowerCase();
     return [...students]
       .filter((s) => searchLower === "" || s.name.toLowerCase().includes(searchLower))
       .sort((a, b) => {
-        const timeA = a.sessionTime || "16:00";
-        const timeB = b.sessionTime || "16:00";
-        return timeA.localeCompare(timeB);
+        const timeA = a.sessionTime;
+        const timeB = b.sessionTime;
+        return (timeA || "").localeCompare(timeB || "");
       });
   }, [students, allStudentsSearch]);
 
-  // ✅ Calculate today's sessions dynamically
   const todaysSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr);
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
+
   const todaysCompletedSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "completed");
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
+
   const todaysScheduledSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled");
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
+
   const getGreeting = () => {
     const hour = now.getHours();
     if (hour < 12) return "صباح الخير";
     if (hour < 18) return "مساءً سعيداً";
     return "مساء الخير";
   };
+
   const getMotivationalMessage = () => {
     if (todaysSessions === 0)
       return {
@@ -358,7 +355,9 @@ const Index = () => {
       color: "from-primary to-primary/70",
     };
   };
+
   const motivational = getMotivationalMessage();
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -366,6 +365,7 @@ const Index = () => {
       </div>
     );
   }
+
   return (
     <div dir="rtl" className="min-h-screen safe-bottom relative">
       {/* Animated Background */}
@@ -495,7 +495,7 @@ const Index = () => {
                             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {student.sessionTime || "16:00"}
+                                {student.sessionTime}
                               </span>
                               <span>•</span>
                               <span className="flex items-center gap-1">
@@ -767,94 +767,51 @@ const Index = () => {
           <TabsContent value="sessions" className="mt-0 space-y-4">
             {students.length === 0 ? (
               <EmptyState />
+            ) : studentsForDay.length === 0 ? (
+              <Card className="border-2 border-dashed bg-card/50 backdrop-blur-sm shadow-lg">
+                <CardContent className="p-10 text-center">
+                  <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center shadow-lg">
+                    <CalendarDays className="h-10 w-10 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-bold text-xl mb-2">لا توجد حصص مجدولة اليوم</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {format(now, "EEEE، dd MMMM yyyy", {
+                      locale: ar,
+                    })}
+                  </p>
+                  <Badge className="bg-primary/10 text-primary border-primary/20">استمتع بيومك! 🌟</Badge>
+                </CardContent>
+              </Card>
             ) : (
-              <>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={studentFilter}
-                      onValueChange={(value) => {
-                        setStudentFilter(value);
-                      }}
-                    >
-                      <SelectTrigger className="w-full h-12 rounded-xl border-2 hover:border-primary transition-all bg-card/90 backdrop-blur-sm shadow-md font-medium">
-                        <Users className="h-4 w-4 ml-2 text-muted-foreground shrink-0" />
-                        <SelectValue placeholder="جميع الطلاب" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover z-50">
-                        <SelectItem value="all">جميع الطلاب</SelectItem>
-                        {students.map((student) => (
-                          <SelectItem key={student.id} value={student.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{student.name}</span>
-                              <span className="text-xs text-muted-foreground hidden sm:inline">
-                                ({student.scheduleDays.map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join("، ")})
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {studentFilter !== "all" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-12 w-12 shrink-0 rounded-xl hover:bg-destructive/10 hover:text-destructive border-2 border-transparent hover:border-destructive/50 transition-all"
-                        onClick={() => setStudentFilter("all")}
-                      >
-                        <X className="h-5 w-5" />
-                      </Button>
-                    )}
+              <div className="grid grid-cols-1 gap-4 sm:gap-5">
+                {studentsForDay.map((student, index) => (
+                  <div
+                    key={student.id}
+                    className="animate-fade-in-up"
+                    style={{
+                      animationDelay: `${index * 0.1}s`,
+                    }}
+                  >
+                    <StudentCard
+                      student={student}
+                      students={students}
+                      settings={settings}
+                      selectedDayOfWeek={selectedDayOfWeek}
+                      todaySessions={student.todaySessions}
+                      onRemove={() => removeStudent(student.id)}
+                      onUpdateName={(name) => updateStudentName(student.id, name)}
+                      onUpdateTime={(time) => updateStudentTime(student.id, time)}
+                      onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
+                      onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
+                      onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
+                      onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
+                      onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
+                      onToggleComplete={handleToggleComplete}
+                      onCancelSession={handleCancelSession}
+                    />
                   </div>
-                </div>
-
-                {filteredStudents.length === 0 ? (
-                  <Card className="border-2 border-dashed bg-card/50 backdrop-blur-sm shadow-lg">
-                    <CardContent className="p-10 text-center">
-                      <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center shadow-lg">
-                        <CalendarDays className="h-10 w-10 text-muted-foreground" />
-                      </div>
-                      <h3 className="font-bold text-xl mb-2">
-                        {studentFilter !== "all" ? `لا توجد حصص لهذا الطالب اليوم` : `لا توجد حصص مجدولة اليوم`}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {format(now, "EEEE، dd MMMM yyyy", {
-                          locale: ar,
-                        })}
-                      </p>
-                      <Badge className="bg-primary/10 text-primary border-primary/20">استمتع بيومك! 🌟</Badge>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:gap-5">
-                    {filteredStudents.map((student, index) => (
-                      <div
-                        key={student.id}
-                        className="animate-fade-in-up"
-                        style={{
-                          animationDelay: `${index * 0.1}s`,
-                        }}
-                      >
-                        <StudentCard
-                          student={student}
-                          students={students}
-                          settings={settings}
-                          selectedDayOfWeek={selectedDayOfWeek}
-                          todaySessions={student.todaySessions}
-                          onRemove={() => removeStudent(student.id)}
-                          onUpdateName={(name) => updateStudentName(student.id, name)}
-                          onUpdateTime={(time) => updateStudentTime(student.id, time)}
-                          onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
-                          onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
-                          onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                          onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
-                          onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+                ))}
+              </div>
             )}
           </TabsContent>
 
@@ -923,4 +880,5 @@ const Index = () => {
     </div>
   );
 };
+
 export default Index;
