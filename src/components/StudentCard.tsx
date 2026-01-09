@@ -1,4 +1,4 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Circle } from "lucide-react";
+import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Circle, Check, Ban, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,8 @@ interface StudentCardProps {
     customPriceOnsite?: number;
     customPriceOnline?: number;
   }) => void;
+  onToggleComplete?: (studentId: string, sessionId: string) => void;
+  onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
 }
 
 export const StudentCard = ({
@@ -55,6 +57,8 @@ export const StudentCard = ({
   onUpdateSchedule,
   onUpdateDuration,
   onUpdateCustomSettings,
+  onToggleComplete,
+  onCancelSession,
 }: StudentCardProps) => {
   return (
     <Card className={cn("card-shadow transition-all duration-300 overflow-hidden border-2")} dir="rtl">
@@ -77,16 +81,16 @@ export const StudentCard = ({
                 onUpdateCustomSettings={onUpdateCustomSettings}
               />
             </div>
-            
+
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium px-3 py-1.5 bg-primary/10 text-primary rounded-lg flex items-center gap-1.5 shadow-sm">
                 <Clock className="h-4 w-4" />
-                {student.sessionTime || "16:00"}
+                {student.sessionTime}
                 <span className="text-xs text-muted-foreground">
                   ({formatDurationAr(student.sessionDuration || 60)})
                 </span>
               </span>
-              
+
               <Badge
                 variant="outline"
                 className={cn(
@@ -123,7 +127,7 @@ export const StudentCard = ({
             </div>
 
             {student.phone && (
-              <a
+              
                 href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -170,82 +174,115 @@ export const StudentCard = ({
       {todaySessions && todaySessions.length > 0 && (
         <CardContent className="p-4 sm:p-5 space-y-3">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-sm text-muted-foreground">
-              حصص اليوم ({todaySessions.length})
-            </h4>
+            <h4 className="font-semibold text-sm text-muted-foreground">حصص اليوم ({todaySessions.length})</h4>
           </div>
-          
-          <div className="space-y-2">
-            {todaySessions
-              .sort((a, b) => (a.time || "").localeCompare(b.time || ""))
-              .map((session, index) => {
-                const sessionTime = session.time || student.sessionTime || "16:00";
-                const isCompleted = session.status === "completed";
-                const isCancelled = session.status === "cancelled";
-                
-                return (
-                  <div
-                    key={session.id || index}
-                    className={cn(
-                      "flex items-center justify-between p-3 rounded-xl border-2 transition-all",
-                      isCompleted && "bg-emerald-500/5 border-emerald-500/30",
-                      isCancelled && "bg-destructive/5 border-destructive/30 opacity-60",
-                      !isCompleted && !isCancelled && "bg-card border-border hover:border-primary/50"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Status Icon */}
-                      <div className={cn(
-                        "p-2 rounded-lg",
-                        isCompleted && "bg-emerald-500/10",
-                        isCancelled && "bg-destructive/10",
-                        !isCompleted && !isCancelled && "bg-primary/10"
-                      )}>
-                        {isCompleted ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                        ) : (
-                          <Circle className={cn(
-                            "h-5 w-5",
-                            isCancelled ? "text-destructive" : "text-primary"
-                          )} />
-                        )}
-                      </div>
 
-                      {/* Session Details */}
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-base">
-                            {sessionTime}
-                          </span>
-                          {session.status && (
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-xs",
-                                isCompleted && "border-emerald-500/50 text-emerald-600 bg-emerald-500/10",
-                                isCancelled && "border-destructive/50 text-destructive bg-destructive/10",
-                                !isCompleted && !isCancelled && "border-primary/50 text-primary bg-primary/10"
-                              )}
-                            >
-                              {isCompleted ? "مكتملة" : isCancelled ? "ملغاة" : "مجدولة"}
-                            </Badge>
-                          )}
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {format(parseISO(session.date), "EEEE، dd MMMM", { locale: ar })}
-                        </span>
-                      </div>
+          <div className="space-y-2">
+            {todaySessions.map((session, index) => {
+              const sessionTime = session.time || student.sessionTime;
+              const isCompleted = session.status === "completed";
+              const isCancelled = session.status === "cancelled";
+              const isScheduled = session.status === "scheduled";
+
+              return (
+                <div
+                  key={session.id || index}
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-xl border-2 transition-all",
+                    isCompleted && "bg-emerald-500/10 border-emerald-500/30",
+                    isCancelled && "bg-rose-500/10 border-rose-500/30",
+                    isScheduled && "bg-card border-border",
+                  )}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* Status Icon */}
+                    <div
+                      className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                        isCompleted && "bg-emerald-500/20 text-emerald-600",
+                        isCancelled && "bg-rose-500/20 text-rose-600",
+                        isScheduled && "bg-primary/20 text-primary",
+                      )}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : isCancelled ? (
+                        <Ban className="h-3.5 w-3.5" />
+                      ) : (
+                        <Clock className="h-3.5 w-3.5" />
+                      )}
                     </div>
 
-                    {/* Session Duration */}
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {formatDurationAr(student.sessionDuration || 60)}
+                    {/* Session Time */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-bold text-base">{sessionTime}</span>
+
+                      {/* Status Badge */}
+                      <Badge
+                        className={cn(
+                          "text-xs",
+                          isCompleted && "bg-emerald-500/20 text-emerald-700 border-emerald-500/30",
+                          isCancelled && "bg-rose-500/20 text-rose-700 border-rose-500/30",
+                          isScheduled && "bg-blue-500/20 text-blue-700 border-blue-500/30",
+                        )}
+                      >
+                        {isCompleted ? "مكتملة ✓" : isCancelled ? "ملغاة ✗" : "مجدولة"}
                       </Badge>
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isScheduled && (
+                      <>
+                        {/* Complete Button */}
+                        {onToggleComplete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+                            onClick={() => onToggleComplete(student.id, session.id)}
+                            title="إكمال الحصة"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {/* Cancel Button */}
+                        {onCancelSession && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700"
+                            onClick={() => {
+                              const reason = prompt("سبب الإلغاء (اختياري):");
+                              onCancelSession(student.id, session.id, reason || undefined);
+                            }}
+                            title="إلغاء الحصة"
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
+                    )}
+
+                    {/* Undo Complete Button */}
+                    {isCompleted && onToggleComplete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-amber-600 hover:bg-amber-500/10"
+                        onClick={() => onToggleComplete(student.id, session.id)}
+                        title="التراجع عن الإكمال"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 ml-1" />
+                        تراجع
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       )}
