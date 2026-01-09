@@ -1,4 +1,4 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Circle, Check, Ban, RotateCcw } from "lucide-react";
+import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,8 +6,6 @@ import { Student, SessionType, AppSettings, Session } from "@/types/student";
 import { EditStudentDialog } from "@/components/EditStudentDialog";
 import { cn } from "@/lib/utils";
 import { DAY_NAMES_SHORT_AR, formatDurationAr } from "@/lib/arabicConstants";
-import { format, parseISO } from "date-fns";
-import { ar } from "date-fns/locale";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -127,7 +125,7 @@ export const StudentCard = ({
             </div>
 
             {student.phone && (
-              
+              <a
                 href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
