@@ -3,8 +3,6 @@ import {
   GraduationCap,
   BookOpen,
   CreditCard,
-  ChevronLeft,
-  ChevronRight,
   Users,
   X,
   Trash2,
@@ -12,12 +10,9 @@ import {
   Monitor,
   MapPin,
   History,
-  FileText,
   CalendarDays,
   Sparkles,
-  TrendingUp,
   CheckCircle2,
-  Circle,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -65,7 +60,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 const Index = () => {
   const now = new Date();
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(now.getDay()); // ✅ Already shows today
+  const [selectedDayOfWeek] = useState(now.getDay()); // ✅ LOCKED TO TODAY
   const [activeTab, setActiveTab] = useState("sessions");
   const [studentFilter, setStudentFilter] = useState<string>("all");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
@@ -119,7 +114,6 @@ const Index = () => {
 
   const { checkConflict } = useConflictDetection(students);
 
-  // ✅ ALL FUNCTIONS UNCHANGED - KEEPING EXACTLY AS IS
   const handleAddSession = (studentId: string, date: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
@@ -281,40 +275,6 @@ const Index = () => {
       return timeA.localeCompare(timeB);
     });
 
-  const goToPrevDay = () => {
-    setSelectedDayOfWeek((prev) => (prev === 0 ? 6 : prev - 1));
-  };
-
-  const goToNextDay = () => {
-    setSelectedDayOfWeek((prev) => (prev === 6 ? 0 : prev + 1));
-  };
-
-  const goToToday = () => {
-    setSelectedDayOfWeek(now.getDay());
-  };
-
-  const getWeekDays = () => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const studentsOnDay = students.filter((student) => student.scheduleDays.some((d) => d.dayOfWeek === i));
-
-      const selectedStudentHasSession =
-        studentFilter !== "all" &&
-        students.some((student) => student.id === studentFilter && student.scheduleDays.some((d) => d.dayOfWeek === i));
-
-      days.push({
-        dayOfWeek: i,
-        dayName: DAY_NAMES_SHORT_AR[i],
-        isToday: now.getDay() === i,
-        studentCount: studentsOnDay.length,
-        hasSelectedStudent: selectedStudentHasSession,
-      });
-    }
-    return days;
-  };
-
-  const weekDays = getWeekDays();
-
   const allStudentsSortedByTime = useMemo(() => {
     const searchLower = allStudentsSearch.trim().toLowerCase();
     return [...students]
@@ -326,7 +286,7 @@ const Index = () => {
       });
   }, [students, allStudentsSearch]);
 
-  // ✅ NEW: Calculate today's stats (visual only - no functionality change)
+  // ✅ Calculate TODAY's sessions dynamically
   const todayStr = format(now, "yyyy-MM-dd");
   const todaysSessions = students.reduce((acc, student) => {
     const sessions = student.sessions.filter((s) => s.date === todayStr);
@@ -343,7 +303,7 @@ const Index = () => {
     return acc + sessions.length;
   }, 0);
 
-  // ✅ NEW: Get greeting based on time
+  // ✅ Get greeting based on time
   const getGreeting = () => {
     const hour = now.getHours();
     if (hour < 12) return "صباح الخير";
@@ -360,33 +320,62 @@ const Index = () => {
   }
 
   return (
-    <div
-      className="min-h-screen safe-bottom relative overflow-hidden"
-      dir="rtl"
-      style={{
-        background:
-          "linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--primary) / 0.03) 25%, hsl(var(--background)) 50%, hsl(var(--primary) / 0.05) 75%, hsl(var(--background)) 100%)",
-        backgroundSize: "400% 400%",
-        animation: "gradientShift 15s ease infinite",
-      }}
-    >
-      {/* ✅ NEW: Animated Background CSS */}
+    <div className="min-h-screen safe-bottom relative" dir="rtl">
+      {/* ✅ ANIMATED BACKGROUND */}
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          background: `
+            radial-gradient(circle at 20% 50%, hsl(var(--primary) / 0.08) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, hsl(var(--primary) / 0.06) 0%, transparent 50%),
+            radial-gradient(circle at 40% 20%, hsl(var(--primary) / 0.04) 0%, transparent 50%),
+            linear-gradient(to bottom, hsl(var(--background)), hsl(var(--background)))
+          `,
+          backgroundSize: "200% 200%",
+          animation: "gradientShift 20s ease infinite",
+        }}
+      />
+
+      {/* ✅ Floating Orbs */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div
+          className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl"
+          style={{ animation: "float 20s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl"
+          style={{ animation: "float 25s ease-in-out infinite reverse" }}
+        />
+      </div>
+
+      {/* ✅ CSS Animations */}
       <style>{`
         @keyframes gradientShift {
           0%, 100% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
         }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes float {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -30px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
         }
-        .animate-fade-in {
-          animation: fadeIn 0.5s ease-out forwards;
+        @keyframes fadeInUp {
+          from { 
+            opacity: 0; 
+            transform: translateY(20px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.6s ease-out forwards;
         }
       `}</style>
 
-      {/* Header - UNCHANGED */}
-      <header className="bg-card/95 backdrop-blur-md border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
+      {/* Header */}
+      <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
         <div className="px-3 py-3 sm:px-4 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
@@ -549,25 +538,25 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto">
-        {/* ✅ NEW: Welcome Section */}
+        {/* ✅ Welcome Section - ONLY for sessions tab */}
         {students.length > 0 && activeTab === "sessions" && (
-          <Card className="border-2 shadow-lg bg-gradient-to-br from-primary/5 via-background to-background animate-fade-in overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl"></div>
+          <Card className="border-2 shadow-xl bg-gradient-to-br from-card/95 to-card/80 backdrop-blur-sm animate-fade-in-up overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl"></div>
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl"></div>
             <CardContent className="p-4 sm:p-6 relative">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                    <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                    <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
                       {getGreeting()} عمر! 👋
                     </h2>
                   </div>
                   <p className="text-sm sm:text-base text-muted-foreground mb-4">
                     {todaysSessions > 0 ? (
                       <>
-                        لديك <span className="font-bold text-primary">{todaysSessions}</span>{" "}
-                        {todaysSessions === 1 ? "حصة" : "حصص"} اليوم
+                        لديك <span className="font-bold text-primary text-lg">{todaysSessions}</span>{" "}
+                        {todaysSessions === 1 ? "حصة" : todaysSessions === 2 ? "حصتان" : "حصص"} اليوم
                         {todaysCompletedSessions > 0 && (
                           <>
                             , أكملت <span className="font-bold text-emerald-600">{todaysCompletedSessions}</span> منها
@@ -579,13 +568,14 @@ const Index = () => {
                       <>لا توجد حصص مجدولة اليوم. استمتع بيومك! 🌟</>
                     )}
                   </p>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" />
                     {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
                   </div>
                 </div>
 
                 {todaysSessions > 0 && (
-                  <div className="flex flex-col items-center gap-2 bg-primary/10 rounded-xl p-3 sm:p-4 min-w-[80px] sm:min-w-[100px]">
+                  <div className="flex flex-col items-center gap-2 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-3 sm:p-4 min-w-[80px] sm:min-w-[100px] border border-primary/20">
                     <div className="relative w-16 h-16 sm:w-20 sm:h-20">
                       <svg className="transform -rotate-90 w-full h-full">
                         <circle
@@ -593,7 +583,7 @@ const Index = () => {
                           cy="50%"
                           r="30"
                           stroke="currentColor"
-                          strokeWidth="6"
+                          strokeWidth="5"
                           fill="transparent"
                           className="text-muted/20"
                         />
@@ -602,7 +592,7 @@ const Index = () => {
                           cy="50%"
                           r="30"
                           stroke="currentColor"
-                          strokeWidth="6"
+                          strokeWidth="5"
                           fill="transparent"
                           strokeDasharray={`${2 * Math.PI * 30}`}
                           strokeDashoffset={`${2 * Math.PI * 30 * (1 - todaysCompletedSessions / todaysSessions)}`}
@@ -617,7 +607,7 @@ const Index = () => {
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xs font-medium text-muted-foreground">التقدم</div>
+                      <div className="text-xs font-medium text-muted-foreground">التقدم اليوم</div>
                       <div className="text-xs text-primary font-bold">
                         {todaysCompletedSessions}/{todaysSessions}
                       </div>
@@ -629,9 +619,9 @@ const Index = () => {
           </Card>
         )}
 
-        {/* Main Tabs - UNCHANGED */}
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-4 mb-4 h-12 bg-muted/50 p-1.5 rounded-2xl shadow-sm">
+          <TabsList className="w-full grid grid-cols-4 mb-4 h-12 bg-muted/50 p-1.5 rounded-2xl shadow-sm backdrop-blur-sm">
             <TabsTrigger
               value="sessions"
               className="gap-2 text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md transition-all font-medium"
@@ -667,94 +657,16 @@ const Index = () => {
               <EmptyState />
             ) : (
               <>
+                {/* ✅ REMOVED DAY NAVIGATION - Locked to today */}
                 <div className="space-y-2.5">
-                  <div className="flex items-center justify-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={goToNextDay}
-                      className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:scale-110 transition-all"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
-                    <div className="text-center min-w-[140px] sm:min-w-[180px]">
-                      <p className="font-heading font-bold text-lg sm:text-xl bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                        {DAY_NAMES_AR[selectedDayOfWeek]}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={goToPrevDay}
-                      className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:scale-110 transition-all"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    {selectedDayOfWeek !== now.getDay() && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToToday}
-                        className="mr-1 h-9 rounded-xl border-2 hover:border-primary hover:scale-105 transition-all shadow-sm"
-                      >
-                        اليوم
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="flex justify-start sm:justify-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
-                    {weekDays.map((day) => (
-                      <button
-                        key={day.dayOfWeek}
-                        onClick={() => {
-                          setSelectedDayOfWeek(day.dayOfWeek);
-                          setStudentFilter("all");
-                        }}
-                        className={cn(
-                          "flex flex-col items-center px-3 py-2 rounded-xl transition-all min-w-[52px] shrink-0 relative shadow-sm",
-                          selectedDayOfWeek === day.dayOfWeek
-                            ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg scale-105"
-                            : day.hasSelectedStudent
-                              ? "bg-accent border-2 border-accent-foreground/20 ring-2 ring-primary/40"
-                              : day.isToday
-                                ? "bg-primary/10 border-2 border-primary/30 hover:bg-primary/20"
-                                : "bg-card border-2 border-border hover:border-primary/50 hover:shadow-md",
-                        )}
-                      >
-                        {day.hasSelectedStudent && selectedDayOfWeek !== day.dayOfWeek && (
-                          <span className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-primary rounded-full shadow-lg" />
-                        )}
-                        <span className="text-sm font-bold">{day.dayName}</span>
-                        {day.studentCount > 0 && (
-                          <span
-                            className={cn(
-                              "text-[9px] px-1.5 rounded-full mt-1 font-bold",
-                              selectedDayOfWeek === day.dayOfWeek
-                                ? "bg-primary-foreground/20 text-primary-foreground"
-                                : "bg-primary/10 text-primary",
-                            )}
-                          >
-                            {day.studentCount}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-
                   <div className="flex items-center gap-2">
                     <Select
                       value={studentFilter}
                       onValueChange={(value) => {
                         setStudentFilter(value);
-                        if (value !== "all") {
-                          const student = students.find((s) => s.id === value);
-                          if (student && student.scheduleDays.length > 0) {
-                            setSelectedDayOfWeek(student.scheduleDays[0].dayOfWeek);
-                          }
-                        }
                       }}
                     >
-                      <SelectTrigger className="w-full h-11 rounded-xl border-2 hover:border-primary transition-colors">
+                      <SelectTrigger className="w-full h-11 rounded-xl border-2 hover:border-primary transition-colors bg-card/80 backdrop-blur-sm">
                         <Users className="h-4 w-4 ml-2 text-muted-foreground shrink-0" />
                         <SelectValue placeholder="جميع الطلاب" />
                       </SelectTrigger>
@@ -786,32 +698,38 @@ const Index = () => {
                 </div>
 
                 {filteredStudents.length === 0 ? (
-                  <div className="text-center py-12 animate-fade-in">
-                    <p className="text-muted-foreground">
-                      {studentFilter !== "all"
-                        ? `لا توجد حصص لهذا الطالب يوم ${DAY_NAMES_AR[selectedDayOfWeek]}`
-                        : `لا توجد حصص مجدولة ليوم ${DAY_NAMES_AR[selectedDayOfWeek]}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">اضغط على أيام أخرى لعرض الحصص</p>
-                  </div>
+                  <Card className="border-2 border-dashed bg-card/50 backdrop-blur-sm">
+                    <CardContent className="p-8 text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                        <CalendarDays className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="font-bold text-lg mb-2">
+                        {studentFilter !== "all" ? `لا توجد حصص لهذا الطالب اليوم` : `لا توجد حصص مجدولة اليوم`}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {DAY_NAMES_AR[selectedDayOfWeek]} - {format(now, "dd MMMM yyyy", { locale: ar })}
+                      </p>
+                    </CardContent>
+                  </Card>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:gap-4">
                     {filteredStudents.map((student) => (
-                      <StudentCard
-                        key={student.id}
-                        student={student}
-                        students={students}
-                        settings={settings}
-                        selectedDayOfWeek={selectedDayOfWeek}
-                        onRemove={() => removeStudent(student.id)}
-                        onUpdateName={(name) => updateStudentName(student.id, name)}
-                        onUpdateTime={(time) => updateStudentTime(student.id, time)}
-                        onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
-                        onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
-                        onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                        onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
-                        onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
-                      />
+                      <div key={student.id} className="animate-fade-in-up">
+                        <StudentCard
+                          student={student}
+                          students={students}
+                          settings={settings}
+                          selectedDayOfWeek={selectedDayOfWeek}
+                          onRemove={() => removeStudent(student.id)}
+                          onUpdateName={(name) => updateStudentName(student.id, name)}
+                          onUpdateTime={(time) => updateStudentTime(student.id, time)}
+                          onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
+                          onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
+                          onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
+                          onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
+                          onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
