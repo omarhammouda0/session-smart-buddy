@@ -68,7 +68,7 @@ interface SessionHistoryBarProps {
   onRestoreSession?: (studentId: string, sessionId: string) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onRescheduleSession?: (studentId: string, sessionId: string, newDate: string) => void;
-  onAddSession?: (studentId: string, date: string) => void;
+  onAddSession?: (studentId: string, date: string, customTime?: string) => void;
   onMarkAsVacation?: (studentId: string, sessionId: string) => void;
   onUpdateSessionDetails?: (
     studentId: string,
@@ -104,6 +104,8 @@ export const SessionHistoryBar = ({
   const today = startOfToday();
   const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
   const [addSessionDate, setAddSessionDate] = useState<Date | undefined>(undefined);
+  const [addSessionTime, setAddSessionTime] = useState<string>("");
+  const [showTimePickerDialog, setShowTimePickerDialog] = useState(false);
 
   // Dialog states
   const [restoreConflictDialog, setRestoreConflictDialog] = useState<{
@@ -141,15 +143,31 @@ export const SessionHistoryBar = ({
 
   // ==================== ACTION HANDLERS ====================
 
-  // ✅ ADD SESSION (with time conflict check, allows multiple sessions per day)
-  const handleAddSession = (studentId: string, date: Date) => {
+  // ✅ Handle date selection - opens time picker dialog
+  const handleDateSelect = (date: Date) => {
+    if (!selectedStudent) return;
+    setAddSessionDate(date);
+    setAddSessionTime(selectedStudent.sessionTime || "16:00"); // Default to student's time
+    setShowTimePickerDialog(true);
+  };
+
+  // ✅ Confirm session creation with selected time
+  const handleConfirmAddSession = () => {
+    if (addSessionDate && selectedStudent) {
+      handleAddSession(selectedStudent.id, addSessionDate, addSessionTime);
+    }
+  };
+
+  // ✅ ADD SESSION (with custom time and conflict check)
+  const handleAddSession = (studentId: string, date: Date, customTime?: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
     const dateStr = format(date, "yyyy-MM-dd");
     const todayStr = format(today, "yyyy-MM-dd");
     const isPastSession = dateStr < todayStr;
-    const sessionTime = student.sessionTime || "16:00";
+    // ✅ Use custom time if provided, otherwise use student's default time
+    const sessionTime = customTime || student.sessionTime || "16:00";
     const sessionDuration = student.sessionDuration || 60;
 
     // ✅ Check if session with SAME TIME already exists on this date for THIS student
@@ -199,13 +217,15 @@ export const SessionHistoryBar = ({
     }
 
     // ✅ Add the session
-    onAddSession?.(studentId, dateStr);
+    onAddSession?.(studentId, dateStr, sessionTime);
     setAddSessionDate(undefined);
+    setAddSessionTime("");
+    setShowTimePickerDialog(false);
 
     if (isPastSession) {
       toast({
         title: "✅ تمت الإضافة بنجاح",
-        description: `تم إضافة جلسة سابقة في ${formatShortDateAr(dateStr)} وتم تسجيلها كمكتملة تلقائياً`,
+        description: `تم إضافة جلسة سابقة في ${formatShortDateAr(dateStr)} الساعة ${formatTimeAr(sessionTime)} وتم تسجيلها كمكتملة تلقائياً`,
       });
     } else {
       toast({
@@ -564,7 +584,7 @@ export const SessionHistoryBar = ({
                     <CalendarPicker
                       mode="single"
                       selected={addSessionDate}
-                      onSelect={(date) => date && handleAddSession(selectedStudent.id, date)}
+                      onSelect={(date) => date && handleDateSelect(date)}
                       initialFocus
                       className="p-3 pointer-events-auto"
                     />
@@ -748,7 +768,7 @@ export const SessionHistoryBar = ({
                       mode="single"
                       selected={addSessionDate}
                       disabled={(date) => isAfter(date, today)}
-                      onSelect={(date) => date && handleAddSession(selectedStudent.id, date)}
+                      onSelect={(date) => date && handleDateSelect(date)}
                       initialFocus
                       className="p-3 pointer-events-auto"
                     />
@@ -1055,6 +1075,81 @@ export const SessionHistoryBar = ({
             >
               <Trash2 className="h-4 w-4 ml-1" />
               نعم، احذف نهائياً
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Time Picker Dialog for Adding Sessions */}
+      <AlertDialog open={showTimePickerDialog} onOpenChange={setShowTimePickerDialog}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              اختر وقت الحصة
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              {addSessionDate && (
+                <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                  <p className="text-sm font-medium text-foreground">{selectedStudent?.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatShortDateAr(format(addSessionDate, "yyyy-MM-dd"))}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">الوقت:</label>
+                <input
+                  type="time"
+                  value={addSessionTime}
+                  onChange={(e) => setAddSessionTime(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border bg-background text-foreground"
+                  dir="ltr"
+                />
+                <p className="text-xs text-muted-foreground">
+                  💡 الوقت الافتراضي: {selectedStudent?.sessionTime || "16:00"}
+                </p>
+              </div>
+
+              {/* Show existing sessions on this date */}
+              {addSessionDate &&
+                selectedStudent &&
+                (() => {
+                  const dateStr = format(addSessionDate, "yyyy-MM-dd");
+                  const existingSessions = selectedStudent.sessions.filter((s) => s.date === dateStr);
+                  if (existingSessions.length > 0) {
+                    return (
+                      <div className="bg-warning/10 border border-warning/30 rounded-lg p-2">
+                        <p className="text-xs font-medium text-warning mb-1">⚠️ حصص موجودة في هذا اليوم:</p>
+                        <div className="space-y-1">
+                          {existingSessions.map((s) => (
+                            <p key={s.id} className="text-xs text-muted-foreground">
+                              • {formatTimeAr(s.time || selectedStudent.sessionTime || "16:00")} (
+                              {getStatusLabel(s.status)})
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel
+              onClick={() => {
+                setShowTimePickerDialog(false);
+                setAddSessionDate(undefined);
+                setAddSessionTime("");
+              }}
+            >
+              إلغاء
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmAddSession} disabled={!addSessionTime}>
+              <Plus className="h-4 w-4 ml-1" />
+              إضافة الحصة
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
