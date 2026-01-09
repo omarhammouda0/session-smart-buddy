@@ -1,4 +1,4 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check } from "lucide-react";
+import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,7 @@ interface StudentCardProps {
   }) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
+  onQuickPayment?: (studentId: string, sessionDate: string) => void; // ✅ NEW
 }
 
 export const StudentCard = ({
@@ -57,6 +58,7 @@ export const StudentCard = ({
   onUpdateCustomSettings,
   onToggleComplete,
   onCancelSession,
+  onQuickPayment, // ✅ NEW
 }: StudentCardProps) => {
   return (
     <Card className={cn("card-shadow transition-all duration-300 overflow-hidden border-2")} dir="rtl">
@@ -125,7 +127,7 @@ export const StudentCard = ({
             </div>
 
             {student.phone && (
-              <a
+              
                 href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -229,9 +231,22 @@ export const StudentCard = ({
                     </div>
                   </div>
 
-                  {/* Action Buttons - ONLY for scheduled sessions */}
+                  {/* Action Buttons */}
                   {isScheduled && (
                     <div className="flex items-center gap-1 shrink-0">
+                      {/* ✅ NEW: Payment Button */}
+                      {onQuickPayment && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
+                          title="تسجيل دفع"
+                          onClick={() => onQuickPayment(student.id, session.date)}
+                        >
+                          <DollarSign className="h-4 w-4" />
+                        </Button>
+                      )}
+
                       {/* Complete Button */}
                       {onToggleComplete && (
                         <AlertDialog>
