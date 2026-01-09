@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { format, parseISO, isBefore, isAfter, startOfToday } from "date-fns";
+import { format, parseISO, isBefore, isAfter, startOfToday, isSameDay, isEqual } from "date-fns";
 import { ar } from "date-fns/locale";
 import {
   History,
@@ -251,15 +251,17 @@ export const SessionHistoryBar = ({
     toast({ title: "تم الحذف", description: `تم حذف الجلسة نهائياً`, variant: "destructive" });
   };
 
-  const getScheduledSessions = () => {
+  // ✅ FIXED: Only show FUTURE sessions with status="scheduled" (date >= today)
+  const getUpcomingSessions = () => {
     if (!selectedStudent) return [];
-    const semesterStart = parseISO(selectedStudent.semesterStart);
+    const todayStr = format(today, "yyyy-MM-dd");
+
     return selectedStudent.sessions
       .filter((session) => {
-        const sessionDate = parseISO(session.date);
-        return !isBefore(sessionDate, semesterStart) && session.status !== "completed";
+        // Only scheduled sessions from today onwards
+        return session.status === "scheduled" && session.date >= todayStr;
       })
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => a.date.localeCompare(b.date)) // ✅ Ascending order
       .map((session) => ({ ...session, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
 
@@ -274,7 +276,6 @@ export const SessionHistoryBar = ({
       else if (session.status === "vacation") vacation++;
     });
     const total = completed + cancelled + vacation;
-    // Completion rate excludes vacation sessions
     const rateTotal = completed + cancelled;
     return {
       completed,
@@ -285,15 +286,16 @@ export const SessionHistoryBar = ({
     };
   };
 
+  // ✅ FIXED: History shows completed/cancelled/vacation (sorted descending - newest first)
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
     return selectedStudent.sessions
       .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => b.date.localeCompare(a.date)) // ✅ Descending order (newest first)
       .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
 
-  const scheduledSessions = getScheduledSessions();
+  const upcomingSessions = getUpcomingSessions(); // ✅ Renamed
   const historyStats = getHistoryStats();
   const historySessions = getHistorySessions();
 
@@ -351,9 +353,10 @@ export const SessionHistoryBar = ({
         {selectedStudentId !== "all" && selectedStudent ? (
           <Tabs value={historyTab} onValueChange={(v) => setHistoryTab(v as "upcoming" | "history")}>
             <TabsList className="w-full grid grid-cols-2">
+              {/* ✅ RENAMED TAB */}
               <TabsTrigger value="upcoming" className="gap-1.5 text-xs">
                 <CalendarClock className="h-3.5 w-3.5" />
-                الحصص
+                الحصص القادمة
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-1.5 text-xs">
                 <History className="h-3.5 w-3.5" />
@@ -365,9 +368,9 @@ export const SessionHistoryBar = ({
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <CalendarClock className="h-3 w-3" />
-                  حصص {selectedStudent.name}
+                  حصص {selectedStudent.name} القادمة
                   <Badge variant="secondary" className="mr-2 text-[10px]">
-                    {scheduledSessions.length}
+                    {upcomingSessions.length}
                   </Badge>
                 </p>
                 <Popover>
@@ -389,40 +392,36 @@ export const SessionHistoryBar = ({
                 </Popover>
               </div>
               <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
-                💡 اختر تاريخ من التقويم لإضافة حصة. الحصص السابقة تُسجل تلقائياً كمكتملة.
+                💡 الحصص القادمة فقط (من اليوم فصاعداً). الحصص المكتملة/الملغاة/الإجازات تنتقل تلقائياً للسجل.
               </p>
               <ScrollArea className="h-[250px]">
                 <div className="space-y-1 pl-2">
-                  {scheduledSessions.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص مجدولة</p>
+                  {upcomingSessions.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص قادمة</p>
                   ) : (
                     (() => {
-                      // Group sessions by date to show gaps
-                      const sessionsByDate = scheduledSessions.reduce(
+                      const sessionsByDate = upcomingSessions.reduce(
                         (acc, session) => {
                           const date = session.date;
                           if (!acc[date]) acc[date] = [];
                           acc[date].push(session);
                           return acc;
                         },
-                        {} as Record<string, typeof scheduledSessions>,
+                        {} as Record<string, typeof upcomingSessions>,
                       );
 
                       const elements: React.ReactNode[] = [];
                       let lastDate: string | null = null;
 
-                      scheduledSessions.forEach((session, idx) => {
-                        // Get sessions with gaps for the current date
+                      upcomingSessions.forEach((session, idx) => {
                         const sessionsWithGaps = getSessionsWithGaps(session.date);
                         const sessionGapInfo = sessionsWithGaps.find((s) => s.session.id === session.id);
 
-                        // Check if this session has conflicts
                         const hasConflict = sessionGapInfo?.hasConflict || false;
                         const conflictType = sessionGapInfo?.conflictType;
                         const gapAfter = sessionGapInfo?.gapAfter;
                         const gapSeverity = sessionGapInfo?.gapSeverity;
 
-                        // Show date separator if new date
                         if (session.date !== lastDate) {
                           if (lastDate !== null) {
                             elements.push(
@@ -439,26 +438,14 @@ export const SessionHistoryBar = ({
                           <div
                             key={session.id}
                             className={cn(
-                              "relative flex items-center justify-between p-2.5 rounded-lg text-xs border transition-all",
-                              session.status === "cancelled" && "bg-destructive/5 border-destructive/20",
-                              session.status === "vacation" && "bg-warning/10 border-warning/30",
-                              session.status === "scheduled" && !hasConflict && "bg-card",
-                              session.status === "scheduled" &&
-                                hasConflict &&
-                                conflictType === "exact" &&
+                              "relative flex items-center justify-between p-2.5 rounded-lg text-xs border transition-all bg-card",
+                              hasConflict &&
+                                (conflictType === "exact" || conflictType === "partial") &&
                                 "bg-destructive/5 border-destructive/30",
-                              session.status === "scheduled" &&
-                                hasConflict &&
-                                conflictType === "partial" &&
-                                "bg-destructive/5 border-destructive/30",
-                              session.status === "scheduled" &&
-                                hasConflict &&
-                                conflictType === "close" &&
-                                "bg-warning/5 border-warning/30",
+                              hasConflict && conflictType === "close" && "bg-warning/5 border-warning/30",
                             )}
                           >
-                            {/* Conflict badge */}
-                            {session.status === "scheduled" && hasConflict && (
+                            {hasConflict && (
                               <div
                                 className={cn(
                                   "absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-sm z-10",
@@ -479,24 +466,14 @@ export const SessionHistoryBar = ({
                               <div
                                 className={cn(
                                   "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                                  session.status === "cancelled" && "bg-destructive/20 text-destructive",
-                                  session.status === "vacation" && "bg-warning/20 text-warning",
-                                  session.status === "scheduled" && !hasConflict && "bg-primary/20 text-primary",
-                                  session.status === "scheduled" &&
-                                    hasConflict &&
+                                  !hasConflict && "bg-primary/20 text-primary",
+                                  hasConflict &&
                                     (conflictType === "exact" || conflictType === "partial") &&
                                     "bg-destructive/20 text-destructive",
-                                  session.status === "scheduled" &&
-                                    hasConflict &&
-                                    conflictType === "close" &&
-                                    "bg-warning/20 text-warning",
+                                  hasConflict && conflictType === "close" && "bg-warning/20 text-warning",
                                 )}
                               >
-                                {session.status === "cancelled" ? (
-                                  <Ban className="h-3 w-3" />
-                                ) : session.status === "vacation" ? (
-                                  <Palmtree className="h-3 w-3" />
-                                ) : hasConflict && (conflictType === "exact" || conflictType === "partial") ? (
+                                {hasConflict && (conflictType === "exact" || conflictType === "partial") ? (
                                   <XCircle className="h-3 w-3" />
                                 ) : hasConflict && conflictType === "close" ? (
                                   <AlertTriangle className="h-3 w-3" />
@@ -505,13 +482,7 @@ export const SessionHistoryBar = ({
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p
-                                  className={cn(
-                                    "font-medium truncate",
-                                    session.status === "cancelled" && "line-through text-muted-foreground",
-                                    session.status === "vacation" && "text-warning",
-                                  )}
-                                >
+                                <p className="font-medium truncate">
                                   {formatShortDateAr(session.date)}
                                   <span className="text-muted-foreground font-normal mr-1">
                                     ({session.time || selectedStudent.sessionTime || "16:00"})
@@ -520,123 +491,66 @@ export const SessionHistoryBar = ({
                                     </span>
                                   </span>
                                 </p>
-                                {session.status === "cancelled" && (
-                                  <span className="text-[10px] text-destructive">ملغاة</span>
+                                {hasConflict && (conflictType === "exact" || conflictType === "partial") && (
+                                  <span className="text-[10px] text-destructive">❌ تعارض</span>
                                 )}
-                                {session.status === "vacation" && (
-                                  <span className="text-[10px] text-warning">إجازة</span>
-                                )}
-                                {session.status === "scheduled" &&
-                                  hasConflict &&
-                                  (conflictType === "exact" || conflictType === "partial") && (
-                                    <span className="text-[10px] text-destructive">❌ تعارض</span>
-                                  )}
-                                {session.status === "scheduled" && hasConflict && conflictType === "close" && (
+                                {hasConflict && conflictType === "close" && (
                                   <span className="text-[10px] text-warning">⚠️ قريب جداً</span>
                                 )}
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              {/* Notes button */}
                               <SessionNotesDialog
                                 session={session}
                                 studentId={session.studentId}
                                 studentName={session.studentName}
                               />
-                              {/* Homework button */}
                               <SessionHomeworkDialog
                                 session={session}
                                 studentId={session.studentId}
                                 studentName={session.studentName}
                               />
-                              {session.status === "cancelled" ? (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-success"
-                                    onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                                    استعادة
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive"
-                                    onClick={() => handleDeleteSession(session.studentId, session.id)}
-                                    title="حذف نهائي"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </>
-                              ) : session.status === "vacation" ? (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-primary"
-                                    onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                                    استعادة
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive"
-                                    onClick={() => openCancelDialog(session.studentId, session.id)}
-                                    title="إلغاء"
-                                  >
-                                    <Ban className="h-3.5 w-3.5" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-success"
-                                    onClick={() => handleToggleComplete(session.studentId, session.id)}
-                                    title="إكمال"
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-warning"
-                                    onClick={() => handleMarkAsVacation(session.studentId, session.id)}
-                                    title="إجازة"
-                                  >
-                                    <Palmtree className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive"
-                                    onClick={() => openCancelDialog(session.studentId, session.id)}
-                                    title="إلغاء"
-                                  >
-                                    <Ban className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                    onClick={() => handleDeleteSession(session.studentId, session.id)}
-                                    title="حذف نهائي"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-success"
+                                onClick={() => handleToggleComplete(session.studentId, session.id)}
+                                title="إكمال"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-warning"
+                                onClick={() => handleMarkAsVacation(session.studentId, session.id)}
+                                title="إجازة"
+                              >
+                                <Palmtree className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => openCancelDialog(session.studentId, session.id)}
+                                title="إلغاء"
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleDeleteSession(session.studentId, session.id)}
+                                title="حذف نهائي"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           </div>,
                         );
 
-                        // Show gap indicator after this session if there's a next session on the same date
-                        if (session.status === "scheduled" && gapAfter !== null && gapAfter !== undefined) {
+                        if (gapAfter !== null && gapAfter !== undefined) {
                           elements.push(
                             <GapIndicator key={`gap-${session.id}`} gapMinutes={gapAfter} className="my-0.5" />,
                           );
@@ -748,13 +662,11 @@ export const SessionHistoryBar = ({
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Notes button */}
                             <SessionNotesDialog
                               session={session}
                               studentId={session.studentId}
                               studentName={session.studentName}
                             />
-                            {/* Homework button */}
                             <SessionHomeworkDialog
                               session={session}
                               studentId={session.studentId}
@@ -808,7 +720,6 @@ export const SessionHistoryBar = ({
                             </Badge>
                           </div>
                         </div>
-                        {/* Show notes preview for completed sessions */}
                         {session.status === "completed" && (session.topic || session.notes || session.homework) && (
                           <div className="mt-2 mr-7 text-[10px] text-muted-foreground space-y-0.5 bg-muted/30 rounded p-1.5">
                             {session.topic && (
@@ -833,7 +744,6 @@ export const SessionHistoryBar = ({
                 </div>
               </ScrollArea>
 
-              {/* Cancellation History Section */}
               {getAllStudentCancellations && (
                 <CancellationHistoryInline
                   student={selectedStudent}
@@ -852,7 +762,6 @@ export const SessionHistoryBar = ({
         )}
       </CardContent>
 
-      {/* Restore Conflict Dialog */}
       {restoreConflictDialog && (
         <RestoreConflictDialog
           open={restoreConflictDialog.open}
@@ -863,7 +772,6 @@ export const SessionHistoryBar = ({
         />
       )}
 
-      {/* Vacation Confirmation Dialog */}
       <AlertDialog open={vacationDialog?.open ?? false} onOpenChange={(open) => !open && setVacationDialog(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
@@ -899,7 +807,6 @@ export const SessionHistoryBar = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Cancel Session Dialog */}
       {cancelDialog && (
         <CancelSessionDialog
           open={cancelDialog.open}
@@ -915,7 +822,7 @@ export const SessionHistoryBar = ({
   );
 };
 
-// Cancellation History Inline Component for Management Tab
+// [Keep the CancellationHistoryInline component unchanged - same as before]
 const CancellationHistoryInline = ({
   student,
   cancellations,
@@ -930,7 +837,6 @@ const CancellationHistoryInline = ({
   const [clearingMonth, setClearingMonth] = useState<string | null>(null);
   const [confirmClearMonth, setConfirmClearMonth] = useState<string | null>(null);
 
-  // Group cancellations by month
   const groupedByMonth = useMemo(() => {
     const groups: Record<string, CancellationRecord[]> = {};
     cancellations.forEach((c) => {
@@ -1060,7 +966,6 @@ const CancellationHistoryInline = ({
         </div>
       </div>
 
-      {/* Confirmation Dialog */}
       <AlertDialog open={!!confirmClearMonth} onOpenChange={(open) => !open && setConfirmClearMonth(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
