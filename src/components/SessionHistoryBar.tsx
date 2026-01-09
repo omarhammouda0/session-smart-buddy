@@ -12,6 +12,7 @@ import {
   addWeeks,
   addMonths,
   subMonths,
+  subWeeks,
 } from "date-fns";
 import { ar } from "date-fns/locale";
 import {
@@ -36,6 +37,8 @@ import {
   ChevronDown,
   Clock,
   TrendingUp,
+  Filter,
+  CalendarRange,
 } from "lucide-react";
 import { Student, Session, HomeworkStatus } from "@/types/student";
 import { Button } from "@/components/ui/button";
@@ -103,7 +106,18 @@ interface SessionHistoryBarProps {
   onClearMonthCancellations?: (studentId: string, month: string) => Promise<boolean>;
 }
 
-type TimeFilter = "this-week" | "next-week" | "this-month" | "next-month" | "last-month" | "custom";
+type TimeFilter =
+  | "today"
+  | "this-week"
+  | "next-week"
+  | "last-week"
+  | "this-month"
+  | "next-month"
+  | "last-month"
+  | "last-2-months"
+  | "last-3-months"
+  | "custom";
+type StatusFilter = "all" | "scheduled" | "completed" | "cancelled" | "vacation";
 type SortOrder = "date-asc" | "date-desc" | "time-asc";
 
 export const SessionHistoryBar = ({
@@ -123,7 +137,8 @@ export const SessionHistoryBar = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string>("all");
   const [historyTab, setHistoryTab] = useState<"upcoming" | "history">("upcoming");
   const [searchQuery, setSearchQuery] = useState("");
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("this-week");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("this-month");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [customDateRange, setCustomDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [sortOrder, setSortOrder] = useState<SortOrder>("date-asc");
 
@@ -194,6 +209,12 @@ export const SessionHistoryBar = ({
     const todayStr = format(today, "yyyy-MM-dd");
 
     switch (timeFilter) {
+      case "today": {
+        return {
+          start: todayStr,
+          end: todayStr,
+        };
+      }
       case "this-week": {
         const weekStart = startOfWeek(today, { weekStartsOn: 0 });
         const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
@@ -208,6 +229,14 @@ export const SessionHistoryBar = ({
         return {
           start: format(nextWeekStart, "yyyy-MM-dd"),
           end: format(nextWeekEnd, "yyyy-MM-dd"),
+        };
+      }
+      case "last-week": {
+        const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 0 });
+        const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 0 });
+        return {
+          start: format(lastWeekStart, "yyyy-MM-dd"),
+          end: format(lastWeekEnd, "yyyy-MM-dd"),
         };
       }
       case "this-month": {
@@ -234,6 +263,22 @@ export const SessionHistoryBar = ({
           end: format(lastMonthEnd, "yyyy-MM-dd"),
         };
       }
+      case "last-2-months": {
+        const twoMonthsAgoStart = startOfMonth(subMonths(today, 2));
+        const lastMonthEnd = endOfMonth(subMonths(today, 1));
+        return {
+          start: format(twoMonthsAgoStart, "yyyy-MM-dd"),
+          end: format(lastMonthEnd, "yyyy-MM-dd"),
+        };
+      }
+      case "last-3-months": {
+        const threeMonthsAgoStart = startOfMonth(subMonths(today, 3));
+        const lastMonthEnd = endOfMonth(subMonths(today, 1));
+        return {
+          start: format(threeMonthsAgoStart, "yyyy-MM-dd"),
+          end: format(lastMonthEnd, "yyyy-MM-dd"),
+        };
+      }
       case "custom": {
         if (customDateRange.from && customDateRange.to) {
           return {
@@ -249,26 +294,77 @@ export const SessionHistoryBar = ({
   };
 
   const getFilterLabel = (): string => {
-    const { start, end } = getFilterDateRange();
-
     switch (timeFilter) {
+      case "today":
+        return "اليوم";
       case "this-week":
-        return `هذا الأسبوع (${formatShortDateAr(start)} - ${formatShortDateAr(end)})`;
+        return "هذا الأسبوع";
       case "next-week":
-        return `الأسبوع القادم (${formatShortDateAr(start)} - ${formatShortDateAr(end)})`;
+        return "الأسبوع القادم";
+      case "last-week":
+        return "الأسبوع الماضي";
       case "this-month":
-        return `هذا الشهر (${format(parseISO(start), "MMMM yyyy", { locale: ar })})`;
+        return "هذا الشهر";
       case "next-month":
-        return `الشهر القادم (${format(parseISO(start), "MMMM yyyy", { locale: ar })})`;
+        return "الشهر القادم";
       case "last-month":
-        return `الشهر الماضي (${format(parseISO(start), "MMMM yyyy", { locale: ar })})`;
+        return "الشهر الماضي";
+      case "last-2-months":
+        return "آخر شهرين";
+      case "last-3-months":
+        return "آخر 3 أشهر";
       case "custom":
-        return customDateRange.from && customDateRange.to
-          ? `${formatShortDateAr(start)} - ${formatShortDateAr(end)}`
-          : "نطاق مخصص";
+        if (customDateRange.from && customDateRange.to) {
+          return `${formatShortDateAr(format(customDateRange.from, "yyyy-MM-dd"))} - ${formatShortDateAr(format(customDateRange.to, "yyyy-MM-dd"))}`;
+        }
+        return "نطاق مخصص";
       default:
         return "";
     }
+  };
+
+  const getStatusFilterLabel = (): string => {
+    switch (statusFilter) {
+      case "all":
+        return "الكل";
+      case "scheduled":
+        return "مجدولة";
+      case "completed":
+        return "مكتملة";
+      case "cancelled":
+        return "ملغاة";
+      case "vacation":
+        return "إجازة";
+      default:
+        return "الكل";
+    }
+  };
+
+  const getSortLabel = (): string => {
+    switch (sortOrder) {
+      case "date-asc":
+        return "التاريخ (الأقرب)";
+      case "date-desc":
+        return "التاريخ (الأبعد)";
+      case "time-asc":
+        return "الوقت (الأبكر)";
+      default:
+        return "التاريخ (الأقرب)";
+    }
+  };
+
+  const hasActiveFilters = (): boolean => {
+    return (
+      searchQuery.trim() !== "" || timeFilter !== "this-month" || statusFilter !== "all" || sortOrder !== "date-asc"
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setTimeFilter("this-month");
+    setStatusFilter("all");
+    setSortOrder("date-asc");
+    setCustomDateRange({});
   };
 
   // ==================== ACTION HANDLERS ====================
@@ -683,6 +779,11 @@ export const SessionHistoryBar = ({
     return sessions.filter((s) => s.date >= start && s.date <= end);
   };
 
+  const filterSessionsByStatus = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+    if (statusFilter === "all") return sessions;
+    return sessions.filter((s) => s.status === statusFilter);
+  };
+
   const filterSessionsBySearch = (sessions: (Session & { studentName: string; studentId: string })[]) => {
     if (!searchQuery.trim()) return sessions;
 
@@ -720,6 +821,7 @@ export const SessionHistoryBar = ({
       .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
 
     sessions = filterSessionsByDateRange(sessions);
+    sessions = filterSessionsByStatus(sessions);
     sessions = filterSessionsBySearch(sessions);
     sessions = sortSessions(sessions);
 
@@ -758,6 +860,13 @@ export const SessionHistoryBar = ({
   const historySessions = getHistorySessions();
   const historyStats = getHistoryStats();
 
+  const todayStr = format(today, "yyyy-MM-dd");
+  const scheduledCount =
+    selectedStudent?.sessions.filter((s) => s.status === "scheduled" && s.date >= todayStr).length ?? 0;
+  const completedCount = historyStats.completed;
+  const cancelledCount = historyStats.cancelled;
+  const vacationCount = historyStats.vacation;
+
   // ==================== RENDER ====================
 
   return (
@@ -766,7 +875,7 @@ export const SessionHistoryBar = ({
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-heading flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
-            📊 حصص {selectedStudent?.name || "الطلاب"}
+            📊 إدارة حصص {selectedStudent?.name || "الطلاب"}
           </CardTitle>
           {selectedStudentId !== "all" && (
             <Button
@@ -774,13 +883,12 @@ export const SessionHistoryBar = ({
               size="sm"
               onClick={() => {
                 setSelectedStudentId("all");
-                setSearchQuery("");
-                setTimeFilter("this-week");
+                clearAllFilters();
               }}
               className="h-8 gap-1"
             >
               <X className="h-3.5 w-3.5" />
-              إلغاء التحديد
+              إلغاء
             </Button>
           )}
         </div>
@@ -814,33 +922,29 @@ export const SessionHistoryBar = ({
               {[
                 {
                   label: "قادمة",
-                  count: upcomingSessions.length,
+                  count: scheduledCount,
                   icon: CalendarClock,
-                  color: "from-blue-500 to-cyan-500",
                   bg: "bg-blue-500/10",
                   border: "border-blue-500/30",
                 },
                 {
                   label: "مكتملة",
-                  count: historyStats.completed,
+                  count: completedCount,
                   icon: Check,
-                  color: "from-emerald-500 to-green-500",
                   bg: "bg-emerald-500/10",
                   border: "border-emerald-500/30",
                 },
                 {
                   label: "ملغية",
-                  count: historyStats.cancelled,
+                  count: cancelledCount,
                   icon: Ban,
-                  color: "from-rose-500 to-red-500",
                   bg: "bg-rose-500/10",
                   border: "border-rose-500/30",
                 },
                 {
                   label: "إجازة",
-                  count: historyStats.vacation,
+                  count: vacationCount,
                   icon: Palmtree,
-                  color: "from-amber-500 to-yellow-500",
                   bg: "bg-amber-500/10",
                   border: "border-amber-500/30",
                 },
@@ -852,92 +956,119 @@ export const SessionHistoryBar = ({
                 </div>
               ))}
             </div>
+            {/* ✅ COMBINED FILTER BAR */}
+            <div className="space-y-3 p-3 rounded-xl border-2 bg-muted/30">
+              {/* Row 1: Search + Filter Dropdowns */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                {/* Search */}
+                <div className="relative sm:col-span-2">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    type="text"
+                    placeholder="بحث..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pr-10 h-10 bg-background"
+                  />
+                </div>
 
-            {/* Time Filters */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                فترة العرض
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: "this-week" as TimeFilter, label: "هذا الأسبوع" },
-                  { value: "next-week" as TimeFilter, label: "الأسبوع القادم" },
-                  { value: "this-month" as TimeFilter, label: "هذا الشهر" },
-                  { value: "next-month" as TimeFilter, label: "الشهر القادم" },
-                  { value: "last-month" as TimeFilter, label: "الشهر الماضي" },
-                ].map((filter) => (
-                  <Button
-                    key={filter.value}
-                    variant={timeFilter === filter.value ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTimeFilter(filter.value)}
-                    className="h-8 text-xs"
-                  >
-                    {filter.label}
-                  </Button>
-                ))}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={timeFilter === "custom" ? "default" : "outline"}
-                      size="sm"
-                      className="h-8 text-xs gap-1"
-                    >
-                      نطاق مخصص
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-3" align="start">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">اختر نطاقاً مخصصاً</p>
-                      <CalendarPicker
-                        mode="range"
-                        selected={{ from: customDateRange.from, to: customDateRange.to }}
-                        onSelect={(range) => {
-                          setCustomDateRange({ from: range?.from, to: range?.to });
-                          if (range?.from && range?.to) {
-                            setTimeFilter("custom");
-                          }
-                        }}
-                        numberOfMonths={1}
-                        className="rounded-md border"
-                      />
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                {/* Time Filter Dropdown */}
+                <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
+                  <SelectTrigger className="h-10 bg-background">
+                    <CalendarRange className="h-4 w-4 ml-1" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">اليوم</SelectItem>
+                    <SelectItem value="this-week">هذا الأسبوع</SelectItem>
+                    <SelectItem value="next-week">الأسبوع القادم</SelectItem>
+                    <SelectItem value="last-week">الأسبوع الماضي</SelectItem>
+                    <SelectItem value="this-month">هذا الشهر</SelectItem>
+                    <SelectItem value="next-month">الشهر القادم</SelectItem>
+                    <SelectItem value="last-month">الشهر الماضي</SelectItem>
+                    <SelectItem value="last-2-months">آخر شهرين</SelectItem>
+                    <SelectItem value="last-3-months">آخر 3 أشهر</SelectItem>
+                    <SelectItem value="custom">نطاق مخصص</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Sort Dropdown */}
+                <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+                  <SelectTrigger className="h-10 bg-background">
+                    <TrendingUp className="h-4 w-4 ml-1" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date-asc">التاريخ (الأقرب)</SelectItem>
+                    <SelectItem value="date-desc">التاريخ (الأبعد)</SelectItem>
+                    <SelectItem value="time-asc">الوقت (الأبكر)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Active Filter Display */}
-              <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg p-2">
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  عرض: <span className="font-semibold text-foreground">{getFilterLabel()}</span>
-                </p>
-                {timeFilter !== "this-week" && (
+              {/* Row 2: Active Filters + Clear Button */}
+              {hasActiveFilters() && (
+                <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg p-2">
+                  <div className="flex items-center gap-2 flex-wrap text-xs">
+                    <Filter className="h-3 w-3 text-primary shrink-0" />
+                    <span className="text-muted-foreground">نشط:</span>
+                    {timeFilter !== "this-month" && (
+                      <Badge variant="secondary" className="text-xs">
+                        {getFilterLabel()}
+                      </Badge>
+                    )}
+                    {statusFilter !== "all" && (
+                      <Badge variant="secondary" className="text-xs">
+                        {getStatusFilterLabel()}
+                      </Badge>
+                    )}
+                    {sortOrder !== "date-asc" && (
+                      <Badge variant="secondary" className="text-xs">
+                        {getSortLabel()}
+                      </Badge>
+                    )}
+                    {searchQuery && (
+                      <Badge variant="secondary" className="text-xs">
+                        بحث: "{searchQuery}"
+                      </Badge>
+                    )}
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setTimeFilter("this-week")}
-                    className="h-6 px-2 text-xs"
+                    onClick={clearAllFilters}
+                    className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3 w-3 ml-1" />
+                    مسح الكل
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="بحث في الحصص (التاريخ، الملاحظات، الموضوع...)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pr-10 h-10 bg-background"
-              />
-            </div>
+            {/* Custom Date Range Picker */}
+            {timeFilter === "custom" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-right">
+                    <CalendarRange className="ml-2 h-4 w-4" />
+                    {customDateRange.from && customDateRange.to
+                      ? `${formatShortDateAr(format(customDateRange.from, "yyyy-MM-dd"))} - ${formatShortDateAr(format(customDateRange.to, "yyyy-MM-dd"))}`
+                      : "اختر نطاقاً مخصصاً"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarPicker
+                    mode="range"
+                    selected={{ from: customDateRange.from, to: customDateRange.to }}
+                    onSelect={(range) => {
+                      setCustomDateRange({ from: range?.from, to: range?.to });
+                    }}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
 
             {/* Tabs */}
             <Tabs value={historyTab} onValueChange={(v) => setHistoryTab(v as "upcoming" | "history")}>
@@ -955,19 +1086,16 @@ export const SessionHistoryBar = ({
               {/* Upcoming Tab */}
               <TabsContent value="upcoming" className="mt-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
-                      <SelectTrigger className="h-8 w-[140px] text-xs">
-                        <TrendingUp className="h-3 w-3 ml-1" />
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="date-asc">التاريخ (الأقرب)</SelectItem>
-                        <SelectItem value="date-desc">التاريخ (الأبعد)</SelectItem>
-                        <SelectItem value="time-asc">الوقت (الأبكر)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                    <SelectTrigger className="h-8 w-[120px] text-xs">
+                      <Filter className="h-3 w-3 ml-1" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">الكل</SelectItem>
+                      <SelectItem value="scheduled">مجدولة</SelectItem>
+                    </SelectContent>
+                  </Select>
 
                   <Popover>
                     <PopoverTrigger asChild>
@@ -1112,15 +1240,16 @@ export const SessionHistoryBar = ({
                 )}
 
                 <div className="flex items-center justify-between">
-                  <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
-                    <SelectTrigger className="h-8 w-[140px] text-xs">
-                      <TrendingUp className="h-3 w-3 ml-1" />
+                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                    <SelectTrigger className="h-8 w-[120px] text-xs">
+                      <Filter className="h-3 w-3 ml-1" />
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="date-asc">التاريخ (الأقدم)</SelectItem>
-                      <SelectItem value="date-desc">التاريخ (الأحدث)</SelectItem>
-                      <SelectItem value="time-asc">الوقت (الأبكر)</SelectItem>
+                      <SelectItem value="all">الكل</SelectItem>
+                      <SelectItem value="completed">مكتملة</SelectItem>
+                      <SelectItem value="cancelled">ملغاة</SelectItem>
+                      <SelectItem value="vacation">إجازة</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1287,7 +1416,7 @@ export const SessionHistoryBar = ({
         )}
       </CardContent>
 
-      {/* All Dialogs - KEEPING ORIGINAL IMPLEMENTATION */}
+      {/* All Dialogs */}
 
       <AlertDialog open={completeDialog?.open ?? false} onOpenChange={(open) => !open && setCompleteDialog(null)}>
         <AlertDialogContent dir="rtl">
@@ -1529,7 +1658,7 @@ export const SessionHistoryBar = ({
   );
 };
 
-// Cancellation History Inline Component - KEEPING ORIGINAL
+// Cancellation History Inline Component
 const CancellationHistoryInline = ({
   student,
   cancellations,
