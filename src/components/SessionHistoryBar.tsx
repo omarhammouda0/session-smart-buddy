@@ -1248,7 +1248,12 @@ export const SessionHistoryBar = ({
           onOpenChange={(open) => !open && setCancelDialog(null)}
           student={cancelDialog.student}
           session={cancelDialog.session}
-          currentCount={getCancellationCount?.(cancelDialog.student.id) ?? 0}
+          currentCount={
+            getCancellationCount?.(
+              cancelDialog.student.id,
+              format(new Date(cancelDialog.session.date), "yyyy-MM"), // ← ADD THIS!
+            ) ?? 0
+          }
           onConfirm={handleConfirmCancel}
           onMarkAsVacation={handleCancelAsVacation}
         />
