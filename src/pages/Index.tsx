@@ -26,7 +26,7 @@ import { AddStudentDialog } from "@/components/AddStudentDialog";
 import { SemesterSettings } from "@/components/SemesterSettings";
 import { StudentCard } from "@/components/StudentCard";
 import { EditStudentDialog } from "@/components/EditStudentDialog";
-import { PaymentsDashboard } from "@/components/PaymentsDashboard";
+import { PaymentsDashboard, QuickPaymentDialog } from "@/components/PaymentsDashboard";
 import { EmptyState } from "@/components/EmptyState";
 import { StudentSearchCombobox } from "@/components/StudentSearchCombobox";
 import { StatsBar } from "@/components/StatsBar";
@@ -59,6 +59,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Student, PaymentMethod } from "@/types/student";
 
 const Index = () => {
   const now = new Date();
@@ -76,6 +77,13 @@ const Index = () => {
       time: string;
     };
   } | null>(null);
+
+  // ✅ ADDED: Quick payment dialog state
+  const [quickPaymentDialog, setQuickPaymentDialog] = useState<{
+    open: boolean;
+    student: Student | null;
+    sessionDate: string;
+  }>({ open: false, student: null, sessionDate: "" });
 
   const {
     students,
@@ -264,6 +272,48 @@ const Index = () => {
       title: "تم تحديد الحصة كإجازة",
       description: "لن يتم احتساب هذه الحصة في المدفوعات",
     });
+  };
+
+  // ✅ ADDED: Quick payment handler
+  const handleQuickPayment = (studentId: string, sessionDate: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+    
+    setQuickPaymentDialog({
+      open: true,
+      student,
+      sessionDate,
+    });
+  };
+
+  // ✅ ADDED: Quick payment confirmation handler
+  const handleQuickPaymentConfirm = (amount: number, method: PaymentMethod) => {
+    if (!quickPaymentDialog.student) return;
+
+    const sessionDate = new Date(quickPaymentDialog.sessionDate);
+    const month = sessionDate.getMonth();
+    const year = sessionDate.getFullYear();
+
+    recordPayment(quickPaymentDialog.student.id, {
+      month,
+      year,
+      amount,
+      method,
+      paidAt: new Date().toISOString(),
+      notes: `دفعة من حصة ${quickPaymentDialog.sessionDate}`,
+    });
+
+    const methodLabel = 
+      method === 'cash' ? 'كاش' : 
+      method === 'bank' ? 'تحويل بنكي' : 
+      'محفظة إلكترونية';
+
+    toast({
+      title: "✅ تم تسجيل الدفعة",
+      description: `${quickPaymentDialog.student.name}: ${amount.toLocaleString()} جنيه (${methodLabel})`,
+    });
+
+    setQuickPaymentDialog({ open: false, student: null, sessionDate: "" });
   };
 
   // ✅ ADD THIS NEW FUNCTION HERE
@@ -838,6 +888,7 @@ const Index = () => {
                       onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
                       onToggleComplete={handleToggleComplete}
                       onCancelSession={handleCancelSession}
+                      onQuickPayment={handleQuickPayment} {/* ✅ ADDED THIS PROP */}
                     />
                   </div>
                 ))}
@@ -894,6 +945,16 @@ const Index = () => {
 
         <EndOfMonthReminder students={students} payments={payments} onTogglePayment={togglePaymentStatus} />
       </main>
+
+      {/* ✅ ADDED: Quick Payment Dialog */}
+      <QuickPaymentDialog
+        open={quickPaymentDialog.open}
+        onOpenChange={(open) => !open && setQuickPaymentDialog({ open: false, student: null, sessionDate: "" })}
+        student={quickPaymentDialog.student}
+        sessionDate={quickPaymentDialog.sessionDate}
+        settings={settings}
+        onConfirm={handleQuickPaymentConfirm}
+      />
 
       {addConflictDialog && (
         <RestoreConflictDialog
