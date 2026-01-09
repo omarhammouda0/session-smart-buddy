@@ -231,55 +231,79 @@ export const StudentCard = ({
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    {isScheduled && (
-                      <>
-                        {/* Complete Button */}
-                        {onToggleComplete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
-                            onClick={() => onToggleComplete(student.id, session.id)}
-                            title="إكمال الحصة"
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        )}
+                  {/* Action Buttons - ONLY for scheduled sessions */}
+                  {isScheduled && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Complete Button */}
+                      {onToggleComplete && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+                              title="إكمال الحصة"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent dir="rtl">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>تأكيد إكمال الحصة</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                هل تريد تسجيل حصة {student.name} في {sessionTime} كمكتملة؟
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="flex-row-reverse gap-2">
+                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => onToggleComplete(student.id, session.id)}
+                                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                              >
+                                تأكيد الإكمال
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
 
-                        {/* Cancel Button */}
-                        {onCancelSession && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700"
-                            onClick={() => {
-                              const reason = prompt("سبب الإلغاء (اختياري):");
-                              onCancelSession(student.id, session.id, reason || undefined);
-                            }}
-                            title="إلغاء الحصة"
-                          >
-                            <Ban className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </>
-                    )}
-
-                    {/* Undo Complete Button */}
-                    {isCompleted && onToggleComplete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-amber-600 hover:bg-amber-500/10"
-                        onClick={() => onToggleComplete(student.id, session.id)}
-                        title="التراجع عن الإكمال"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                        تراجع
-                      </Button>
-                    )}
-                  </div>
+                      {/* Cancel Button */}
+                      {onCancelSession && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700"
+                              title="إلغاء الحصة"
+                            >
+                              <Ban className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent dir="rtl">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>تأكيد إلغاء الحصة</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                هل تريد إلغاء حصة {student.name} في {sessionTime}؟
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="flex-row-reverse gap-2">
+                              <AlertDialogCancel>رجوع</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  const reason = prompt("سبب الإلغاء (اختياري):");
+                                  onCancelSession(student.id, session.id, reason || undefined);
+                                }}
+                                className="bg-rose-600 text-white hover:bg-rose-700"
+                              >
+                                تأكيد الإلغاء
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
