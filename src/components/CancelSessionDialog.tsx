@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, XCircle } from "lucide-react";
-import { format } from "date-fns"; // ← Add this import
-import { ar } from "date-fns/locale"; // ← Add this import
+import { format } from "date-fns";
+import { ar } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +43,7 @@ export const CancelSessionDialog = ({
   const willReachLimit = limit !== null && newCount === limit;
   const willExceedLimit = limit !== null && newCount > limit;
 
-  // ✅ Format month and year in Arabic
+  // Format month and year in Arabic
   const sessionMonth = format(new Date(session.date), "MMMM yyyy", { locale: ar });
 
   const handleConfirm = () => {
@@ -112,7 +112,7 @@ export const CancelSessionDialog = ({
                         : "text-muted-foreground",
                   )}
                 />
-                <div className="space-y-1">
+                <div className="space-y-2 flex-1">
                   <p
                     className={cn(
                       "font-semibold text-sm",
@@ -124,16 +124,47 @@ export const CancelSessionDialog = ({
                     )}
                   >
                     {willExceedLimit
-                      ? `🔴 الإلغاء رقم ${newCount} للطالب ${student.name} لشهر ${sessionMonth} - سيتجاوز الحد الأقصى (${limit})`
+                      ? "🔴 تجاوز الحد الأقصى للإلغاءات"
                       : willReachLimit
-                        ? `⚠️ الإلغاء رقم ${newCount} للطالب ${student.name} لشهر ${sessionMonth} - سيصل للحد الأقصى (${limit})`
-                        : `الإلغاء رقم ${newCount} للطالب ${student.name} لشهر ${sessionMonth} من ${limit}`}
+                        ? "⚠️ الوصول للحد الأقصى"
+                        : "تتبع الإلغاءات"}
                   </p>
+
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <div className="flex gap-2 items-center">
+                      <span className="text-muted-foreground">الطالب:</span>
+                      <span className="font-semibold text-foreground" style={{ unicodeBidi: "plaintext" }}>
+                        {student.name}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2 items-center">
+                      <span className="text-muted-foreground">الشهر:</span>
+                      <span className="font-semibold text-foreground">{sessionMonth}</span>
+                    </div>
+
+                    <div className="flex gap-2 items-center">
+                      <span className="text-muted-foreground">الإلغاءات:</span>
+                      <span
+                        className={cn(
+                          "font-semibold",
+                          willExceedLimit
+                            ? "text-destructive"
+                            : willReachLimit
+                              ? "text-amber-700 dark:text-amber-400"
+                              : "text-foreground",
+                        )}
+                      >
+                        {newCount} من {limit}
+                      </span>
+                    </div>
+                  </div>
+
                   {(willReachLimit || willExceedLimit) && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground pt-1 border-t">
                       {student.cancellationPolicy?.autoNotifyParent
-                        ? "سيتم إبلاغ ولي الأمر تلقائياً"
-                        : "يمكنك إبلاغ ولي الأمر يدوياً"}
+                        ? "📱 سيتم إبلاغ ولي الأمر تلقائياً"
+                        : "💡 يمكنك إبلاغ ولي الأمر يدوياً"}
                     </p>
                   )}
                 </div>
