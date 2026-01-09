@@ -124,17 +124,18 @@ export const StudentCard = ({
               ))}
             </div>
 
-             {student.phone && (
-              
-                href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mt-2"
-              >
-                <Phone className="h-3.5 w-3.5" />
-                {student.phone}
-              </a>
-            )}
+     {student.phone && (
+  
+    href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mt-2"
+  >
+    <Phone className="h-3.5 w-3.5" />
+    {student.phone}
+  </a>
+)}
+          
           </div>
 
           <AlertDialog>
