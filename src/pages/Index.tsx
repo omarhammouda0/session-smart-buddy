@@ -13,7 +13,6 @@ import {
   CalendarDays,
   Sparkles,
   CheckCircle2,
-  Phone,
   Award,
   Zap,
   TrendingUp,
@@ -291,21 +290,29 @@ const Index = () => {
       });
   }, [students, allStudentsSearch]);
 
+  // ✅ FIXED: Calculate today's sessions with useMemo for real-time updates
   const todayStr = format(now, "yyyy-MM-dd");
-  const todaysSessions = students.reduce((acc, student) => {
-    const sessions = student.sessions.filter((s) => s.date === todayStr);
-    return acc + sessions.length;
-  }, 0);
 
-  const todaysCompletedSessions = students.reduce((acc, student) => {
-    const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "completed");
-    return acc + sessions.length;
-  }, 0);
+  const todaysSessions = useMemo(() => {
+    return students.reduce((acc, student) => {
+      const sessions = student.sessions.filter((s) => s.date === todayStr);
+      return acc + sessions.length;
+    }, 0);
+  }, [students, todayStr]);
 
-  const todaysScheduledSessions = students.reduce((acc, student) => {
-    const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled");
-    return acc + sessions.length;
-  }, 0);
+  const todaysCompletedSessions = useMemo(() => {
+    return students.reduce((acc, student) => {
+      const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "completed");
+      return acc + sessions.length;
+    }, 0);
+  }, [students, todayStr]);
+
+  const todaysScheduledSessions = useMemo(() => {
+    return students.reduce((acc, student) => {
+      const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled");
+      return acc + sessions.length;
+    }, 0);
+  }, [students, todayStr]);
 
   const getGreeting = () => {
     const hour = now.getHours();
@@ -562,18 +569,15 @@ const Index = () => {
         {/* Welcome Card */}
         {students.length > 0 && activeTab === "sessions" && (
           <div className="relative animate-fade-in-up">
-            {/* Glow Effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-3xl blur-2xl opacity-50" />
 
             <Card className="relative border-2 border-primary/20 shadow-2xl bg-gradient-to-br from-card via-card/95 to-primary/5 backdrop-blur-sm overflow-hidden">
-              {/* Decorative Elements */}
               <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-primary/5 to-transparent rounded-full blur-3xl" />
 
               <CardContent className="p-5 sm:p-7 relative">
                 <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
                   <div className="flex-1 space-y-3">
-                    {/* Greeting */}
                     <div className="flex items-center gap-3 flex-wrap">
                       <div className="flex items-center gap-2">
                         <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10">
@@ -584,7 +588,6 @@ const Index = () => {
                         </h2>
                       </div>
 
-                      {/* Motivational Badge */}
                       <Badge
                         className={cn(
                           "px-3 py-1.5 text-sm font-bold shadow-lg animate-pulse-slow bg-gradient-to-r",
@@ -595,7 +598,6 @@ const Index = () => {
                       </Badge>
                     </div>
 
-                    {/* Session Info */}
                     <div className="space-y-2">
                       <p className="text-base sm:text-lg text-foreground/90 font-medium">
                         {todaysSessions > 0 ? (
@@ -634,14 +636,12 @@ const Index = () => {
                       )}
                     </div>
 
-                    {/* Date */}
                     <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg w-fit">
                       <CalendarDays className="h-4 w-4 text-primary" />
                       {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
                     </div>
                   </div>
 
-                  {/* Progress Circle */}
                   {todaysSessions > 0 && (
                     <div className="flex flex-col items-center gap-3 bg-gradient-to-br from-primary/15 to-primary/5 rounded-2xl p-4 sm:p-5 border-2 border-primary/20 shadow-xl min-w-[110px] sm:min-w-[130px]">
                       <div className="relative w-20 h-20 sm:w-24 sm:h-24">
@@ -697,7 +697,6 @@ const Index = () => {
           </div>
         )}
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-4 mb-5 h-13 bg-gradient-to-br from-muted/80 to-muted/50 p-1.5 rounded-2xl shadow-lg backdrop-blur-md border border-border/50">
             <TabsTrigger
