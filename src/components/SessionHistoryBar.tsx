@@ -136,6 +136,30 @@ export const SessionHistoryBar = ({
     sessionInfo: { studentName: string; date: string; time: string; status: string };
   } | null>(null);
 
+  // ✅ NEW: Complete confirmation dialog
+  const [completeDialog, setCompleteDialog] = useState<{
+    open: boolean;
+    studentId: string;
+    sessionId: string;
+    sessionInfo: { studentName: string; date: string; time: string };
+  } | null>(null);
+
+  // ✅ NEW: Undo complete confirmation dialog
+  const [undoCompleteDialog, setUndoCompleteDialog] = useState<{
+    open: boolean;
+    studentId: string;
+    sessionId: string;
+    sessionInfo: { studentName: string; date: string; time: string };
+  } | null>(null);
+
+  // ✅ NEW: Restore confirmation dialog
+  const [restoreDialog, setRestoreDialog] = useState<{
+    open: boolean;
+    studentId: string;
+    sessionId: string;
+    sessionInfo: { studentName: string; date: string; time: string; previousStatus: string };
+  } | null>(null);
+
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
 
   // Conflict detection
@@ -147,7 +171,7 @@ export const SessionHistoryBar = ({
   const handleDateSelect = (date: Date) => {
     if (!selectedStudent) return;
     setAddSessionDate(date);
-    setAddSessionTime(selectedStudent.sessionTime || "16:00"); // Default to student's time
+    setAddSessionTime(selectedStudent.sessionTime);
     setShowTimePickerDialog(true);
   };
 
@@ -166,14 +190,12 @@ export const SessionHistoryBar = ({
     const dateStr = format(date, "yyyy-MM-dd");
     const todayStr = format(today, "yyyy-MM-dd");
     const isPastSession = dateStr < todayStr;
-    // ✅ Use custom time if provided, otherwise use student's default time
-    const sessionTime = customTime || student.sessionTime || "16:00";
+    const sessionTime = customTime || student.sessionTime;
     const sessionDuration = student.sessionDuration || 60;
 
-    // ✅ Check if session with SAME TIME already exists on this date for THIS student
     const existingSessionAtSameTime = student.sessions.find((s) => {
       if (s.date !== dateStr) return false;
-      const existingTime = s.time || student.sessionTime || "16:00";
+      const existingTime = s.time || student.sessionTime;
       const existingDuration = s.duration || student.sessionDuration || 60;
       return checkTimeConflict(sessionTime, sessionDuration, existingTime, existingDuration);
     });
@@ -187,12 +209,11 @@ export const SessionHistoryBar = ({
       return;
     }
 
-    // ✅ Check for time conflicts with OTHER students on the same date
     const conflictsWithOtherStudents = students.some((otherStudent) => {
       if (otherStudent.id === studentId) return false;
       return otherStudent.sessions.some((session) => {
         if (session.date !== dateStr) return false;
-        const otherTime = session.time || otherStudent.sessionTime || "16:00";
+        const otherTime = session.time || otherStudent.sessionTime;
         const otherDuration = session.duration || otherStudent.sessionDuration || 60;
         return checkTimeConflict(sessionTime, sessionDuration, otherTime, otherDuration);
       });
@@ -202,7 +223,7 @@ export const SessionHistoryBar = ({
       const conflictingStudent = students.find((s) =>
         s.sessions.some((session) => {
           if (session.date !== dateStr || s.id === studentId) return false;
-          const otherTime = session.time || s.sessionTime || "16:00";
+          const otherTime = session.time || s.sessionTime;
           const otherDuration = session.duration || s.sessionDuration || 60;
           return checkTimeConflict(sessionTime, sessionDuration, otherTime, otherDuration);
         }),
@@ -216,7 +237,6 @@ export const SessionHistoryBar = ({
       return;
     }
 
-    // ✅ Add the session
     onAddSession?.(studentId, dateStr, sessionTime);
     setAddSessionDate(undefined);
     setAddSessionTime("");
@@ -235,79 +255,64 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // ✅ RESTORE SESSION (with past/future logic)
-  const handleRestoreWithCheck = (studentId: string, sessionId: string) => {
+  // ✅ OPEN COMPLETE DIALOG (upcoming sessions)
+  const openCompleteDialog = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
     if (!student || !session) return;
 
-    const todayStr = format(today, "yyyy-MM-dd");
-    const isPastSession = session.date < todayStr;
-    const sessionTime = session.time || student.sessionTime || "16:00";
-    const previousStatus = session.status;
-
-    // Past session: Just restore status, stays in history
-    if (isPastSession) {
-      onRestoreSession?.(studentId, sessionId);
-      toast({
-        title: "✅ تم تحديث الحالة",
-        description: `تم استعادة الجلسة من "${getStatusLabel(previousStatus)}" إلى "مجدولة" (ستبقى في السجل لأنها جلسة سابقة)`,
-      });
-      return;
-    }
-
-    // Future session: Check conflicts before restoring
-    const conflictResult = checkRestoreConflict(studentId, sessionId);
-
-    if (conflictResult.severity === "none") {
-      onRestoreSession?.(studentId, sessionId);
-      toast({
-        title: "✅ تمت الاستعادة بنجاح",
-        description: `تم استعادة الجلسة من "${getStatusLabel(previousStatus)}" وإرجاعها إلى الحصص القادمة`,
-      });
-      return;
-    }
-
-    // Show conflict dialog for future sessions
-    setRestoreConflictDialog({
+    setCompleteDialog({
       open: true,
       studentId,
       sessionId,
-      conflictResult,
       sessionInfo: {
         studentName: student.name,
         date: formatShortDateAr(session.date),
-        time: sessionTime,
+        time: session.time || student.sessionTime,
       },
     });
   };
 
-  const handleConfirmRestore = () => {
-    if (restoreConflictDialog) {
-      onRestoreSession?.(restoreConflictDialog.studentId, restoreConflictDialog.sessionId);
+  // ✅ CONFIRM COMPLETE
+  const handleConfirmComplete = () => {
+    if (completeDialog) {
+      onToggleComplete?.(completeDialog.studentId, completeDialog.sessionId);
       toast({
-        title: "✅ تمت الاستعادة رغم التعارض",
-        description: `تم استعادة الجلسة إلى الحصص القادمة (يوجد تعارض مع جلسات أخرى)`,
-        variant: "default",
+        title: "✅ تم إكمال الجلسة",
+        description: `تم تسجيل الجلسة كمكتملة ونقلها إلى السجل`,
       });
-      setRestoreConflictDialog(null);
+      setCompleteDialog(null);
     }
   };
 
-  // ✅ TOGGLE COMPLETE (with past/future logic)
-  const handleToggleComplete = (studentId: string, sessionId: string) => {
+  // ✅ OPEN UNDO COMPLETE DIALOG (history sessions)
+  const openUndoCompleteDialog = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
     if (!student || !session) return;
 
-    const todayStr = format(today, "yyyy-MM-dd");
-    const isPastSession = session.date < todayStr;
-    const isCompleted = session.status === "completed";
+    setUndoCompleteDialog({
+      open: true,
+      studentId,
+      sessionId,
+      sessionInfo: {
+        studentName: student.name,
+        date: formatShortDateAr(session.date),
+        time: session.time || student.sessionTime,
+      },
+    });
+  };
 
-    onToggleComplete?.(studentId, sessionId);
+  // ✅ CONFIRM UNDO COMPLETE
+  const handleConfirmUndoComplete = () => {
+    if (undoCompleteDialog) {
+      const student = students.find((s) => s.id === undoCompleteDialog.studentId);
+      const session = student?.sessions.find((s) => s.id === undoCompleteDialog.sessionId);
+      const todayStr = format(today, "yyyy-MM-dd");
+      const isPastSession = session && session.date < todayStr;
 
-    if (isCompleted) {
-      // Undoing completion
+      onToggleComplete?.(undoCompleteDialog.studentId, undoCompleteDialog.sessionId);
+
       if (isPastSession) {
         toast({
           title: "↩️ تم التراجع عن الإكمال",
@@ -319,12 +324,101 @@ export const SessionHistoryBar = ({
           description: `تم إرجاع الجلسة من "مكتملة" إلى الحصص القادمة`,
         });
       }
-    } else {
-      // Marking as complete
-      toast({
-        title: "✅ تم إكمال الجلسة",
-        description: `تم تسجيل الجلسة كمكتملة ونقلها إلى السجل`,
+      setUndoCompleteDialog(null);
+    }
+  };
+
+  // ✅ OPEN RESTORE DIALOG (cancelled/vacation sessions)
+  const openRestoreDialog = (studentId: string, sessionId: string) => {
+    const student = students.find((s) => s.id === studentId);
+    const session = student?.sessions.find((s) => s.id === sessionId);
+    if (!student || !session) return;
+
+    const todayStr = format(today, "yyyy-MM-dd");
+    const isPastSession = session.date < todayStr;
+
+    // If it's a past session, just restore directly (no conflicts possible)
+    if (isPastSession) {
+      setRestoreDialog({
+        open: true,
+        studentId,
+        sessionId,
+        sessionInfo: {
+          studentName: student.name,
+          date: formatShortDateAr(session.date),
+          time: session.time || student.sessionTime,
+          previousStatus: getStatusLabel(session.status),
+        },
       });
+      return;
+    }
+
+    // For future sessions, check conflicts first
+    const conflictResult = checkRestoreConflict(studentId, sessionId);
+
+    if (conflictResult.severity === "none") {
+      // No conflicts, show simple restore dialog
+      setRestoreDialog({
+        open: true,
+        studentId,
+        sessionId,
+        sessionInfo: {
+          studentName: student.name,
+          date: formatShortDateAr(session.date),
+          time: session.time || student.sessionTime,
+          previousStatus: getStatusLabel(session.status),
+        },
+      });
+    } else {
+      // Has conflicts, show conflict dialog
+      setRestoreConflictDialog({
+        open: true,
+        studentId,
+        sessionId,
+        conflictResult,
+        sessionInfo: {
+          studentName: student.name,
+          date: formatShortDateAr(session.date),
+          time: session.time || student.sessionTime,
+        },
+      });
+    }
+  };
+
+  // ✅ CONFIRM RESTORE (simple, no conflicts)
+  const handleConfirmRestore = () => {
+    if (restoreDialog) {
+      onRestoreSession?.(restoreDialog.studentId, restoreDialog.sessionId);
+      const student = students.find((s) => s.id === restoreDialog.studentId);
+      const session = student?.sessions.find((s) => s.id === restoreDialog.sessionId);
+      const todayStr = format(today, "yyyy-MM-dd");
+      const isPastSession = session && session.date < todayStr;
+
+      if (isPastSession) {
+        toast({
+          title: "✅ تم تحديث الحالة",
+          description: `تم استعادة الجلسة من "${restoreDialog.sessionInfo.previousStatus}" إلى "مجدولة" (ستبقى في السجل لأنها جلسة سابقة)`,
+        });
+      } else {
+        toast({
+          title: "✅ تمت الاستعادة بنجاح",
+          description: `تم استعادة الجلسة من "${restoreDialog.sessionInfo.previousStatus}" وإرجاعها إلى الحصص القادمة`,
+        });
+      }
+      setRestoreDialog(null);
+    }
+  };
+
+  // ✅ CONFIRM RESTORE WITH CONFLICT
+  const handleConfirmRestoreWithConflict = () => {
+    if (restoreConflictDialog) {
+      onRestoreSession?.(restoreConflictDialog.studentId, restoreConflictDialog.sessionId);
+      toast({
+        title: "✅ تمت الاستعادة رغم التعارض",
+        description: `تم استعادة الجلسة إلى الحصص القادمة (يوجد تعارض مع جلسات أخرى)`,
+        variant: "default",
+      });
+      setRestoreConflictDialog(null);
     }
   };
 
@@ -341,7 +435,7 @@ export const SessionHistoryBar = ({
       sessionInfo: {
         studentName: student.name,
         date: formatShortDateAr(session.date),
-        time: session.time || student.sessionTime || "16:00",
+        time: session.time || student.sessionTime,
       },
     });
   };
@@ -417,7 +511,7 @@ export const SessionHistoryBar = ({
       sessionInfo: {
         studentName: student.name,
         date: formatShortDateAr(session.date),
-        time: session.time || student.sessionTime || "16:00",
+        time: session.time || student.sessionTime,
         status: getStatusLabel(session.status),
       },
     });
@@ -462,9 +556,6 @@ export const SessionHistoryBar = ({
     return start1 < end2 && end1 > start2;
   };
 
-  // ✅ Only future scheduled sessions
-  // ✅ Only future scheduled sessions - ASCENDING ORDER (earliest first)
-
   const getUpcomingSessions = () => {
     if (!selectedStudent) return [];
     const todayStr = format(today, "yyyy-MM-dd");
@@ -472,11 +563,9 @@ export const SessionHistoryBar = ({
     return selectedStudent.sessions
       .filter((session) => session.status === "scheduled" && session.date >= todayStr)
       .sort((a, b) => {
-        // First sort by date ascending
         const dateCompare = a.date.localeCompare(b.date);
         if (dateCompare !== 0) return dateCompare;
 
-        // If same date, sort by time ascending
         const timeA = a.time || selectedStudent.sessionTime;
         const timeB = b.time || selectedStudent.sessionTime;
         return (timeA || "").localeCompare(timeB || "");
@@ -484,25 +573,21 @@ export const SessionHistoryBar = ({
       .map((session) => ({ ...session, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
 
-  // ✅ History sessions (completed/cancelled/vacation) - ascending order
-  // ✅ History sessions (completed/cancelled/vacation) - ASCENDING ORDER (oldest first)
-
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
     return selectedStudent.sessions
       .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
       .sort((a, b) => {
-        // First sort by date ascending (oldest first)
         const dateCompare = a.date.localeCompare(b.date);
         if (dateCompare !== 0) return dateCompare;
 
-        // If same date, sort by time ascending
         const timeA = a.time || selectedStudent.sessionTime;
         const timeB = b.time || selectedStudent.sessionTime;
         return (timeA || "").localeCompare(timeB || "");
       })
       .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
+
   const getHistoryStats = () => {
     if (!selectedStudent) return { completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0 };
     let completed = 0,
@@ -554,7 +639,7 @@ export const SessionHistoryBar = ({
                 <SelectItem key={student.id} value={student.id}>
                   <div className="flex items-center gap-2">
                     <span>{student.name}</span>
-                    <span className="text-xs text-muted-foreground">({student.sessionTime || "16:00"})</span>
+                    <span className="text-xs text-muted-foreground">({student.sessionTime})</span>
                   </div>
                 </SelectItem>
               ))}
@@ -695,7 +780,7 @@ export const SessionHistoryBar = ({
                                 <p className="font-medium truncate">
                                   {formatShortDateAr(session.date)}
                                   <span className="text-muted-foreground font-normal mr-1">
-                                    ({session.time || selectedStudent.sessionTime || "16:00"})
+                                    ({session.time || selectedStudent.sessionTime})
                                     <span className="text-muted-foreground/70 mr-1">
                                       ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
                                     </span>
@@ -720,15 +805,17 @@ export const SessionHistoryBar = ({
                                 studentId={session.studentId}
                                 studentName={session.studentName}
                               />
+                              {/* ✅ COMPLETE BUTTON - WITH CONFIRMATION */}
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-success"
-                                onClick={() => handleToggleComplete(session.studentId, session.id)}
+                                onClick={() => openCompleteDialog(session.studentId, session.id)}
                                 title="إكمال الجلسة"
                               >
                                 <Check className="h-3.5 w-3.5" />
                               </Button>
+                              {/* ✅ VACATION BUTTON - WITH CONFIRMATION */}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -738,6 +825,7 @@ export const SessionHistoryBar = ({
                               >
                                 <Palmtree className="h-3.5 w-3.5" />
                               </Button>
+                              {/* ✅ CANCEL BUTTON - WITH CONFIRMATION */}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -747,6 +835,7 @@ export const SessionHistoryBar = ({
                               >
                                 <Ban className="h-3.5 w-3.5" />
                               </Button>
+                              {/* ✅ DELETE BUTTON - WITH CONFIRMATION */}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -835,7 +924,6 @@ export const SessionHistoryBar = ({
                     <p className="text-center text-muted-foreground py-6 text-xs">لا توجد حصص سابقة</p>
                   ) : (
                     historySessions.map((session) => {
-                      // ✅ Check if this is a past session
                       const todayStr = format(today, "yyyy-MM-dd");
                       const isPastSession = session.date < todayStr;
 
@@ -870,7 +958,7 @@ export const SessionHistoryBar = ({
                               <p className="font-medium truncate">
                                 {formatShortDateAr(session.date)}
                                 <span className="text-muted-foreground font-normal mr-1">
-                                  ({session.time || selectedStudent.sessionTime || "16:00"})
+                                  ({session.time || selectedStudent.sessionTime})
                                   <span className="text-muted-foreground/70 mr-1">
                                     ({formatDurationAr(session.duration || selectedStudent.sessionDuration || 60)})
                                   </span>
@@ -889,7 +977,7 @@ export const SessionHistoryBar = ({
                                 studentName={session.studentName}
                               />
 
-                              {/* ✅ PAST SESSIONS: Only DELETE button (no تراجع or استعادة) */}
+                              {/* ✅ PAST SESSIONS: Only DELETE button */}
                               {isPastSession ? (
                                 <Button
                                   variant="ghost"
@@ -901,14 +989,14 @@ export const SessionHistoryBar = ({
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               ) : (
-                                /* ✅ FUTURE SESSIONS: Show تراجع/استعادة + DELETE */
+                                /* ✅ FUTURE SESSIONS: Show تراجع/استعادة + DELETE - WITH CONFIRMATION */
                                 <>
                                   {session.status === "completed" ? (
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-7 px-2 text-warning"
-                                      onClick={() => handleToggleComplete(session.studentId, session.id)}
+                                      onClick={() => openUndoCompleteDialog(session.studentId, session.id)}
                                       title="التراجع عن الإكمال"
                                     >
                                       <X className="h-3.5 w-3.5 ml-1" />
@@ -919,7 +1007,7 @@ export const SessionHistoryBar = ({
                                       variant="ghost"
                                       size="sm"
                                       className="h-7 px-2 text-success"
-                                      onClick={() => handleRestoreWithCheck(session.studentId, session.id)}
+                                      onClick={() => openRestoreDialog(session.studentId, session.id)}
                                       title="استعادة الجلسة"
                                     >
                                       <RotateCcw className="h-3.5 w-3.5 ml-1" />
@@ -952,7 +1040,6 @@ export const SessionHistoryBar = ({
                             </div>
                           </div>
 
-                          {/* Show session details for completed sessions */}
                           {session.status === "completed" && (session.topic || session.notes || session.homework) && (
                             <div className="mt-2 mr-7 text-[10px] text-muted-foreground space-y-0.5 bg-muted/30 rounded p-1.5">
                               {session.topic && (
@@ -982,7 +1069,7 @@ export const SessionHistoryBar = ({
                 <CancellationHistoryInline
                   student={selectedStudent}
                   cancellations={getAllStudentCancellations(selectedStudent.id)}
-                  onRestore={handleRestoreWithCheck}
+                  onRestore={openRestoreDialog}
                   onClearMonth={onClearMonthCancellations}
                 />
               )}
@@ -996,6 +1083,117 @@ export const SessionHistoryBar = ({
         )}
       </CardContent>
 
+      {/* ✅ COMPLETE CONFIRMATION DIALOG */}
+      <AlertDialog open={completeDialog?.open ?? false} onOpenChange={(open) => !open && setCompleteDialog(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-success">
+              <Check className="h-5 w-5" />
+              تأكيد إكمال الحصة
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>هل تريد تسجيل هذه الحصة كمكتملة؟</p>
+              {completeDialog && (
+                <div className="bg-success/10 border border-success/30 rounded-lg p-3 mt-2">
+                  <p className="font-medium text-foreground">{completeDialog.sessionInfo.studentName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {completeDialog.sessionInfo.date} - {formatTimeAr(completeDialog.sessionInfo.time)}
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmComplete}
+              className="bg-success text-success-foreground hover:bg-success/90"
+            >
+              <Check className="h-4 w-4 ml-1" />
+              نعم، أكمل الحصة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ✅ UNDO COMPLETE CONFIRMATION DIALOG */}
+      <AlertDialog
+        open={undoCompleteDialog?.open ?? false}
+        onOpenChange={(open) => !open && setUndoCompleteDialog(null)}
+      >
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-warning">
+              <RotateCcw className="h-5 w-5" />
+              تأكيد التراجع عن الإكمال
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>هل تريد التراجع عن إكمال هذه الحصة؟</p>
+              {undoCompleteDialog && (
+                <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mt-2">
+                  <p className="font-medium text-foreground">{undoCompleteDialog.sessionInfo.studentName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {undoCompleteDialog.sessionInfo.date} - {formatTimeAr(undoCompleteDialog.sessionInfo.time)}
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg mt-2">
+                💡 سيتم تغيير الحالة من "مكتملة" إلى "مجدولة"
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmUndoComplete}
+              className="bg-warning text-warning-foreground hover:bg-warning/90"
+            >
+              <X className="h-4 w-4 ml-1" />
+              نعم، تراجع
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ✅ RESTORE CONFIRMATION DIALOG (Simple, no conflicts) */}
+      <AlertDialog open={restoreDialog?.open ?? false} onOpenChange={(open) => !open && setRestoreDialog(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-success">
+              <RotateCcw className="h-5 w-5" />
+              تأكيد استعادة الحصة
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>هل تريد استعادة هذه الحصة؟</p>
+              {restoreDialog && (
+                <div className="bg-success/10 border border-success/30 rounded-lg p-3 mt-2">
+                  <p className="font-medium text-foreground">{restoreDialog.sessionInfo.studentName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {restoreDialog.sessionInfo.date} - {formatTimeAr(restoreDialog.sessionInfo.time)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    الحالة الحالية: {restoreDialog.sessionInfo.previousStatus}
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg mt-2">
+                💡 سيتم تغيير الحالة إلى "مجدولة"
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRestore}
+              className="bg-success text-success-foreground hover:bg-success/90"
+            >
+              <RotateCcw className="h-4 w-4 ml-1" />
+              نعم، استعد الحصة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Restore Conflict Dialog */}
       {restoreConflictDialog && (
         <RestoreConflictDialog
@@ -1003,7 +1201,7 @@ export const SessionHistoryBar = ({
           onOpenChange={(open) => !open && setRestoreConflictDialog(null)}
           conflictResult={restoreConflictDialog.conflictResult}
           sessionInfo={restoreConflictDialog.sessionInfo}
-          onConfirm={handleConfirmRestore}
+          onConfirm={handleConfirmRestoreWithConflict}
         />
       )}
 
@@ -1128,12 +1326,9 @@ export const SessionHistoryBar = ({
                   className="w-full px-3 py-2 rounded-md border bg-background text-foreground"
                   dir="ltr"
                 />
-                <p className="text-xs text-muted-foreground">
-                  💡 الوقت الافتراضي: {selectedStudent?.sessionTime || "16:00"}
-                </p>
+                <p className="text-xs text-muted-foreground">💡 الوقت الافتراضي: {selectedStudent?.sessionTime}</p>
               </div>
 
-              {/* Show existing sessions on this date */}
               {addSessionDate &&
                 selectedStudent &&
                 (() => {
@@ -1146,8 +1341,7 @@ export const SessionHistoryBar = ({
                         <div className="space-y-1">
                           {existingSessions.map((s) => (
                             <p key={s.id} className="text-xs text-muted-foreground">
-                              • {formatTimeAr(s.time || selectedStudent.sessionTime || "16:00")} (
-                              {getStatusLabel(s.status)})
+                              • {formatTimeAr(s.time || selectedStudent.sessionTime)} ({getStatusLabel(s.status)})
                             </p>
                           ))}
                         </div>
