@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import {
   format,
   startOfWeek,
@@ -62,6 +62,17 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
   const [selectedDaySheet, setSelectedDaySheet] = useState<{ date: string; sessions: SessionWithStudent[] } | null>(
     null,
   );
+  const [touchDragState, setTouchDragState] = useState<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    sessionId: string;
+    studentId: string;
+    studentName: string;
+    originalDate: string;
+    originalTime: string;
+  } | null>(null);
+  const longPressTimer = React.useRef<NodeJS.Timeout | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     sessionId: string;
@@ -205,6 +216,105 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
   const handleDragLeave = () => {
     setDropTargetDate(null);
   };
+
+  // Touch handlers for mobile drag-and-drop
+  const handleTouchStart = useCallback((
+    e: React.TouchEvent,
+    sessionId: string,
+    studentId: string,
+    studentName: string,
+    date: string,
+    time: string,
+  ) => {
+    const touch = e.touches[0];
+    
+    // Start a long-press timer (500ms)
+    longPressTimer.current = setTimeout(() => {
+      setTouchDragState({
+        active: true,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        sessionId,
+        studentId,
+        studentName,
+        originalDate: date,
+        originalTime: time,
+      });
+      
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      
+      toast({
+        title: "اسحب الحصة",
+        description: "حرك إصبعك لنقل الحصة إلى يوم آخر",
+      });
+    }, 500);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+
+    if (!touchDragState?.active) return;
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dayCell = element?.closest('[data-date]');
+    
+    if (dayCell) {
+      const dateStr = dayCell.getAttribute('data-date');
+      if (dateStr && dateStr !== touchDragState.originalDate) {
+        setDropTargetDate(dateStr);
+      }
+    } else {
+      setDropTargetDate(null);
+    }
+  }, [touchDragState]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+
+    if (!touchDragState?.active) {
+      setTouchDragState(null);
+      return;
+    }
+
+    if (dropTargetDate && dropTargetDate !== touchDragState.originalDate) {
+      const student = students.find((s) => s.id === touchDragState.studentId);
+      const hasExistingSession = student?.sessions.some(
+        (s) => s.date === dropTargetDate && s.id !== touchDragState.sessionId
+      );
+
+      if (hasExistingSession) {
+        toast({
+          title: "لا يمكن النقل",
+          description: `${touchDragState.studentName} لديه حصة بالفعل في هذا التاريخ`,
+          variant: "destructive",
+        });
+      } else {
+        setConfirmDialog({
+          open: true,
+          sessionId: touchDragState.sessionId,
+          studentId: touchDragState.studentId,
+          studentName: touchDragState.studentName,
+          originalDate: touchDragState.originalDate,
+          originalTime: touchDragState.originalTime,
+          newDate: dropTargetDate,
+          newTime: touchDragState.originalTime,
+        });
+      }
+    }
+
+    setTouchDragState(null);
+    setDropTargetDate(null);
+  }, [touchDragState, dropTargetDate, students]);
 
   const handleDrop = (e: React.DragEvent, newDate: string) => {
     e.preventDefault();
@@ -404,19 +514,21 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
             const daySessions = sessionsByDate.get(dateStr) || [];
             const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
             const isToday = isSameDay(day, today);
-            const isDragTarget = dropTargetDate === dateStr && dragState?.originalDate !== dateStr;
+            const isDragTarget = dropTargetDate === dateStr && (dragState?.originalDate !== dateStr || touchDragState?.originalDate !== dateStr);
             const maxVisible = viewMode === "week" ? 4 : 2;
 
             return (
               <div
                 key={index}
+                data-date={dateStr}
                 className={cn(
-                  "border-2 rounded-xl p-3 transition-all duration-200",
-                  viewMode === "week" ? "min-h-[200px]" : "min-h-[140px]",
+                  "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200 touch-manipulation",
+                  viewMode === "week" ? "min-h-[160px] sm:min-h-[200px]" : "min-h-[100px] sm:min-h-[140px]",
                   !isCurrentMonth && "opacity-40 bg-muted/20",
                   isToday && "ring-2 ring-primary shadow-lg bg-primary/5",
                   isDragTarget &&
                     "bg-gradient-to-br from-primary/20 to-primary/5 border-primary border-dashed scale-105 shadow-xl",
+                  touchDragState?.active && "select-none",
                   !isDragTarget && !isToday && "hover:border-primary/30 hover:shadow-md",
                 )}
                 onDragOver={(e) => handleDragOver(e, dateStr)}
@@ -426,27 +538,27 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                 {/* Date header */}
                 <div
                   className={cn(
-                    "flex items-center justify-between mb-3 pb-2 border-b-2",
+                    "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2",
                     isToday ? "border-primary" : "border-border/50",
                   )}
                 >
                   <span
                     className={cn(
-                      "text-lg font-bold",
-                      isToday && "bg-primary text-primary-foreground px-2.5 py-1 rounded-lg shadow-sm",
+                      "text-base sm:text-lg font-bold",
+                      isToday && "bg-primary text-primary-foreground px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg shadow-sm",
                     )}
                   >
                     {format(day, "d")}
                   </span>
                   {daySessions.length > 0 && (
-                    <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full font-bold shadow-sm">
+                    <span className="text-[10px] sm:text-xs bg-primary text-primary-foreground px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-bold shadow-sm">
                       {daySessions.length}
                     </span>
                   )}
                 </div>
 
                 {/* Sessions - LARGER CARDS */}
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   {daySessions.slice(0, maxVisible).map(({ session, student }) => {
                     const time = session.time || student.sessionTime || "16:00";
                     const canDrag = session.status === "scheduled";
@@ -459,18 +571,24 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                           canDrag && handleDragStart(e, session.id, student.id, student.name, session.date, time)
                         }
                         onDragEnd={handleDragEnd}
+                        onTouchStart={(e) =>
+                          canDrag && handleTouchStart(e, session.id, student.id, student.name, session.date, time)
+                        }
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
                         className={cn(
-                          "text-sm p-3 rounded-lg border-2 flex items-start gap-2 transition-all duration-200",
+                          "text-xs sm:text-sm p-2 sm:p-3 rounded-lg border-2 flex items-start gap-1.5 sm:gap-2 transition-all duration-200 touch-manipulation select-none",
                           getStatusColor(session.status),
-                          canDrag && "cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-105",
+                          canDrag && "cursor-grab active:cursor-grabbing hover:shadow-lg active:scale-95",
                           !canDrag && "cursor-default opacity-75",
+                          touchDragState?.sessionId === session.id && touchDragState?.active && "opacity-50 scale-95",
                         )}
                       >
-                        {canDrag && <GripVertical className="h-4 w-4 shrink-0 opacity-50 mt-0.5" />}
+                        {canDrag && <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 opacity-50 mt-0.5" />}
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold truncate">{student.name}</div>
-                          <div className="text-xs opacity-80 flex items-center gap-1.5 mt-1">
-                            <Clock className="h-3.5 w-3.5" />
+                          <div className="font-bold truncate text-xs sm:text-sm">{student.name}</div>
+                          <div className="text-[10px] sm:text-xs opacity-80 flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1">
+                            <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                             <span className="font-medium">{time}</span>
                           </div>
                         </div>
