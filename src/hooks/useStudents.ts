@@ -8,6 +8,8 @@ import {
   HomeworkStatus,
   CancellationPolicy,
   PaymentMethod,
+  PaymentRecord,
+  PaymentStatus,
 } from "@/types/student";
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from "@/lib/dateUtils";
 
@@ -50,8 +52,6 @@ export const useStudents = () => {
     if (storedPayments) setPayments(JSON.parse(storedPayments));
     if (storedSettings) {
       const parsed = JSON.parse(storedSettings);
-
-      // Normalize + enforce non-zero defaults for pricing
       const onsite = Number(parsed.defaultPriceOnsite);
       const online = Number(parsed.defaultPriceOnline);
 
@@ -86,7 +86,6 @@ export const useStudents = () => {
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
-      // Merge without letting `undefined` wipe existing values
       const next: AppSettings = { ...prev };
       (Object.keys(newSettings) as (keyof AppSettings)[]).forEach((key) => {
         const value = newSettings[key];
@@ -95,7 +94,6 @@ export const useStudents = () => {
         }
       });
 
-      // Ensure price defaults always exist + are valid numbers
       const onsite = Number((next as any).defaultPriceOnsite);
       const online = Number((next as any).defaultPriceOnline);
       next.defaultPriceOnsite = Number.isFinite(onsite) && onsite > 0 ? onsite : 150;
@@ -124,7 +122,7 @@ export const useStudents = () => {
     const sessions: Session[] = sessionDates.map((date) => ({
       id: generateId(),
       date,
-      duration, // Include duration in each session
+      duration,
       completed: false,
       status: "scheduled" as SessionStatus,
       history: [{ status: "scheduled" as SessionStatus, timestamp: new Date().toISOString() }],
@@ -136,16 +134,14 @@ export const useStudents = () => {
       phone,
       parentPhone,
       sessionTime,
-      sessionDuration: duration, // Store default duration for this student
+      sessionDuration: duration,
       sessionType,
-      // Pricing: new students should always start on global defaults
       useCustomSettings: false,
       scheduleDays: scheduleDays.map((d) => ({ dayOfWeek: d })),
       semesterStart,
       semesterEnd,
       sessions,
       createdAt: new Date().toISOString(),
-      // Default cancellation policy: 3 per month, auto-notify parent
       cancellationPolicy: {
         monthlyLimit: 3,
         alertTutor: true,
@@ -155,7 +151,6 @@ export const useStudents = () => {
 
     setStudents((prev) => [...prev, newStudent]);
 
-    // Initialize payments for all months in semester
     const months = getMonthsInSemester(semesterStart, semesterEnd);
     const studentPayments: StudentPayments = {
       studentId: newStudent.id,
@@ -163,6 +158,10 @@ export const useStudents = () => {
         month,
         year,
         isPaid: false,
+        amountDue: 0,
+        amountPaid: 0,
+        paymentStatus: "unpaid" as PaymentStatus,
+        paymentRecords: [],
       })),
     };
     setPayments((prev) => [...prev, studentPayments]);
@@ -196,9 +195,7 @@ export const useStudents = () => {
     setStudents((prev) =>
       prev.map((s) => {
         if (s.id !== studentId) return s;
-
         const next = { ...s };
-
         if (customSettings.useCustomSettings !== undefined) {
           next.useCustomSettings = customSettings.useCustomSettings;
         }
@@ -211,7 +208,6 @@ export const useStudents = () => {
         if (customSettings.customPriceOnline !== undefined) {
           next.customPriceOnline = customSettings.customPriceOnline;
         }
-
         return next;
       }),
     );
@@ -251,12 +247,7 @@ export const useStudents = () => {
 
         const newStart = semesterStart || s.semesterStart;
         const newEnd = semesterEnd || s.semesterEnd;
-
-        // Regenerate sessions based on new schedule
         const sessionDates = generateSessionsForSchedule(scheduleDays, newStart, newEnd);
-
-        // Preserve completion status for existing dates
-        const existingCompletions = new Map(s.sessions.map((sess) => [sess.date, sess.completed]));
 
         const newSessions: Session[] = sessionDates.map((date) => {
           const existing = s.sessions.find((sess) => sess.date === date);
@@ -282,7 +273,6 @@ export const useStudents = () => {
       }),
     );
 
-    // Update payments if semester changed
     if (semesterStart || semesterEnd) {
       const student = students.find((s) => s.id === studentId);
       if (student) {
@@ -293,8 +283,6 @@ export const useStudents = () => {
         setPayments((prev) =>
           prev.map((p) => {
             if (p.studentId !== studentId) return p;
-
-            // Preserve existing payment status
             const existingPayments = new Map(p.payments.map((pay) => [`${pay.year}-${pay.month}`, pay]));
 
             return {
@@ -306,6 +294,10 @@ export const useStudents = () => {
                     month,
                     year,
                     isPaid: false,
+                    amountDue: 0,
+                    amountPaid: 0,
+                    paymentStatus: "unpaid" as PaymentStatus,
+                    paymentRecords: [],
                   }
                 );
               }),
@@ -325,15 +317,11 @@ export const useStudents = () => {
         const today = toYmdLocal(new Date());
         const isPastDate = date < today;
 
-        // ✅ Use custom time if provided
-        const sessionTime = customTime || s.sessionTime || "16:00";
-
-        // Auto-complete past sessions
         const newSession: Session = {
           id: generateId(),
           date,
-          time: customTime, // ✅ Store the custom time
-          duration: s.sessionDuration, // Use student's default duration
+          time: customTime,
+          duration: s.sessionDuration,
           completed: isPastDate,
           status: isPastDate ? ("completed" as SessionStatus) : ("scheduled" as SessionStatus),
           completedAt: isPastDate ? now : undefined,
@@ -346,9 +334,7 @@ export const useStudents = () => {
           ],
         };
 
-        // Insert in sorted order
         const newSessions = [...s.sessions, newSession].sort((a, b) => a.date.localeCompare(b.date));
-
         return { ...s, sessions: newSessions };
       }),
     );
@@ -375,7 +361,6 @@ export const useStudents = () => {
     );
   };
 
-  // Permanently delete a session (for accidentally added sessions)
   const deleteSession = (studentId: string, sessionId: string) => {
     setStudents((prev) =>
       prev.map((s) => {
@@ -415,7 +400,6 @@ export const useStudents = () => {
     );
   };
 
-  // Mark session as vacation
   const markSessionAsVacation = (studentId: string, sessionId: string) => {
     setStudents((prev) =>
       prev.map((s) => {
@@ -424,7 +408,6 @@ export const useStudents = () => {
           ...s,
           sessions: s.sessions.map((sess) => {
             if (sess.id !== sessionId) return sess;
-            // Only scheduled sessions can become vacation
             if (sess.status !== "scheduled") return sess;
             const now = new Date().toISOString();
             return {
@@ -440,7 +423,6 @@ export const useStudents = () => {
     );
   };
 
-  // Bulk mark sessions as vacation
   const bulkMarkAsVacation = (
     studentIds: string[],
     sessionIds: string[],
@@ -454,7 +436,6 @@ export const useStudents = () => {
 
         const updatedSessions = student.sessions.map((session) => {
           if (!sessionIds.includes(session.id)) return session;
-          // Only mark scheduled sessions as vacation
           if (session.status !== "scheduled") return session;
           updatedCount++;
           return {
@@ -484,7 +465,6 @@ export const useStudents = () => {
       prev.map((s) => {
         if (s.id !== studentId) return s;
 
-        // Check if new date already has a session
         const existingSession = s.sessions.find((sess) => sess.date === newDate);
         if (existingSession) return s;
 
@@ -505,7 +485,6 @@ export const useStudents = () => {
           };
         });
 
-        // Sort sessions by date
         return {
           ...s,
           sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)),
@@ -514,7 +493,6 @@ export const useStudents = () => {
     );
   };
 
-  // Update session date AND time together (for bulk day+time changes)
   const updateSessionDateTime = (studentId: string, sessionId: string, newDate: string, newTime: string) => {
     setStudents((prev) =>
       prev.map((s) => {
@@ -540,7 +518,6 @@ export const useStudents = () => {
           };
         });
 
-        // Sort sessions by date
         return {
           ...s,
           sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)),
@@ -573,7 +550,6 @@ export const useStudents = () => {
     );
   };
 
-  // Bulk update session times - updates individual sessions, not the student's default time
   const bulkUpdateSessionTime = (
     studentIds: string[],
     sessionIds: string[],
@@ -588,7 +564,6 @@ export const useStudents = () => {
         const updatedSessions = student.sessions.map((session) => {
           if (!sessionIds.includes(session.id)) return session;
           updatedCount++;
-          // Update the individual session's time
           return {
             ...session,
             time: newTime,
@@ -605,7 +580,6 @@ export const useStudents = () => {
     return { success: true, updatedCount, conflicts: [] };
   };
 
-  // Update session notes and details
   const updateSessionDetails = (
     studentId: string,
     sessionId: string,
@@ -655,7 +629,127 @@ export const useStudents = () => {
     );
   };
 
-  // ✅ NEW: Record payment with enhanced details
+  // ✅ NEW: Add partial payment
+  const addPartialPayment = (
+    studentId: string,
+    month: number,
+    year: number,
+    amount: number,
+    method: PaymentMethod,
+    notes?: string,
+  ) => {
+    const now = new Date().toISOString();
+
+    setPayments((prev) => {
+      const updated = [...prev];
+      const studentPaymentIndex = updated.findIndex((p) => p.studentId === studentId);
+
+      if (studentPaymentIndex === -1) {
+        // Create new payment record
+        updated.push({
+          studentId,
+          payments: [
+            {
+              month,
+              year,
+              isPaid: false,
+              amountDue: 0,
+              amountPaid: amount,
+              paymentStatus: "partial" as PaymentStatus,
+              paymentRecords: [
+                {
+                  id: generateId(),
+                  amount,
+                  method,
+                  paidAt: now,
+                  notes,
+                },
+              ],
+            },
+          ],
+        });
+      } else {
+        const studentPayments = updated[studentPaymentIndex];
+        const paymentIndex = studentPayments.payments.findIndex((p) => p.month === month && p.year === year);
+
+        if (paymentIndex === -1) {
+          // Add new month payment
+          studentPayments.payments.push({
+            month,
+            year,
+            isPaid: false,
+            amountDue: 0,
+            amountPaid: amount,
+            paymentStatus: "partial" as PaymentStatus,
+            paymentRecords: [
+              {
+                id: generateId(),
+                amount,
+                method,
+                paidAt: now,
+                notes,
+              },
+            ],
+          });
+        } else {
+          // Add to existing month
+          const payment = studentPayments.payments[paymentIndex];
+          const newAmountPaid = (payment.amountPaid || 0) + amount;
+          const amountDue = payment.amountDue || 0;
+
+          const newStatus: PaymentStatus =
+            newAmountPaid >= amountDue && amountDue > 0 ? "paid" : newAmountPaid > 0 ? "partial" : "unpaid";
+
+          studentPayments.payments[paymentIndex] = {
+            ...payment,
+            amountPaid: newAmountPaid,
+            paymentStatus: newStatus,
+            isPaid: newStatus === "paid",
+            paidAt: newStatus === "paid" ? now : payment.paidAt,
+            paymentRecords: [
+              ...(payment.paymentRecords || []),
+              {
+                id: generateId(),
+                amount,
+                method,
+                paidAt: now,
+                notes,
+              },
+            ],
+          };
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  // ✅ NEW: Update monthly amount due (called when calculating from sessions)
+  const updateMonthlyAmountDue = (studentId: string, month: number, year: number, amountDue: number) => {
+    setPayments((prev) =>
+      prev.map((p) => {
+        if (p.studentId !== studentId) return p;
+        return {
+          ...p,
+          payments: p.payments.map((pay) => {
+            if (pay.month !== month || pay.year !== year) return pay;
+
+            const currentAmountPaid = pay.amountPaid || 0;
+            const newStatus: PaymentStatus =
+              currentAmountPaid >= amountDue && amountDue > 0 ? "paid" : currentAmountPaid > 0 ? "partial" : "unpaid";
+
+            return {
+              ...pay,
+              amountDue,
+              paymentStatus: newStatus,
+              isPaid: newStatus === "paid",
+            };
+          }),
+        };
+      }),
+    );
+  };
+
   const recordPayment = (
     studentId: string,
     paymentData: {
@@ -672,7 +766,6 @@ export const useStudents = () => {
       const studentPaymentIndex = updated.findIndex((p) => p.studentId === studentId);
 
       if (studentPaymentIndex === -1) {
-        // Create new payment record for this student
         updated.push({
           studentId,
           payments: [
@@ -684,18 +777,28 @@ export const useStudents = () => {
               amount: paymentData.amount,
               method: paymentData.method,
               notes: paymentData.notes,
+              amountDue: paymentData.amount,
+              amountPaid: paymentData.amount,
+              paymentStatus: "paid" as PaymentStatus,
+              paymentRecords: [
+                {
+                  id: generateId(),
+                  amount: paymentData.amount,
+                  method: paymentData.method,
+                  paidAt: paymentData.paidAt,
+                  notes: paymentData.notes,
+                },
+              ],
             },
           ],
         });
       } else {
-        // Update existing student's payments
         const studentPayments = updated[studentPaymentIndex];
         const paymentIndex = studentPayments.payments.findIndex(
           (p) => p.month === paymentData.month && p.year === paymentData.year,
         );
 
         if (paymentIndex === -1) {
-          // Add new payment
           studentPayments.payments.push({
             month: paymentData.month,
             year: paymentData.year,
@@ -704,9 +807,20 @@ export const useStudents = () => {
             amount: paymentData.amount,
             method: paymentData.method,
             notes: paymentData.notes,
+            amountDue: paymentData.amount,
+            amountPaid: paymentData.amount,
+            paymentStatus: "paid" as PaymentStatus,
+            paymentRecords: [
+              {
+                id: generateId(),
+                amount: paymentData.amount,
+                method: paymentData.method,
+                paidAt: paymentData.paidAt,
+                notes: paymentData.notes,
+              },
+            ],
           });
         } else {
-          // Update existing payment
           studentPayments.payments[paymentIndex] = {
             ...studentPayments.payments[paymentIndex],
             isPaid: true,
@@ -714,6 +828,17 @@ export const useStudents = () => {
             amount: paymentData.amount,
             method: paymentData.method,
             notes: paymentData.notes,
+            amountPaid: paymentData.amount,
+            paymentStatus: "paid" as PaymentStatus,
+            paymentRecords: [
+              {
+                id: generateId(),
+                amount: paymentData.amount,
+                method: paymentData.method,
+                paidAt: paymentData.paidAt,
+                notes: paymentData.notes,
+              },
+            ],
           };
         }
       }
@@ -758,7 +883,9 @@ export const useStudents = () => {
     updateSessionDateTime,
     toggleSessionComplete,
     togglePaymentStatus,
-    recordPayment, // ✅ NEW EXPORT
+    recordPayment,
+    addPartialPayment, // ✅ NEW
+    updateMonthlyAmountDue, // ✅ NEW
     getStudentPayments,
     isStudentPaidForMonth,
     bulkUpdateSessionTime,
