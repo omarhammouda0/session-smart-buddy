@@ -463,25 +463,46 @@ export const SessionHistoryBar = ({
   };
 
   // ✅ Only future scheduled sessions
+  // ✅ Only future scheduled sessions - ASCENDING ORDER (earliest first)
+
   const getUpcomingSessions = () => {
     if (!selectedStudent) return [];
     const todayStr = format(today, "yyyy-MM-dd");
 
     return selectedStudent.sessions
       .filter((session) => session.status === "scheduled" && session.date >= todayStr)
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => {
+        // First sort by date ascending
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+
+        // If same date, sort by time ascending
+        const timeA = a.time || selectedStudent.sessionTime;
+        const timeB = b.time || selectedStudent.sessionTime;
+        return (timeA || "").localeCompare(timeB || "");
+      })
       .map((session) => ({ ...session, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
 
   // ✅ History sessions (completed/cancelled/vacation) - ascending order
+  // ✅ History sessions (completed/cancelled/vacation) - ASCENDING ORDER (oldest first)
+
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
     return selectedStudent.sessions
       .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => {
+        // First sort by date ascending (oldest first)
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+
+        // If same date, sort by time ascending
+        const timeA = a.time || selectedStudent.sessionTime;
+        const timeB = b.time || selectedStudent.sessionTime;
+        return (timeA || "").localeCompare(timeB || "");
+      })
       .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
-
   const getHistoryStats = () => {
     if (!selectedStudent) return { completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0 };
     let completed = 0,
