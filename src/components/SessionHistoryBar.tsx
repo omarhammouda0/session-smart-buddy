@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { format, parseISO, isBefore, isAfter, startOfToday, isSameDay, isEqual } from "date-fns";
+import { format, parseISO, isBefore, isAfter, startOfToday } from "date-fns";
 import { ar } from "date-fns/locale";
 import {
   History,
@@ -132,25 +132,38 @@ export const SessionHistoryBar = ({
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
 
-  // Handle restore with conflict check
+  // ✅ FIXED: Handle restore with future/past logic
   const handleRestoreWithCheck = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
     if (!student || !session) return;
 
-    const conflictResult = checkRestoreConflict(studentId, sessionId);
+    const todayStr = format(today, "yyyy-MM-dd");
+    const isPastSession = session.date < todayStr;
 
-    if (conflictResult.severity === "none") {
-      // No conflicts, restore directly
+    // If it's a past session, restore without conflict check (will stay in history)
+    if (isPastSession) {
       onRestoreSession?.(studentId, sessionId);
       toast({
-        title: "تم الاستعادة",
-        description: `تم استعادة جلسة ${student.name} - ${formatShortDateAr(session.date)}`,
+        title: "تم التحديث",
+        description: `تم تحديث حالة الجلسة (ستبقى في السجل)`,
       });
       return;
     }
 
-    // Show conflict dialog
+    // For future sessions, check conflicts before restoring
+    const conflictResult = checkRestoreConflict(studentId, sessionId);
+
+    if (conflictResult.severity === "none") {
+      onRestoreSession?.(studentId, sessionId);
+      toast({
+        title: "تم الاستعادة",
+        description: `تم استعادة الجلسة إلى الحصص القادمة`,
+      });
+      return;
+    }
+
+    // Show conflict dialog for future sessions
     setRestoreConflictDialog({
       open: true,
       studentId,
@@ -166,9 +179,11 @@ export const SessionHistoryBar = ({
 
   const handleConfirmRestore = () => {
     if (restoreConflictDialog) {
-      const student = students.find((s) => s.id === restoreConflictDialog.studentId);
       onRestoreSession?.(restoreConflictDialog.studentId, restoreConflictDialog.sessionId);
-      toast({ title: "تم الاستعادة", description: `تم استعادة الجلسة بنجاح` });
+      toast({
+        title: "تم الاستعادة",
+        description: `تم استعادة الجلسة إلى الحصص القادمة`,
+      });
       setRestoreConflictDialog(null);
     }
   };
@@ -200,18 +215,38 @@ export const SessionHistoryBar = ({
     }
   };
 
-  // Wrapper functions with toast notifications
+  // ✅ FIXED: Handle toggle complete with future/past logic
   const handleToggleComplete = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
     if (!student || !session) return;
 
+    const todayStr = format(today, "yyyy-MM-dd");
+    const isPastSession = session.date < todayStr;
     const isCompleted = session.status === "completed";
+
     onToggleComplete?.(studentId, sessionId);
-    toast({
-      title: isCompleted ? "تم التراجع" : "تم الإكمال",
-      description: isCompleted ? `تم إلغاء إكمال جلسة ${student.name}` : `تم تسجيل إكمال جلسة ${student.name}`,
-    });
+
+    if (isCompleted) {
+      // Undoing completion
+      if (isPastSession) {
+        toast({
+          title: "تم التراجع",
+          description: `تم تحديث الحالة (ستبقى في السجل)`,
+        });
+      } else {
+        toast({
+          title: "تم التراجع",
+          description: `تم إرجاع الجلسة إلى الحصص القادمة`,
+        });
+      }
+    } else {
+      // Marking as complete
+      toast({
+        title: "تم الإكمال",
+        description: `تم نقل الجلسة إلى السجل`,
+      });
+    }
   };
 
   // Open cancel dialog instead of direct cancel
@@ -295,7 +330,7 @@ export const SessionHistoryBar = ({
       .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
   };
 
-  const upcomingSessions = getUpcomingSessions(); // ✅ Renamed
+  const upcomingSessions = getUpcomingSessions();
   const historyStats = getHistoryStats();
   const historySessions = getHistorySessions();
 
@@ -822,7 +857,7 @@ export const SessionHistoryBar = ({
   );
 };
 
-// [Keep the CancellationHistoryInline component unchanged - same as before]
+// Cancellation History Inline Component
 const CancellationHistoryInline = ({
   student,
   cancellations,
