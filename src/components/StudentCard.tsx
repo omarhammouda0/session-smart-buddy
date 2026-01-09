@@ -123,7 +123,7 @@ export const StudentCard = ({
             </div>
 
             {student.phone && (
-              
+              <a
                 href={`https://wa.me/${student.phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
