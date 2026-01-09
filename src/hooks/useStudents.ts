@@ -310,22 +310,24 @@ export const useStudents = () => {
     }
   };
 
-  const addExtraSession = (studentId: string, date: string, sessionTime?: string) => {
+  const addExtraSession = (studentId: string, date: string, customTime?: string) => {
     setStudents((prev) =>
       prev.map((s) => {
         if (s.id !== studentId) return s;
-        // Check if session already exists
-        if (s.sessions.some((sess) => sess.date === date)) return s;
 
         const now = new Date().toISOString();
         const today = toYmdLocal(new Date());
         const isPastDate = date < today;
 
+        // ✅ Use custom time if provided
+        const sessionTime = customTime || s.sessionTime || "16:00";
+
         // Auto-complete past sessions
         const newSession: Session = {
           id: generateId(),
           date,
-          time: sessionTime, // Store the session time if provided
+          time: customTime, // ✅ Store the custom time
+          duration: s.sessionDuration, // Use student's default duration
           completed: isPastDate,
           status: isPastDate ? ("completed" as SessionStatus) : ("scheduled" as SessionStatus),
           completedAt: isPastDate ? now : undefined,
