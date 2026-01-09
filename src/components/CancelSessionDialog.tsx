@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { AlertTriangle, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from "react";
+import { AlertTriangle, XCircle } from "lucide-react";
+import { format } from "date-fns"; // ← Add this import
+import { ar } from "date-fns/locale"; // ← Add this import
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -10,10 +12,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Student, Session } from '@/types/student';
-import { formatShortDateAr } from '@/lib/arabicConstants';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dialog";
+import { Student, Session } from "@/types/student";
+import { formatShortDateAr } from "@/lib/arabicConstants";
+import { cn } from "@/lib/utils";
 
 interface CancelSessionDialogProps {
   open: boolean;
@@ -34,27 +36,30 @@ export const CancelSessionDialog = ({
   onConfirm,
   onMarkAsVacation,
 }: CancelSessionDialogProps) => {
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState("");
 
   const limit = student.cancellationPolicy?.monthlyLimit ?? null;
   const newCount = currentCount + 1;
   const willReachLimit = limit !== null && newCount === limit;
   const willExceedLimit = limit !== null && newCount > limit;
 
+  // ✅ Format month and year in Arabic
+  const sessionMonth = format(new Date(session.date), "MMMM yyyy", { locale: ar });
+
   const handleConfirm = () => {
     onConfirm(reason.trim() || undefined);
-    setReason('');
+    setReason("");
     onOpenChange(false);
   };
 
   const handleVacation = () => {
     onMarkAsVacation?.();
-    setReason('');
+    setReason("");
     onOpenChange(false);
   };
 
   const handleClose = () => {
-    setReason('');
+    setReason("");
     onOpenChange(false);
   };
 
@@ -88,47 +93,47 @@ export const CancelSessionDialog = ({
           {limit !== null && (
             <div
               className={cn(
-                'p-3 rounded-lg border-2',
+                "p-3 rounded-lg border-2",
                 willExceedLimit
-                  ? 'bg-destructive/10 border-destructive'
+                  ? "bg-destructive/10 border-destructive"
                   : willReachLimit
-                  ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-500'
-                  : 'bg-muted/50 border-border'
+                    ? "bg-amber-50 dark:bg-amber-950/30 border-amber-500"
+                    : "bg-muted/50 border-border",
               )}
             >
               <div className="flex items-start gap-2">
                 <AlertTriangle
                   className={cn(
-                    'h-5 w-5 shrink-0 mt-0.5',
+                    "h-5 w-5 shrink-0 mt-0.5",
                     willExceedLimit
-                      ? 'text-destructive'
+                      ? "text-destructive"
                       : willReachLimit
-                      ? 'text-amber-600 dark:text-amber-500'
-                      : 'text-muted-foreground'
+                        ? "text-amber-600 dark:text-amber-500"
+                        : "text-muted-foreground",
                   )}
                 />
                 <div className="space-y-1">
                   <p
                     className={cn(
-                      'font-semibold text-sm',
+                      "font-semibold text-sm",
                       willExceedLimit
-                        ? 'text-destructive'
+                        ? "text-destructive"
                         : willReachLimit
-                        ? 'text-amber-700 dark:text-amber-400'
-                        : 'text-foreground'
+                          ? "text-amber-700 dark:text-amber-400"
+                          : "text-foreground",
                     )}
                   >
                     {willExceedLimit
-                      ? `🔴 هذا الإلغاء رقم ${newCount} - سيتجاوز الحد الأقصى (${limit})`
+                      ? `🔴 الإلغاء رقم ${newCount} للطالب ${student.name} لشهر ${sessionMonth} - سيتجاوز الحد الأقصى (${limit})`
                       : willReachLimit
-                      ? `⚠️ هذا الإلغاء رقم ${newCount} من ${limit} - سيصل للحد الأقصى`
-                      : `الإلغاء رقم ${newCount} من ${limit}`}
+                        ? `⚠️ الإلغاء رقم ${newCount} للطالب ${student.name} لشهر ${sessionMonth} - سيصل للحد الأقصى (${limit})`
+                        : `الإلغاء رقم ${newCount} للطالب ${student.name} لشهر ${sessionMonth} من ${limit}`}
                   </p>
                   {(willReachLimit || willExceedLimit) && (
                     <p className="text-xs text-muted-foreground">
                       {student.cancellationPolicy?.autoNotifyParent
-                        ? 'سيتم إبلاغ ولي الأمر تلقائياً'
-                        : 'يمكنك إبلاغ ولي الأمر يدوياً'}
+                        ? "سيتم إبلاغ ولي الأمر تلقائياً"
+                        : "يمكنك إبلاغ ولي الأمر يدوياً"}
                     </p>
                   )}
                 </div>
@@ -142,9 +147,7 @@ export const CancelSessionDialog = ({
               <p className="text-sm text-blue-700 dark:text-blue-400">
                 💡 إذا كانت إجازة، يمكنك تحديدها كـ "إجازة" بدلاً من "إلغاء"
               </p>
-              <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">
-                (جلسات الإجازة لا تحتسب في حد الإلغاء)
-              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">(جلسات الإجازة لا تحتسب في حد الإلغاء)</p>
             </div>
           )}
         </div>
@@ -154,19 +157,11 @@ export const CancelSessionDialog = ({
             رجوع
           </Button>
           {onMarkAsVacation && (
-            <Button
-              variant="secondary"
-              onClick={handleVacation}
-              className="gap-1"
-            >
+            <Button variant="secondary" onClick={handleVacation} className="gap-1">
               تحديد كإجازة
             </Button>
           )}
-          <Button
-            variant="destructive"
-            onClick={handleConfirm}
-            className="gap-1"
-          >
+          <Button variant="destructive" onClick={handleConfirm} className="gap-1">
             نعم، إلغاء
           </Button>
         </DialogFooter>
