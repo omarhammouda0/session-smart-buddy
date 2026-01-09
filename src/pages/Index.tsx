@@ -60,7 +60,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-
 const Index = () => {
   const now = new Date();
   const [selectedDayOfWeek] = useState(now.getDay());
@@ -78,7 +77,6 @@ const Index = () => {
       time: string;
     };
   } | null>(null);
-
   const {
     students,
     payments,
@@ -109,7 +107,6 @@ const Index = () => {
     bulkMarkAsVacation,
     updateSessionDetails,
   } = useStudents();
-
   const {
     getCancellationCount,
     getAllStudentCancellations,
@@ -117,10 +114,8 @@ const Index = () => {
     removeCancellation,
     clearMonthCancellations,
   } = useCancellationTracking(students);
-
   const { checkConflict } = useConflictDetection(students);
 
-  // ✅ UPDATED: Now accepts customTime parameter
   const handleAddSession = (studentId: string, date: string, customTime?: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
@@ -128,12 +123,28 @@ const Index = () => {
     // ✅ Use custom time if provided, otherwise use student's default time
     const sessionTime = customTime || student.sessionTime || "16:00";
 
-    const conflictResult = checkConflict({
+    console.log("🔍 DEBUG - Adding session:", {
+      studentId,
+      studentName: student.name,
       date,
-      startTime: sessionTime,
+      sessionTime,
+      customTime,
     });
 
+    // ✅ Pass studentId as third parameter to skip same student's sessions
+    const conflictResult = checkConflict(
+      {
+        date,
+        startTime: sessionTime,
+      },
+      undefined, // No session to exclude
+      studentId, // ✅ Skip this student's existing sessions
+    );
+
+    console.log("🔍 DEBUG - Conflict check result:", conflictResult);
+
     if (conflictResult.severity === "error") {
+      console.log("❌ BLOCKED by error conflict");
       setAddConflictDialog({
         open: true,
         studentId,
@@ -149,6 +160,7 @@ const Index = () => {
     }
 
     if (conflictResult.severity === "warning") {
+      console.log("⚠️ BLOCKED by warning conflict");
       setAddConflictDialog({
         open: true,
         studentId,
@@ -163,41 +175,34 @@ const Index = () => {
       return;
     }
 
+    console.log("✅ Proceeding to add session");
     // ✅ Pass custom time to addExtraSession
     addExtraSession(studentId, date, sessionTime);
 
+    console.log("✅ Session added, showing toast");
     toast({
       title: "تمت إضافة الحصة",
       description: `حصة جديدة بتاريخ ${format(parseISO(date), "dd/MM/yyyy")} الساعة ${sessionTime}${student ? ` لـ ${student.name}` : ""}`,
     });
   };
 
-  // ✅ UPDATED: Now passes custom time when forcing add
   const handleForceAddSession = () => {
     if (!addConflictDialog) return;
-    const { studentId, date, sessionInfo } = addConflictDialog;
+    const { studentId, date } = addConflictDialog;
     const student = students.find((s) => s.id === studentId);
-
-    // ✅ Use the time from sessionInfo (which comes from the time picker)
-    const sessionTime = sessionInfo.time || student?.sessionTime || "16:00";
-
-    addExtraSession(studentId, date, sessionTime);
-
+    addExtraSession(studentId, date);
     toast({
       title: "تمت إضافة الحصة",
-      description: `حصة جديدة بتاريخ ${format(parseISO(date), "dd/MM/yyyy")} الساعة ${sessionTime}${student ? ` لـ ${student.name}` : ""}`,
+      description: `حصة جديدة بتاريخ ${format(parseISO(date), "dd/MM/yyyy")}${student ? ` لـ ${student.name}` : ""}`,
     });
     setAddConflictDialog(null);
   };
-
   const handleCancelSession = async (studentId: string, sessionId: string, reason?: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
-
     if (session) {
       const result = await recordCancellation(studentId, session.date, session.time, reason);
       removeSession(studentId, sessionId);
-
       if (result.success) {
         if (result.autoNotificationSent) {
           toast({
@@ -233,7 +238,6 @@ const Index = () => {
       });
     }
   };
-
   const handleDeleteSession = (studentId: string, sessionId: string) => {
     deleteSession(studentId, sessionId);
     toast({
@@ -241,35 +245,28 @@ const Index = () => {
       description: "تم حذف الحصة نهائياً",
     });
   };
-
   const handleRestoreSession = async (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
-
     if (session?.status === "cancelled") {
       await removeCancellation(studentId, session.date);
     }
-
     restoreSession(studentId, sessionId);
     toast({
       title: "تم استعادة الحصة",
       description: "تم استعادة الحصة وتحديث عداد الإلغاءات",
     });
   };
-
   const handleToggleComplete = (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
     const wasCompleted = session?.status === "completed";
-
     toggleSessionComplete(studentId, sessionId);
-
     toast({
       title: wasCompleted ? "تم إلغاء الإكمال" : "تم إكمال الحصة",
       description: wasCompleted ? "تم إرجاع الحصة إلى مجدولة" : "أحسنت! تم تسجيل الحصة كمكتملة",
     });
   };
-
   const handleMarkAsVacation = (studentId: string, sessionId: string) => {
     markSessionAsVacation(studentId, sessionId);
     toast({
@@ -277,7 +274,6 @@ const Index = () => {
       description: "لن يتم احتساب هذه الحصة في المدفوعات",
     });
   };
-
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
 
@@ -293,9 +289,7 @@ const Index = () => {
       }))
       .filter((student) => student.todaySessions.length > 0);
   };
-
   const studentsForDay = getStudentsForDay();
-
   const filteredStudents = studentsForDay
     .filter((s) => studentFilter === "all" || s.id === studentFilter)
     .sort((a, b) => {
@@ -303,7 +297,6 @@ const Index = () => {
       const timeB = b.sessionTime || "16:00";
       return timeA.localeCompare(timeB);
     });
-
   const allStudentsSortedByTime = useMemo(() => {
     const searchLower = allStudentsSearch.trim().toLowerCase();
     return [...students]
@@ -322,28 +315,24 @@ const Index = () => {
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
-
   const todaysCompletedSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "completed");
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
-
   const todaysScheduledSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled");
       return acc + sessions.length;
     }, 0);
   }, [students, todayStr]);
-
   const getGreeting = () => {
     const hour = now.getHours();
     if (hour < 12) return "صباح الخير";
     if (hour < 18) return "مساءً سعيداً";
     return "مساء الخير";
   };
-
   const getMotivationalMessage = () => {
     if (todaysSessions === 0)
       return {
@@ -369,9 +358,7 @@ const Index = () => {
       color: "from-primary to-primary/70",
     };
   };
-
   const motivational = getMotivationalMessage();
-
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -379,7 +366,6 @@ const Index = () => {
       </div>
     );
   }
-
   return (
     <div dir="rtl" className="min-h-screen safe-bottom relative">
       {/* Animated Background */}
@@ -933,5 +919,4 @@ const Index = () => {
     </div>
   );
 };
-
 export default Index;
