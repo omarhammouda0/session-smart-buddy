@@ -1,11 +1,5 @@
 import { useState, useMemo } from "react";
-import {
-  BookOpen,
-  CalendarDays,
-  History,
-  CreditCard,
-  Users,
-} from "lucide-react";
+import { BookOpen, CalendarDays, History, CreditCard, Users } from "lucide-react";
 
 import { useStudents } from "@/hooks/useStudents";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
@@ -27,19 +21,8 @@ import { BulkEditSessionsDialog } from "@/components/BulkEditSessionsDialog";
 import { AddVacationDialog } from "@/components/AddVacationDialog";
 import { StudentSearchCombobox } from "@/components/StudentSearchCombobox";
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { cn } from "@/lib/utils";
@@ -67,35 +50,22 @@ const Index = () => {
     updateSessionDetails,
   } = useStudents();
 
-  const {
-    getCancellationCount,
-    getAllStudentCancellations,
-    clearMonthCancellations,
-  } = useCancellationTracking(students);
+  const { getCancellationCount, getAllStudentCancellations, clearMonthCancellations } =
+    useCancellationTracking(students);
 
   const studentsForDay = useMemo(() => {
     return students
-      .filter((s) =>
-        s.scheduleDays.some((d) => d.dayOfWeek === selectedDayOfWeek)
-      )
-      .sort((a, b) =>
-        (a.sessionTime || "16:00").localeCompare(b.sessionTime || "16:00")
-      );
+      .filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === selectedDayOfWeek))
+      .sort((a, b) => (a.sessionTime || "16:00").localeCompare(b.sessionTime || "16:00"));
   }, [students, selectedDayOfWeek]);
 
   const allStudentsFiltered = useMemo(() => {
     const q = allStudentsSearch.trim().toLowerCase();
-    return students.filter(
-      (s) => q === "" || s.name.toLowerCase().includes(q)
-    );
+    return students.filter((s) => q === "" || s.name.toLowerCase().includes(q));
   }, [students, allStudentsSearch]);
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        جاري التحميل…
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">جاري التحميل…</div>;
   }
 
   return (
@@ -133,9 +103,7 @@ const Index = () => {
               >
                 <Users className="h-4 w-4" />
                 جميع الطلاب
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  {students.length}
-                </span>
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{students.length}</span>
               </button>
             </SheetTrigger>
 
@@ -155,16 +123,11 @@ const Index = () => {
 
               <div className="mt-4 space-y-2 max-h-[70vh] overflow-y-auto">
                 {allStudentsFiltered.map((student) => (
-                  <div
-                    key={student.id}
-                    className="p-3 rounded-lg border bg-card"
-                  >
+                  <div key={student.id} className="p-3 rounded-lg border bg-card">
                     <div className="font-medium">{student.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {student.sessionTime || "—"} •{" "}
-                      {student.scheduleDays
-                        .map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek])
-                        .join("، ")}
+                      {student.scheduleDays.map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join("، ")}
                     </div>
                   </div>
                 ))}
@@ -178,24 +141,145 @@ const Index = () => {
           <SemesterSettings settings={settings} onUpdate={updateSettings} />
           <ReminderSettingsDialog />
           <ReminderHistoryDialog />
-          <MonthlyReportDialog
-            students={students}
-            payments={payments}
-            settings={settings}
-          />
+          <MonthlyReportDialog students={students} payments={payments} settings={settings} />
           <BulkEditSessionsDialog
             students={students}
             onBulkUpdateTime={bulkUpdateSessionTime}
             onUpdateSessionDate={updateSessionDateTime}
             onBulkMarkAsVacation={bulkMarkAsVacation}
           />
-          <AddVacationDialog
-            students={students}
-            onBulkMarkAsVacation={bulkMarkAsVacation}
-          />
+          <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
         </div>
       </div>
 
       {/* ================= Main Content ================= */}
       <main className="max-w-4xl mx-auto px-4 pt-10 pb-12 space-y-10">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-4 bg-background/70 backdrop-blur rounded-xl p-1 shadow">
+            <TabsTrigger value="sessions">
+              <BookOpen className="h-4 w-4 ml-1" />
+              اليوم
+            </TabsTrigger>
+            <TabsTrigger value="calendar">
+              <CalendarDays className="h-4 w-4 ml-1" />
+              التقويم
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="h-4 w-4 ml-1" />
+              السجل
+            </TabsTrigger>
+            <TabsTrigger value="payments">
+              <CreditCard className="h-4 w-4 ml-1" />
+              المدفوعات
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ================= TODAY ================= */}
+          <TabsContent value="sessions" className="space-y-8">
+            {students.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <>
+                <div className="text-center space-y-1 animate-in fade-in slide-in-from-top-4 duration-300">
+                  <p className="text-sm text-muted-foreground">⚡ اليوم</p>
+                  <h1 className="text-4xl font-heading font-bold">{studentsForDay.length} حصص</h1>
+                  <p className="text-sm text-muted-foreground">{DAY_NAMES_AR[selectedDayOfWeek]} • لنبدأ</p>
+                </div>
+
+                {studentsForDay.length === 0 ? (
+                  <p className="text-center text-muted-foreground">لا توجد حصص اليوم</p>
+                ) : (
+                  <div className="grid gap-4 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                    {studentsForDay.map((student) => (
+                      <StudentCard
+                        key={student.id}
+                        student={student}
+                        students={students}
+                        settings={settings}
+                        selectedDayOfWeek={selectedDayOfWeek}
+                        onRemove={() => {}}
+                        onUpdateName={() => {}}
+                        onUpdateTime={() => {}}
+                        onUpdatePhone={() => {}}
+                        onUpdateSessionType={() => {}}
+                        onUpdateSchedule={() => {}}
+                        onUpdateDuration={() => {}}
+                        onUpdateCustomSettings={() => {}}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <div className="pt-6 text-center space-y-2">
+                  <p className="text-xs text-muted-foreground">يوم آخر؟</p>
+                  <div className="flex justify-center gap-1 flex-wrap">
+                    {DAY_NAMES_SHORT_AR.map((day, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedDayOfWeek(i)}
+                        className={cn(
+                          "px-3 py-2 rounded-lg text-sm transition",
+                          selectedDayOfWeek === i
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-background/70 backdrop-blur hover:bg-accent",
+                        )}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* ================= CALENDAR ================= */}
+          <TabsContent value="calendar">
+            <CalendarView students={students} onRescheduleSession={rescheduleSession} />
+          </TabsContent>
+
+          {/* ================= HISTORY ================= */}
+          <TabsContent value="history">
+            <SessionHistoryBar
+              students={students}
+              onCancelSession={() => {}}
+              onDeleteSession={() => {}}
+              onRestoreSession={() => {}}
+              onToggleComplete={() => {}}
+              onRescheduleSession={rescheduleSession}
+              onAddSession={() => {}}
+              onMarkAsVacation={() => {}}
+              onUpdateSessionDetails={updateSessionDetails}
+              getCancellationCount={getCancellationCount}
+              getAllStudentCancellations={getAllStudentCancellations}
+              onClearMonthCancellations={clearMonthCancellations}
+            />
+          </TabsContent>
+
+          {/* ================= PAYMENTS ================= */}
+          <TabsContent value="payments" className="space-y-4">
+            <StatsBar
+              students={students}
+              payments={payments}
+              selectedMonth={now.getMonth()}
+              selectedYear={now.getFullYear()}
+            />
+
+            <PaymentsDashboard
+              students={students}
+              payments={payments}
+              selectedMonth={now.getMonth()}
+              selectedYear={now.getFullYear()}
+              onTogglePayment={togglePaymentStatus}
+              settings={settings}
+            />
+          </TabsContent>
+        </Tabs>
+
+        <EndOfMonthReminder students={students} payments={payments} onTogglePayment={togglePaymentStatus} />
+      </main>
+    </div>
+  );
+};
+
+export default Index;
