@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { GraduationCap, Users, CalendarDays, History, CreditCard, Sparkles } from "lucide-react";
+import { GraduationCap, Users, CalendarDays, History, CreditCard, Sparkles, Plus, Clock } from "lucide-react";
+
 import { useStudents } from "@/hooks/useStudents";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,10 @@ import { SessionHistoryBar } from "@/components/SessionHistoryBar";
 import { PaymentsDashboard } from "@/components/PaymentsDashboard";
 import { StatsBar } from "@/components/StatsBar";
 import { EndOfMonthReminder } from "@/components/EndOfMonthReminder";
+import { AddStudentDialog } from "@/components/AddStudentDialog";
+import { StudentSearchCombobox } from "@/components/StudentSearchCombobox";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+
 import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { cn } from "@/lib/utils";
 
@@ -19,12 +24,14 @@ export default function Index() {
 
   const [activeTab, setActiveTab] = useState("sessions");
   const [selectedDay, setSelectedDay] = useState(today);
+  const [studentsSearch, setStudentsSearch] = useState("");
 
   const {
     students,
     payments,
     settings,
     isLoaded,
+    addStudent,
     removeStudent,
     updateStudentName,
     updateStudentTime,
@@ -42,6 +49,8 @@ export default function Index() {
       .filter((s) => s.scheduleDays.some((d) => d.dayOfWeek === selectedDay))
       .sort((a, b) => (a.sessionTime || "").localeCompare(b.sessionTime || ""));
   }, [students, selectedDay]);
+
+  const nextSession = studentsForDay[0];
 
   if (!isLoaded) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">جاري التحميل...</div>;
@@ -66,14 +75,70 @@ export default function Index() {
 
           <h1 className="text-4xl font-heading font-bold mb-1">{studentsForDay.length} حصة</h1>
 
-          <p className="text-muted-foreground">{DAY_NAMES_AR[selectedDay]} · خلينا نبدأ اليوم 👋</p>
+          <p className="text-muted-foreground">{DAY_NAMES_AR[selectedDay]} · خلّينا نبدأ اليوم 👋</p>
         </div>
       </section>
 
-      {/* Tabs */}
-      <main className="max-w-4xl mx-auto px-4 pb-10">
+      {/* 🧭 TODAY ACTIONS BAR */}
+      <div className="max-w-4xl mx-auto px-4 -mt-6 relative z-10">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-2xl bg-background/70 backdrop-blur border shadow-lg">
+          {/* Add Student */}
+          <AddStudentDialog
+            onAdd={addStudent}
+            defaultStart={settings.defaultSemesterStart}
+            defaultEnd={settings.defaultSemesterEnd}
+            students={students}
+            defaultDuration={settings.defaultSessionDuration}
+          >
+            <Button variant="ghost" className="h-14 flex-col gap-1">
+              <Plus className="h-5 w-5 text-primary" />
+              <span className="text-xs">إضافة طالب</span>
+            </Button>
+          </AddStudentDialog>
+
+          {/* All Students */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" className="h-14 flex-col gap-1">
+                <Users className="h-5 w-5 text-primary" />
+                <span className="text-xs">جميع الطلاب ({students.length})</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left">
+              <SheetHeader>
+                <SheetTitle>جميع الطلاب</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                <StudentSearchCombobox
+                  students={students}
+                  value={studentsSearch}
+                  onChange={setStudentsSearch}
+                  placeholder="ابحث عن طالب..."
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Go to Calendar */}
+          <Button variant="ghost" className="h-14 flex-col gap-1" onClick={() => setActiveTab("calendar")}>
+            <CalendarDays className="h-5 w-5 text-primary" />
+            <span className="text-xs">التقويم</span>
+          </Button>
+
+          {/* Next Session */}
+          <div className="h-14 flex flex-col items-center justify-center gap-1 rounded-xl bg-primary/5">
+            <Clock className="h-4 w-4 text-primary" />
+            <span className="text-xs text-muted-foreground">
+              {nextSession ? `أقرب حصة ${nextSession.sessionTime}` : "لا توجد حصص"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT */}
+      <main className="max-w-4xl mx-auto px-4 pb-10 mt-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 rounded-2xl bg-muted/50 p-1 mt-6">
+          <TabsList className="grid grid-cols-4 rounded-2xl bg-muted/50 p-1">
             <TabsTrigger value="sessions">
               <GraduationCap className="h-4 w-4 ml-1" />
               اليوم
@@ -92,7 +157,7 @@ export default function Index() {
             </TabsTrigger>
           </TabsList>
 
-          {/* 🧑‍🎓 Today Sessions */}
+          {/* TODAY SESSIONS */}
           <TabsContent value="sessions" className="mt-6">
             {studentsForDay.length === 0 ? (
               <EmptyState />
@@ -134,17 +199,14 @@ export default function Index() {
             </div>
           </TabsContent>
 
-          {/* 📅 Calendar */}
           <TabsContent value="calendar">
             <CalendarView students={students} onRescheduleSession={rescheduleSession} />
           </TabsContent>
 
-          {/* 🕘 History */}
           <TabsContent value="history">
             <SessionHistoryBar students={students} />
           </TabsContent>
 
-          {/* 💳 Payments */}
           <TabsContent value="payments" className="space-y-4">
             <StatsBar
               students={students}
