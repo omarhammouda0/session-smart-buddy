@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react"; // ✅ Add useEffect here
 import {
   Check,
   X,
@@ -1176,7 +1176,7 @@ export const PaymentsDashboard = ({
 };
 
 // ============================================
-// ✅ QUICK PAYMENT DIALOG COMPONENT
+// ✅ QUICK PAYMENT DIALOG COMPONENT (COMPLETE)
 // ============================================
 
 interface QuickPaymentDialogProps {
@@ -1209,7 +1209,7 @@ export const QuickPaymentDialog = ({
         : settings.defaultPriceOnsite || 150
     : 0;
 
-  useState(() => {
+  useEffect(() => {
     if (open && student) {
       setAmount(sessionPrice.toString());
       setPaymentMethod("cash");
@@ -1289,4 +1289,48 @@ export const QuickPaymentDialog = ({
                   </div>
                 ) : isPartialPayment ? (
                   <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-500/10 px-3 py-2 rounded-lg">
-                    ⚠️ دفع ج
+                    ⚠️ دفع جزئي
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>طريقة الدفع</Label>
+            <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="cash" id="quick-cash" />
+                <Label htmlFor="quick-cash" className="cursor-pointer">
+                  💵 كاش
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="bank" id="quick-bank" />
+                <Label htmlFor="quick-bank" className="cursor-pointer">
+                  🏦 تحويل بنكي
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="wallet" id="quick-wallet" />
+                <Label htmlFor="quick-wallet" className="cursor-pointer">
+                  📱 محفظة إلكترونية
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <DialogClose asChild>
+            <Button variant="outline">إلغاء</Button>
+          </DialogClose>
+          <Button onClick={handleConfirm} className="gradient-accent gap-2">
+            <Check className="h-4 w-4" />
+            تأكيد الدفع
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
