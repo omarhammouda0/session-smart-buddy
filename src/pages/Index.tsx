@@ -3,6 +3,8 @@ import {
   GraduationCap,
   BookOpen,
   CreditCard,
+  ChevronLeft,
+  ChevronRight,
   Users,
   X,
   Trash2,
@@ -64,7 +66,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 const Index = () => {
   const now = new Date();
-  const [selectedDayOfWeek] = useState(now.getDay());
+  const [selectedDayOfWeek] = useState(now.getDay()); // Locked to today
   const [activeTab, setActiveTab] = useState("sessions");
   const [studentFilter, setStudentFilter] = useState<string>("all");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
@@ -263,6 +265,9 @@ const Index = () => {
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
 
+  // ✅ NEW: Today's date string
+  const todayStr = format(now, "yyyy-MM-dd");
+
   const getStudentsForDay = () => {
     return students.filter((student) => {
       return student.scheduleDays.some((d) => d.dayOfWeek === selectedDayOfWeek);
@@ -290,9 +295,7 @@ const Index = () => {
       });
   }, [students, allStudentsSearch]);
 
-  // ✅ FIXED: Calculate today's sessions with useMemo for real-time updates
-  const todayStr = format(now, "yyyy-MM-dd");
-
+  // ✅ NEW: Calculate today's sessions dynamically with useMemo
   const todaysSessions = useMemo(() => {
     return students.reduce((acc, student) => {
       const sessions = student.sessions.filter((s) => s.date === todayStr);
@@ -342,7 +345,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen safe-bottom relative" dir="rtl">
-      {/* Background */}
+      {/* ✅ Animated Background */}
       <div
         className="fixed inset-0 -z-10"
         style={{
@@ -566,7 +569,7 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="px-3 py-4 sm:px-4 sm:py-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto">
-        {/* Welcome Card */}
+        {/* ✅ Welcome Card */}
         {students.length > 0 && activeTab === "sessions" && (
           <div className="relative animate-fade-in-up">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-3xl blur-2xl opacity-50" />
@@ -697,6 +700,7 @@ const Index = () => {
           </div>
         )}
 
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-4 mb-5 h-13 bg-gradient-to-br from-muted/80 to-muted/50 p-1.5 rounded-2xl shadow-lg backdrop-blur-md border border-border/50">
             <TabsTrigger
@@ -783,7 +787,7 @@ const Index = () => {
                         {studentFilter !== "all" ? `لا توجد حصص لهذا الطالب اليوم` : `لا توجد حصص مجدولة اليوم`}
                       </h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        {DAY_NAMES_AR[selectedDayOfWeek]} - {format(now, "dd MMMM yyyy", { locale: ar })}
+                        {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
                       </p>
                       <Badge className="bg-primary/10 text-primary border-primary/20">استمتع بيومك! 🌟</Badge>
                     </CardContent>
@@ -801,6 +805,7 @@ const Index = () => {
                           students={students}
                           settings={settings}
                           selectedDayOfWeek={selectedDayOfWeek}
+                          todaySessions={student.sessions.filter((s) => s.date === todayStr)}
                           onRemove={() => removeStudent(student.id)}
                           onUpdateName={(name) => updateStudentName(student.id, name)}
                           onUpdateTime={(time) => updateStudentTime(student.id, time)}
