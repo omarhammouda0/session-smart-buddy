@@ -1395,15 +1395,6 @@ export const SessionHistoryBar = ({
                     )}
                   </div>
                 </ScrollArea>
-
-                {getAllStudentCancellations && (
-                  <CancellationHistoryInline
-                    student={selectedStudent}
-                    cancellations={getAllStudentCancellations(selectedStudent.id)}
-                    onRestore={openRestoreDialog}
-                    onClearMonth={onClearMonthCancellations}
-                  />
-                )}
               </TabsContent>
             </Tabs>
           </>
