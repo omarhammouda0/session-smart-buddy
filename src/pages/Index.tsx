@@ -102,6 +102,7 @@ const Index = () => {
     updateSessionDateTime,
     toggleSessionComplete,
     togglePaymentStatus,
+    recordPayment,
     bulkUpdateSessionTime,
     markSessionAsVacation,
     bulkMarkAsVacation,
@@ -264,6 +265,37 @@ const Index = () => {
       description: "لن يتم احتساب هذه الحصة في المدفوعات",
     });
   };
+
+  // ✅ ADD THIS NEW FUNCTION HERE
+  const handleRecordPayment = (
+    studentId: string,
+    paymentData: {
+      month: number;
+      year: number;
+      amount: number;
+      method: PaymentMethod;
+      paidAt: string;
+      notes?: string;
+    },
+  ) => {
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return;
+
+    // Call the new recordPayment function from useStudents hook
+    recordPayment(studentId, paymentData);
+
+    // Show success toast with payment details
+    const methodLabel =
+      paymentData.method === "cash" ? "كاش" : paymentData.method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
+
+    toast({
+      title: "✅ تم تسجيل الدفعة",
+      description: `${student.name}: ${paymentData.amount.toLocaleString()} جنيه (${methodLabel})`,
+    });
+  };
+
+  const selectedMonth = now.getMonth();
+  const selectedYear = now.getFullYear();
 
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
@@ -856,6 +888,7 @@ const Index = () => {
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               onTogglePayment={togglePaymentStatus}
+              onRecordPayment={handleRecordPayment}
               settings={settings}
             />
           </TabsContent>
