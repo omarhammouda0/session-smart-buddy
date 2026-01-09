@@ -141,7 +141,7 @@ export const SessionHistoryBar = ({
 
   // ==================== ACTION HANDLERS ====================
 
-  // ✅ ADD SESSION (with conflict check)
+  // ✅ ADD SESSION (with time conflict check, allows multiple sessions per day)
   const handleAddSession = (studentId: string, date: Date) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
@@ -150,26 +150,33 @@ export const SessionHistoryBar = ({
     const todayStr = format(today, "yyyy-MM-dd");
     const isPastSession = dateStr < todayStr;
     const sessionTime = student.sessionTime || "16:00";
+    const sessionDuration = student.sessionDuration || 60;
 
-    // ✅ Check if session already exists on this date
-    const existingSession = student.sessions.find((s) => s.date === dateStr);
-    if (existingSession) {
+    // ✅ Check if session with SAME TIME already exists on this date for THIS student
+    const existingSessionAtSameTime = student.sessions.find((s) => {
+      if (s.date !== dateStr) return false;
+      const existingTime = s.time || student.sessionTime || "16:00";
+      const existingDuration = s.duration || student.sessionDuration || 60;
+      return checkTimeConflict(sessionTime, sessionDuration, existingTime, existingDuration);
+    });
+
+    if (existingSessionAtSameTime) {
       toast({
         title: "⚠️ لا يمكن إضافة الحصة",
-        description: `يوجد بالفعل جلسة في ${formatShortDateAr(dateStr)} بحالة "${getStatusLabel(existingSession.status)}"`,
+        description: `يوجد بالفعل جلسة لـ ${student.name} في ${formatShortDateAr(dateStr)} في نفس الوقت (${formatTimeAr(sessionTime)})`,
         variant: "destructive",
       });
       return;
     }
 
-    // ✅ Check for conflicts with other students
+    // ✅ Check for time conflicts with OTHER students on the same date
     const conflictsWithOtherStudents = students.some((otherStudent) => {
       if (otherStudent.id === studentId) return false;
       return otherStudent.sessions.some((session) => {
         if (session.date !== dateStr) return false;
         const otherTime = session.time || otherStudent.sessionTime || "16:00";
         const otherDuration = session.duration || otherStudent.sessionDuration || 60;
-        return checkTimeConflict(sessionTime, student.sessionDuration || 60, otherTime, otherDuration);
+        return checkTimeConflict(sessionTime, sessionDuration, otherTime, otherDuration);
       });
     });
 
@@ -179,7 +186,7 @@ export const SessionHistoryBar = ({
           if (session.date !== dateStr || s.id === studentId) return false;
           const otherTime = session.time || s.sessionTime || "16:00";
           const otherDuration = session.duration || s.sessionDuration || 60;
-          return checkTimeConflict(sessionTime, student.sessionDuration || 60, otherTime, otherDuration);
+          return checkTimeConflict(sessionTime, sessionDuration, otherTime, otherDuration);
         }),
       );
 
@@ -203,7 +210,7 @@ export const SessionHistoryBar = ({
     } else {
       toast({
         title: "✅ تمت الإضافة بنجاح",
-        description: `تم إضافة جلسة جديدة في ${formatShortDateAr(dateStr)} في الحصص القادمة`,
+        description: `تم إضافة جلسة جديدة في ${formatShortDateAr(dateStr)} الساعة ${formatTimeAr(sessionTime)} في الحصص القادمة`,
       });
     }
   };
@@ -565,7 +572,7 @@ export const SessionHistoryBar = ({
                 </Popover>
               </div>
               <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
-                💡 الحصص القادمة فقط (من اليوم فصاعداً). الحصص المكتملة/الملغاة/الإجازات تنتقل تلقائياً للسجل.
+                💡 يمكنك إضافة عدة حصص في نفس اليوم بأوقات مختلفة. الحصص المكتملة/الملغاة/الإجازات تنتقل تلقائياً للسجل.
               </p>
               <ScrollArea className="h-[250px]">
                 <div className="space-y-1 pl-2">
