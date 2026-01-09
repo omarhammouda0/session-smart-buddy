@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   format,
   startOfWeek,
@@ -15,20 +15,12 @@ import {
   parseISO,
 } from "date-fns";
 import { ar } from "date-fns/locale";
-import {
-  ChevronRight,
-  ChevronLeft,
-  Calendar as CalendarIcon,
-  GripVertical,
-  Clock,
-  CalendarDays,
-  MoreHorizontal,
-} from "lucide-react";
+import { ChevronRight, ChevronLeft, Calendar as CalendarIcon, GripVertical, Clock, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Student, Session } from "@/types/student";
-import { DAY_NAMES_AR, DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
+import { DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
@@ -39,6 +31,7 @@ import { toast } from "@/hooks/use-toast";
 interface CalendarViewProps {
   students: Student[];
   onRescheduleSession: (studentId: string, sessionId: string, newDate: string) => void;
+  onUpdateSessionDateTime?: (studentId: string, sessionId: string, newDate: string, newTime: string) => void;
 }
 
 interface SessionWithStudent {
@@ -54,7 +47,7 @@ interface DragState {
   originalTime: string;
 }
 
-export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProps) => {
+export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDateTime }: CalendarViewProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -95,11 +88,12 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
       });
     });
 
+    // Sort sessions by time (ascending)
     map.forEach((sessions, date) => {
       sessions.sort((a, b) => {
-        const timeA = a.session.time || a.student.sessionTime || "16:00";
-        const timeB = b.session.time || b.student.sessionTime || "16:00";
-        return timeA.localeCompare(timeB);
+        const timeA = a.session.time || a.student.sessionTime;
+        const timeB = b.session.time || b.student.sessionTime;
+        return (timeA || "").localeCompare(timeB || "");
       });
     });
 
@@ -170,9 +164,12 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
     const newEndMinutes = newStartMinutes + sessionDuration;
 
     for (const { session, student } of sessionsOnDate) {
-      if (session.id === sessionId) continue;
+      // Skip if it's the same session OR same student (allow multiple sessions per day for same student)
+      if (session.id === sessionId || student.id === studentId) continue;
 
-      const otherTime = session.time || student.sessionTime || "16:00";
+      const otherTime = session.time || student.sessionTime;
+      if (!otherTime) continue;
+
       const [otherHour, otherMin] = otherTime.split(":").map(Number);
       const otherStartMinutes = otherHour * 60 + otherMin;
       const otherEndMinutes = otherStartMinutes + sessionDuration;
@@ -217,63 +214,59 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
     setDropTargetDate(null);
   };
 
-  // Touch handlers for mobile drag-and-drop
-  const handleTouchStart = useCallback((
-    e: React.TouchEvent,
-    sessionId: string,
-    studentId: string,
-    studentName: string,
-    date: string,
-    time: string,
-  ) => {
-    const touch = e.touches[0];
-    
-    // Start a long-press timer (500ms)
-    longPressTimer.current = setTimeout(() => {
-      setTouchDragState({
-        active: true,
-        startX: touch.clientX,
-        startY: touch.clientY,
-        sessionId,
-        studentId,
-        studentName,
-        originalDate: date,
-        originalTime: time,
-      });
-      
-      // Haptic feedback if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent, sessionId: string, studentId: string, studentName: string, date: string, time: string) => {
+      const touch = e.touches[0];
+
+      longPressTimer.current = setTimeout(() => {
+        setTouchDragState({
+          active: true,
+          startX: touch.clientX,
+          startY: touch.clientY,
+          sessionId,
+          studentId,
+          studentName,
+          originalDate: date,
+          originalTime: time,
+        });
+
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+
+        toast({
+          title: "اسحب الحصة",
+          description: "حرك إصبعك لنقل الحصة إلى يوم آخر",
+        });
+      }, 500);
+    },
+    [],
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
       }
-      
-      toast({
-        title: "اسحب الحصة",
-        description: "حرك إصبعك لنقل الحصة إلى يوم آخر",
-      });
-    }, 500);
-  }, []);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+      if (!touchDragState?.active) return;
 
-    if (!touchDragState?.active) return;
+      const touch = e.touches[0];
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const dayCell = element?.closest("[data-date]");
 
-    const touch = e.touches[0];
-    const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    const dayCell = element?.closest('[data-date]');
-    
-    if (dayCell) {
-      const dateStr = dayCell.getAttribute('data-date');
-      if (dateStr && dateStr !== touchDragState.originalDate) {
-        setDropTargetDate(dateStr);
+      if (dayCell) {
+        const dateStr = dayCell.getAttribute("data-date");
+        if (dateStr && dateStr !== touchDragState.originalDate) {
+          setDropTargetDate(dateStr);
+        }
+      } else {
+        setDropTargetDate(null);
       }
-    } else {
-      setDropTargetDate(null);
-    }
-  }, [touchDragState]);
+    },
+    [touchDragState],
+  );
 
   const handleTouchEnd = useCallback(() => {
     if (longPressTimer.current) {
@@ -287,34 +280,21 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
     }
 
     if (dropTargetDate && dropTargetDate !== touchDragState.originalDate) {
-      const student = students.find((s) => s.id === touchDragState.studentId);
-      const hasExistingSession = student?.sessions.some(
-        (s) => s.date === dropTargetDate && s.id !== touchDragState.sessionId
-      );
-
-      if (hasExistingSession) {
-        toast({
-          title: "لا يمكن النقل",
-          description: `${touchDragState.studentName} لديه حصة بالفعل في هذا التاريخ`,
-          variant: "destructive",
-        });
-      } else {
-        setConfirmDialog({
-          open: true,
-          sessionId: touchDragState.sessionId,
-          studentId: touchDragState.studentId,
-          studentName: touchDragState.studentName,
-          originalDate: touchDragState.originalDate,
-          originalTime: touchDragState.originalTime,
-          newDate: dropTargetDate,
-          newTime: touchDragState.originalTime,
-        });
-      }
+      setConfirmDialog({
+        open: true,
+        sessionId: touchDragState.sessionId,
+        studentId: touchDragState.studentId,
+        studentName: touchDragState.studentName,
+        originalDate: touchDragState.originalDate,
+        originalTime: touchDragState.originalTime,
+        newDate: dropTargetDate,
+        newTime: touchDragState.originalTime,
+      });
     }
 
     setTouchDragState(null);
     setDropTargetDate(null);
-  }, [touchDragState, dropTargetDate, students]);
+  }, [touchDragState, dropTargetDate]);
 
   const handleDrop = (e: React.DragEvent, newDate: string) => {
     e.preventDefault();
@@ -322,19 +302,6 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
 
     if (!dragState) return;
     if (dragState.originalDate === newDate) {
-      setDragState(null);
-      return;
-    }
-
-    const student = students.find((s) => s.id === dragState.studentId);
-    const hasExistingSession = student?.sessions.some((s) => s.date === newDate && s.id !== dragState.sessionId);
-
-    if (hasExistingSession) {
-      toast({
-        title: "لا يمكن النقل",
-        description: `${dragState.studentName} لديه حصة بالفعل في هذا التاريخ`,
-        variant: "destructive",
-      });
       setDragState(null);
       return;
     }
@@ -371,10 +338,22 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
       return;
     }
 
-    onRescheduleSession(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate);
+    // Use onUpdateSessionDateTime to update BOTH date AND time
+    if (onUpdateSessionDateTime) {
+      onUpdateSessionDateTime(
+        confirmDialog.studentId,
+        confirmDialog.sessionId,
+        confirmDialog.newDate,
+        confirmDialog.newTime,
+      );
+    } else {
+      // Fallback to old method (only updates date)
+      onRescheduleSession(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate);
+    }
+
     toast({
       title: "✓ تم تعديل موعد الحصة",
-      description: `تم نقل حصة ${confirmDialog.studentName} من ${format(parseISO(confirmDialog.originalDate), "dd/MM")} إلى ${format(parseISO(confirmDialog.newDate), "dd/MM")}`,
+      description: `تم نقل حصة ${confirmDialog.studentName} من ${format(parseISO(confirmDialog.originalDate), "dd/MM")} الساعة ${confirmDialog.originalTime} إلى ${format(parseISO(confirmDialog.newDate), "dd/MM")} الساعة ${confirmDialog.newTime}`,
     });
     setConfirmDialog(null);
   };
@@ -496,7 +475,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
       </CardHeader>
 
       <CardContent className="p-3 sm:p-6">
-        {/* Calendar Grid - LARGER DAYS */}
+        {/* Calendar Grid */}
         <div className={cn("grid gap-3", "grid-cols-7")}>
           {/* Day headers */}
           {DAY_NAMES_SHORT_AR.map((day, i) => (
@@ -508,13 +487,16 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
             </div>
           ))}
 
-          {/* Day cells - MUCH LARGER */}
+          {/* Day cells */}
           {days.map((day, index) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const daySessions = sessionsByDate.get(dateStr) || [];
             const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
             const isToday = isSameDay(day, today);
-            const isDragTarget = dropTargetDate === dateStr && (dragState?.originalDate !== dateStr || touchDragState?.originalDate !== dateStr);
+            const isDragTarget =
+              dropTargetDate === dateStr &&
+              dragState?.originalDate !== dateStr &&
+              touchDragState?.originalDate !== dateStr;
             const maxVisible = viewMode === "week" ? 4 : 2;
 
             return (
@@ -545,7 +527,8 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                   <span
                     className={cn(
                       "text-base sm:text-lg font-bold",
-                      isToday && "bg-primary text-primary-foreground px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg shadow-sm",
+                      isToday &&
+                        "bg-primary text-primary-foreground px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg shadow-sm",
                     )}
                   >
                     {format(day, "d")}
@@ -557,10 +540,10 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                   )}
                 </div>
 
-                {/* Sessions - LARGER CARDS */}
+                {/* Sessions */}
                 <div className="space-y-1.5 sm:space-y-2">
                   {daySessions.slice(0, maxVisible).map(({ session, student }) => {
-                    const time = session.time || student.sessionTime || "16:00";
+                    const time = session.time || student.sessionTime;
                     const canDrag = session.status === "scheduled";
 
                     return (
@@ -568,11 +551,11 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                         key={session.id}
                         draggable={canDrag}
                         onDragStart={(e) =>
-                          canDrag && handleDragStart(e, session.id, student.id, student.name, session.date, time)
+                          canDrag && handleDragStart(e, session.id, student.id, student.name, session.date, time || "")
                         }
                         onDragEnd={handleDragEnd}
                         onTouchStart={(e) =>
-                          canDrag && handleTouchStart(e, session.id, student.id, student.name, session.date, time)
+                          canDrag && handleTouchStart(e, session.id, student.id, student.name, session.date, time || "")
                         }
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
@@ -619,8 +602,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                         <ScrollArea className="h-[calc(100vh-120px)] mt-4">
                           <div className="space-y-3 pr-4">
                             {daySessions.map(({ session, student }) => {
-                              const time = session.time || student.sessionTime || "16:00";
-                              const canDrag = session.status === "scheduled";
+                              const time = session.time || student.sessionTime;
 
                               return (
                                 <div
@@ -686,7 +668,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
         </div>
       </CardContent>
 
-      {/* Reschedule Dialog */}
+      {/* Reschedule Confirmation Dialog */}
       <Dialog open={confirmDialog?.open || false} onOpenChange={(open) => !open && setConfirmDialog(null)}>
         <DialogContent dir="rtl" className="sm:max-w-md">
           <DialogHeader>
@@ -721,14 +703,14 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
 
             <div className="space-y-2">
               <Label htmlFor="new-time" className="text-sm font-medium">
-                الوقت:
+                اختر الوقت الجديد:
               </Label>
               <Select
                 value={confirmDialog?.newTime}
                 onValueChange={(time) => setConfirmDialog((prev) => (prev ? { ...prev, newTime: time } : null))}
               >
                 <SelectTrigger id="new-time" className="h-11 rounded-xl border-2">
-                  <SelectValue />
+                  <SelectValue placeholder="اختر الوقت" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
                   {timeOptions.map((time) => (
@@ -738,6 +720,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">💡 الوقت الحالي: {confirmDialog?.originalTime}</p>
             </div>
           </div>
 
@@ -747,6 +730,7 @@ export const CalendarView = ({ students, onRescheduleSession }: CalendarViewProp
             </Button>
             <Button
               onClick={confirmReschedule}
+              disabled={!confirmDialog?.newTime}
               className="rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl"
             >
               تأكيد النقل
