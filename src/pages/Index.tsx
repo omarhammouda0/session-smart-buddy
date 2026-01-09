@@ -859,7 +859,11 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-0">
-            <CalendarView students={students} onRescheduleSession={rescheduleSession} />
+            <CalendarView
+              students={students}
+              onRescheduleSession={rescheduleSession}
+              onUpdateSessionDateTime={updateSessionDateTime}
+            />
           </TabsContent>
 
           <TabsContent value="history" className="mt-0">
