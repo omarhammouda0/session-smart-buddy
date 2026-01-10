@@ -4,7 +4,6 @@ import {
   BookOpen,
   CreditCard,
   Users,
-  X,
   Trash2,
   Clock,
   Monitor,
@@ -79,12 +78,16 @@ const Index = () => {
     };
   } | null>(null);
 
-  // ✅ ADDED: Quick payment dialog state
+  // Quick payment dialog state
   const [quickPaymentDialog, setQuickPaymentDialog] = useState<{
     open: boolean;
     student: Student | null;
     sessionDate: string;
   }>({ open: false, student: null, sessionDate: "" });
+
+  // ============================================
+  // HOOKS
+  // ============================================
 
   const {
     students,
@@ -112,6 +115,7 @@ const Index = () => {
     toggleSessionComplete,
     togglePaymentStatus,
     recordPayment,
+    resetMonthlyPayment, // ✅ NEW: Added for resetting payments
     bulkUpdateSessionTime,
     markSessionAsVacation,
     bulkMarkAsVacation,
@@ -128,37 +132,19 @@ const Index = () => {
 
   const { checkConflict } = useConflictDetection(students);
 
+  // ============================================
+  // SESSION HANDLERS
+  // ============================================
+
   const handleAddSession = (studentId: string, date: string, customTime?: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
     const sessionTime = customTime || student.sessionTime;
 
-    const conflictResult = checkConflict(
-      {
-        date,
-        startTime: sessionTime,
-      },
-      undefined,
-      studentId,
-    );
+    const conflictResult = checkConflict({ date, startTime: sessionTime }, undefined, studentId);
 
-    if (conflictResult.severity === "error") {
-      setAddConflictDialog({
-        open: true,
-        studentId,
-        date,
-        conflictResult,
-        sessionInfo: {
-          studentName: student.name,
-          date: formatShortDateAr(date),
-          time: sessionTime,
-        },
-      });
-      return;
-    }
-
-    if (conflictResult.severity === "warning") {
+    if (conflictResult.severity === "error" || conflictResult.severity === "warning") {
       setAddConflictDialog({
         open: true,
         studentId,
@@ -174,10 +160,9 @@ const Index = () => {
     }
 
     addExtraSession(studentId, date, sessionTime);
-
     toast({
       title: "تمت إضافة الحصة",
-      description: `حصة جديدة بتاريخ ${format(parseISO(date), "dd/MM/yyyy")} الساعة ${sessionTime}${student ? ` لـ ${student.name}` : ""}`,
+      description: `حصة جديدة بتاريخ ${format(parseISO(date), "dd/MM/yyyy")} الساعة ${sessionTime} لـ ${student.name}`,
     });
   };
 
@@ -196,9 +181,11 @@ const Index = () => {
   const handleCancelSession = async (studentId: string, sessionId: string, reason?: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
+
     if (session) {
       const result = await recordCancellation(studentId, session.date, session.time, reason);
       removeSession(studentId, sessionId);
+
       if (result.success) {
         if (result.autoNotificationSent) {
           toast({
@@ -219,28 +206,18 @@ const Index = () => {
               : `إلغاء ${result.newCount}${result.limit ? `/${result.limit}` : ""} هذا الشهر`,
           });
         }
-      } else {
-        toast({
-          title: "تم إلغاء الحصة",
-          description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح",
-          variant: "destructive",
-        });
       }
     } else {
       toast({
         title: "تم إلغاء الحصة",
         description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح",
-        variant: "destructive",
       });
     }
   };
 
   const handleDeleteSession = (studentId: string, sessionId: string) => {
     deleteSession(studentId, sessionId);
-    toast({
-      title: "تم حذف الحصة",
-      description: "تم حذف الحصة نهائياً",
-    });
+    toast({ title: "تم حذف الحصة", description: "تم حذف الحصة نهائياً" });
   };
 
   const handleRestoreSession = async (studentId: string, sessionId: string) => {
@@ -250,10 +227,7 @@ const Index = () => {
       await removeCancellation(studentId, session.date);
     }
     restoreSession(studentId, sessionId);
-    toast({
-      title: "تم استعادة الحصة",
-      description: "تم استعادة الحصة وتحديث عداد الإلغاءات",
-    });
+    toast({ title: "تم استعادة الحصة", description: "تم استعادة الحصة وتحديث عداد الإلغاءات" });
   };
 
   const handleToggleComplete = (studentId: string, sessionId: string) => {
@@ -269,25 +243,21 @@ const Index = () => {
 
   const handleMarkAsVacation = (studentId: string, sessionId: string) => {
     markSessionAsVacation(studentId, sessionId);
-    toast({
-      title: "تم تحديد الحصة كإجازة",
-      description: "لن يتم احتساب هذه الحصة في المدفوعات",
-    });
+    toast({ title: "تم تحديد الحصة كإجازة", description: "لن يتم احتساب هذه الحصة في المدفوعات" });
   };
 
-  // ✅ ADDED: Quick payment handler
+  // ============================================
+  // PAYMENT HANDLERS
+  // ============================================
+
+  // Quick payment from today's sessions
   const handleQuickPayment = (studentId: string, sessionDate: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
-
-    setQuickPaymentDialog({
-      open: true,
-      student,
-      sessionDate,
-    });
+    setQuickPaymentDialog({ open: true, student, sessionDate });
   };
 
-  // ✅ ADDED: Quick payment confirmation handler
+  // Confirm quick payment
   const handleQuickPaymentConfirm = (amount: number, method: PaymentMethod) => {
     if (!quickPaymentDialog.student) return;
 
@@ -305,7 +275,6 @@ const Index = () => {
     });
 
     const methodLabel = method === "cash" ? "كاش" : method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
-
     toast({
       title: "✅ تم تسجيل الدفعة",
       description: `${quickPaymentDialog.student.name}: ${amount.toLocaleString()} جنيه (${methodLabel})`,
@@ -314,7 +283,7 @@ const Index = () => {
     setQuickPaymentDialog({ open: false, student: null, sessionDate: "" });
   };
 
-  // ✅ ADD THIS NEW FUNCTION HERE
+  // Record payment from PaymentsDashboard
   const handleRecordPayment = (
     studentId: string,
     paymentData: {
@@ -329,25 +298,25 @@ const Index = () => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
-    // Call the new recordPayment function from useStudents hook
     recordPayment(studentId, paymentData);
 
-    // Show success toast with payment details
     const methodLabel =
       paymentData.method === "cash" ? "كاش" : paymentData.method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
-
     toast({
       title: "✅ تم تسجيل الدفعة",
       description: `${student.name}: ${paymentData.amount.toLocaleString()} جنيه (${methodLabel})`,
     });
   };
 
+  // ============================================
+  // COMPUTED VALUES
+  // ============================================
+
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
-
   const todayStr = format(now, "yyyy-MM-dd");
 
-  // Get ALL students with today's sessions (no filter)
+  // Students with today's sessions
   const studentsForDay = useMemo(() => {
     return students
       .map((student) => ({
@@ -362,44 +331,42 @@ const Index = () => {
       }))
       .filter((student) => student.todaySessions.length > 0)
       .sort((a, b) => {
-        // Sort by earliest session time
         const timeA = a.todaySessions[0]?.time || a.sessionTime;
         const timeB = b.todaySessions[0]?.time || b.sessionTime;
         return (timeA || "").localeCompare(timeB || "");
       });
   }, [students, todayStr]);
 
+  // All students sorted by time
   const allStudentsSortedByTime = useMemo(() => {
     const searchLower = allStudentsSearch.trim().toLowerCase();
     return [...students]
       .filter((s) => searchLower === "" || s.name.toLowerCase().includes(searchLower))
-      .sort((a, b) => {
-        const timeA = a.sessionTime;
-        const timeB = b.sessionTime;
-        return (timeA || "").localeCompare(timeB || "");
-      });
+      .sort((a, b) => (a.sessionTime || "").localeCompare(b.sessionTime || ""));
   }, [students, allStudentsSearch]);
 
+  // Today's session counts
   const todaysSessions = useMemo(() => {
     return students.reduce((acc, student) => {
-      const sessions = student.sessions.filter((s) => s.date === todayStr);
-      return acc + sessions.length;
+      return acc + student.sessions.filter((s) => s.date === todayStr).length;
     }, 0);
   }, [students, todayStr]);
 
   const todaysCompletedSessions = useMemo(() => {
     return students.reduce((acc, student) => {
-      const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "completed");
-      return acc + sessions.length;
+      return acc + student.sessions.filter((s) => s.date === todayStr && s.status === "completed").length;
     }, 0);
   }, [students, todayStr]);
 
   const todaysScheduledSessions = useMemo(() => {
     return students.reduce((acc, student) => {
-      const sessions = student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled");
-      return acc + sessions.length;
+      return acc + student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled").length;
     }, 0);
   }, [students, todayStr]);
+
+  // ============================================
+  // UI HELPERS
+  // ============================================
 
   const getGreeting = () => {
     const hour = now.getHours();
@@ -409,32 +376,19 @@ const Index = () => {
   };
 
   const getMotivationalMessage = () => {
-    if (todaysSessions === 0)
-      return {
-        text: "يوم راحة!",
-        emoji: "🌟",
-        color: "from-blue-500 to-cyan-500",
-      };
+    if (todaysSessions === 0) return { text: "يوم راحة!", emoji: "🌟", color: "from-blue-500 to-cyan-500" };
     if (todaysCompletedSessions === todaysSessions)
-      return {
-        text: "إنجاز رائع!",
-        emoji: "🏆",
-        color: "from-emerald-500 to-green-500",
-      };
+      return { text: "إنجاز رائع!", emoji: "🏆", color: "from-emerald-500 to-green-500" };
     if (todaysCompletedSessions >= todaysSessions / 2)
-      return {
-        text: "أداء ممتاز!",
-        emoji: "⭐",
-        color: "from-amber-500 to-yellow-500",
-      };
-    return {
-      text: "لنبدأ!",
-      emoji: "💪",
-      color: "from-primary to-primary/70",
-    };
+      return { text: "أداء ممتاز!", emoji: "⭐", color: "from-amber-500 to-yellow-500" };
+    return { text: "لنبدأ!", emoji: "💪", color: "from-primary to-primary/70" };
   };
 
   const motivational = getMotivationalMessage();
+
+  // ============================================
+  // LOADING STATE
+  // ============================================
 
   if (!isLoaded) {
     return (
@@ -443,6 +397,10 @@ const Index = () => {
       </div>
     );
   }
+
+  // ============================================
+  // RENDER
+  // ============================================
 
   return (
     <div dir="rtl" className="min-h-screen safe-bottom relative">
@@ -464,51 +422,23 @@ const Index = () => {
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div
           className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl"
-          style={{
-            animation: "float 25s ease-in-out infinite",
-          }}
+          style={{ animation: "float 25s ease-in-out infinite" }}
         />
         <div
           className="absolute bottom-1/3 right-1/3 w-[500px] h-[500px] bg-primary/3 rounded-full blur-3xl"
-          style={{
-            animation: "float 30s ease-in-out infinite reverse",
-          }}
+          style={{ animation: "float 30s ease-in-out infinite reverse" }}
         />
       </div>
 
       <style>{`
-        @keyframes gradientShift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        @keyframes float {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(40px, -40px) scale(1.1); }
-          66% { transform: translate(-30px, 30px) scale(0.9); }
-        }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.8; }
-        }
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        .animate-fade-in-up {
-          animation: fadeInUp 0.6s ease-out forwards;
-        }
-        .animate-pulse-slow {
-          animation: pulse 3s ease-in-out infinite;
-        }
-        .shimmer {
-          background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent);
-          background-size: 200% 100%;
-          animation: shimmer 3s infinite;
-        }
+        @keyframes gradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+        @keyframes float { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(40px, -40px) scale(1.1); } 66% { transform: translate(-30px, 30px) scale(0.9); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
+        .animate-pulse-slow { animation: pulse 3s ease-in-out infinite; }
+        .shimmer { background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent); background-size: 200% 100%; animation: shimmer 3s infinite; }
       `}</style>
 
       {/* Header */}
@@ -530,6 +460,7 @@ const Index = () => {
             </div>
 
             <div className="flex items-center gap-1.5">
+              {/* Students Sheet */}
               <Sheet>
                 <SheetTrigger asChild>
                   <Button
@@ -748,9 +679,7 @@ const Index = () => {
 
                     <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg w-fit">
                       <CalendarDays className="h-4 w-4 text-primary" />
-                      {format(now, "EEEE، dd MMMM yyyy", {
-                        locale: ar,
-                      })}
+                      {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
                     </div>
                   </div>
 
@@ -842,6 +771,7 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
+          {/* Sessions Tab */}
           <TabsContent value="sessions" className="mt-0 space-y-4">
             {students.length === 0 ? (
               <EmptyState />
@@ -853,9 +783,7 @@ const Index = () => {
                   </div>
                   <h3 className="font-bold text-xl mb-2">لا توجد حصص مجدولة اليوم</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {format(now, "EEEE، dd MMMM yyyy", {
-                      locale: ar,
-                    })}
+                    {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
                   </p>
                   <Badge className="bg-primary/10 text-primary border-primary/20">استمتع بيومك! 🌟</Badge>
                 </CardContent>
@@ -863,13 +791,7 @@ const Index = () => {
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:gap-5">
                 {studentsForDay.map((student, index) => (
-                  <div
-                    key={student.id}
-                    className="animate-fade-in-up"
-                    style={{
-                      animationDelay: `${index * 0.1}s`,
-                    }}
-                  >
+                  <div key={student.id} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
                     <StudentCard
                       student={student}
                       students={students}
@@ -894,6 +816,7 @@ const Index = () => {
             )}
           </TabsContent>
 
+          {/* Calendar Tab */}
           <TabsContent value="calendar" className="mt-0">
             <CalendarView
               students={students}
@@ -902,6 +825,7 @@ const Index = () => {
             />
           </TabsContent>
 
+          {/* History Tab */}
           <TabsContent value="history" className="mt-0">
             <SessionHistoryBar
               students={students}
@@ -919,6 +843,7 @@ const Index = () => {
             />
           </TabsContent>
 
+          {/* Payments Tab */}
           <TabsContent value="payments" className="mt-0 space-y-4">
             {students.length > 0 && (
               <StatsBar
@@ -936,6 +861,7 @@ const Index = () => {
               selectedYear={selectedYear}
               onTogglePayment={togglePaymentStatus}
               onRecordPayment={handleRecordPayment}
+              onResetPayment={resetMonthlyPayment}
               settings={settings}
             />
           </TabsContent>
@@ -944,7 +870,7 @@ const Index = () => {
         <EndOfMonthReminder students={students} payments={payments} onTogglePayment={togglePaymentStatus} />
       </main>
 
-      {/* ✅ ADDED: Quick Payment Dialog */}
+      {/* Quick Payment Dialog */}
       <QuickPaymentDialog
         open={quickPaymentDialog.open}
         onOpenChange={(open) => !open && setQuickPaymentDialog({ open: false, student: null, sessionDate: "" })}
@@ -954,6 +880,7 @@ const Index = () => {
         onConfirm={handleQuickPaymentConfirm}
       />
 
+      {/* Add Session Conflict Dialog */}
       {addConflictDialog && (
         <RestoreConflictDialog
           open={addConflictDialog.open}
