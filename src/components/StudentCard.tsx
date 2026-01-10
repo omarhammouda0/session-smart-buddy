@@ -39,7 +39,8 @@ interface StudentCardProps {
   }) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
-  onQuickPayment?: (studentId: string, sessionDate: string) => void;
+  // ✅ UPDATED: Added sessionId parameter
+  onQuickPayment?: (studentId: string, sessionId: string, sessionDate: string) => void;
 }
 
 export const StudentCard = ({
@@ -234,7 +235,7 @@ export const StudentCard = ({
                           size="icon"
                           className="h-8 w-8 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
                           title="تسجيل دفع"
-                          onClick={() => onQuickPayment(student.id, session.date)}
+                          onClick={() => onQuickPayment(student.id, session.id, session.date)}
                         >
                           <DollarSign className="h-4 w-4" />
                         </Button>
