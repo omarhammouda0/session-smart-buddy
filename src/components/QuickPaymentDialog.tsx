@@ -76,6 +76,7 @@ export const QuickPaymentDialog = ({
         alreadyPaidForSession: 0,
         remainingForSession: 0,
         isFullyPaid: false,
+        hasPartialPayment: false,
       };
     }
 
@@ -106,12 +107,14 @@ export const QuickPaymentDialog = ({
     alreadyPaidForSession = Math.min(alreadyPaidForSession, sessionPrice);
     const remainingForSession = Math.max(0, sessionPrice - alreadyPaidForSession);
     const isFullyPaid = remainingForSession === 0 && sessionPrice > 0;
+    const hasPartialPayment = alreadyPaidForSession > 0 && !isFullyPaid;
 
     return {
       sessionPrice,
       alreadyPaidForSession,
       remainingForSession,
       isFullyPaid,
+      hasPartialPayment,
     };
   }, [student, sessionId, sessionDate, settings, payments]);
 
@@ -211,10 +214,10 @@ export const QuickPaymentDialog = ({
             <div
               className={cn(
                 "p-2 rounded-lg",
-                sessionPaymentInfo.alreadyPaidForSession > 0 ? "bg-amber-500/10" : "bg-primary/10",
+                sessionPaymentInfo.hasPartialPayment ? "bg-amber-500/10" : "bg-primary/10",
               )}
             >
-              {sessionPaymentInfo.alreadyPaidForSession > 0 ? (
+              {sessionPaymentInfo.hasPartialPayment ? (
                 <Clock className="h-5 w-5 text-amber-500" />
               ) : (
                 <Banknote className="h-5 w-5 text-primary" />
@@ -228,58 +231,51 @@ export const QuickPaymentDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Session Payment Status */}
+          {/* Session Payment Status - Always show both lines */}
           <div
             className={cn(
               "p-4 rounded-xl border-2",
-              sessionPaymentInfo.alreadyPaidForSession > 0
-                ? "bg-amber-500/5 border-amber-500/30"
-                : "bg-muted/50 border-border",
+              sessionPaymentInfo.hasPartialPayment ? "bg-amber-500/5 border-amber-500/30" : "bg-muted/50 border-border",
             )}
           >
-            {/* Session Price */}
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-sm font-medium">سعر الحصة:</span>
+            {/* المطلوب للحصة - Session Price (always shown) */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">المطلوب للحصة:</span>
               <span className="text-lg font-bold text-primary">
                 {sessionPaymentInfo.sessionPrice.toLocaleString()} جنيه
               </span>
             </div>
 
+            {/* المدفوع - Already paid (always shown) */}
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/50">
+              <span className="text-sm font-medium">المدفوع:</span>
+              <span
+                className={cn(
+                  "text-lg font-bold",
+                  sessionPaymentInfo.alreadyPaidForSession > 0 ? "text-emerald-600" : "text-muted-foreground",
+                )}
+              >
+                {sessionPaymentInfo.alreadyPaidForSession.toLocaleString()} جنيه
+              </span>
+            </div>
+
             {/* Progress Bar (only if partial payment exists) */}
-            {sessionPaymentInfo.alreadyPaidForSession > 0 && (
-              <div className="space-y-2 mb-3">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>المدفوع</span>
-                  <span>{progressPercentage}%</span>
-                </div>
-                <Progress value={progressPercentage} className="h-2 [&>div]:bg-amber-500" />
-                <div className="flex justify-between text-xs">
-                  <span className="text-amber-600 font-medium">
-                    المدفوع: {sessionPaymentInfo.alreadyPaidForSession.toLocaleString()} جنيه
-                  </span>
-                </div>
+            {sessionPaymentInfo.hasPartialPayment && (
+              <div className="mt-3">
+                <Progress value={progressPercentage} className="h-2 [&>div]:bg-emerald-500" />
+                <div className="text-xs text-muted-foreground mt-1 text-center">{progressPercentage}% مدفوع</div>
               </div>
             )}
 
-            {/* Remaining Amount */}
-            <div
-              className={cn(
-                "pt-3 border-t border-border/50 flex justify-between items-center",
-                sessionPaymentInfo.alreadyPaidForSession > 0 && "mt-2",
-              )}
-            >
-              <span className="text-sm font-medium">
-                {sessionPaymentInfo.alreadyPaidForSession > 0 ? "المتبقي:" : "المطلوب:"}
-              </span>
-              <span
-                className={cn(
-                  "text-xl font-bold",
-                  sessionPaymentInfo.alreadyPaidForSession > 0 ? "text-amber-600" : "text-primary",
-                )}
-              >
-                {sessionPaymentInfo.remainingForSession.toLocaleString()} جنيه
-              </span>
-            </div>
+            {/* المتبقي - Remaining (only if partial payment) */}
+            {sessionPaymentInfo.hasPartialPayment && (
+              <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/50">
+                <span className="text-sm font-medium">المتبقي:</span>
+                <span className="text-xl font-bold text-amber-600">
+                  {sessionPaymentInfo.remainingForSession.toLocaleString()} جنيه
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Amount Input */}
@@ -312,7 +308,9 @@ export const QuickPaymentDialog = ({
                     className={cn("text-xs", amount === quickAmount && "ring-2 ring-primary/30")}
                   >
                     {quickAmount === sessionPaymentInfo.remainingForSession
-                      ? `كامل المتبقي (${quickAmount})`
+                      ? sessionPaymentInfo.hasPartialPayment
+                        ? `كامل المتبقي (${quickAmount})`
+                        : `كامل المبلغ (${quickAmount})`
                       : `${quickAmount} جنيه`}
                   </Button>
                 ))}
