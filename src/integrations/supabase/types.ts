@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          default_price_online: number | null
+          default_price_onsite: number | null
+          default_semester_end: string | null
+          default_semester_months: number | null
+          default_semester_start: string | null
+          default_session_duration: number | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_price_online?: number | null
+          default_price_onsite?: number | null
+          default_semester_end?: string | null
+          default_semester_months?: number | null
+          default_semester_start?: string | null
+          default_session_duration?: number | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_price_online?: number | null
+          default_price_onsite?: number | null
+          default_semester_end?: string | null
+          default_semester_months?: number | null
+          default_semester_start?: string | null
+          default_session_duration?: number | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cancellation_notifications: {
         Row: {
           created_at: string
@@ -147,6 +186,113 @@ export type Database = {
             columns: ["homework_id"]
             isOneToOne: false
             referencedRelation: "homework"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_payments: {
+        Row: {
+          amount_due: number | null
+          amount_paid: number | null
+          created_at: string
+          id: string
+          is_paid: boolean | null
+          month: number
+          notes: string | null
+          paid_at: string | null
+          payment_status: string | null
+          student_id: string
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          amount_due?: number | null
+          amount_paid?: number | null
+          created_at?: string
+          id?: string
+          is_paid?: boolean | null
+          month: number
+          notes?: string | null
+          paid_at?: string | null
+          payment_status?: string | null
+          student_id: string
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          amount_due?: number | null
+          amount_paid?: number | null
+          created_at?: string
+          id?: string
+          is_paid?: boolean | null
+          month?: number
+          notes?: string | null
+          paid_at?: string | null
+          payment_status?: string | null
+          student_id?: string
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_records: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          method: string
+          monthly_payment_id: string
+          notes: string | null
+          paid_at: string
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          method?: string
+          monthly_payment_id: string
+          notes?: string | null
+          paid_at?: string
+          student_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          method?: string
+          monthly_payment_id?: string
+          notes?: string | null
+          paid_at?: string
+          student_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_records_monthly_payment_id_fkey"
+            columns: ["monthly_payment_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_records_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -382,6 +528,71 @@ export type Database = {
         }
         Relationships: []
       }
+      sessions: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          date: string
+          duration: number | null
+          homework: string | null
+          homework_status: string | null
+          id: string
+          notes: string | null
+          status: string
+          student_id: string
+          time: string | null
+          topic: string | null
+          updated_at: string
+          user_id: string
+          vacation_at: string | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          date: string
+          duration?: number | null
+          homework?: string | null
+          homework_status?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id: string
+          time?: string | null
+          topic?: string | null
+          updated_at?: string
+          user_id: string
+          vacation_at?: string | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          date?: string
+          duration?: number | null
+          homework?: string | null
+          homework_status?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id?: string
+          time?: string | null
+          topic?: string | null
+          updated_at?: string
+          user_id?: string
+          vacation_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_cancellation_tracking: {
         Row: {
           cancellation_count: number
@@ -420,6 +631,72 @@ export type Database = {
           parent_notified_at?: string | null
           student_id?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          cancellation_alert_tutor: boolean | null
+          cancellation_auto_notify_parent: boolean | null
+          cancellation_monthly_limit: number | null
+          created_at: string
+          custom_price_online: number | null
+          custom_price_onsite: number | null
+          id: string
+          name: string
+          parent_phone: string | null
+          phone: string | null
+          schedule_days: Json
+          semester_end: string
+          semester_start: string
+          session_duration: number | null
+          session_time: string
+          session_type: string
+          updated_at: string
+          use_custom_settings: boolean | null
+          user_id: string
+        }
+        Insert: {
+          cancellation_alert_tutor?: boolean | null
+          cancellation_auto_notify_parent?: boolean | null
+          cancellation_monthly_limit?: number | null
+          created_at?: string
+          custom_price_online?: number | null
+          custom_price_onsite?: number | null
+          id?: string
+          name: string
+          parent_phone?: string | null
+          phone?: string | null
+          schedule_days?: Json
+          semester_end: string
+          semester_start: string
+          session_duration?: number | null
+          session_time?: string
+          session_type?: string
+          updated_at?: string
+          use_custom_settings?: boolean | null
+          user_id: string
+        }
+        Update: {
+          cancellation_alert_tutor?: boolean | null
+          cancellation_auto_notify_parent?: boolean | null
+          cancellation_monthly_limit?: number | null
+          created_at?: string
+          custom_price_online?: number | null
+          custom_price_onsite?: number | null
+          id?: string
+          name?: string
+          parent_phone?: string | null
+          phone?: string | null
+          schedule_days?: Json
+          semester_end?: string
+          semester_start?: string
+          session_duration?: number | null
+          session_time?: string
+          session_type?: string
+          updated_at?: string
+          use_custom_settings?: boolean | null
           user_id?: string
         }
         Relationships: []
