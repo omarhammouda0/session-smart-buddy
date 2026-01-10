@@ -924,6 +924,9 @@ const Index = () => {
               students={students}
               onRescheduleSession={rescheduleSession}
               onUpdateSessionDateTime={updateSessionDateTime}
+              onToggleComplete={handleToggleComplete}
+              onCancelSession={handleCancelSession}
+              onQuickPayment={handleQuickPayment}
             />
           </TabsContent>
           <TabsContent value="history" className="mt-0">
