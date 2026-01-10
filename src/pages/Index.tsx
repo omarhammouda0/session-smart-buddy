@@ -12,18 +12,21 @@ import {
   CalendarDays,
   Sparkles,
   CheckCircle2,
-  Award,
-  Zap,
-  TrendingUp,
+  XCircle,
+  DollarSign,
+  User,
+  Timer,
+  ChevronDown,
+  ChevronUp,
+  Check,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
 import { useStudents } from "@/hooks/useStudents";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
 import { useConflictDetection, ConflictResult } from "@/hooks/useConflictDetection";
 import { AddStudentDialog } from "@/components/AddStudentDialog";
 import { SemesterSettings } from "@/components/SemesterSettings";
-import { StudentCard } from "@/components/StudentCard";
 import { EditStudentDialog } from "@/components/EditStudentDialog";
 import { PaymentsDashboard } from "@/components/PaymentsDashboard";
 import { QuickPaymentDialog } from "@/components/QuickPaymentDialog";
@@ -40,7 +43,7 @@ import { ReminderHistoryDialog } from "@/components/ReminderHistoryDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { StudentNotesHistory } from "@/components/StudentNotesHistory";
 import { CalendarView } from "@/components/CalendarView";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -59,36 +62,32 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Student, PaymentMethod } from "@/types/student";
+import { Student, PaymentMethod, Session } from "@/types/student";
+
+interface SessionWithStudent {
+  session: Session;
+  student: Student;
+}
 
 const Index = () => {
   const now = new Date();
-  const [selectedDayOfWeek] = useState(now.getDay());
   const [activeTab, setActiveTab] = useState("sessions");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
+  const [showAllSessions, setShowAllSessions] = useState(false);
   const [addConflictDialog, setAddConflictDialog] = useState<{
     open: boolean;
     studentId: string;
     date: string;
     conflictResult: ConflictResult;
-    sessionInfo: {
-      studentName: string;
-      date: string;
-      time: string;
-    };
+    sessionInfo: { studentName: string; date: string; time: string };
   } | null>(null);
 
-  // Quick payment dialog state
   const [quickPaymentDialog, setQuickPaymentDialog] = useState<{
     open: boolean;
     student: Student | null;
     sessionId: string;
     sessionDate: string;
   }>({ open: false, student: null, sessionId: "", sessionDate: "" });
-
-  // ============================================
-  // HOOKS
-  // ============================================
 
   const {
     students,
@@ -116,7 +115,7 @@ const Index = () => {
     toggleSessionComplete,
     togglePaymentStatus,
     recordPayment,
-    resetMonthlyPayment, // ✅ NEW: Added for resetting payments
+    resetMonthlyPayment,
     bulkUpdateSessionTime,
     markSessionAsVacation,
     bulkMarkAsVacation,
@@ -133,33 +132,22 @@ const Index = () => {
 
   const { checkConflict } = useConflictDetection(students);
 
-  // ============================================
-  // SESSION HANDLERS
-  // ============================================
-
+  // Session Handlers
   const handleAddSession = (studentId: string, date: string, customTime?: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
-
     const sessionTime = customTime || student.sessionTime;
-
     const conflictResult = checkConflict({ date, startTime: sessionTime }, undefined, studentId);
-
     if (conflictResult.severity === "error" || conflictResult.severity === "warning") {
       setAddConflictDialog({
         open: true,
         studentId,
         date,
         conflictResult,
-        sessionInfo: {
-          studentName: student.name,
-          date: formatShortDateAr(date),
-          time: sessionTime,
-        },
+        sessionInfo: { studentName: student.name, date: formatShortDateAr(date), time: sessionTime },
       });
       return;
     }
-
     addExtraSession(studentId, date, sessionTime);
     toast({
       title: "تمت إضافة الحصة",
@@ -182,11 +170,9 @@ const Index = () => {
   const handleCancelSession = async (studentId: string, sessionId: string, reason?: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
-
     if (session) {
       const result = await recordCancellation(studentId, session.date, session.time, reason);
       removeSession(studentId, sessionId);
-
       if (result.success) {
         if (result.autoNotificationSent) {
           toast({
@@ -209,10 +195,7 @@ const Index = () => {
         }
       }
     } else {
-      toast({
-        title: "تم إلغاء الحصة",
-        description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح",
-      });
+      toast({ title: "تم إلغاء الحصة", description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح" });
     }
   };
 
@@ -224,9 +207,7 @@ const Index = () => {
   const handleRestoreSession = async (studentId: string, sessionId: string) => {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
-    if (session?.status === "cancelled") {
-      await removeCancellation(studentId, session.date);
-    }
+    if (session?.status === "cancelled") await removeCancellation(studentId, session.date);
     restoreSession(studentId, sessionId);
     toast({ title: "تم استعادة الحصة", description: "تم استعادة الحصة وتحديث عداد الإلغاءات" });
   };
@@ -247,60 +228,39 @@ const Index = () => {
     toast({ title: "تم تحديد الحصة كإجازة", description: "لن يتم احتساب هذه الحصة في المدفوعات" });
   };
 
-  // ============================================
-  // PAYMENT HANDLERS
-  // ============================================
-
-  // Quick payment from today's sessions
+  // Payment Handlers
   const handleQuickPayment = (studentId: string, sessionId: string, sessionDate: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
     setQuickPaymentDialog({ open: true, student, sessionId, sessionDate });
   };
 
-  // Confirm quick payment
   const handleQuickPaymentConfirm = (amount: number, method: PaymentMethod) => {
     if (!quickPaymentDialog.student || !quickPaymentDialog.sessionId) return;
-
     const sessionDate = new Date(quickPaymentDialog.sessionDate);
-    const month = sessionDate.getMonth();
-    const year = sessionDate.getFullYear();
-
     recordPayment(quickPaymentDialog.student.id, {
-      month,
-      year,
+      month: sessionDate.getMonth(),
+      year: sessionDate.getFullYear(),
       amount,
       method,
       paidAt: new Date().toISOString(),
       notes: `session:${quickPaymentDialog.sessionId}|date:${quickPaymentDialog.sessionDate}`,
     });
-
     const methodLabel = method === "cash" ? "كاش" : method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
     toast({
       title: "✅ تم تسجيل الدفعة",
       description: `${quickPaymentDialog.student.name}: ${amount.toLocaleString()} جنيه (${methodLabel})`,
     });
-
     setQuickPaymentDialog({ open: false, student: null, sessionId: "", sessionDate: "" });
   };
 
-  // Record payment from PaymentsDashboard
   const handleRecordPayment = (
     studentId: string,
-    paymentData: {
-      month: number;
-      year: number;
-      amount: number;
-      method: PaymentMethod;
-      paidAt: string;
-      notes?: string;
-    },
+    paymentData: { month: number; year: number; amount: number; method: PaymentMethod; paidAt: string; notes?: string },
   ) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
-
     recordPayment(studentId, paymentData);
-
     const methodLabel =
       paymentData.method === "cash" ? "كاش" : paymentData.method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
     toast({
@@ -309,36 +269,63 @@ const Index = () => {
     });
   };
 
-  // ============================================
-  // COMPUTED VALUES
-  // ============================================
-
+  // Computed Values
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
   const todayStr = format(now, "yyyy-MM-dd");
+  const currentTimeStr = format(now, "HH:mm");
 
-  // Students with today's sessions
-  const studentsForDay = useMemo(() => {
-    return students
-      .map((student) => ({
-        ...student,
-        todaySessions: student.sessions
-          .filter((s) => s.date === todayStr)
-          .sort((a, b) => {
-            const timeA = a.time || student.sessionTime;
-            const timeB = b.time || student.sessionTime;
-            return (timeA || "").localeCompare(timeB || "");
-          }),
-      }))
-      .filter((student) => student.todaySessions.length > 0)
-      .sort((a, b) => {
-        const timeA = a.todaySessions[0]?.time || a.sessionTime;
-        const timeB = b.todaySessions[0]?.time || b.sessionTime;
-        return (timeA || "").localeCompare(timeB || "");
-      });
+  const allTodaySessions = useMemo((): SessionWithStudent[] => {
+    const sessions: SessionWithStudent[] = [];
+    students.forEach((student) => {
+      student.sessions
+        .filter((s) => s.date === todayStr)
+        .forEach((session) => {
+          sessions.push({ session, student });
+        });
+    });
+    return sessions.sort((a, b) => {
+      const timeA = a.session.time || a.student.sessionTime || "00:00";
+      const timeB = b.session.time || b.student.sessionTime || "00:00";
+      return timeA.localeCompare(timeB);
+    });
   }, [students, todayStr]);
 
-  // All students sorted by time
+  const todayStats = useMemo(() => {
+    const total = allTodaySessions.length;
+    const completed = allTodaySessions.filter((s) => s.session.status === "completed").length;
+    const scheduled = allTodaySessions.filter((s) => s.session.status === "scheduled").length;
+    const cancelled = allTodaySessions.filter((s) => s.session.status === "cancelled").length;
+    const vacation = allTodaySessions.filter((s) => s.session.status === "vacation").length;
+    const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, scheduled, cancelled, vacation, progressPercent };
+  }, [allTodaySessions]);
+
+  const nextSession = useMemo((): SessionWithStudent | null => {
+    return (
+      allTodaySessions.find((item) => {
+        if (item.session.status !== "scheduled") return false;
+        const sessionTime = item.session.time || item.student.sessionTime || "00:00";
+        return sessionTime >= currentTimeStr;
+      }) || null
+    );
+  }, [allTodaySessions, currentTimeStr]);
+
+  const timeUntilNext = useMemo(() => {
+    if (!nextSession) return null;
+    const sessionTime = nextSession.session.time || nextSession.student.sessionTime || "16:00";
+    const [hours, minutes] = sessionTime.split(":").map(Number);
+    const sessionDateTime = new Date(now);
+    sessionDateTime.setHours(hours, minutes, 0, 0);
+    const diffMinutes = differenceInMinutes(sessionDateTime, now);
+    if (diffMinutes <= 0) return "الآن";
+    if (diffMinutes < 60) return `بعد ${diffMinutes} دقيقة`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    const remainingMinutes = diffMinutes % 60;
+    if (remainingMinutes === 0) return `بعد ${diffHours} ساعة`;
+    return `بعد ${diffHours} ساعة و ${remainingMinutes} دقيقة`;
+  }, [nextSession, now]);
+
   const allStudentsSortedByTime = useMemo(() => {
     const searchLower = allStudentsSearch.trim().toLowerCase();
     return [...students]
@@ -346,28 +333,8 @@ const Index = () => {
       .sort((a, b) => (a.sessionTime || "").localeCompare(b.sessionTime || ""));
   }, [students, allStudentsSearch]);
 
-  // Today's session counts
-  const todaysSessions = useMemo(() => {
-    return students.reduce((acc, student) => {
-      return acc + student.sessions.filter((s) => s.date === todayStr).length;
-    }, 0);
-  }, [students, todayStr]);
-
-  const todaysCompletedSessions = useMemo(() => {
-    return students.reduce((acc, student) => {
-      return acc + student.sessions.filter((s) => s.date === todayStr && s.status === "completed").length;
-    }, 0);
-  }, [students, todayStr]);
-
-  const todaysScheduledSessions = useMemo(() => {
-    return students.reduce((acc, student) => {
-      return acc + student.sessions.filter((s) => s.date === todayStr && s.status === "scheduled").length;
-    }, 0);
-  }, [students, todayStr]);
-
-  // ============================================
-  // UI HELPERS
-  // ============================================
+  const visibleSessions = showAllSessions ? allTodaySessions : allTodaySessions.slice(0, 5);
+  const hasMoreSessions = allTodaySessions.length > 5;
 
   const getGreeting = () => {
     const hour = now.getHours();
@@ -375,21 +342,6 @@ const Index = () => {
     if (hour < 18) return "مساءً سعيداً";
     return "مساء الخير";
   };
-
-  const getMotivationalMessage = () => {
-    if (todaysSessions === 0) return { text: "يوم راحة!", emoji: "🌟", color: "from-blue-500 to-cyan-500" };
-    if (todaysCompletedSessions === todaysSessions)
-      return { text: "إنجاز رائع!", emoji: "🏆", color: "from-emerald-500 to-green-500" };
-    if (todaysCompletedSessions >= todaysSessions / 2)
-      return { text: "أداء ممتاز!", emoji: "⭐", color: "from-amber-500 to-yellow-500" };
-    return { text: "لنبدأ!", emoji: "💪", color: "from-primary to-primary/70" };
-  };
-
-  const motivational = getMotivationalMessage();
-
-  // ============================================
-  // LOADING STATE
-  // ============================================
 
   if (!isLoaded) {
     return (
@@ -399,80 +351,41 @@ const Index = () => {
     );
   }
 
-  // ============================================
-  // RENDER
-  // ============================================
-
   return (
-    <div dir="rtl" className="min-h-screen safe-bottom relative">
-      {/* Animated Background */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          background: `
-            radial-gradient(circle at 20% 50%, hsl(var(--primary) / 0.12) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, hsl(var(--primary) / 0.08) 0%, transparent 50%),
-            radial-gradient(circle at 40% 20%, hsl(var(--primary) / 0.06) 0%, transparent 50%),
-            linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--primary) / 0.02) 100%)
-          `,
-          backgroundSize: "200% 200%",
-          animation: "gradientShift 20s ease infinite",
-        }}
-      />
-
+    <div
+      dir="rtl"
+      className="min-h-screen safe-bottom relative bg-gradient-to-br from-background via-background to-primary/5"
+    >
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div
-          className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl"
-          style={{ animation: "float 25s ease-in-out infinite" }}
-        />
-        <div
-          className="absolute bottom-1/3 right-1/3 w-[500px] h-[500px] bg-primary/3 rounded-full blur-3xl"
-          style={{ animation: "float 30s ease-in-out infinite reverse" }}
-        />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
       </div>
 
-      <style>{`
-        @keyframes gradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-        @keyframes float { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(40px, -40px) scale(1.1); } 66% { transform: translate(-30px, 30px) scale(0.9); } }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
-        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-        .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
-        .animate-pulse-slow { animation: pulse 3s ease-in-out infinite; }
-        .shimmer { background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent); background-size: 200% 100%; animation: shimmer 3s infinite; }
-      `}</style>
-
-      {/* Header */}
-      <header className="bg-card/90 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-lg">
+      <header className="bg-card/95 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
         <div className="px-3 py-3 sm:px-4 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-xl flex items-center justify-center shrink-0 ring-4 ring-primary/10 animate-pulse-slow">
-                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground drop-shadow-lg" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg flex items-center justify-center shrink-0">
+                <GraduationCap className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-heading font-bold text-base sm:text-xl leading-tight truncate bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent">
-                  متابعة الطلاب
-                </h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium hidden xs:block">
-                  إدارة احترافية للحصص
+                <h1 className="font-heading font-bold text-base sm:text-lg leading-tight truncate">متابعة الطلاب</h1>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block">
+                  {format(now, "EEEE، d MMMM", { locale: ar })}
                 </p>
               </div>
             </div>
-
             <div className="flex items-center gap-1.5">
-              {/* Students Sheet */}
               <Sheet>
                 <SheetTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-10 w-10 sm:w-auto sm:px-4 gap-2 rounded-xl border-2 hover:border-primary hover:bg-primary/10 transition-all active:scale-95 shadow-md relative overflow-hidden group touch-manipulation"
+                    className="h-9 w-9 sm:w-auto sm:px-3 gap-1.5 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all"
                   >
-                    <div className="absolute inset-0 shimmer group-hover:opacity-100 opacity-0 transition-opacity" />
-                    <Users className="h-4 w-4 relative z-10" />
-                    <span className="hidden sm:inline text-sm font-semibold relative z-10">الطلاب</span>
-                    <Badge className="relative z-10 bg-primary text-primary-foreground shadow-sm hidden sm:flex">
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline text-sm">الطلاب</span>
+                    <Badge variant="secondary" className="hidden sm:flex h-5 px-1.5 text-xs">
                       {students.length}
                     </Badge>
                   </Button>
@@ -582,7 +495,6 @@ const Index = () => {
                   </div>
                 </SheetContent>
               </Sheet>
-
               <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <BulkEditSessionsDialog
                 students={students}
@@ -606,218 +518,407 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="px-3 py-4 sm:px-4 sm:py-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto">
-        {/* Welcome Card */}
+      <main className="px-3 py-4 sm:px-4 sm:py-6 space-y-4 max-w-5xl mx-auto">
         {students.length > 0 && activeTab === "sessions" && (
-          <div className="relative animate-fade-in-up">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-3xl blur-2xl opacity-50" />
-
-            <Card className="relative border-2 border-primary/20 shadow-2xl bg-gradient-to-br from-card via-card/95 to-primary/5 backdrop-blur-sm overflow-hidden">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-primary/5 to-transparent rounded-full blur-3xl" />
-
-              <CardContent className="p-5 sm:p-7 relative">
-                <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10">
-                          <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-primary animate-pulse" />
-                        </div>
-                        <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-                          {getGreeting()} عمر! 👋
-                        </h2>
-                      </div>
-
-                      <Badge
-                        className={cn(
-                          "px-3 py-1.5 text-sm font-bold shadow-lg animate-pulse-slow bg-gradient-to-r",
-                          motivational.color,
-                        )}
-                      >
-                        {motivational.emoji} {motivational.text}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-base sm:text-lg text-foreground/90 font-medium">
-                        {todaysSessions > 0 ? (
-                          <span className="flex items-center gap-2 flex-wrap">
-                            لديك
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/15 rounded-xl font-bold text-primary text-xl">
-                              <Zap className="h-5 w-5" />
-                              {todaysSessions}
-                            </span>
-                            {todaysSessions === 1 ? "حصة" : todaysSessions === 2 ? "حصتان" : "حصص"} اليوم
-                            {todaysCompletedSessions > 0 && (
-                              <>
-                                <span className="text-muted-foreground">|</span>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/15 rounded-xl font-bold text-emerald-600">
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  {todaysCompletedSessions}
-                                </span>
-                                مكتملة
-                              </>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            <span className="text-2xl">🌟</span>
-                            لا توجد حصص مجدولة اليوم
-                          </span>
-                        )}
-                      </p>
-
-                      {todaysScheduledSessions > 0 && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-primary" />
-                          متبقي {todaysScheduledSessions} {todaysScheduledSessions === 1 ? "حصة" : "حصص"}
-                          {todaysSessions > 0 && " - هل أنت مستعد؟ 💪"}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg w-fit">
-                      <CalendarDays className="h-4 w-4 text-primary" />
-                      {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
-                    </div>
-                  </div>
-
-                  {todaysSessions > 0 && (
-                    <div className="flex flex-col items-center gap-3 bg-gradient-to-br from-primary/15 to-primary/5 rounded-2xl p-4 sm:p-5 border-2 border-primary/20 shadow-xl min-w-[110px] sm:min-w-[130px]">
-                      <div className="relative w-20 h-20 sm:w-24 sm:h-24">
-                        <svg className="transform -rotate-90 w-full h-full">
-                          <circle
-                            cx="50%"
-                            cy="50%"
-                            r="35"
-                            stroke="currentColor"
-                            strokeWidth="6"
-                            fill="transparent"
-                            className="text-muted/30"
-                          />
-                          <circle
-                            cx="50%"
-                            cy="50%"
-                            r="35"
-                            stroke="url(#gradient)"
-                            strokeWidth="6"
-                            fill="transparent"
-                            strokeDasharray={`${2 * Math.PI * 35}`}
-                            strokeDashoffset={`${2 * Math.PI * 35 * (1 - todaysCompletedSessions / todaysSessions)}`}
-                            className="transition-all duration-1000"
-                            strokeLinecap="round"
-                          />
-                          <defs>
-                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="hsl(var(--primary))" />
-                              <stop offset="100%" stopColor="hsl(var(--primary) / 0.6)" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-2xl sm:text-3xl font-black bg-gradient-to-br from-primary to-primary/70 bg-clip-text text-transparent">
-                            {Math.round((todaysCompletedSessions / todaysSessions) * 100)}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-center space-y-1">
-                        <div className="text-xs font-bold text-foreground">التقدم اليوم</div>
-                        <div className="flex items-center gap-1.5 justify-center">
-                          <Award className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-sm text-primary font-bold">
-                            {todaysCompletedSessions}/{todaysSessions}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+          <div className="flex items-center justify-between gap-3 p-3 sm:p-4 bg-card rounded-xl border shadow-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="hidden sm:flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-foreground">{getGreeting()} عمر!</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700 border-blue-500/30">
+                  <CalendarDays className="h-3 w-3" />
+                  {todayStats.total} حصص
+                </Badge>
+                {todayStats.completed > 0 && (
+                  <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {todayStats.completed} مكتملة
+                  </Badge>
+                )}
+                {todayStats.cancelled > 0 && (
+                  <Badge variant="outline" className="gap-1 bg-rose-500/10 text-rose-700 border-rose-500/30">
+                    <XCircle className="h-3 w-3" />
+                    {todayStats.cancelled} ملغاة
+                  </Badge>
+                )}
+              </div>
+            </div>
+            {todayStats.total > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:block w-24 h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-500"
+                    style={{ width: `${todayStats.progressPercent}%` }}
+                  />
                 </div>
-              </CardContent>
-            </Card>
+                <span className="text-sm font-bold text-primary">{todayStats.progressPercent}%</span>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-4 mb-5 h-14 bg-gradient-to-br from-muted/80 to-muted/50 p-1.5 rounded-2xl shadow-lg backdrop-blur-md border border-border/50">
+          <TabsList className="w-full grid grid-cols-4 mb-4 h-12 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger
               value="sessions"
-              className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]"
+              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
             >
-              <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
+              <BookOpen className="h-4 w-4" />
               <span className="hidden xs:inline">الحصص</span>
             </TabsTrigger>
             <TabsTrigger
               value="calendar"
-              className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]"
+              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
             >
-              <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5" />
+              <CalendarDays className="h-4 w-4" />
               <span className="hidden xs:inline">التقويم</span>
             </TabsTrigger>
             <TabsTrigger
               value="history"
-              className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]"
+              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
             >
-              <History className="h-4 w-4 sm:h-5 sm:w-5" />
+              <History className="h-4 w-4" />
               <span className="hidden xs:inline">إدارة الطلبة</span>
             </TabsTrigger>
             <TabsTrigger
               value="payments"
-              className="gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all font-semibold data-[state=active]:scale-105 touch-manipulation active:scale-95 min-h-[44px]"
+              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
             >
-              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+              <CreditCard className="h-4 w-4" />
               <span className="hidden xs:inline">المدفوعات</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Sessions Tab */}
           <TabsContent value="sessions" className="mt-0 space-y-4">
             {students.length === 0 ? (
               <EmptyState />
-            ) : studentsForDay.length === 0 ? (
-              <Card className="border-2 border-dashed bg-card/50 backdrop-blur-sm shadow-lg">
+            ) : allTodaySessions.length === 0 ? (
+              <Card className="border-2 border-dashed">
                 <CardContent className="p-10 text-center">
-                  <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center shadow-lg">
-                    <CalendarDays className="h-10 w-10 text-muted-foreground" />
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted flex items-center justify-center">
+                    <CalendarDays className="h-8 w-8 text-muted-foreground" />
                   </div>
-                  <h3 className="font-bold text-xl mb-2">لا توجد حصص مجدولة اليوم</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {format(now, "EEEE، dd MMMM yyyy", { locale: ar })}
-                  </p>
-                  <Badge className="bg-primary/10 text-primary border-primary/20">استمتع بيومك! 🌟</Badge>
+                  <h3 className="font-bold text-lg mb-2">لا توجد حصص اليوم</h3>
+                  <p className="text-sm text-muted-foreground">{format(now, "EEEE، d MMMM yyyy", { locale: ar })}</p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:gap-5">
-                {studentsForDay.map((student, index) => (
-                  <div key={student.id} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
-                    <StudentCard
-                      student={student}
-                      students={students}
-                      settings={settings}
-                      selectedDayOfWeek={selectedDayOfWeek}
-                      todaySessions={student.todaySessions}
-                      onRemove={() => removeStudent(student.id)}
-                      onUpdateName={(name) => updateStudentName(student.id, name)}
-                      onUpdateTime={(time) => updateStudentTime(student.id, time)}
-                      onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
-                      onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
-                      onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)}
-                      onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
-                      onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
-                      onToggleComplete={handleToggleComplete}
-                      onCancelSession={handleCancelSession}
-                      onQuickPayment={handleQuickPayment}
-                    />
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {nextSession && (
+                  <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-transparent overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                            <Timer className="h-6 w-6 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground mb-0.5">الحصة القادمة</p>
+                            <p className="font-bold text-lg truncate">{nextSession.student.name}</p>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{nextSession.session.time || nextSession.student.sessionTime}</span>
+                              {timeUntilNext && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-primary font-medium">{timeUntilNext}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
+                              >
+                                <Check className="h-4 w-4" />
+                                <span className="hidden sm:inline">إكمال</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent dir="rtl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>تأكيد إكمال الحصة</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  هل تريد تسجيل حصة <strong>{nextSession.student.name}</strong> كمكتملة؟
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="flex-row-reverse gap-2">
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleToggleComplete(nextSession.student.id, nextSession.session.id)}
+                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
+                                  تأكيد الإكمال
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-rose-500/50 text-rose-600 hover:bg-rose-500/10 gap-1.5 h-9 px-4"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                <span className="hidden sm:inline">إلغاء</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent dir="rtl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>تأكيد إلغاء الحصة</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  هل تريد إلغاء حصة <strong>{nextSession.student.name}</strong>؟
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="flex-row-reverse gap-2">
+                                <AlertDialogCancel>رجوع</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    const reason = prompt("سبب الإلغاء (اختياري):");
+                                    handleCancelSession(
+                                      nextSession.student.id,
+                                      nextSession.session.id,
+                                      reason || undefined,
+                                    );
+                                  }}
+                                  className="bg-rose-600 text-white hover:bg-rose-700"
+                                >
+                                  تأكيد الإلغاء
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card className="border overflow-hidden">
+                  <CardHeader className="pb-3 border-b bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        جدول اليوم
+                      </CardTitle>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {todayStats.scheduled > 0 && (
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/30">
+                            {todayStats.scheduled} مجدولة
+                          </Badge>
+                        )}
+                        {todayStats.completed > 0 && (
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                            {todayStats.completed} مكتملة
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {visibleSessions.map((item, index) => {
+                        const { session, student } = item;
+                        const sessionTime = session.time || student.sessionTime || "16:00";
+                        const isCompleted = session.status === "completed";
+                        const isCancelled = session.status === "cancelled";
+                        const isVacation = session.status === "vacation";
+                        const isScheduled = session.status === "scheduled";
+                        const isNextSession = nextSession?.session.id === session.id;
+                        return (
+                          <div
+                            key={session.id}
+                            className={cn(
+                              "flex gap-3 sm:gap-4 p-3 sm:p-4 transition-all",
+                              isCompleted && "bg-emerald-500/5",
+                              isCancelled && "bg-rose-500/5",
+                              isVacation && "bg-amber-500/5",
+                              isScheduled && !isNextSession && "hover:bg-muted/50",
+                              isNextSession && "bg-primary/5",
+                            )}
+                          >
+                            <div className="flex flex-col items-center">
+                              <div
+                                className={cn(
+                                  "w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-sm border-2 shadow-sm",
+                                  isCompleted && "bg-emerald-500 text-white border-emerald-600",
+                                  isCancelled && "bg-rose-500 text-white border-rose-600",
+                                  isVacation && "bg-amber-500 text-white border-amber-600",
+                                  isScheduled && "bg-blue-500 text-white border-blue-600",
+                                )}
+                              >
+                                <span className="text-base font-bold">{sessionTime.substring(0, 5)}</span>
+                              </div>
+                              {index < visibleSessions.length - 1 && (
+                                <div
+                                  className={cn(
+                                    "w-0.5 flex-1 mt-2 min-h-[16px]",
+                                    isCompleted && "bg-emerald-300",
+                                    isCancelled && "bg-rose-300",
+                                    isVacation && "bg-amber-300",
+                                    isScheduled && "bg-blue-300",
+                                  )}
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0 py-1">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <User
+                                    className={cn(
+                                      "h-4 w-4 shrink-0",
+                                      isCompleted && "text-emerald-600",
+                                      isCancelled && "text-rose-600",
+                                      isVacation && "text-amber-600",
+                                      isScheduled && "text-blue-600",
+                                    )}
+                                  />
+                                  <h4 className="font-bold text-base truncate">{student.name}</h4>
+                                </div>
+                                <Badge
+                                  className={cn(
+                                    "shrink-0 text-xs font-semibold",
+                                    isCompleted && "bg-emerald-500 text-white",
+                                    isCancelled && "bg-rose-500 text-white",
+                                    isVacation && "bg-amber-500 text-white",
+                                    isScheduled && "bg-blue-500 text-white",
+                                  )}
+                                >
+                                  {isCompleted && "✓ مكتملة"}
+                                  {isCancelled && "✕ ملغاة"}
+                                  {isVacation && "🏖 إجازة"}
+                                  {isScheduled && "◉ مجدولة"}
+                                </Badge>
+                              </div>
+                              {isScheduled && !isNextSession && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
+                                      >
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        إكمال
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent dir="rtl">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>تأكيد إكمال الحصة</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          هل تريد تسجيل حصة <strong>{student.name}</strong> في{" "}
+                                          <strong>{sessionTime}</strong> كمكتملة؟
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter className="flex-row-reverse gap-2">
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleToggleComplete(student.id, session.id)}
+                                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                        >
+                                          تأكيد الإكمال
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-rose-500/50 text-rose-600 hover:bg-rose-500/10 gap-1.5 h-9 px-4"
+                                      >
+                                        <XCircle className="h-4 w-4" />
+                                        إلغاء
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent dir="rtl">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>تأكيد إلغاء الحصة</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          هل تريد إلغاء حصة <strong>{student.name}</strong> في{" "}
+                                          <strong>{sessionTime}</strong>؟
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter className="flex-row-reverse gap-2">
+                                        <AlertDialogCancel>رجوع</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => {
+                                            const reason = prompt("سبب الإلغاء (اختياري):");
+                                            handleCancelSession(student.id, session.id, reason || undefined);
+                                          }}
+                                          className="bg-rose-600 text-white hover:bg-rose-700"
+                                        >
+                                          تأكيد الإلغاء
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 gap-1.5 h-9 px-4"
+                                    onClick={() => handleQuickPayment(student.id, session.id, session.date)}
+                                  >
+                                    <DollarSign className="h-4 w-4" />
+                                    دفع
+                                  </Button>
+                                </div>
+                              )}
+                              {isCompleted && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-emerald-600 font-medium">✓ تم إكمال الحصة</span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 gap-1.5 h-8 px-3 text-xs"
+                                    onClick={() => handleQuickPayment(student.id, session.id, session.date)}
+                                  >
+                                    <DollarSign className="h-3.5 w-3.5" />
+                                    دفع
+                                  </Button>
+                                </div>
+                              )}
+                              {isCancelled && <span className="text-sm text-rose-600">تم إلغاء هذه الحصة</span>}
+                              {isVacation && <span className="text-sm text-amber-600">إجازة</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {hasMoreSessions && (
+                      <div className="border-t p-3">
+                        <Button
+                          variant="ghost"
+                          className="w-full gap-2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowAllSessions(!showAllSessions)}
+                        >
+                          {showAllSessions ? (
+                            <>
+                              <ChevronUp className="h-4 w-4" />
+                              عرض أقل
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4" />
+                              عرض الكل ({allTodaySessions.length - 5} إضافية)
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
           </TabsContent>
 
-          {/* Calendar Tab */}
           <TabsContent value="calendar" className="mt-0">
             <CalendarView
               students={students}
@@ -825,8 +926,6 @@ const Index = () => {
               onUpdateSessionDateTime={updateSessionDateTime}
             />
           </TabsContent>
-
-          {/* History Tab */}
           <TabsContent value="history" className="mt-0">
             <SessionHistoryBar
               students={students}
@@ -843,8 +942,6 @@ const Index = () => {
               onClearMonthCancellations={clearMonthCancellations}
             />
           </TabsContent>
-
-          {/* Payments Tab */}
           <TabsContent value="payments" className="mt-0 space-y-4">
             {students.length > 0 && (
               <StatsBar
@@ -854,7 +951,6 @@ const Index = () => {
                 selectedYear={selectedYear}
               />
             )}
-
             <PaymentsDashboard
               students={students}
               payments={payments}
@@ -871,7 +967,6 @@ const Index = () => {
         <EndOfMonthReminder students={students} payments={payments} onTogglePayment={togglePaymentStatus} />
       </main>
 
-      {/* Quick Payment Dialog */}
       <QuickPaymentDialog
         open={quickPaymentDialog.open}
         onOpenChange={(open) =>
@@ -884,8 +979,6 @@ const Index = () => {
         payments={payments}
         onConfirm={handleQuickPaymentConfirm}
       />
-
-      {/* Add Session Conflict Dialog */}
       {addConflictDialog && (
         <RestoreConflictDialog
           open={addConflictDialog.open}
