@@ -638,90 +638,83 @@ export const useStudents = () => {
     method: PaymentMethod,
     notes?: string,
   ) => {
-    const now = new Date().toISOString();
+    setStudents((prevStudents) =>
+      prevStudents.map((student) => {
+        if (student.id !== studentId) return student;
 
-    setPayments((prev) => {
-      const updated = [...prev];
-      const studentPaymentIndex = updated.findIndex((p) => p.studentId === studentId);
-
-      if (studentPaymentIndex === -1) {
-        // Create new payment record
-        updated.push({
-          studentId,
-          payments: [
-            {
-              month,
-              year,
-              isPaid: false,
-              amountDue: 0,
-              amountPaid: amount,
-              paymentStatus: "partial" as PaymentStatus,
-              paymentRecords: [
-                {
-                  id: generateId(),
-                  amount,
-                  method,
-                  paidAt: now,
-                  notes,
-                },
-              ],
-            },
-          ],
+        // Calculate total due for this month
+        const monthSessions = student.sessions.filter((s) => {
+          const sessionDate = new Date(s.date);
+          return (
+            sessionDate.getMonth() === month &&
+            sessionDate.getFullYear() === year &&
+            (s.status === "completed" || s.status === "scheduled")
+          );
         });
-      } else {
-        const studentPayments = updated[studentPaymentIndex];
-        const paymentIndex = studentPayments.payments.findIndex((p) => p.month === month && p.year === year);
 
-        if (paymentIndex === -1) {
-          // Add new month payment
-          studentPayments.payments.push({
-            month,
-            year,
-            isPaid: false,
-            amountDue: 0,
-            amountPaid: amount,
-            paymentStatus: "partial" as PaymentStatus,
+        const sessionPrice = getStudentSessionPrice(student);
+        const totalDue = monthSessions.length * sessionPrice;
+
+        // Find existing payment for this month
+        const existingPaymentIndex = student.payments.findIndex((p) => p.month === month && p.year === year);
+
+        let updatedPayments = [...student.payments];
+
+        if (existingPaymentIndex >= 0) {
+          // Add to existing payment
+          const existingPayment = updatedPayments[existingPaymentIndex];
+          const newTotalPaid = (existingPayment.amountPaid || 0) + amount;
+
+          updatedPayments[existingPaymentIndex] = {
+            ...existingPayment,
+            amountPaid: newTotalPaid,
+            amountDue: totalDue,
+            isPaid: newTotalPaid >= totalDue,
+            amount: newTotalPaid, // Keep for backward compatibility
+            paidAt: new Date().toISOString(),
+            method,
+            notes: notes || existingPayment.notes,
             paymentRecords: [
+              ...(existingPayment.paymentRecords || []),
               {
-                id: generateId(),
+                id: Date.now().toString(),
                 amount,
                 method,
-                paidAt: now,
-                notes,
-              },
-            ],
-          });
-        } else {
-          // Add to existing month
-          const payment = studentPayments.payments[paymentIndex];
-          const newAmountPaid = (payment.amountPaid || 0) + amount;
-          const amountDue = payment.amountDue || 0;
-
-          const newStatus: PaymentStatus =
-            newAmountPaid >= amountDue && amountDue > 0 ? "paid" : newAmountPaid > 0 ? "partial" : "unpaid";
-
-          studentPayments.payments[paymentIndex] = {
-            ...payment,
-            amountPaid: newAmountPaid,
-            paymentStatus: newStatus,
-            isPaid: newStatus === "paid",
-            paidAt: newStatus === "paid" ? now : payment.paidAt,
-            paymentRecords: [
-              ...(payment.paymentRecords || []),
-              {
-                id: generateId(),
-                amount,
-                method,
-                paidAt: now,
+                paidAt: new Date().toISOString(),
                 notes,
               },
             ],
           };
+        } else {
+          // Create new payment
+          updatedPayments.push({
+            month,
+            year,
+            isPaid: amount >= totalDue,
+            amount, // Keep for backward compatibility
+            amountPaid: amount,
+            amountDue: totalDue,
+            method,
+            paidAt: new Date().toISOString(),
+            notes,
+            paymentRecords: [
+              {
+                id: Date.now().toString(),
+                amount,
+                method,
+                paidAt: new Date().toISOString(),
+                notes,
+              },
+            ],
+          });
         }
-      }
 
-      return updated;
-    });
+        return {
+          ...student,
+          payments: updatedPayments,
+        };
+      }),
+    );
   };
 
   // ✅ NEW: Update monthly amount due (called when calculating from sessions)
