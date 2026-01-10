@@ -21,7 +21,6 @@ import {
   Calendar as CalendarIcon,
   GripVertical,
   Clock,
-  MoreHorizontal,
   AlertTriangle,
   CheckCircle2,
   XCircle,
@@ -36,10 +35,8 @@ import { cn } from "@/lib/utils";
 import { Student, Session } from "@/types/student";
 import { DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -92,9 +89,6 @@ export const CalendarView = ({
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
-  const [selectedDaySheet, setSelectedDaySheet] = useState<{ date: string; sessions: SessionWithStudent[] } | null>(
-    null,
-  );
   const [touchDragState, setTouchDragState] = useState<{
     active: boolean;
     startX: number;
@@ -584,15 +578,16 @@ export const CalendarView = ({
             const dropConflict = isDropTarget ? getDropTargetConflict(dateStr) : null;
             const hasDropConflict = dropConflict?.hasConflict;
             const hasDropWarning = dropConflict?.severity === "warning";
-            const maxVisible = viewMode === "week" ? 4 : 2;
 
             return (
               <div
                 key={index}
                 data-date={dateStr}
                 className={cn(
-                  "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200 touch-manipulation relative",
-                  viewMode === "week" ? "min-h-[160px] sm:min-h-[200px]" : "min-h-[100px] sm:min-h-[140px]",
+                  "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200 touch-manipulation relative flex flex-col",
+                  viewMode === "week"
+                    ? "min-h-[160px] sm:min-h-[200px] max-h-[300px] sm:max-h-[400px]"
+                    : "min-h-[100px] sm:min-h-[140px] max-h-[180px] sm:max-h-[220px]",
                   !isCurrentMonth && "opacity-40 bg-muted/20",
                   isToday && "ring-2 ring-primary shadow-lg bg-primary/5",
                   isDropTarget && hasDropConflict && "bg-rose-500/20 border-rose-500 border-dashed scale-105 shadow-xl",
@@ -630,9 +625,10 @@ export const CalendarView = ({
                     )}
                   </div>
                 )}
+                {/* Date header - fixed */}
                 <div
                   className={cn(
-                    "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2",
+                    "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2 shrink-0",
                     isToday ? "border-primary" : "border-border/50",
                     isDropTarget && (hasDropConflict || hasDropWarning) && "mt-6",
                   )}
@@ -652,8 +648,9 @@ export const CalendarView = ({
                     </span>
                   )}
                 </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  {daySessions.slice(0, maxVisible).map(({ session, student }) => {
+                {/* Sessions - scrollable */}
+                <div className="space-y-1.5 sm:space-y-2 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                  {daySessions.map(({ session, student }) => {
                     const time = session.time || student.sessionTime;
                     const canDrag = session.status === "scheduled";
                     return (
@@ -689,69 +686,6 @@ export const CalendarView = ({
                       </div>
                     );
                   })}
-                  {daySessions.length > maxVisible && (
-                    <Sheet
-                      open={selectedDaySheet?.date === dateStr}
-                      onOpenChange={(open) => !open && setSelectedDaySheet(null)}
-                    >
-                      <SheetTrigger asChild>
-                        <button
-                          onClick={() => setSelectedDaySheet({ date: dateStr, sessions: daySessions })}
-                          className="w-full text-xs text-primary hover:text-primary/80 py-2 bg-primary/5 hover:bg-primary/10 rounded-lg font-bold transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />+{daySessions.length - maxVisible} المزيد
-                        </button>
-                      </SheetTrigger>
-                      <SheetContent side="left" className="w-full sm:max-w-md">
-                        <SheetHeader>
-                          <SheetTitle className="text-right font-bold">
-                            {format(parseISO(dateStr), "EEEE dd MMMM yyyy", { locale: ar })}
-                          </SheetTitle>
-                        </SheetHeader>
-                        <ScrollArea className="h-[calc(100vh-120px)] mt-4">
-                          <div className="space-y-3 pr-4">
-                            {daySessions.map(({ session, student }) => {
-                              const time = session.time || student.sessionTime;
-                              return (
-                                <div
-                                  key={session.id}
-                                  onClick={(e) => {
-                                    handleSessionClick(e, session, student);
-                                    setSelectedDaySheet(null);
-                                  }}
-                                  className={cn(
-                                    "p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md",
-                                    getStatusColor(session.status),
-                                  )}
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div>
-                                      <div className="font-bold text-base">{student.name}</div>
-                                      <div className="text-sm opacity-80 flex items-center gap-2 mt-2">
-                                        <Clock className="h-4 w-4" />
-                                        <span className="font-medium">{time}</span>
-                                      </div>
-                                    </div>
-                                    <div
-                                      className={cn(
-                                        "text-xs px-2.5 py-1 rounded-full font-bold",
-                                        session.status === "completed" && "bg-emerald-500/30 text-emerald-700",
-                                        session.status === "cancelled" && "bg-rose-500/30 text-rose-700",
-                                        session.status === "vacation" && "bg-amber-500/30 text-amber-700",
-                                        session.status === "scheduled" && "bg-blue-500/30 text-blue-700",
-                                      )}
-                                    >
-                                      {getStatusLabel(session.status)}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </ScrollArea>
-                      </SheetContent>
-                    </Sheet>
-                  )}
                 </div>
               </div>
             );
