@@ -767,115 +767,140 @@ export const PaymentsDashboard = ({
               {studentSearch.trim() ? "لا يوجد نتائج" : "لا يوجد طلاب تطابق الفلتر"}
             </p>
           ) : (
-            filteredStudents.map((student) => {
-              const isPaid = getPaymentStatus(student.id);
-              const isSending = sendingReminder === student.id;
-              const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
-              const billableCount = monthStats.completed + monthStats.scheduled;
-              const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
-              const pricePerSession = getStudentSessionPrice(student, settings);
+{filteredStudents.map((student) => {
+  const paymentStatus = getPaymentStatus(student.id, selectedMonth, selectedYear, students, payments, settings);
+  const isPaid = paymentStatus === "paid";
+  const isPartial = paymentStatus === "partial";
+  const isSending = sendingReminder === student.id;
+  const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+  const billableCount = monthStats.completed + monthStats.scheduled;
+  const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+  const pricePerSession = getStudentSessionPrice(student, settings);
+  
+  // Get payment details
+  const paymentDetails = getPaymentDetails(student.id);
+  const amountPaid = paymentDetails?.amountPaid || paymentDetails?.amount || 0;
+  const amountDue = paymentDetails?.amountDue || studentTotal;
 
-              return (
-                <div
-                  key={student.id}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border transition-all",
-                    isPaid ? "bg-success/10 border-success/30" : "bg-card border-border",
-                  )}
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div
-                      className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                        isPaid ? "bg-success text-success-foreground" : "bg-muted",
-                      )}
-                    >
-                      {isPaid ? <Check className="h-4 w-4" /> : <X className="h-4 w-4 text-muted-foreground" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium truncate">{student.name}</span>
-                        {billableCount > 0 && (
-                          <span
-                            className={cn("text-sm font-medium shrink-0", isPaid ? "text-success" : "text-foreground")}
-                          >
-                            {studentTotal.toLocaleString()} {CURRENCY}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                        <span>{student.scheduleDays.map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join("، ")}</span>
-                        {billableCount > 0 && (
-                          <>
-                            <span>•</span>
-                            <span className="text-primary">{billableCount} جلسة</span>
-                          </>
-                        )}
-                        {monthStats.vacation > 0 && (
-                          <>
-                            <span>•</span>
-                            <span className="text-warning flex items-center gap-0.5">
-                              <Palmtree className="h-3 w-3" />
-                              {monthStats.vacation} إجازة
-                            </span>
-                          </>
-                        )}
-                        {monthStats.cancelled > 0 && (
-                          <>
-                            <span>•</span>
-                            <span className="text-destructive">{monthStats.cancelled} ملغاة</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setSelectedStudentHistory(student.id);
-                        setHistoryDialog({ open: true, view: "student" });
-                      }}
-                      title="السجل"
-                    >
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                    {!isPaid && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 border-green-500/50 text-green-600 hover:bg-green-500/10"
-                        onClick={() => sendWhatsAppReminder(student)}
-                        disabled={isSending}
-                      >
-                        {isSending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <MessageCircle className="h-4 w-4" />
-                        )}
-                        تذكير
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant={isPaid ? "outline" : "default"}
-                      className={cn(!isPaid && "gradient-accent")}
-                      onClick={() =>
-                        isPaid
-                          ? onTogglePayment(student.id, selectedMonth, selectedYear)
-                          : openRecordPaymentDialog(student)
-                      }
-                    >
-                      {isPaid ? "إلغاء الدفع" : "سجل دفع"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })
+  return (
+    <div
+      key={student.id}
+      className={cn(
+        "flex items-center justify-between p-3 rounded-lg border transition-all",
+        isPaid && "bg-success/10 border-success/30",
+        isPartial && "bg-amber-500/10 border-amber-500/30",
+        !isPaid && !isPartial && "bg-card border-border",
+      )}
+    >
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div
+          className={cn(
+            "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+            isPaid && "bg-success text-success-foreground",
+            isPartial && "bg-amber-500 text-white",
+            !isPaid && !isPartial && "bg-muted",
           )}
-        </CardContent>
-      </Card>
+        >
+          {isPaid ? (
+            <Check className="h-4 w-4" />
+          ) : isPartial ? (
+            <Clock className="h-4 w-4" />
+          ) : (
+            <X className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium truncate">{student.name}</span>
+            {billableCount > 0 && (
+              <span
+                className={cn(
+                  "text-sm font-medium shrink-0",
+                  isPaid && "text-success",
+                  isPartial && "text-amber-600",
+                  !isPaid && !isPartial && "text-foreground"
+                )}
+              >
+                {isPartial ? (
+                  <>
+                    {amountPaid.toLocaleString()} / {amountDue.toLocaleString()} {CURRENCY}
+                  </>
+                ) : (
+                  <>
+                    {studentTotal.toLocaleString()} {CURRENCY}
+                  </>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            <span>{student.scheduleDays.map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join("، ")}</span>
+            {billableCount > 0 && (
+              <>
+                <span>•</span>
+                <span className={cn(isPartial ? "text-amber-600 font-medium" : "text-primary")}>
+                  {billableCount} جلسة
+                </span>
+              </>
+            )}
+            {monthStats.vacation > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-warning flex items-center gap-0.5">
+                  <Palmtree className="h-3 w-3" />
+                  {monthStats.vacation} إجازة
+                </span>
+              </>
+            )}
+            {monthStats.cancelled > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-destructive">{monthStats.cancelled} ملغاة</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setSelectedStudentHistory(student.id);
+            setHistoryDialog({ open: true, view: "student" });
+          }}
+          title="السجل"
+        >
+          <FileText className="h-4 w-4" />
+        </Button>
+        {!isPaid && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1 border-green-500/50 text-green-600 hover:bg-green-500/10"
+            onClick={() => sendWhatsAppReminder(student)}
+            disabled={isSending}
+          >
+            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+            تذكير
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant={isPaid ? "outline" : "default"}
+          className={cn(!isPaid && "gradient-accent")}
+          onClick={() =>
+            isPaid || isPartial
+              ? onTogglePayment(student.id, selectedMonth, selectedYear)
+              : openRecordPaymentDialog(student)
+          }
+        >
+          {isPaid ? "إلغاء الدفع" : isPartial ? "أضف دفعة" : "سجل دفع"}
+        </Button>
+      </div>
+    </div>
+  );
+})}
 
       {/* Payment Recording Dialog */}
       <Dialog
