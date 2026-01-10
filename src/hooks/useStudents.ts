@@ -1110,14 +1110,11 @@ export const useStudents = () => {
   );
 
   const bulkMarkAsVacation = useCallback(
-    async (studentIds: string[], sessionIds: string[]): Promise<{ success: boolean; updatedCount: number }> => {
-      const currentUserId = await getUserId();
-      if (!currentUserId) return { success: false, updatedCount: 0 };
-
+    (studentIds: string[], sessionIds: string[]): { success: boolean; updatedCount: number } => {
       const now = new Date().toISOString();
       let updatedCount = 0;
 
-      // Optimistic update
+      // Optimistic update (synchronous)
       setStudents((prev) =>
         prev.map((student) => {
           if (!studentIds.includes(student.id)) return student;
@@ -1139,22 +1136,27 @@ export const useStudents = () => {
         }),
       );
 
-      const { error } = await supabase
-        .from("sessions")
-        .update({
-          status: "vacation",
-          vacation_at: now,
-          updated_at: now,
-        })
-        .in("id", sessionIds)
-        .eq("user_id", currentUserId)
-        .eq("status", "scheduled");
+      // Async database update (fire and forget)
+      (async () => {
+        const currentUserId = await getUserId();
+        if (!currentUserId) return;
 
-      if (error) {
-        console.error("Error bulk marking as vacation:", error);
-        loadData();
-        return { success: false, updatedCount: 0 };
-      }
+        const { error } = await supabase
+          .from("sessions")
+          .update({
+            status: "vacation",
+            vacation_at: now,
+            updated_at: now,
+          })
+          .in("id", sessionIds)
+          .eq("user_id", currentUserId)
+          .eq("status", "scheduled");
+
+        if (error) {
+          console.error("Error bulk marking as vacation:", error);
+          loadData();
+        }
+      })();
 
       return { success: true, updatedCount };
     },
@@ -1288,17 +1290,14 @@ export const useStudents = () => {
   );
 
   const bulkUpdateSessionTime = useCallback(
-    async (
+    (
       studentIds: string[],
       sessionIds: string[],
       newTime: string,
-    ): Promise<{ success: boolean; updatedCount: number; conflicts: any[] }> => {
-      const currentUserId = await getUserId();
-      if (!currentUserId) return { success: false, updatedCount: 0, conflicts: [] };
-
+    ): { success: boolean; updatedCount: number; conflicts: any[] } => {
       let updatedCount = 0;
 
-      // Optimistic update
+      // Optimistic update (synchronous)
       setStudents((prev) =>
         prev.map((student) => {
           if (!studentIds.includes(student.id)) return student;
@@ -1313,20 +1312,25 @@ export const useStudents = () => {
         }),
       );
 
-      const { error } = await supabase
-        .from("sessions")
-        .update({
-          time: newTime,
-          updated_at: new Date().toISOString(),
-        })
-        .in("id", sessionIds)
-        .eq("user_id", currentUserId);
+      // Async database update (fire and forget)
+      (async () => {
+        const currentUserId = await getUserId();
+        if (!currentUserId) return;
 
-      if (error) {
-        console.error("Error bulk updating session time:", error);
-        loadData();
-        return { success: false, updatedCount: 0, conflicts: [] };
-      }
+        const { error } = await supabase
+          .from("sessions")
+          .update({
+            time: newTime,
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", sessionIds)
+          .eq("user_id", currentUserId);
+
+        if (error) {
+          console.error("Error bulk updating session time:", error);
+          loadData();
+        }
+      })();
 
       return { success: true, updatedCount, conflicts: [] };
     },
