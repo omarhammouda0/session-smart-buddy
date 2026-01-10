@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Student,
   StudentPayments,
@@ -10,14 +11,99 @@ import {
   PaymentMethod,
   PaymentRecord,
   PaymentStatus,
+  ScheduleDay,
 } from "@/types/student";
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from "@/lib/dateUtils";
 
-const STUDENTS_KEY = "teacher-students-v2";
-const PAYMENTS_KEY = "teacher-payments-v2";
-const SETTINGS_KEY = "teacher-settings-v2";
+// ============================================================================
+// TYPES FOR DATABASE ROWS
+// ============================================================================
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+interface DbStudent {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string | null;
+  parent_phone: string | null;
+  session_type: string;
+  session_time: string;
+  session_duration: number | null;
+  custom_price_onsite: number | null;
+  custom_price_online: number | null;
+  use_custom_settings: boolean | null;
+  schedule_days: any; // JSON
+  semester_start: string;
+  semester_end: string;
+  cancellation_monthly_limit: number | null;
+  cancellation_alert_tutor: boolean | null;
+  cancellation_auto_notify_parent: boolean | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbSession {
+  id: string;
+  student_id: string;
+  user_id: string;
+  date: string;
+  time: string | null;
+  duration: number | null;
+  status: string;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  vacation_at: string | null;
+  topic: string | null;
+  notes: string | null;
+  homework: string | null;
+  homework_status: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbMonthlyPayment {
+  id: string;
+  student_id: string;
+  user_id: string;
+  month: number;
+  year: number;
+  is_paid: boolean | null;
+  amount_due: number | null;
+  amount_paid: number | null;
+  payment_status: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbPaymentRecord {
+  id: string;
+  monthly_payment_id: string;
+  student_id: string;
+  user_id: string;
+  amount: number;
+  method: string;
+  paid_at: string;
+  notes: string | null;
+  created_at: string;
+}
+
+interface DbAppSettings {
+  id: string;
+  user_id: string;
+  default_semester_months: number | null;
+  default_semester_start: string | null;
+  default_semester_end: string | null;
+  default_session_duration: number | null;
+  default_price_onsite: number | null;
+  default_price_online: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 const toYmdLocal = (d: Date) => {
   const yyyy = d.getFullYear();
@@ -26,12 +112,125 @@ const toYmdLocal = (d: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-// ✅ Helper function to calculate amount due for a student in a month
+// Convert DB student row to app Student type
+const dbStudentToStudent = (dbStudent: DbStudent, sessions: Session[]): Student => {
+  // Parse schedule_days from JSON
+  let scheduleDays: ScheduleDay[] = [];
+  if (dbStudent.schedule_days) {
+    if (Array.isArray(dbStudent.schedule_days)) {
+      scheduleDays = dbStudent.schedule_days.map((d: any) => ({
+        dayOfWeek: typeof d === "number" ? d : (d.dayOfWeek ?? d.day_of_week ?? 0),
+      }));
+    }
+  }
+
+  return {
+    id: dbStudent.id,
+    name: dbStudent.name,
+    phone: dbStudent.phone || undefined,
+    parentPhone: dbStudent.parent_phone || undefined,
+    sessionType: (dbStudent.session_type as "online" | "onsite") || "onsite",
+    sessionTime: dbStudent.session_time || "16:00",
+    sessionDuration: dbStudent.session_duration || 60,
+    customPriceOnsite: dbStudent.custom_price_onsite || undefined,
+    customPriceOnline: dbStudent.custom_price_online || undefined,
+    useCustomSettings: dbStudent.use_custom_settings || false,
+    scheduleDays,
+    semesterStart: dbStudent.semester_start,
+    semesterEnd: dbStudent.semester_end,
+    sessions,
+    createdAt: dbStudent.created_at,
+    cancellationPolicy: {
+      monthlyLimit: dbStudent.cancellation_monthly_limit ?? 3,
+      alertTutor: dbStudent.cancellation_alert_tutor ?? true,
+      autoNotifyParent: dbStudent.cancellation_auto_notify_parent ?? true,
+    },
+  };
+};
+
+// Convert DB session row to app Session type
+const dbSessionToSession = (dbSession: DbSession): Session => {
+  return {
+    id: dbSession.id,
+    date: dbSession.date,
+    time: dbSession.time || undefined,
+    duration: dbSession.duration || 60,
+    completed: dbSession.status === "completed",
+    status: (dbSession.status as SessionStatus) || "scheduled",
+    completedAt: dbSession.completed_at || undefined,
+    cancelledAt: dbSession.cancelled_at || undefined,
+    vacationAt: dbSession.vacation_at || undefined,
+    topic: dbSession.topic || undefined,
+    notes: dbSession.notes || undefined,
+    homework: dbSession.homework || undefined,
+    homeworkStatus: (dbSession.homework_status as HomeworkStatus) || undefined,
+    history: [], // History is not stored in DB for now
+  };
+};
+
+// Convert DB payment records to app format
+const dbPaymentsToStudentPayments = (
+  studentId: string,
+  monthlyPayments: DbMonthlyPayment[],
+  paymentRecords: DbPaymentRecord[],
+): StudentPayments => {
+  const payments = monthlyPayments.map((mp) => {
+    const records = paymentRecords
+      .filter((pr) => pr.monthly_payment_id === mp.id)
+      .map((pr) => ({
+        id: pr.id,
+        amount: pr.amount,
+        method: pr.method as PaymentMethod,
+        paidAt: pr.paid_at,
+        notes: pr.notes || undefined,
+      }));
+
+    return {
+      month: mp.month,
+      year: mp.year,
+      isPaid: mp.is_paid || false,
+      amountDue: mp.amount_due || 0,
+      amountPaid: mp.amount_paid || 0,
+      paymentStatus: (mp.payment_status as PaymentStatus) || "unpaid",
+      paidAt: mp.paid_at || undefined,
+      notes: mp.notes || undefined,
+      paymentRecords: records,
+    };
+  });
+
+  return { studentId, payments };
+};
+
+// Convert DB settings to app format
+const dbSettingsToAppSettings = (dbSettings: DbAppSettings | null): AppSettings => {
+  const { start, end } = generateDefaultSemester(4);
+
+  if (!dbSettings) {
+    return {
+      defaultSemesterMonths: 4,
+      defaultSemesterStart: start,
+      defaultSemesterEnd: end,
+      defaultSessionDuration: 60,
+      defaultPriceOnsite: 150,
+      defaultPriceOnline: 120,
+    };
+  }
+
+  return {
+    defaultSemesterMonths: dbSettings.default_semester_months || 4,
+    defaultSemesterStart: dbSettings.default_semester_start || start,
+    defaultSemesterEnd: dbSettings.default_semester_end || end,
+    defaultSessionDuration: dbSettings.default_session_duration || 60,
+    defaultPriceOnsite: dbSettings.default_price_onsite || 150,
+    defaultPriceOnline: dbSettings.default_price_online || 120,
+  };
+};
+
+// Calculate amount due for a student in a month
 const calculateMonthlyAmountDue = (student: Student, month: number, year: number, settings?: AppSettings): number => {
   const defaultOnsite = 150;
   const defaultOnline = 120;
 
-  // Get session price
   let sessionPrice: number;
   if (student.useCustomSettings) {
     if (student.sessionType === "online") {
@@ -59,7 +258,6 @@ const calculateMonthlyAmountDue = (student: Student, month: number, year: number
     }
   }
 
-  // Count billable sessions (completed + scheduled, excluding cancelled and vacation)
   const billableSessions = student.sessions.filter((s) => {
     const sessionDate = new Date(s.date);
     return (
@@ -71,6 +269,10 @@ const calculateMonthlyAmountDue = (student: Student, month: number, year: number
 
   return billableSessions.length * sessionPrice;
 };
+
+// ============================================================================
+// MAIN HOOK
+// ============================================================================
 
 export const useStudents = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -87,831 +289,1399 @@ export const useStudents = () => {
     };
   });
   const [isLoaded, setIsLoaded] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Load data from localStorage
-  useEffect(() => {
-    const storedStudents = localStorage.getItem(STUDENTS_KEY);
-    const storedPayments = localStorage.getItem(PAYMENTS_KEY);
-    const storedSettings = localStorage.getItem(SETTINGS_KEY);
-
-    if (storedStudents) setStudents(JSON.parse(storedStudents));
-    if (storedPayments) setPayments(JSON.parse(storedPayments));
-    if (storedSettings) {
-      const parsed = JSON.parse(storedSettings);
-      const onsite = Number(parsed.defaultPriceOnsite);
-      const online = Number(parsed.defaultPriceOnline);
-
-      setSettings({
-        ...parsed,
-        defaultPriceOnsite: Number.isFinite(onsite) && onsite > 0 ? onsite : 150,
-        defaultPriceOnline: Number.isFinite(online) && online > 0 ? online : 120,
-      });
+  // Get current user ID
+  const getUserId = useCallback(async (): Promise<string | null> => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Auth error:", error);
+      return null;
     }
-
-    setIsLoaded(true);
+    return data.user?.id ?? null;
   }, []);
 
-  // Save data to localStorage
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-    }
-  }, [students, isLoaded]);
+  // ============================================================================
+  // LOAD DATA FROM SUPABASE
+  // ============================================================================
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
-    }
-  }, [payments, isLoaded]);
+  const loadData = useCallback(async () => {
+    try {
+      const currentUserId = await getUserId();
+      if (!currentUserId) {
+        console.log("No authenticated user, skipping data load");
+        setStudents([]);
+        setPayments([]);
+        setIsLoaded(true);
+        return;
+      }
+      setUserId(currentUserId);
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    }
-  }, [settings, isLoaded]);
+      // Load students
+      const { data: studentsData, error: studentsError } = await supabase
+        .from("students")
+        .select("*")
+        .eq("user_id", currentUserId)
+        .order("created_at", { ascending: true });
 
-  const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings((prev) => {
-      const next: AppSettings = { ...prev };
-      (Object.keys(newSettings) as (keyof AppSettings)[]).forEach((key) => {
-        const value = newSettings[key];
-        if (value !== undefined) {
-          (next as any)[key] = value;
-        }
+      if (studentsError) {
+        console.error("Error loading students:", studentsError);
+        return;
+      }
+
+      // Load all sessions for this user
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("user_id", currentUserId)
+        .order("date", { ascending: true });
+
+      if (sessionsError) {
+        console.error("Error loading sessions:", sessionsError);
+        return;
+      }
+
+      // Load all monthly payments
+      const { data: monthlyPaymentsData, error: mpError } = await supabase
+        .from("monthly_payments")
+        .select("*")
+        .eq("user_id", currentUserId);
+
+      if (mpError) {
+        console.error("Error loading monthly payments:", mpError);
+      }
+
+      // Load all payment records
+      const { data: paymentRecordsData, error: prError } = await supabase
+        .from("payment_records")
+        .select("*")
+        .eq("user_id", currentUserId);
+
+      if (prError) {
+        console.error("Error loading payment records:", prError);
+      }
+
+      // Load settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from("app_settings")
+        .select("*")
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+
+      if (settingsError) {
+        console.error("Error loading settings:", settingsError);
+      }
+
+      // Group sessions by student
+      const sessionsByStudent = new Map<string, Session[]>();
+      (sessionsData || []).forEach((dbSession: DbSession) => {
+        const session = dbSessionToSession(dbSession);
+        const existing = sessionsByStudent.get(dbSession.student_id) || [];
+        existing.push(session);
+        sessionsByStudent.set(dbSession.student_id, existing);
       });
 
-      const onsite = Number((next as any).defaultPriceOnsite);
-      const online = Number((next as any).defaultPriceOnline);
-      next.defaultPriceOnsite = Number.isFinite(onsite) && onsite > 0 ? onsite : 150;
-      next.defaultPriceOnline = Number.isFinite(online) && online > 0 ? online : 120;
+      // Convert students with their sessions
+      const convertedStudents = (studentsData || []).map((dbStudent: DbStudent) => {
+        const studentSessions = sessionsByStudent.get(dbStudent.id) || [];
+        return dbStudentToStudent(dbStudent, studentSessions);
+      });
 
-      return next;
-    });
-  };
+      // Convert payments
+      const convertedPayments = convertedStudents.map((student) => {
+        const studentMonthlyPayments = (monthlyPaymentsData || []).filter(
+          (mp: DbMonthlyPayment) => mp.student_id === student.id,
+        );
+        const studentPaymentRecords = (paymentRecordsData || []).filter(
+          (pr: DbPaymentRecord) => pr.student_id === student.id,
+        );
+        return dbPaymentsToStudentPayments(student.id, studentMonthlyPayments, studentPaymentRecords);
+      });
 
-  const addStudent = (
-    name: string,
-    scheduleDays: number[],
-    sessionTime: string = "16:00",
-    sessionType: "online" | "onsite" = "onsite",
-    phone?: string,
-    parentPhone?: string,
-    customSemesterStart?: string,
-    customSemesterEnd?: string,
-    sessionDuration?: number,
-  ) => {
-    const semesterStart = customSemesterStart || settings.defaultSemesterStart;
-    const semesterEnd = customSemesterEnd || settings.defaultSemesterEnd;
-    const duration = sessionDuration || settings.defaultSessionDuration || 60;
+      // Convert settings
+      const convertedSettings = dbSettingsToAppSettings(settingsData as DbAppSettings | null);
 
-    const sessionDates = generateSessionsForSchedule(scheduleDays, semesterStart, semesterEnd);
-    const sessions: Session[] = sessionDates.map((date) => ({
-      id: generateId(),
-      date,
-      duration,
-      completed: false,
-      status: "scheduled" as SessionStatus,
-      history: [{ status: "scheduled" as SessionStatus, timestamp: new Date().toISOString() }],
-    }));
+      setStudents(convertedStudents);
+      setPayments(convertedPayments);
+      setSettings(convertedSettings);
+      setIsLoaded(true);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      setIsLoaded(true);
+    }
+  }, [getUserId]);
 
-    const newStudent: Student = {
-      id: generateId(),
-      name,
-      phone,
-      parentPhone,
-      sessionTime,
-      sessionDuration: duration,
-      sessionType,
-      useCustomSettings: false,
-      scheduleDays: scheduleDays.map((d) => ({ dayOfWeek: d })),
-      semesterStart,
-      semesterEnd,
-      sessions,
-      createdAt: new Date().toISOString(),
-      cancellationPolicy: {
-        monthlyLimit: 3,
-        alertTutor: true,
-        autoNotifyParent: true,
-      },
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Set up real-time subscriptions for multi-device sync
+  useEffect(() => {
+    if (!userId) return;
+
+    const studentsChannel = supabase
+      .channel("students-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "students", filter: `user_id=eq.${userId}` }, () =>
+        loadData(),
+      )
+      .subscribe();
+
+    const sessionsChannel = supabase
+      .channel("sessions-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions", filter: `user_id=eq.${userId}` }, () =>
+        loadData(),
+      )
+      .subscribe();
+
+    const paymentsChannel = supabase
+      .channel("payments-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "monthly_payments", filter: `user_id=eq.${userId}` },
+        () => loadData(),
+      )
+      .subscribe();
+
+    const settingsChannel = supabase
+      .channel("settings-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings", filter: `user_id=eq.${userId}` },
+        () => loadData(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(studentsChannel);
+      supabase.removeChannel(sessionsChannel);
+      supabase.removeChannel(paymentsChannel);
+      supabase.removeChannel(settingsChannel);
     };
+  }, [userId, loadData]);
 
-    setStudents((prev) => [...prev, newStudent]);
+  // ============================================================================
+  // SETTINGS OPERATIONS
+  // ============================================================================
 
-    const months = getMonthsInSemester(semesterStart, semesterEnd);
-    const studentPayments: StudentPayments = {
-      studentId: newStudent.id,
-      payments: months.map(({ month, year }) => ({
+  const updateSettings = useCallback(
+    async (newSettings: Partial<AppSettings>) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const updatedSettings = { ...settings, ...newSettings };
+
+      // Validate prices
+      const onsite = Number(updatedSettings.defaultPriceOnsite);
+      const online = Number(updatedSettings.defaultPriceOnline);
+      updatedSettings.defaultPriceOnsite = Number.isFinite(onsite) && onsite > 0 ? onsite : 150;
+      updatedSettings.defaultPriceOnline = Number.isFinite(online) && online > 0 ? online : 120;
+
+      // Optimistic update
+      setSettings(updatedSettings);
+
+      // Upsert to database
+      const { error } = await supabase.from("app_settings").upsert(
+        {
+          user_id: currentUserId,
+          default_semester_months: updatedSettings.defaultSemesterMonths,
+          default_semester_start: updatedSettings.defaultSemesterStart,
+          default_semester_end: updatedSettings.defaultSemesterEnd,
+          default_session_duration: updatedSettings.defaultSessionDuration,
+          default_price_onsite: updatedSettings.defaultPriceOnsite,
+          default_price_online: updatedSettings.defaultPriceOnline,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        },
+      );
+
+      if (error) {
+        console.error("Error updating settings:", error);
+        // Reload to get correct state
+        loadData();
+      }
+    },
+    [getUserId, settings, loadData],
+  );
+
+  // ============================================================================
+  // STUDENT OPERATIONS
+  // ============================================================================
+
+  const addStudent = useCallback(
+    async (
+      name: string,
+      scheduleDays: number[],
+      sessionTime: string = "16:00",
+      sessionType: "online" | "onsite" = "onsite",
+      phone?: string,
+      parentPhone?: string,
+      customSemesterStart?: string,
+      customSemesterEnd?: string,
+      sessionDuration?: number,
+    ) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const semesterStart = customSemesterStart || settings.defaultSemesterStart;
+      const semesterEnd = customSemesterEnd || settings.defaultSemesterEnd;
+      const duration = sessionDuration || settings.defaultSessionDuration || 60;
+
+      // Insert student
+      const { data: studentData, error: studentError } = await supabase
+        .from("students")
+        .insert({
+          user_id: currentUserId,
+          name,
+          phone: phone || null,
+          parent_phone: parentPhone || null,
+          session_type: sessionType,
+          session_time: sessionTime,
+          session_duration: duration,
+          use_custom_settings: false,
+          schedule_days: scheduleDays.map((d) => ({ dayOfWeek: d })),
+          semester_start: semesterStart,
+          semester_end: semesterEnd,
+          cancellation_monthly_limit: 3,
+          cancellation_alert_tutor: true,
+          cancellation_auto_notify_parent: true,
+        })
+        .select()
+        .single();
+
+      if (studentError) {
+        console.error("Error adding student:", studentError);
+        return;
+      }
+
+      // Generate sessions
+      const sessionDates = generateSessionsForSchedule(scheduleDays, semesterStart, semesterEnd);
+      const sessionsToInsert = sessionDates.map((date) => ({
+        student_id: studentData.id,
+        user_id: currentUserId,
+        date,
+        duration,
+        status: "scheduled",
+      }));
+
+      if (sessionsToInsert.length > 0) {
+        const { error: sessionsError } = await supabase.from("sessions").insert(sessionsToInsert);
+
+        if (sessionsError) {
+          console.error("Error adding sessions:", sessionsError);
+        }
+      }
+
+      // Create monthly payment records
+      const months = getMonthsInSemester(semesterStart, semesterEnd);
+      const paymentsToInsert = months.map(({ month, year }) => ({
+        student_id: studentData.id,
+        user_id: currentUserId,
         month,
         year,
-        isPaid: false,
-        amountDue: 0,
-        amountPaid: 0,
-        paymentStatus: "unpaid" as PaymentStatus,
-        paymentRecords: [],
-      })),
-    };
-    setPayments((prev) => [...prev, studentPayments]);
-  };
+        is_paid: false,
+        amount_due: 0,
+        amount_paid: 0,
+        payment_status: "unpaid",
+      }));
 
-  const updateStudentPhone = (studentId: string, phone: string) => {
-    setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, phone } : s)));
-  };
+      if (paymentsToInsert.length > 0) {
+        const { error: paymentsError } = await supabase.from("monthly_payments").insert(paymentsToInsert);
 
-  const updateStudentParentPhone = (studentId: string, parentPhone: string) => {
-    setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, parentPhone } : s)));
-  };
+        if (paymentsError) {
+          console.error("Error adding payments:", paymentsError);
+        }
+      }
 
-  const updateStudentSessionType = (studentId: string, sessionType: "online" | "onsite") => {
-    setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, sessionType } : s)));
-  };
-
-  const updateStudentDuration = (studentId: string, sessionDuration: number) => {
-    setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, sessionDuration } : s)));
-  };
-
-  const updateStudentCustomSettings = (
-    studentId: string,
-    customSettings: {
-      useCustomSettings?: boolean;
-      sessionDuration?: number;
-      customPriceOnsite?: number;
-      customPriceOnline?: number;
+      // Reload data
+      await loadData();
     },
-  ) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        const next = { ...s };
-        if (customSettings.useCustomSettings !== undefined) {
-          next.useCustomSettings = customSettings.useCustomSettings;
-        }
-        if (customSettings.sessionDuration !== undefined) {
-          next.sessionDuration = customSettings.sessionDuration;
-        }
-        if (customSettings.customPriceOnsite !== undefined) {
-          next.customPriceOnsite = customSettings.customPriceOnsite;
-        }
-        if (customSettings.customPriceOnline !== undefined) {
-          next.customPriceOnline = customSettings.customPriceOnline;
-        }
-        return next;
-      }),
-    );
-  };
+    [getUserId, settings, loadData],
+  );
 
-  const updateStudentCancellationPolicy = (studentId: string, policy: CancellationPolicy) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        return { ...s, cancellationPolicy: policy };
-      }),
-    );
-  };
+  const removeStudent = useCallback(
+    async (studentId: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
 
-  const removeStudent = (studentId: string) => {
-    setStudents((prev) => prev.filter((s) => s.id !== studentId));
-    setPayments((prev) => prev.filter((p) => p.studentId !== studentId));
-  };
+      // Optimistic update
+      setStudents((prev) => prev.filter((s) => s.id !== studentId));
+      setPayments((prev) => prev.filter((p) => p.studentId !== studentId));
 
-  const updateStudentName = (studentId: string, name: string) => {
-    setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, name } : s)));
-  };
+      // Delete from database (cascades will handle sessions and payments)
+      const { error } = await supabase.from("students").delete().eq("id", studentId).eq("user_id", currentUserId);
 
-  const updateStudentTime = (studentId: string, sessionTime: string) => {
-    setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, sessionTime } : s)));
-  };
+      if (error) {
+        console.error("Error removing student:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
 
-  const updateStudentSchedule = (
-    studentId: string,
-    scheduleDays: number[],
-    semesterStart?: string,
-    semesterEnd?: string,
-  ) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
+  const updateStudentName = useCallback(
+    async (studentId: string, name: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
 
-        const newStart = semesterStart || s.semesterStart;
-        const newEnd = semesterEnd || s.semesterEnd;
-        const sessionDates = generateSessionsForSchedule(scheduleDays, newStart, newEnd);
+      // Optimistic update
+      setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, name } : s)));
 
-        const newSessions: Session[] = sessionDates.map((date) => {
-          const existing = s.sessions.find((sess) => sess.date === date);
-          if (existing) {
-            return existing;
-          }
+      const { error } = await supabase
+        .from("students")
+        .update({ name, updated_at: new Date().toISOString() })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating student name:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentTime = useCallback(
+    async (studentId: string, sessionTime: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, sessionTime } : s)));
+
+      const { error } = await supabase
+        .from("students")
+        .update({ session_time: sessionTime, updated_at: new Date().toISOString() })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating session time:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentPhone = useCallback(
+    async (studentId: string, phone: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, phone } : s)));
+
+      const { error } = await supabase
+        .from("students")
+        .update({ phone: phone || null, updated_at: new Date().toISOString() })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating phone:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentParentPhone = useCallback(
+    async (studentId: string, parentPhone: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, parentPhone } : s)));
+
+      const { error } = await supabase
+        .from("students")
+        .update({ parent_phone: parentPhone || null, updated_at: new Date().toISOString() })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating parent phone:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentSessionType = useCallback(
+    async (studentId: string, sessionType: "online" | "onsite") => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, sessionType } : s)));
+
+      const { error } = await supabase
+        .from("students")
+        .update({ session_type: sessionType, updated_at: new Date().toISOString() })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating session type:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentDuration = useCallback(
+    async (studentId: string, sessionDuration: number) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, sessionDuration } : s)));
+
+      const { error } = await supabase
+        .from("students")
+        .update({ session_duration: sessionDuration, updated_at: new Date().toISOString() })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating duration:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentCustomSettings = useCallback(
+    async (
+      studentId: string,
+      customSettings: {
+        useCustomSettings?: boolean;
+        sessionDuration?: number;
+        customPriceOnsite?: number;
+        customPriceOnline?: number;
+      },
+    ) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
           return {
-            id: generateId(),
-            date,
-            completed: false,
-            status: "scheduled" as SessionStatus,
-            history: [{ status: "scheduled" as SessionStatus, timestamp: new Date().toISOString() }],
+            ...s,
+            useCustomSettings: customSettings.useCustomSettings ?? s.useCustomSettings,
+            sessionDuration: customSettings.sessionDuration ?? s.sessionDuration,
+            customPriceOnsite: customSettings.customPriceOnsite ?? s.customPriceOnsite,
+            customPriceOnline: customSettings.customPriceOnline ?? s.customPriceOnline,
           };
-        });
+        }),
+      );
 
-        return {
-          ...s,
-          scheduleDays: scheduleDays.map((d) => ({ dayOfWeek: d })),
-          semesterStart: newStart,
-          semesterEnd: newEnd,
-          sessions: newSessions,
-        };
-      }),
-    );
+      const updateData: any = { updated_at: new Date().toISOString() };
+      if (customSettings.useCustomSettings !== undefined) {
+        updateData.use_custom_settings = customSettings.useCustomSettings;
+      }
+      if (customSettings.sessionDuration !== undefined) {
+        updateData.session_duration = customSettings.sessionDuration;
+      }
+      if (customSettings.customPriceOnsite !== undefined) {
+        updateData.custom_price_onsite = customSettings.customPriceOnsite;
+      }
+      if (customSettings.customPriceOnline !== undefined) {
+        updateData.custom_price_online = customSettings.customPriceOnline;
+      }
 
-    if (semesterStart || semesterEnd) {
+      const { error } = await supabase
+        .from("students")
+        .update(updateData)
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating custom settings:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentCancellationPolicy = useCallback(
+    async (studentId: string, policy: CancellationPolicy) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, cancellationPolicy: policy } : s)));
+
+      const { error } = await supabase
+        .from("students")
+        .update({
+          cancellation_monthly_limit: policy.monthlyLimit,
+          cancellation_alert_tutor: policy.alertTutor,
+          cancellation_auto_notify_parent: policy.autoNotifyParent,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating cancellation policy:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateStudentSchedule = useCallback(
+    async (studentId: string, scheduleDays: number[], semesterStart?: string, semesterEnd?: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
       const student = students.find((s) => s.id === studentId);
-      if (student) {
-        const newStart = semesterStart || student.semesterStart;
-        const newEnd = semesterEnd || student.semesterEnd;
+      if (!student) return;
+
+      const newStart = semesterStart || student.semesterStart;
+      const newEnd = semesterEnd || student.semesterEnd;
+      const sessionDates = generateSessionsForSchedule(scheduleDays, newStart, newEnd);
+
+      // Get existing sessions
+      const { data: existingSessions } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("student_id", studentId)
+        .eq("user_id", currentUserId);
+
+      const existingDates = new Map((existingSessions || []).map((s: any) => [s.date, s]));
+
+      // Sessions to add (new dates)
+      const sessionsToAdd = sessionDates
+        .filter((date) => !existingDates.has(date))
+        .map((date) => ({
+          student_id: studentId,
+          user_id: currentUserId,
+          date,
+          duration: student.sessionDuration || 60,
+          status: "scheduled",
+        }));
+
+      // Update student record
+      const { error: updateError } = await supabase
+        .from("students")
+        .update({
+          schedule_days: scheduleDays.map((d) => ({ dayOfWeek: d })),
+          semester_start: newStart,
+          semester_end: newEnd,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", studentId)
+        .eq("user_id", currentUserId);
+
+      if (updateError) {
+        console.error("Error updating schedule:", updateError);
+      }
+
+      // Add new sessions
+      if (sessionsToAdd.length > 0) {
+        const { error: insertError } = await supabase.from("sessions").insert(sessionsToAdd);
+
+        if (insertError) {
+          console.error("Error adding new sessions:", insertError);
+        }
+      }
+
+      // Update payment months if semester changed
+      if (semesterStart || semesterEnd) {
         const months = getMonthsInSemester(newStart, newEnd);
 
-        setPayments((prev) =>
-          prev.map((p) => {
-            if (p.studentId !== studentId) return p;
-            const existingPayments = new Map(p.payments.map((pay) => [`${pay.year}-${pay.month}`, pay]));
+        // Get existing payments
+        const { data: existingPayments } = await supabase
+          .from("monthly_payments")
+          .select("*")
+          .eq("student_id", studentId)
+          .eq("user_id", currentUserId);
 
-            return {
-              ...p,
-              payments: months.map(({ month, year }) => {
-                const existing = existingPayments.get(`${year}-${month}`);
-                return (
-                  existing || {
-                    month,
-                    year,
-                    isPaid: false,
-                    amountDue: 0,
-                    amountPaid: 0,
-                    paymentStatus: "unpaid" as PaymentStatus,
-                    paymentRecords: [],
-                  }
-                );
-              }),
-            };
-          }),
-        );
-      }
-    }
-  };
+        const existingPaymentKeys = new Set((existingPayments || []).map((p: any) => `${p.year}-${p.month}`));
 
-  const addExtraSession = (studentId: string, date: string, customTime?: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
+        // Add missing payment months
+        const paymentsToAdd = months
+          .filter(({ month, year }) => !existingPaymentKeys.has(`${year}-${month}`))
+          .map(({ month, year }) => ({
+            student_id: studentId,
+            user_id: currentUserId,
+            month,
+            year,
+            is_paid: false,
+            amount_due: 0,
+            amount_paid: 0,
+            payment_status: "unpaid",
+          }));
 
-        const now = new Date().toISOString();
-        const today = toYmdLocal(new Date());
-        const isPastDate = date < today;
-
-        const newSession: Session = {
-          id: generateId(),
-          date,
-          time: customTime,
-          duration: s.sessionDuration,
-          completed: isPastDate,
-          status: isPastDate ? ("completed" as SessionStatus) : ("scheduled" as SessionStatus),
-          completedAt: isPastDate ? now : undefined,
-          history: [
-            {
-              status: isPastDate ? ("completed" as SessionStatus) : ("scheduled" as SessionStatus),
-              timestamp: now,
-              note: isPastDate ? "Added as past session" : undefined,
-            },
-          ],
-        };
-
-        const newSessions = [...s.sessions, newSession].sort((a, b) => a.date.localeCompare(b.date));
-        return { ...s, sessions: newSessions };
-      }),
-    );
-  };
-
-  const removeSession = (studentId: string, sessionId: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        return {
-          ...s,
-          sessions: s.sessions.map((sess) => {
-            if (sess.id !== sessionId) return sess;
-            const now = new Date().toISOString();
-            return {
-              ...sess,
-              status: "cancelled" as SessionStatus,
-              cancelledAt: now,
-              history: [...(sess.history || []), { status: "cancelled" as SessionStatus, timestamp: now }],
-            };
-          }),
-        };
-      }),
-    );
-  };
-
-  const deleteSession = (studentId: string, sessionId: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        return {
-          ...s,
-          sessions: s.sessions.filter((sess) => sess.id !== sessionId),
-        };
-      }),
-    );
-  };
-
-  const restoreSession = (studentId: string, sessionId: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        return {
-          ...s,
-          sessions: s.sessions.map((sess) => {
-            if (sess.id !== sessionId) return sess;
-            const now = new Date().toISOString();
-            const previousStatus = sess.status;
-            return {
-              ...sess,
-              status: "scheduled" as SessionStatus,
-              completed: false,
-              cancelledAt: undefined,
-              vacationAt: undefined,
-              history: [
-                ...(sess.history || []),
-                { status: "scheduled" as SessionStatus, timestamp: now, note: `Restored from ${previousStatus}` },
-              ],
-            };
-          }),
-        };
-      }),
-    );
-  };
-
-  const markSessionAsVacation = (studentId: string, sessionId: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        return {
-          ...s,
-          sessions: s.sessions.map((sess) => {
-            if (sess.id !== sessionId) return sess;
-            if (sess.status !== "scheduled") return sess;
-            const now = new Date().toISOString();
-            return {
-              ...sess,
-              status: "vacation" as SessionStatus,
-              completed: false,
-              vacationAt: now,
-              history: [...(sess.history || []), { status: "vacation" as SessionStatus, timestamp: now }],
-            };
-          }),
-        };
-      }),
-    );
-  };
-
-  const bulkMarkAsVacation = (
-    studentIds: string[],
-    sessionIds: string[],
-  ): { success: boolean; updatedCount: number } => {
-    let updatedCount = 0;
-    const now = new Date().toISOString();
-
-    setStudents((prev) =>
-      prev.map((student) => {
-        if (!studentIds.includes(student.id)) return student;
-
-        const updatedSessions = student.sessions.map((session) => {
-          if (!sessionIds.includes(session.id)) return session;
-          if (session.status !== "scheduled") return session;
-          updatedCount++;
-          return {
-            ...session,
-            status: "vacation" as SessionStatus,
-            completed: false,
-            vacationAt: now,
-            history: [
-              ...(session.history || []),
-              { status: "vacation" as SessionStatus, timestamp: now, note: "Bulk vacation" },
-            ],
-          };
-        });
-
-        return {
-          ...student,
-          sessions: updatedSessions,
-        };
-      }),
-    );
-
-    return { success: true, updatedCount };
-  };
-
-  const rescheduleSession = (studentId: string, sessionId: string, newDate: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-
-        const existingSession = s.sessions.find((sess) => sess.date === newDate);
-        if (existingSession) return s;
-
-        const now = new Date().toISOString();
-        const updatedSessions = s.sessions.map((sess) => {
-          if (sess.id !== sessionId) return sess;
-          return {
-            ...sess,
-            date: newDate,
-            history: [
-              ...(sess.history || []),
-              {
-                status: "scheduled" as SessionStatus,
-                timestamp: now,
-                note: `Rescheduled from ${sess.date}`,
-              },
-            ],
-          };
-        });
-
-        return {
-          ...s,
-          sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)),
-        };
-      }),
-    );
-  };
-
-  const updateSessionDateTime = (studentId: string, sessionId: string, newDate: string, newTime: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-
-        const now = new Date().toISOString();
-        const updatedSessions = s.sessions.map((sess) => {
-          if (sess.id !== sessionId) return sess;
-          const oldDate = sess.date;
-          const oldTime = sess.time || s.sessionTime || "16:00";
-          return {
-            ...sess,
-            date: newDate,
-            time: newTime,
-            history: [
-              ...(sess.history || []),
-              {
-                status: sess.status as SessionStatus,
-                timestamp: now,
-                note: `Moved from ${oldDate} ${oldTime} to ${newDate} ${newTime}`,
-              },
-            ],
-          };
-        });
-
-        return {
-          ...s,
-          sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)),
-        };
-      }),
-    );
-  };
-
-  const toggleSessionComplete = (studentId: string, sessionId: string) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        return {
-          ...s,
-          sessions: s.sessions.map((sess) => {
-            if (sess.id !== sessionId) return sess;
-            const now = new Date().toISOString();
-            const newCompleted = !sess.completed;
-            const newStatus: SessionStatus = newCompleted ? "completed" : "scheduled";
-            return {
-              ...sess,
-              completed: newCompleted,
-              status: newStatus,
-              completedAt: newCompleted ? now : undefined,
-              history: [...(sess.history || []), { status: newStatus, timestamp: now }],
-            };
-          }),
-        };
-      }),
-    );
-  };
-
-  const bulkUpdateSessionTime = (
-    studentIds: string[],
-    sessionIds: string[],
-    newTime: string,
-  ): { success: boolean; updatedCount: number; conflicts: any[] } => {
-    let updatedCount = 0;
-
-    setStudents((prev) =>
-      prev.map((student) => {
-        if (!studentIds.includes(student.id)) return student;
-
-        const updatedSessions = student.sessions.map((session) => {
-          if (!sessionIds.includes(session.id)) return session;
-          updatedCount++;
-          return {
-            ...session,
-            time: newTime,
-          };
-        });
-
-        return {
-          ...student,
-          sessions: updatedSessions,
-        };
-      }),
-    );
-
-    return { success: true, updatedCount, conflicts: [] };
-  };
-
-  const updateSessionDetails = (
-    studentId: string,
-    sessionId: string,
-    details: {
-      topic?: string;
-      notes?: string;
-      homework?: string;
-      homeworkStatus?: HomeworkStatus;
-    },
-  ) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== studentId) return s;
-        return {
-          ...s,
-          sessions: s.sessions.map((sess) => {
-            if (sess.id !== sessionId) return sess;
-            return {
-              ...sess,
-              topic: details.topic !== undefined ? details.topic : sess.topic,
-              notes: details.notes !== undefined ? details.notes : sess.notes,
-              homework: details.homework !== undefined ? details.homework : sess.homework,
-              homeworkStatus: details.homeworkStatus !== undefined ? details.homeworkStatus : sess.homeworkStatus,
-            };
-          }),
-        };
-      }),
-    );
-  };
-
-  // ✅ FIXED: Toggle payment status (for full payment toggle)
-  const togglePaymentStatus = (studentId: string, month: number, year: number) => {
-    setPayments((prev) =>
-      prev.map((p) => {
-        if (p.studentId !== studentId) return p;
-        return {
-          ...p,
-          payments: p.payments.map((pay) => {
-            if (pay.month !== month || pay.year !== year) return pay;
-
-            const wasFullyPaid = pay.isPaid;
-
-            if (wasFullyPaid) {
-              // Unpaying: reset everything
-              return {
-                ...pay,
-                isPaid: false,
-                amountPaid: 0,
-                paymentStatus: "unpaid" as PaymentStatus,
-                paidAt: undefined,
-                method: undefined,
-                notes: undefined,
-                paymentRecords: [],
-              };
-            } else {
-              // This is a simple toggle to "paid" - should use recordPayment instead
-              // Keep for backwards compatibility but prefer recordPayment
-              return {
-                ...pay,
-                isPaid: true,
-                paidAt: new Date().toISOString(),
-              };
-            }
-          }),
-        };
-      }),
-    );
-  };
-
-  // ✅ FIXED: Record payment - ACCUMULATES instead of overwrites
-  const recordPayment = (
-    studentId: string,
-    paymentData: {
-      month: number;
-      year: number;
-      amount: number;
-      method: PaymentMethod;
-      paidAt: string;
-      notes?: string;
-    },
-  ) => {
-    // First, get the student to calculate amountDue
-    const student = students.find((s) => s.id === studentId);
-    if (!student) {
-      console.error("Student not found:", studentId);
-      return;
-    }
-
-    const amountDue = calculateMonthlyAmountDue(student, paymentData.month, paymentData.year, settings);
-
-    setPayments((prev) => {
-      const studentPaymentIndex = prev.findIndex((p) => p.studentId === studentId);
-
-      // If no payment record exists for this student, create one
-      if (studentPaymentIndex === -1) {
-        const newPaymentRecord: PaymentRecord = {
-          id: generateId(),
-          amount: paymentData.amount,
-          method: paymentData.method,
-          paidAt: paymentData.paidAt,
-          notes: paymentData.notes,
-        };
-
-        const newAmountPaid = paymentData.amount;
-        const newPaymentStatus: PaymentStatus =
-          newAmountPaid >= amountDue ? "paid" : newAmountPaid > 0 ? "partial" : "unpaid";
-
-        return [
-          ...prev,
-          {
-            studentId,
-            payments: [
-              {
-                month: paymentData.month,
-                year: paymentData.year,
-                isPaid: newPaymentStatus === "paid",
-                amountDue,
-                amountPaid: newAmountPaid,
-                paymentStatus: newPaymentStatus,
-                paidAt: paymentData.paidAt,
-                method: paymentData.method,
-                notes: paymentData.notes,
-                paymentRecords: [newPaymentRecord],
-              },
-            ],
-          },
-        ];
-      }
-
-      // Update existing student payments
-      return prev.map((studentPayments, index) => {
-        if (index !== studentPaymentIndex) return studentPayments;
-
-        const paymentIndex = studentPayments.payments.findIndex(
-          (p) => p.month === paymentData.month && p.year === paymentData.year,
-        );
-
-        const newPaymentRecord: PaymentRecord = {
-          id: generateId(),
-          amount: paymentData.amount,
-          method: paymentData.method,
-          paidAt: paymentData.paidAt,
-          notes: paymentData.notes,
-        };
-
-        // If no payment for this month exists, create one
-        if (paymentIndex === -1) {
-          const newAmountPaid = paymentData.amount;
-          const newPaymentStatus: PaymentStatus =
-            newAmountPaid >= amountDue ? "paid" : newAmountPaid > 0 ? "partial" : "unpaid";
-
-          return {
-            ...studentPayments,
-            payments: [
-              ...studentPayments.payments,
-              {
-                month: paymentData.month,
-                year: paymentData.year,
-                isPaid: newPaymentStatus === "paid",
-                amountDue,
-                amountPaid: newAmountPaid,
-                paymentStatus: newPaymentStatus,
-                paidAt: paymentData.paidAt,
-                method: paymentData.method,
-                notes: paymentData.notes,
-                paymentRecords: [newPaymentRecord],
-              },
-            ],
-          };
+        if (paymentsToAdd.length > 0) {
+          await supabase.from("monthly_payments").insert(paymentsToAdd);
         }
+      }
 
-        // ✅ KEY FIX: ACCUMULATE the payment instead of overwriting
-        return {
-          ...studentPayments,
-          payments: studentPayments.payments.map((pay, idx) => {
-            if (idx !== paymentIndex) return pay;
+      await loadData();
+    },
+    [getUserId, students, loadData],
+  );
 
-            // Calculate new total by ADDING to existing amount
-            const existingAmountPaid = pay.amountPaid || 0;
-            const newTotalAmountPaid = existingAmountPaid + paymentData.amount;
+  // ============================================================================
+  // SESSION OPERATIONS
+  // ============================================================================
 
-            // Determine new status based on accumulated amount
-            const newPaymentStatus: PaymentStatus =
-              newTotalAmountPaid >= amountDue ? "paid" : newTotalAmountPaid > 0 ? "partial" : "unpaid";
+  const addExtraSession = useCallback(
+    async (studentId: string, date: string, customTime?: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
 
-            // Append to existing payment records (don't replace)
-            const existingRecords = pay.paymentRecords || [];
+      const student = students.find((s) => s.id === studentId);
+      if (!student) return;
 
-            return {
-              ...pay,
-              amountDue,
-              amountPaid: newTotalAmountPaid,
-              isPaid: newPaymentStatus === "paid",
-              paymentStatus: newPaymentStatus,
-              paidAt: paymentData.paidAt, // Update to latest payment date
-              method: paymentData.method, // Update to latest method
-              notes: paymentData.notes || pay.notes, // Keep existing notes if no new ones
-              // ✅ APPEND new record to existing records
-              paymentRecords: [...existingRecords, newPaymentRecord],
-            };
-          }),
-        };
+      const now = new Date().toISOString();
+      const today = toYmdLocal(new Date());
+      const isPastDate = date < today;
+
+      const { error } = await supabase.from("sessions").insert({
+        student_id: studentId,
+        user_id: currentUserId,
+        date,
+        time: customTime || null,
+        duration: student.sessionDuration || 60,
+        status: isPastDate ? "completed" : "scheduled",
+        completed_at: isPastDate ? now : null,
       });
-    });
-  };
 
-  // ✅ Keep addPartialPayment for backwards compatibility (calls recordPayment internally)
-  const addPartialPayment = (
-    studentId: string,
-    month: number,
-    year: number,
-    amount: number,
-    method: PaymentMethod,
-    notes?: string,
-  ) => {
-    recordPayment(studentId, {
-      month,
-      year,
-      amount,
-      method,
-      paidAt: new Date().toISOString(),
-      notes,
-    });
-  };
+      if (error) {
+        console.error("Error adding extra session:", error);
+      } else {
+        await loadData();
+      }
+    },
+    [getUserId, students, loadData],
+  );
 
-  // ✅ NEW: Reset payment for a month (clear all partial payments)
-  const resetMonthlyPayment = (studentId: string, month: number, year: number) => {
-    setPayments((prev) =>
-      prev.map((p) => {
-        if (p.studentId !== studentId) return p;
-        return {
-          ...p,
-          payments: p.payments.map((pay) => {
-            if (pay.month !== month || pay.year !== year) return pay;
-            return {
-              ...pay,
-              isPaid: false,
-              amountPaid: 0,
-              paymentStatus: "unpaid" as PaymentStatus,
-              paidAt: undefined,
-              method: undefined,
-              notes: undefined,
-              paymentRecords: [],
-            };
-          }),
-        };
-      }),
-    );
-  };
+  const removeSession = useCallback(
+    async (studentId: string, sessionId: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
 
-  // ✅ Update monthly amount due (called when calculating from sessions)
-  const updateMonthlyAmountDue = (studentId: string, month: number, year: number, amountDue: number) => {
-    setPayments((prev) =>
-      prev.map((p) => {
-        if (p.studentId !== studentId) return p;
-        return {
-          ...p,
-          payments: p.payments.map((pay) => {
-            if (pay.month !== month || pay.year !== year) return pay;
+      const now = new Date().toISOString();
 
-            const currentAmountPaid = pay.amountPaid || 0;
-            const newStatus: PaymentStatus =
-              currentAmountPaid >= amountDue && amountDue > 0 ? "paid" : currentAmountPaid > 0 ? "partial" : "unpaid";
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          return {
+            ...s,
+            sessions: s.sessions.map((sess) =>
+              sess.id === sessionId ? { ...sess, status: "cancelled" as SessionStatus, cancelledAt: now } : sess,
+            ),
+          };
+        }),
+      );
 
-            return {
-              ...pay,
-              amountDue,
-              paymentStatus: newStatus,
-              isPaid: newStatus === "paid",
-            };
-          }),
-        };
-      }),
-    );
-  };
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          status: "cancelled",
+          cancelled_at: now,
+          updated_at: now,
+        })
+        .eq("id", sessionId)
+        .eq("user_id", currentUserId);
 
-  const getStudentPayments = (studentId: string): StudentPayments | undefined => {
-    return payments.find((p) => p.studentId === studentId);
-  };
+      if (error) {
+        console.error("Error removing session:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
 
-  const isStudentPaidForMonth = (studentId: string, month: number, year: number): boolean => {
-    const studentPayments = getStudentPayments(studentId);
-    if (!studentPayments) return false;
-    const payment = studentPayments.payments.find((p) => p.month === month && p.year === year);
-    return payment?.isPaid || false;
-  };
+  const deleteSession = useCallback(
+    async (studentId: string, sessionId: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          return {
+            ...s,
+            sessions: s.sessions.filter((sess) => sess.id !== sessionId),
+          };
+        }),
+      );
+
+      const { error } = await supabase.from("sessions").delete().eq("id", sessionId).eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error deleting session:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const restoreSession = useCallback(
+    async (studentId: string, sessionId: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const now = new Date().toISOString();
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          return {
+            ...s,
+            sessions: s.sessions.map((sess) =>
+              sess.id === sessionId
+                ? {
+                    ...sess,
+                    status: "scheduled" as SessionStatus,
+                    completed: false,
+                    cancelledAt: undefined,
+                    vacationAt: undefined,
+                  }
+                : sess,
+            ),
+          };
+        }),
+      );
+
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          status: "scheduled",
+          completed_at: null,
+          cancelled_at: null,
+          vacation_at: null,
+          updated_at: now,
+        })
+        .eq("id", sessionId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error restoring session:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const markSessionAsVacation = useCallback(
+    async (studentId: string, sessionId: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const now = new Date().toISOString();
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          return {
+            ...s,
+            sessions: s.sessions.map((sess) =>
+              sess.id === sessionId && sess.status === "scheduled"
+                ? { ...sess, status: "vacation" as SessionStatus, completed: false, vacationAt: now }
+                : sess,
+            ),
+          };
+        }),
+      );
+
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          status: "vacation",
+          vacation_at: now,
+          updated_at: now,
+        })
+        .eq("id", sessionId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error marking as vacation:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const bulkMarkAsVacation = useCallback(
+    async (studentIds: string[], sessionIds: string[]): Promise<{ success: boolean; updatedCount: number }> => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return { success: false, updatedCount: 0 };
+
+      const now = new Date().toISOString();
+      let updatedCount = 0;
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((student) => {
+          if (!studentIds.includes(student.id)) return student;
+          return {
+            ...student,
+            sessions: student.sessions.map((session) => {
+              if (!sessionIds.includes(session.id) || session.status !== "scheduled") {
+                return session;
+              }
+              updatedCount++;
+              return {
+                ...session,
+                status: "vacation" as SessionStatus,
+                completed: false,
+                vacationAt: now,
+              };
+            }),
+          };
+        }),
+      );
+
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          status: "vacation",
+          vacation_at: now,
+          updated_at: now,
+        })
+        .in("id", sessionIds)
+        .eq("user_id", currentUserId)
+        .eq("status", "scheduled");
+
+      if (error) {
+        console.error("Error bulk marking as vacation:", error);
+        loadData();
+        return { success: false, updatedCount: 0 };
+      }
+
+      return { success: true, updatedCount };
+    },
+    [getUserId, loadData],
+  );
+
+  const rescheduleSession = useCallback(
+    async (studentId: string, sessionId: string, newDate: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const now = new Date().toISOString();
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          const updatedSessions = s.sessions.map((sess) => (sess.id === sessionId ? { ...sess, date: newDate } : sess));
+          return {
+            ...s,
+            sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)),
+          };
+        }),
+      );
+
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          date: newDate,
+          updated_at: now,
+        })
+        .eq("id", sessionId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error rescheduling session:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const updateSessionDateTime = useCallback(
+    async (studentId: string, sessionId: string, newDate: string, newTime: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const now = new Date().toISOString();
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          const updatedSessions = s.sessions.map((sess) =>
+            sess.id === sessionId ? { ...sess, date: newDate, time: newTime } : sess,
+          );
+          return {
+            ...s,
+            sessions: updatedSessions.sort((a, b) => a.date.localeCompare(b.date)),
+          };
+        }),
+      );
+
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          date: newDate,
+          time: newTime,
+          updated_at: now,
+        })
+        .eq("id", sessionId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating session date/time:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  const toggleSessionComplete = useCallback(
+    async (studentId: string, sessionId: string) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const student = students.find((s) => s.id === studentId);
+      const session = student?.sessions.find((sess) => sess.id === sessionId);
+      if (!session) return;
+
+      const now = new Date().toISOString();
+      const newCompleted = !session.completed;
+      const newStatus: SessionStatus = newCompleted ? "completed" : "scheduled";
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          return {
+            ...s,
+            sessions: s.sessions.map((sess) =>
+              sess.id === sessionId
+                ? {
+                    ...sess,
+                    completed: newCompleted,
+                    status: newStatus,
+                    completedAt: newCompleted ? now : undefined,
+                  }
+                : sess,
+            ),
+          };
+        }),
+      );
+
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          status: newStatus,
+          completed_at: newCompleted ? now : null,
+          updated_at: now,
+        })
+        .eq("id", sessionId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error toggling session complete:", error);
+        loadData();
+      }
+    },
+    [getUserId, students, loadData],
+  );
+
+  const bulkUpdateSessionTime = useCallback(
+    async (
+      studentIds: string[],
+      sessionIds: string[],
+      newTime: string,
+    ): Promise<{ success: boolean; updatedCount: number; conflicts: any[] }> => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return { success: false, updatedCount: 0, conflicts: [] };
+
+      let updatedCount = 0;
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((student) => {
+          if (!studentIds.includes(student.id)) return student;
+          return {
+            ...student,
+            sessions: student.sessions.map((session) => {
+              if (!sessionIds.includes(session.id)) return session;
+              updatedCount++;
+              return { ...session, time: newTime };
+            }),
+          };
+        }),
+      );
+
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          time: newTime,
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", sessionIds)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error bulk updating session time:", error);
+        loadData();
+        return { success: false, updatedCount: 0, conflicts: [] };
+      }
+
+      return { success: true, updatedCount, conflicts: [] };
+    },
+    [getUserId, loadData],
+  );
+
+  const updateSessionDetails = useCallback(
+    async (
+      studentId: string,
+      sessionId: string,
+      details: {
+        topic?: string;
+        notes?: string;
+        homework?: string;
+        homeworkStatus?: HomeworkStatus;
+      },
+    ) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== studentId) return s;
+          return {
+            ...s,
+            sessions: s.sessions.map((sess) => {
+              if (sess.id !== sessionId) return sess;
+              return {
+                ...sess,
+                topic: details.topic !== undefined ? details.topic : sess.topic,
+                notes: details.notes !== undefined ? details.notes : sess.notes,
+                homework: details.homework !== undefined ? details.homework : sess.homework,
+                homeworkStatus: details.homeworkStatus !== undefined ? details.homeworkStatus : sess.homeworkStatus,
+              };
+            }),
+          };
+        }),
+      );
+
+      const updateData: any = { updated_at: new Date().toISOString() };
+      if (details.topic !== undefined) updateData.topic = details.topic || null;
+      if (details.notes !== undefined) updateData.notes = details.notes || null;
+      if (details.homework !== undefined) updateData.homework = details.homework || null;
+      if (details.homeworkStatus !== undefined) updateData.homework_status = details.homeworkStatus || null;
+
+      const { error } = await supabase
+        .from("sessions")
+        .update(updateData)
+        .eq("id", sessionId)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error updating session details:", error);
+        loadData();
+      }
+    },
+    [getUserId, loadData],
+  );
+
+  // ============================================================================
+  // PAYMENT OPERATIONS
+  // ============================================================================
+
+  const togglePaymentStatus = useCallback(
+    async (studentId: string, month: number, year: number) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const studentPayments = payments.find((p) => p.studentId === studentId);
+      const monthPayment = studentPayments?.payments.find((p) => p.month === month && p.year === year);
+      const wasFullyPaid = monthPayment?.isPaid || false;
+
+      if (wasFullyPaid) {
+        // Reset payment
+        // First get the monthly_payment record
+        const { data: mpData } = await supabase
+          .from("monthly_payments")
+          .select("id")
+          .eq("student_id", studentId)
+          .eq("user_id", currentUserId)
+          .eq("month", month)
+          .eq("year", year)
+          .single();
+
+        if (mpData) {
+          // Delete all payment records for this month
+          await supabase
+            .from("payment_records")
+            .delete()
+            .eq("monthly_payment_id", mpData.id)
+            .eq("user_id", currentUserId);
+
+          // Reset monthly payment
+          await supabase
+            .from("monthly_payments")
+            .update({
+              is_paid: false,
+              amount_paid: 0,
+              payment_status: "unpaid",
+              paid_at: null,
+              notes: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", mpData.id)
+            .eq("user_id", currentUserId);
+        }
+      } else {
+        // Mark as paid (simple toggle - prefer recordPayment for actual payments)
+        await supabase
+          .from("monthly_payments")
+          .update({
+            is_paid: true,
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("student_id", studentId)
+          .eq("user_id", currentUserId)
+          .eq("month", month)
+          .eq("year", year);
+      }
+
+      await loadData();
+    },
+    [getUserId, payments, loadData],
+  );
+
+  const recordPayment = useCallback(
+    async (
+      studentId: string,
+      paymentData: {
+        month: number;
+        year: number;
+        amount: number;
+        method: PaymentMethod;
+        paidAt: string;
+        notes?: string;
+      },
+    ) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      const student = students.find((s) => s.id === studentId);
+      if (!student) {
+        console.error("Student not found:", studentId);
+        return;
+      }
+
+      const amountDue = calculateMonthlyAmountDue(student, paymentData.month, paymentData.year, settings);
+
+      // Get or create monthly payment record
+      let { data: mpData } = await supabase
+        .from("monthly_payments")
+        .select("*")
+        .eq("student_id", studentId)
+        .eq("user_id", currentUserId)
+        .eq("month", paymentData.month)
+        .eq("year", paymentData.year)
+        .maybeSingle();
+
+      if (!mpData) {
+        // Create monthly payment record
+        const { data: newMp, error: createError } = await supabase
+          .from("monthly_payments")
+          .insert({
+            student_id: studentId,
+            user_id: currentUserId,
+            month: paymentData.month,
+            year: paymentData.year,
+            is_paid: false,
+            amount_due: amountDue,
+            amount_paid: 0,
+            payment_status: "unpaid",
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error("Error creating monthly payment:", createError);
+          return;
+        }
+        mpData = newMp;
+      }
+
+      // Insert payment record
+      const { error: prError } = await supabase.from("payment_records").insert({
+        monthly_payment_id: mpData.id,
+        student_id: studentId,
+        user_id: currentUserId,
+        amount: paymentData.amount,
+        method: paymentData.method,
+        paid_at: paymentData.paidAt,
+        notes: paymentData.notes || null,
+      });
+
+      if (prError) {
+        console.error("Error inserting payment record:", prError);
+        return;
+      }
+
+      // Calculate new totals
+      const existingAmountPaid = mpData.amount_paid || 0;
+      const newTotalAmountPaid = existingAmountPaid + paymentData.amount;
+      const newPaymentStatus: PaymentStatus =
+        newTotalAmountPaid >= amountDue ? "paid" : newTotalAmountPaid > 0 ? "partial" : "unpaid";
+
+      // Update monthly payment
+      const { error: updateError } = await supabase
+        .from("monthly_payments")
+        .update({
+          amount_due: amountDue,
+          amount_paid: newTotalAmountPaid,
+          is_paid: newPaymentStatus === "paid",
+          payment_status: newPaymentStatus,
+          paid_at: paymentData.paidAt,
+          notes: paymentData.notes || mpData.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", mpData.id)
+        .eq("user_id", currentUserId);
+
+      if (updateError) {
+        console.error("Error updating monthly payment:", updateError);
+      }
+
+      await loadData();
+    },
+    [getUserId, students, settings, loadData],
+  );
+
+  const addPartialPayment = useCallback(
+    (studentId: string, month: number, year: number, amount: number, method: PaymentMethod, notes?: string) => {
+      recordPayment(studentId, {
+        month,
+        year,
+        amount,
+        method,
+        paidAt: new Date().toISOString(),
+        notes,
+      });
+    },
+    [recordPayment],
+  );
+
+  const resetMonthlyPayment = useCallback(
+    async (studentId: string, month: number, year: number) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      // Get monthly payment record
+      const { data: mpData } = await supabase
+        .from("monthly_payments")
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("user_id", currentUserId)
+        .eq("month", month)
+        .eq("year", year)
+        .single();
+
+      if (mpData) {
+        // Delete all payment records
+        await supabase
+          .from("payment_records")
+          .delete()
+          .eq("monthly_payment_id", mpData.id)
+          .eq("user_id", currentUserId);
+
+        // Reset monthly payment
+        await supabase
+          .from("monthly_payments")
+          .update({
+            is_paid: false,
+            amount_paid: 0,
+            payment_status: "unpaid",
+            paid_at: null,
+            notes: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", mpData.id)
+          .eq("user_id", currentUserId);
+      }
+
+      await loadData();
+    },
+    [getUserId, loadData],
+  );
+
+  const updateMonthlyAmountDue = useCallback(
+    async (studentId: string, month: number, year: number, amountDue: number) => {
+      const currentUserId = await getUserId();
+      if (!currentUserId) return;
+
+      // Get current payment
+      const { data: mpData } = await supabase
+        .from("monthly_payments")
+        .select("*")
+        .eq("student_id", studentId)
+        .eq("user_id", currentUserId)
+        .eq("month", month)
+        .eq("year", year)
+        .maybeSingle();
+
+      const currentAmountPaid = mpData?.amount_paid || 0;
+      const newStatus: PaymentStatus =
+        currentAmountPaid >= amountDue && amountDue > 0 ? "paid" : currentAmountPaid > 0 ? "partial" : "unpaid";
+
+      if (mpData) {
+        await supabase
+          .from("monthly_payments")
+          .update({
+            amount_due: amountDue,
+            payment_status: newStatus,
+            is_paid: newStatus === "paid",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", mpData.id)
+          .eq("user_id", currentUserId);
+      } else {
+        await supabase.from("monthly_payments").insert({
+          student_id: studentId,
+          user_id: currentUserId,
+          month,
+          year,
+          amount_due: amountDue,
+          amount_paid: 0,
+          is_paid: false,
+          payment_status: "unpaid",
+        });
+      }
+
+      await loadData();
+    },
+    [getUserId, loadData],
+  );
+
+  const getStudentPayments = useCallback(
+    (studentId: string): StudentPayments | undefined => {
+      return payments.find((p) => p.studentId === studentId);
+    },
+    [payments],
+  );
+
+  const isStudentPaidForMonth = useCallback(
+    (studentId: string, month: number, year: number): boolean => {
+      const studentPayments = getStudentPayments(studentId);
+      if (!studentPayments) return false;
+      const payment = studentPayments.payments.find((p) => p.month === month && p.year === year);
+      return payment?.isPaid || false;
+    },
+    [getStudentPayments],
+  );
+
+  // ============================================================================
+  // RETURN
+  // ============================================================================
 
   return {
     students,
@@ -940,7 +1710,7 @@ export const useStudents = () => {
     togglePaymentStatus,
     recordPayment,
     addPartialPayment,
-    resetMonthlyPayment, // ✅ NEW
+    resetMonthlyPayment,
     updateMonthlyAmountDue,
     getStudentPayments,
     isStudentPaidForMonth,
