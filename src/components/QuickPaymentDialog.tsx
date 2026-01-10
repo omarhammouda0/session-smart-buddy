@@ -22,12 +22,14 @@ interface QuickPaymentDialogProps {
   student: Student | null;
   sessionDate: string;
   settings: AppSettings;
-  payments?: StudentPayments[]; // ✅ NEW: Add payments to calculate remaining
+  payments?: StudentPayments[];
   onConfirm: (amount: number, method: PaymentMethod) => void;
 }
 
 // Helper to get session price
-const getStudentSessionPrice = (student: Student, settings: AppSettings): number => {
+const getStudentSessionPrice = (student: Student | null, settings: AppSettings): number => {
+  if (!student) return 0;
+
   const defaultOnsite = 150;
   const defaultOnline = 120;
 
@@ -53,7 +55,9 @@ const getStudentSessionPrice = (student: Student, settings: AppSettings): number
 };
 
 // Helper to count billable sessions in a month
-const getStudentMonthStats = (student: Student, month: number, year: number) => {
+const getStudentMonthStats = (student: Student | null, month: number, year: number) => {
+  if (!student) return { completed: 0, scheduled: 0, billable: 0 };
+
   const sessions = student.sessions.filter((s) => {
     const sessionDate = new Date(s.date);
     return sessionDate.getMonth() === month && sessionDate.getFullYear() === year;
@@ -77,7 +81,7 @@ export const QuickPaymentDialog = ({
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState<PaymentMethod>("cash");
 
-  // ✅ Calculate payment info for this month
+  // ✅ Calculate payment info - MUST be called before any early return
   const paymentInfo = useMemo(() => {
     if (!student || !sessionDate) {
       return {
@@ -129,28 +133,10 @@ export const QuickPaymentDialog = ({
     };
   }, [student, sessionDate, settings, payments]);
 
-  // ✅ Set default amount to REMAINING, not session price
-  useEffect(() => {
-    if (student && open) {
-      // Default to remaining amount if there's partial payment, otherwise session price
-      const defaultAmount = paymentInfo.remaining > 0 ? paymentInfo.remaining : paymentInfo.sessionPrice;
-      setAmount(defaultAmount);
-      setMethod("cash");
-    }
-  }, [student, open, paymentInfo]);
-
-  if (!student) return null;
-
-  const handleConfirm = () => {
-    if (amount > 0) {
-      onConfirm(amount, method);
-    }
-  };
-
-  // Quick amount buttons
+  // Quick amount buttons - MUST be called before any early return
   const quickAmounts = useMemo(() => {
     const amounts: number[] = [];
-    const { sessionPrice, remaining } = paymentInfo;
+    const { sessionPrice, remaining, monthlyDue } = paymentInfo;
 
     // Add session price if different from remaining
     if (sessionPrice > 0 && sessionPrice !== remaining) {
@@ -163,13 +149,34 @@ export const QuickPaymentDialog = ({
     }
 
     // Add monthly due if different
-    if (paymentInfo.monthlyDue > 0 && paymentInfo.monthlyDue !== remaining && paymentInfo.monthlyDue !== sessionPrice) {
-      amounts.push(paymentInfo.monthlyDue);
+    if (monthlyDue > 0 && monthlyDue !== remaining && monthlyDue !== sessionPrice) {
+      amounts.push(monthlyDue);
     }
 
     // Sort and remove duplicates
     return [...new Set(amounts)].sort((a, b) => a - b);
   }, [paymentInfo]);
+
+  // ✅ Set default amount - MUST be called before any early return
+  useEffect(() => {
+    if (student && open) {
+      // Default to remaining amount if there's partial payment, otherwise session price
+      const defaultAmount = paymentInfo.remaining > 0 ? paymentInfo.remaining : paymentInfo.sessionPrice;
+      setAmount(defaultAmount);
+      setMethod("cash");
+    }
+  }, [student, open, paymentInfo.remaining, paymentInfo.sessionPrice]);
+
+  // ✅ NOW we can do early return after all hooks
+  if (!student) {
+    return null;
+  }
+
+  const handleConfirm = () => {
+    if (amount > 0) {
+      onConfirm(amount, method);
+    }
+  };
 
   const progressPercentage =
     paymentInfo.monthlyDue > 0
@@ -207,7 +214,7 @@ export const QuickPaymentDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* ✅ NEW: Payment Status Summary */}
+          {/* Payment Status Summary */}
           <div
             className={cn(
               "p-4 rounded-xl border-2",
@@ -298,7 +305,7 @@ export const QuickPaymentDialog = ({
               dir="ltr"
             />
 
-            {/* ✅ NEW: Quick Amount Buttons */}
+            {/* Quick Amount Buttons */}
             {quickAmounts.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {quickAmounts.map((quickAmount) => (
