@@ -151,6 +151,7 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
   }, [currentDate, viewMode]);
 
   // ✅ IMPROVED: Check for time conflicts with more detailed info
+  // Now properly checks conflicts with OTHER sessions of the SAME student too
   const checkTimeConflict = useCallback(
     (studentId: string, sessionId: string, newDate: string, newTime: string): ConflictInfo => {
       const sessionsOnDate = sessionsByDate.get(newDate) || [];
@@ -165,8 +166,9 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
       const newEndMinutes = newStartMinutes + sessionDuration;
 
       for (const { session, student } of sessionsOnDate) {
-        // Skip same session or same student
-        if (session.id === sessionId || student.id === studentId) continue;
+        // ✅ FIX: Only skip the EXACT session being moved (by session ID)
+        // Do NOT skip other sessions of the same student - they can conflict!
+        if (session.id === sessionId) continue;
 
         const otherTime = session.time || student.sessionTime;
         if (!otherTime) continue;
@@ -182,9 +184,11 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
           (newStartMinutes <= otherStartMinutes && newEndMinutes >= otherEndMinutes);
 
         if (hasOverlap) {
+          // ✅ Show if it's the same student or different
+          const isSameStudent = student.id === studentId;
           return {
             hasConflict: true,
-            conflictStudent: student.name,
+            conflictStudent: isSameStudent ? `${student.name} (نفس الطالب)` : student.name,
             conflictTime: otherTime,
             severity: "error",
           };
@@ -193,9 +197,10 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
         // Check for close proximity (within 15 minutes) - warning only
         const timeDiff = Math.abs(newStartMinutes - otherStartMinutes);
         if (timeDiff < 15 && timeDiff > 0) {
+          const isSameStudent = student.id === studentId;
           return {
             hasConflict: false,
-            conflictStudent: student.name,
+            conflictStudent: isSameStudent ? `${student.name} (نفس الطالب)` : student.name,
             conflictTime: otherTime,
             severity: "warning",
           };
