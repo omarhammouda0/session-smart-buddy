@@ -84,7 +84,7 @@ const AnimatedBackground = memo(() => {
           }}
         />
 
-        {/* Animated Blobs - more visible */}
+        {/* Animated Blobs */}
         <div
           className="absolute rounded-full bg-blob"
           style={{
@@ -119,7 +119,7 @@ const AnimatedBackground = memo(() => {
           }}
         />
 
-        {/* Grid pattern - slightly more visible */}
+        {/* Grid pattern */}
         <div
           className="absolute inset-0"
           style={{
@@ -131,14 +131,14 @@ const AnimatedBackground = memo(() => {
           }}
         />
 
-        {/* ========== FLOATING EDUCATION ICONS ========== */}
+        {/* ========== FLOATING EDUCATION ICONS - MORE VISIBLE ========== */}
 
         {/* Book - top left */}
         <svg
           className="absolute bg-float"
-          style={{ top: "8%", left: "3%", width: "50px", height: "50px", opacity: 0.12 }}
+          style={{ top: "80px", left: "20px", width: "45px", height: "45px", opacity: 0.25 }}
           viewBox="0 0 24 24"
-          fill="none"
+          fill="hsl(333 71% 50% / 0.1)"
           stroke="hsl(333 71% 50%)"
           strokeWidth="1.5"
         >
@@ -148,12 +148,12 @@ const AnimatedBackground = memo(() => {
           <path d="M8 11h6" />
         </svg>
 
-        {/* Graduation Cap - top right */}
+        {/* Graduation Cap - top right area */}
         <svg
           className="absolute bg-float-1"
-          style={{ top: "5%", right: "5%", width: "60px", height: "60px", opacity: 0.12 }}
+          style={{ top: "120px", right: "30px", width: "55px", height: "55px", opacity: 0.2 }}
           viewBox="0 0 24 24"
-          fill="none"
+          fill="hsl(333 71% 50% / 0.1)"
           stroke="hsl(333 71% 50%)"
           strokeWidth="1.5"
         >
@@ -161,13 +161,13 @@ const AnimatedBackground = memo(() => {
           <path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5" />
         </svg>
 
-        {/* Pencil - left side middle */}
+        {/* Pencil - left side */}
         <svg
           className="absolute bg-float-2"
-          style={{ top: "40%", left: "2%", width: "40px", height: "40px", opacity: 0.1 }}
+          style={{ top: "350px", left: "15px", width: "38px", height: "38px", opacity: 0.22 }}
           viewBox="0 0 24 24"
-          fill="none"
-          stroke="hsl(333 71% 45%)"
+          fill="hsl(152 60% 42% / 0.1)"
+          stroke="hsl(152 60% 42%)"
           strokeWidth="1.5"
         >
           <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
@@ -177,9 +177,9 @@ const AnimatedBackground = memo(() => {
         {/* Lightbulb - right side */}
         <svg
           className="absolute bg-float-3"
-          style={{ top: "55%", right: "2%", width: "45px", height: "45px", opacity: 0.12 }}
+          style={{ top: "400px", right: "20px", width: "42px", height: "42px", opacity: 0.25 }}
           viewBox="0 0 24 24"
-          fill="none"
+          fill="hsl(38 92% 50% / 0.15)"
           stroke="hsl(38 92% 50%)"
           strokeWidth="1.5"
         >
@@ -191,10 +191,10 @@ const AnimatedBackground = memo(() => {
         {/* Calculator - bottom left */}
         <svg
           className="absolute bg-float-4"
-          style={{ bottom: "15%", left: "4%", width: "35px", height: "35px", opacity: 0.1 }}
+          style={{ bottom: "150px", left: "25px", width: "35px", height: "35px", opacity: 0.2 }}
           viewBox="0 0 24 24"
-          fill="none"
-          stroke="hsl(152 60% 42%)"
+          fill="hsl(200 80% 50% / 0.1)"
+          stroke="hsl(200 80% 50%)"
           strokeWidth="1.5"
         >
           <rect x="4" y="2" width="16" height="20" rx="2" />
@@ -209,9 +209,9 @@ const AnimatedBackground = memo(() => {
         {/* Star - bottom right */}
         <svg
           className="absolute bg-float-5"
-          style={{ bottom: "20%", right: "6%", width: "30px", height: "30px", opacity: 0.15 }}
+          style={{ bottom: "200px", right: "35px", width: "32px", height: "32px", opacity: 0.3 }}
           viewBox="0 0 24 24"
-          fill="hsl(38 92% 50% / 0.4)"
+          fill="hsl(38 92% 50% / 0.5)"
           stroke="hsl(38 92% 50%)"
           strokeWidth="1.5"
         >
@@ -222,16 +222,16 @@ const AnimatedBackground = memo(() => {
         <svg
           className="absolute bg-float-1"
           style={{
-            bottom: "35%",
-            left: "1%",
+            bottom: "300px",
+            left: "10px",
             width: "40px",
             height: "40px",
-            opacity: 0.08,
+            opacity: 0.18,
             transform: "rotate(-20deg)",
           }}
           viewBox="0 0 24 24"
           fill="none"
-          stroke="hsl(200 80% 50%)"
+          stroke="hsl(280 60% 50%)"
           strokeWidth="1.5"
         >
           <path d="M21.2 8.8l-9.9 9.9c-.8.8-2 .8-2.8 0l-5.4-5.4c-.8-.8-.8-2 0-2.8l9.9-9.9c.8-.8 2-.8 2.8 0l5.4 5.4c.8.8.8 2 0 2.8z" />
@@ -240,15 +240,28 @@ const AnimatedBackground = memo(() => {
           <path d="M13 8l2-2" />
         </svg>
 
+        {/* Clock - right side upper */}
+        <svg
+          className="absolute bg-float-2"
+          style={{ top: "250px", right: "15px", width: "36px", height: "36px", opacity: 0.2 }}
+          viewBox="0 0 24 24"
+          fill="hsl(333 71% 50% / 0.1)"
+          stroke="hsl(333 71% 50%)"
+          strokeWidth="1.5"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
+        </svg>
+
         {/* Arabic Letters - floating text */}
         <div
           className="absolute bg-float-2"
           style={{
-            top: "20%",
-            right: "2%",
-            fontSize: "24px",
+            top: "180px",
+            right: "25px",
+            fontSize: "22px",
             fontWeight: "bold",
-            opacity: 0.08,
+            opacity: 0.15,
             color: "hsl(333 71% 50%)",
             fontFamily: "Tajawal, sans-serif",
           }}
@@ -260,11 +273,11 @@ const AnimatedBackground = memo(() => {
         <div
           className="absolute bg-float-3"
           style={{
-            bottom: "10%",
-            left: "8%",
-            fontSize: "22px",
+            bottom: "100px",
+            left: "30px",
+            fontSize: "20px",
             fontWeight: "bold",
-            opacity: 0.08,
+            opacity: 0.15,
             color: "hsl(152 60% 42%)",
             fontFamily: "Tajawal, sans-serif",
           }}
@@ -276,64 +289,64 @@ const AnimatedBackground = memo(() => {
         <div
           className="absolute bg-float-4"
           style={{
-            top: "65%",
-            right: "3%",
-            fontSize: "20px",
+            top: "500px",
+            right: "25px",
+            fontSize: "18px",
             fontWeight: "bold",
-            opacity: 0.08,
+            opacity: 0.15,
             color: "hsl(38 92% 50%)",
             fontFamily: "monospace",
           }}
         >
-          + − × ÷
+          + − ×
         </div>
 
-        {/* Decorative dots */}
+        {/* Decorative dots - more visible */}
         <div
           className="absolute rounded-full animate-pulse"
-          style={{ top: "15%", right: "15%", width: "6px", height: "6px", background: "hsl(333 71% 50% / 0.4)" }}
+          style={{ top: "150px", right: "120px", width: "8px", height: "8px", background: "hsl(333 71% 50% / 0.5)" }}
         />
         <div
           className="absolute rounded-full animate-pulse"
           style={{
-            top: "45%",
-            left: "8%",
-            width: "8px",
-            height: "8px",
-            background: "hsl(152 60% 42% / 0.4)",
+            top: "380px",
+            left: "80px",
+            width: "10px",
+            height: "10px",
+            background: "hsl(152 60% 42% / 0.5)",
             animationDelay: "1s",
           }}
         />
         <div
           className="absolute rounded-full animate-pulse"
           style={{
-            bottom: "25%",
-            right: "20%",
-            width: "6px",
-            height: "6px",
-            background: "hsl(38 92% 50% / 0.4)",
+            bottom: "250px",
+            right: "100px",
+            width: "8px",
+            height: "8px",
+            background: "hsl(38 92% 50% / 0.5)",
             animationDelay: "2s",
           }}
         />
         <div
           className="absolute rounded-full animate-pulse"
           style={{
-            top: "70%",
-            left: "15%",
-            width: "5px",
-            height: "5px",
-            background: "hsl(333 71% 50% / 0.3)",
+            top: "550px",
+            left: "100px",
+            width: "6px",
+            height: "6px",
+            background: "hsl(200 80% 50% / 0.4)",
             animationDelay: "0.5s",
           }}
         />
         <div
           className="absolute rounded-full animate-pulse"
           style={{
-            top: "30%",
-            right: "25%",
+            top: "280px",
+            right: "80px",
             width: "7px",
             height: "7px",
-            background: "hsl(200 80% 50% / 0.3)",
+            background: "hsl(280 60% 50% / 0.4)",
             animationDelay: "1.5s",
           }}
         />
