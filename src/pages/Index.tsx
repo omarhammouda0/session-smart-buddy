@@ -82,8 +82,9 @@ const Index = () => {
   const [quickPaymentDialog, setQuickPaymentDialog] = useState<{
     open: boolean;
     student: Student | null;
+    sessionId: string;
     sessionDate: string;
-  }>({ open: false, student: null, sessionDate: "" });
+  }>({ open: false, student: null, sessionId: "", sessionDate: "" });
 
   // ============================================
   // HOOKS
@@ -251,15 +252,15 @@ const Index = () => {
   // ============================================
 
   // Quick payment from today's sessions
-  const handleQuickPayment = (studentId: string, sessionDate: string) => {
+  const handleQuickPayment = (studentId: string, sessionId: string, sessionDate: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
-    setQuickPaymentDialog({ open: true, student, sessionDate });
+    setQuickPaymentDialog({ open: true, student, sessionId, sessionDate });
   };
 
   // Confirm quick payment
   const handleQuickPaymentConfirm = (amount: number, method: PaymentMethod) => {
-    if (!quickPaymentDialog.student) return;
+    if (!quickPaymentDialog.student || !quickPaymentDialog.sessionId) return;
 
     const sessionDate = new Date(quickPaymentDialog.sessionDate);
     const month = sessionDate.getMonth();
@@ -271,7 +272,7 @@ const Index = () => {
       amount,
       method,
       paidAt: new Date().toISOString(),
-      notes: `دفعة من حصة ${quickPaymentDialog.sessionDate}`,
+      notes: `session:${quickPaymentDialog.sessionId}|date:${quickPaymentDialog.sessionDate}`,
     });
 
     const methodLabel = method === "cash" ? "كاش" : method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
@@ -280,7 +281,7 @@ const Index = () => {
       description: `${quickPaymentDialog.student.name}: ${amount.toLocaleString()} جنيه (${methodLabel})`,
     });
 
-    setQuickPaymentDialog({ open: false, student: null, sessionDate: "" });
+    setQuickPaymentDialog({ open: false, student: null, sessionId: "", sessionDate: "" });
   };
 
   // Record payment from PaymentsDashboard
@@ -873,8 +874,11 @@ const Index = () => {
       {/* Quick Payment Dialog */}
       <QuickPaymentDialog
         open={quickPaymentDialog.open}
-        onOpenChange={(open) => !open && setQuickPaymentDialog({ open: false, student: null, sessionDate: "" })}
+        onOpenChange={(open) =>
+          !open && setQuickPaymentDialog({ open: false, student: null, sessionId: "", sessionDate: "" })
+        }
         student={quickPaymentDialog.student}
+        sessionId={quickPaymentDialog.sessionId}
         sessionDate={quickPaymentDialog.sessionDate}
         settings={settings}
         payments={payments}
