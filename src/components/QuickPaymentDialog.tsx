@@ -26,7 +26,7 @@ interface QuickPaymentDialogProps {
   onConfirm: (amount: number, method: PaymentMethod) => void;
 }
 
-// Helper to get session price
+// Helper to get session price for a student
 const getStudentSessionPrice = (student: Student | null, settings: AppSettings): number => {
   if (!student) return 0;
 
@@ -54,21 +54,6 @@ const getStudentSessionPrice = (student: Student | null, settings: AppSettings):
     : defaultOnsite;
 };
 
-// Helper to count billable sessions in a month
-const getStudentMonthStats = (student: Student | null, month: number, year: number) => {
-  if (!student) return { completed: 0, scheduled: 0, billable: 0 };
-
-  const sessions = student.sessions.filter((s) => {
-    const sessionDate = new Date(s.date);
-    return sessionDate.getMonth() === month && sessionDate.getFullYear() === year;
-  });
-
-  const completed = sessions.filter((s) => s.status === "completed").length;
-  const scheduled = sessions.filter((s) => s.status === "scheduled").length;
-
-  return { completed, scheduled, billable: completed + scheduled };
-};
-
 export const QuickPaymentDialog = ({
   open,
   onOpenChange,
@@ -81,132 +66,161 @@ export const QuickPaymentDialog = ({
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState<PaymentMethod>("cash");
 
-  // ✅ Calculate payment info - MUST be called before any early return
-  const paymentInfo = useMemo(() => {
+  // Calculate SESSION payment info (not monthly!)
+  const sessionPaymentInfo = useMemo(() => {
     if (!student || !sessionDate) {
       return {
         sessionPrice: 0,
-        monthlyDue: 0,
-        alreadyPaid: 0,
-        remaining: 0,
-        status: "unpaid" as const,
-        billableSessions: 0,
+        alreadyPaidForSession: 0,
+        remainingForSession: 0,
+        isFullyPaid: false,
       };
     }
 
+    const sessionPrice = getStudentSessionPrice(student, settings);
+
+    // Get amount already paid for THIS SESSION from the monthly payment
+    // We track this by looking at the payment records that contain this session date in notes
     const date = new Date(sessionDate);
     const month = date.getMonth();
     const year = date.getFullYear();
 
-    const sessionPrice = getStudentSessionPrice(student, settings);
-    const { billable } = getStudentMonthStats(student, month, year);
-    const monthlyDue = billable * sessionPrice;
-
-    // Get already paid amount from payments
-    let alreadyPaid = 0;
-    let status: "unpaid" | "partial" | "paid" = "unpaid";
+    let alreadyPaidForSession = 0;
 
     if (payments) {
       const studentPayments = payments.find((p) => p.studentId === student.id);
       if (studentPayments) {
         const monthPayment = studentPayments.payments.find((p) => p.month === month && p.year === year);
-        if (monthPayment) {
-          alreadyPaid = monthPayment.amountPaid || monthPayment.amount || 0;
-          if (alreadyPaid >= monthlyDue && monthlyDue > 0) {
-            status = "paid";
-          } else if (alreadyPaid > 0) {
-            status = "partial";
-          }
+        if (monthPayment && monthPayment.paymentRecords) {
+          // Sum payments made for this specific session date
+          // Notes format: "دفعة من حصة 2026-01-10"
+          alreadyPaidForSession = monthPayment.paymentRecords
+            .filter((record) => record.notes && record.notes.includes(sessionDate))
+            .reduce((sum, record) => sum + record.amount, 0);
         }
       }
     }
 
-    const remaining = Math.max(0, monthlyDue - alreadyPaid);
+    // Cap at session price (can't pay more than session cost)
+    alreadyPaidForSession = Math.min(alreadyPaidForSession, sessionPrice);
+    const remainingForSession = Math.max(0, sessionPrice - alreadyPaidForSession);
+    const isFullyPaid = remainingForSession === 0 && sessionPrice > 0;
 
     return {
       sessionPrice,
-      monthlyDue,
-      alreadyPaid,
-      remaining,
-      status,
-      billableSessions: billable,
+      alreadyPaidForSession,
+      remainingForSession,
+      isFullyPaid,
     };
   }, [student, sessionDate, settings, payments]);
 
-  // Quick amount buttons - MUST be called before any early return
+  // Quick amount buttons
   const quickAmounts = useMemo(() => {
+    const { remainingForSession } = sessionPaymentInfo;
     const amounts: number[] = [];
-    const { sessionPrice, remaining, monthlyDue } = paymentInfo;
 
-    // Add session price if different from remaining
-    if (sessionPrice > 0 && sessionPrice !== remaining) {
-      amounts.push(sessionPrice);
+    if (remainingForSession > 0) {
+      // Add remaining (full payment for session)
+      amounts.push(remainingForSession);
+
+      // Add half if it makes sense (more than 50 and not same as remaining)
+      if (remainingForSession > 50) {
+        const half = Math.round(remainingForSession / 2);
+        if (half !== remainingForSession && half > 0) {
+          amounts.push(half);
+        }
+      }
     }
 
-    // Add remaining if there is one
-    if (remaining > 0) {
-      amounts.push(remaining);
-    }
-
-    // Add monthly due if different
-    if (monthlyDue > 0 && monthlyDue !== remaining && monthlyDue !== sessionPrice) {
-      amounts.push(monthlyDue);
-    }
-
-    // Sort and remove duplicates
     return [...new Set(amounts)].sort((a, b) => a - b);
-  }, [paymentInfo]);
+  }, [sessionPaymentInfo]);
 
-  // ✅ Set default amount - MUST be called before any early return
+  // Set default amount to REMAINING session fee
   useEffect(() => {
     if (student && open) {
-      // Default to remaining amount if there's partial payment, otherwise session price
-      const defaultAmount = paymentInfo.remaining > 0 ? paymentInfo.remaining : paymentInfo.sessionPrice;
-      setAmount(defaultAmount);
+      setAmount(sessionPaymentInfo.remainingForSession);
       setMethod("cash");
     }
-  }, [student, open, paymentInfo.remaining, paymentInfo.sessionPrice]);
+  }, [student, open, sessionPaymentInfo.remainingForSession]);
 
-  // ✅ NOW we can do early return after all hooks
+  // Early return after all hooks
   if (!student) {
     return null;
   }
 
   const handleConfirm = () => {
-    if (amount > 0) {
+    if (amount > 0 && amount <= sessionPaymentInfo.remainingForSession) {
       onConfirm(amount, method);
     }
   };
 
+  // Handle amount change - cap at remaining
+  const handleAmountChange = (value: number) => {
+    // Allow typing any value but cap it
+    const cappedValue = Math.min(Math.max(0, value), sessionPaymentInfo.remainingForSession);
+    setAmount(cappedValue);
+  };
+
   const progressPercentage =
-    paymentInfo.monthlyDue > 0
-      ? Math.min(100, Math.round((paymentInfo.alreadyPaid / paymentInfo.monthlyDue) * 100))
+    sessionPaymentInfo.sessionPrice > 0
+      ? Math.round((sessionPaymentInfo.alreadyPaidForSession / sessionPaymentInfo.sessionPrice) * 100)
       : 0;
+
+  // If session is fully paid, show success message
+  if (sessionPaymentInfo.isFullyPaid) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[380px]" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-success/10">
+                <Check className="h-5 w-5 text-success" />
+              </div>
+              حصة مدفوعة بالكامل
+            </DialogTitle>
+            <DialogDescription>
+              {student.name} - حصة {sessionDate}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6">
+            <div className="p-4 rounded-xl bg-success/10 border-2 border-success/30 text-center">
+              <Check className="h-12 w-12 text-success mx-auto mb-3" />
+              <p className="font-bold text-success text-lg">تم دفع رسوم هذه الحصة</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                المبلغ: {sessionPaymentInfo.sessionPrice.toLocaleString()} جنيه
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)} className="w-full rounded-xl">
+              إغلاق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]" dir="rtl">
+      <DialogContent className="sm:max-w-[400px]" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div
               className={cn(
                 "p-2 rounded-lg",
-                paymentInfo.status === "paid"
-                  ? "bg-success/10"
-                  : paymentInfo.status === "partial"
-                    ? "bg-amber-500/10"
-                    : "bg-primary/10",
+                sessionPaymentInfo.alreadyPaidForSession > 0 ? "bg-amber-500/10" : "bg-primary/10",
               )}
             >
-              {paymentInfo.status === "paid" ? (
-                <Check className="h-5 w-5 text-success" />
-              ) : paymentInfo.status === "partial" ? (
+              {sessionPaymentInfo.alreadyPaidForSession > 0 ? (
                 <Clock className="h-5 w-5 text-amber-500" />
               ) : (
                 <Banknote className="h-5 w-5 text-primary" />
               )}
             </div>
-            تسجيل دفعة سريعة
+            دفع رسوم الحصة
           </DialogTitle>
           <DialogDescription>
             {student.name} - حصة {sessionDate}
@@ -214,81 +228,57 @@ export const QuickPaymentDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Payment Status Summary */}
+          {/* Session Payment Status */}
           <div
             className={cn(
               "p-4 rounded-xl border-2",
-              paymentInfo.status === "paid"
-                ? "bg-success/5 border-success/30"
-                : paymentInfo.status === "partial"
-                  ? "bg-amber-500/5 border-amber-500/30"
-                  : "bg-muted/50 border-border",
+              sessionPaymentInfo.alreadyPaidForSession > 0
+                ? "bg-amber-500/5 border-amber-500/30"
+                : "bg-muted/50 border-border",
             )}
           >
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-muted-foreground">حالة الشهر:</span>
-              <span
-                className={cn(
-                  "text-sm font-bold px-2 py-0.5 rounded-full",
-                  paymentInfo.status === "paid"
-                    ? "bg-success/20 text-success"
-                    : paymentInfo.status === "partial"
-                      ? "bg-amber-500/20 text-amber-600"
-                      : "bg-muted text-muted-foreground",
-                )}
-              >
-                {paymentInfo.status === "paid"
-                  ? "مدفوع بالكامل"
-                  : paymentInfo.status === "partial"
-                    ? "دفع جزئي"
-                    : "غير مدفوع"}
+            {/* Session Price */}
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-sm font-medium">سعر الحصة:</span>
+              <span className="text-lg font-bold text-primary">
+                {sessionPaymentInfo.sessionPrice.toLocaleString()} جنيه
               </span>
             </div>
 
-            {/* Progress Bar */}
-            {paymentInfo.monthlyDue > 0 && (
-              <div className="space-y-1.5">
-                <Progress
-                  value={progressPercentage}
-                  className={cn(
-                    "h-2",
-                    paymentInfo.status === "paid"
-                      ? "[&>div]:bg-success"
-                      : paymentInfo.status === "partial"
-                        ? "[&>div]:bg-amber-500"
-                        : "",
-                  )}
-                />
+            {/* Progress Bar (only if partial payment exists) */}
+            {sessionPaymentInfo.alreadyPaidForSession > 0 && (
+              <div className="space-y-2 mb-3">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>المدفوع</span>
+                  <span>{progressPercentage}%</span>
+                </div>
+                <Progress value={progressPercentage} className="h-2 [&>div]:bg-amber-500" />
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">
-                    المدفوع:{" "}
-                    <span className="font-bold text-foreground">{paymentInfo.alreadyPaid.toLocaleString()}</span> جنيه
-                  </span>
-                  <span className="text-muted-foreground">
-                    من <span className="font-bold text-foreground">{paymentInfo.monthlyDue.toLocaleString()}</span> جنيه
+                  <span className="text-amber-600 font-medium">
+                    المدفوع: {sessionPaymentInfo.alreadyPaidForSession.toLocaleString()} جنيه
                   </span>
                 </div>
               </div>
             )}
 
-            {/* Remaining Amount Highlight */}
-            {paymentInfo.remaining > 0 && (
-              <div className="mt-3 pt-3 border-t border-border/50 flex justify-between items-center">
-                <span className="text-sm font-medium">المتبقي:</span>
-                <span
-                  className={cn(
-                    "text-lg font-bold",
-                    paymentInfo.status === "partial" ? "text-amber-600" : "text-primary",
-                  )}
-                >
-                  {paymentInfo.remaining.toLocaleString()} جنيه
-                </span>
-              </div>
-            )}
-
-            {/* Session Info */}
-            <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-              سعر الحصة: {paymentInfo.sessionPrice} جنيه × {paymentInfo.billableSessions} حصص
+            {/* Remaining Amount */}
+            <div
+              className={cn(
+                "pt-3 border-t border-border/50 flex justify-between items-center",
+                sessionPaymentInfo.alreadyPaidForSession > 0 && "mt-2",
+              )}
+            >
+              <span className="text-sm font-medium">
+                {sessionPaymentInfo.alreadyPaidForSession > 0 ? "المتبقي:" : "المطلوب:"}
+              </span>
+              <span
+                className={cn(
+                  "text-xl font-bold",
+                  sessionPaymentInfo.alreadyPaidForSession > 0 ? "text-amber-600" : "text-primary",
+                )}
+              >
+                {sessionPaymentInfo.remainingForSession.toLocaleString()} جنيه
+              </span>
             </div>
           </div>
 
@@ -299,11 +289,15 @@ export const QuickPaymentDialog = ({
               id="amount"
               type="number"
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
+              onChange={(e) => handleAmountChange(Number(e.target.value))}
               min={0}
+              max={sessionPaymentInfo.remainingForSession}
               className="text-left text-lg font-bold h-12"
               dir="ltr"
             />
+            <p className="text-xs text-muted-foreground">
+              الحد الأقصى: {sessionPaymentInfo.remainingForSession.toLocaleString()} جنيه
+            </p>
 
             {/* Quick Amount Buttons */}
             {quickAmounts.length > 0 && (
@@ -317,11 +311,9 @@ export const QuickPaymentDialog = ({
                     onClick={() => setAmount(quickAmount)}
                     className={cn("text-xs", amount === quickAmount && "ring-2 ring-primary/30")}
                   >
-                    {quickAmount === paymentInfo.remaining && paymentInfo.status === "partial"
-                      ? `المتبقي (${quickAmount})`
-                      : quickAmount === paymentInfo.sessionPrice
-                        ? `حصة (${quickAmount})`
-                        : `${quickAmount} جنيه`}
+                    {quickAmount === sessionPaymentInfo.remainingForSession
+                      ? `كامل المتبقي (${quickAmount})`
+                      : `${quickAmount} جنيه`}
                   </Button>
                 ))}
               </div>
@@ -340,7 +332,7 @@ export const QuickPaymentDialog = ({
                 <RadioGroupItem value="cash" id="quick-cash" className="peer sr-only" />
                 <Label
                   htmlFor="quick-cash"
-                  className="flex flex-col items-center justify-center rounded-xl border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                  className="flex flex-col items-center justify-center rounded-xl border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
                 >
                   <Banknote className="mb-1.5 h-5 w-5" />
                   <span className="text-xs font-medium">كاش</span>
@@ -351,7 +343,7 @@ export const QuickPaymentDialog = ({
                 <RadioGroupItem value="bank" id="quick-bank" className="peer sr-only" />
                 <Label
                   htmlFor="quick-bank"
-                  className="flex flex-col items-center justify-center rounded-xl border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                  className="flex flex-col items-center justify-center rounded-xl border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
                 >
                   <CreditCard className="mb-1.5 h-5 w-5" />
                   <span className="text-xs font-medium">بنك</span>
@@ -362,7 +354,7 @@ export const QuickPaymentDialog = ({
                 <RadioGroupItem value="wallet" id="quick-wallet" className="peer sr-only" />
                 <Label
                   htmlFor="quick-wallet"
-                  className="flex flex-col items-center justify-center rounded-xl border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                  className="flex flex-col items-center justify-center rounded-xl border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
                 >
                   <Wallet className="mb-1.5 h-5 w-5" />
                   <span className="text-xs font-medium">محفظة</span>
@@ -371,12 +363,12 @@ export const QuickPaymentDialog = ({
             </RadioGroup>
           </div>
 
-          {/* Warning if paying more than remaining */}
-          {paymentInfo.remaining > 0 && amount > paymentInfo.remaining && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
-              <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-              <span className="text-amber-700">
-                المبلغ المدخل ({amount} جنيه) أكبر من المتبقي ({paymentInfo.remaining} جنيه)
+          {/* Warning if somehow amount exceeds remaining */}
+          {amount > sessionPaymentInfo.remainingForSession && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-sm">
+              <AlertCircle className="h-4 w-4 text-rose-500 mt-0.5 shrink-0" />
+              <span className="text-rose-700">
+                لا يمكن دفع أكثر من المتبقي ({sessionPaymentInfo.remainingForSession} جنيه)
               </span>
             </div>
           )}
@@ -388,7 +380,7 @@ export const QuickPaymentDialog = ({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={amount <= 0}
+            disabled={amount <= 0 || amount > sessionPaymentInfo.remainingForSession}
             className="rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg"
           >
             تأكيد الدفع ({amount.toLocaleString()} جنيه)
