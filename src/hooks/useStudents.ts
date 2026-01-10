@@ -26,6 +26,52 @@ const toYmdLocal = (d: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// ✅ Helper function to calculate amount due for a student in a month
+const calculateMonthlyAmountDue = (student: Student, month: number, year: number, settings?: AppSettings): number => {
+  const defaultOnsite = 150;
+  const defaultOnline = 120;
+
+  // Get session price
+  let sessionPrice: number;
+  if (student.useCustomSettings) {
+    if (student.sessionType === "online") {
+      sessionPrice =
+        typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
+          ? student.customPriceOnline
+          : (settings?.defaultPriceOnline ?? defaultOnline);
+    } else {
+      sessionPrice =
+        typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
+          ? student.customPriceOnsite
+          : (settings?.defaultPriceOnsite ?? defaultOnsite);
+    }
+  } else {
+    if (student.sessionType === "online") {
+      sessionPrice =
+        typeof settings?.defaultPriceOnline === "number" && settings.defaultPriceOnline > 0
+          ? settings.defaultPriceOnline
+          : defaultOnline;
+    } else {
+      sessionPrice =
+        typeof settings?.defaultPriceOnsite === "number" && settings.defaultPriceOnsite > 0
+          ? settings.defaultPriceOnsite
+          : defaultOnsite;
+    }
+  }
+
+  // Count billable sessions (completed + scheduled, excluding cancelled and vacation)
+  const billableSessions = student.sessions.filter((s) => {
+    const sessionDate = new Date(s.date);
+    return (
+      sessionDate.getMonth() === month &&
+      sessionDate.getFullYear() === year &&
+      (s.status === "completed" || s.status === "scheduled")
+    );
+  });
+
+  return billableSessions.length * sessionPrice;
+};
+
 export const useStudents = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [payments, setPayments] = useState<StudentPayments[]>([]);
@@ -610,7 +656,203 @@ export const useStudents = () => {
     );
   };
 
+  // ✅ FIXED: Toggle payment status (for full payment toggle)
   const togglePaymentStatus = (studentId: string, month: number, year: number) => {
+    setPayments((prev) =>
+      prev.map((p) => {
+        if (p.studentId !== studentId) return p;
+        return {
+          ...p,
+          payments: p.payments.map((pay) => {
+            if (pay.month !== month || pay.year !== year) return pay;
+
+            const wasFullyPaid = pay.isPaid;
+
+            if (wasFullyPaid) {
+              // Unpaying: reset everything
+              return {
+                ...pay,
+                isPaid: false,
+                amountPaid: 0,
+                paymentStatus: "unpaid" as PaymentStatus,
+                paidAt: undefined,
+                method: undefined,
+                notes: undefined,
+                paymentRecords: [],
+              };
+            } else {
+              // This is a simple toggle to "paid" - should use recordPayment instead
+              // Keep for backwards compatibility but prefer recordPayment
+              return {
+                ...pay,
+                isPaid: true,
+                paidAt: new Date().toISOString(),
+              };
+            }
+          }),
+        };
+      }),
+    );
+  };
+
+  // ✅ FIXED: Record payment - ACCUMULATES instead of overwrites
+  const recordPayment = (
+    studentId: string,
+    paymentData: {
+      month: number;
+      year: number;
+      amount: number;
+      method: PaymentMethod;
+      paidAt: string;
+      notes?: string;
+    },
+  ) => {
+    // First, get the student to calculate amountDue
+    const student = students.find((s) => s.id === studentId);
+    if (!student) {
+      console.error("Student not found:", studentId);
+      return;
+    }
+
+    const amountDue = calculateMonthlyAmountDue(student, paymentData.month, paymentData.year, settings);
+
+    setPayments((prev) => {
+      const studentPaymentIndex = prev.findIndex((p) => p.studentId === studentId);
+
+      // If no payment record exists for this student, create one
+      if (studentPaymentIndex === -1) {
+        const newPaymentRecord: PaymentRecord = {
+          id: generateId(),
+          amount: paymentData.amount,
+          method: paymentData.method,
+          paidAt: paymentData.paidAt,
+          notes: paymentData.notes,
+        };
+
+        const newAmountPaid = paymentData.amount;
+        const newPaymentStatus: PaymentStatus =
+          newAmountPaid >= amountDue ? "paid" : newAmountPaid > 0 ? "partial" : "unpaid";
+
+        return [
+          ...prev,
+          {
+            studentId,
+            payments: [
+              {
+                month: paymentData.month,
+                year: paymentData.year,
+                isPaid: newPaymentStatus === "paid",
+                amountDue,
+                amountPaid: newAmountPaid,
+                paymentStatus: newPaymentStatus,
+                paidAt: paymentData.paidAt,
+                method: paymentData.method,
+                notes: paymentData.notes,
+                paymentRecords: [newPaymentRecord],
+              },
+            ],
+          },
+        ];
+      }
+
+      // Update existing student payments
+      return prev.map((studentPayments, index) => {
+        if (index !== studentPaymentIndex) return studentPayments;
+
+        const paymentIndex = studentPayments.payments.findIndex(
+          (p) => p.month === paymentData.month && p.year === paymentData.year,
+        );
+
+        const newPaymentRecord: PaymentRecord = {
+          id: generateId(),
+          amount: paymentData.amount,
+          method: paymentData.method,
+          paidAt: paymentData.paidAt,
+          notes: paymentData.notes,
+        };
+
+        // If no payment for this month exists, create one
+        if (paymentIndex === -1) {
+          const newAmountPaid = paymentData.amount;
+          const newPaymentStatus: PaymentStatus =
+            newAmountPaid >= amountDue ? "paid" : newAmountPaid > 0 ? "partial" : "unpaid";
+
+          return {
+            ...studentPayments,
+            payments: [
+              ...studentPayments.payments,
+              {
+                month: paymentData.month,
+                year: paymentData.year,
+                isPaid: newPaymentStatus === "paid",
+                amountDue,
+                amountPaid: newAmountPaid,
+                paymentStatus: newPaymentStatus,
+                paidAt: paymentData.paidAt,
+                method: paymentData.method,
+                notes: paymentData.notes,
+                paymentRecords: [newPaymentRecord],
+              },
+            ],
+          };
+        }
+
+        // ✅ KEY FIX: ACCUMULATE the payment instead of overwriting
+        return {
+          ...studentPayments,
+          payments: studentPayments.payments.map((pay, idx) => {
+            if (idx !== paymentIndex) return pay;
+
+            // Calculate new total by ADDING to existing amount
+            const existingAmountPaid = pay.amountPaid || 0;
+            const newTotalAmountPaid = existingAmountPaid + paymentData.amount;
+
+            // Determine new status based on accumulated amount
+            const newPaymentStatus: PaymentStatus =
+              newTotalAmountPaid >= amountDue ? "paid" : newTotalAmountPaid > 0 ? "partial" : "unpaid";
+
+            // Append to existing payment records (don't replace)
+            const existingRecords = pay.paymentRecords || [];
+
+            return {
+              ...pay,
+              amountDue,
+              amountPaid: newTotalAmountPaid,
+              isPaid: newPaymentStatus === "paid",
+              paymentStatus: newPaymentStatus,
+              paidAt: paymentData.paidAt, // Update to latest payment date
+              method: paymentData.method, // Update to latest method
+              notes: paymentData.notes || pay.notes, // Keep existing notes if no new ones
+              // ✅ APPEND new record to existing records
+              paymentRecords: [...existingRecords, newPaymentRecord],
+            };
+          }),
+        };
+      });
+    });
+  };
+
+  // ✅ Keep addPartialPayment for backwards compatibility (calls recordPayment internally)
+  const addPartialPayment = (
+    studentId: string,
+    month: number,
+    year: number,
+    amount: number,
+    method: PaymentMethod,
+    notes?: string,
+  ) => {
+    recordPayment(studentId, {
+      month,
+      year,
+      amount,
+      method,
+      paidAt: new Date().toISOString(),
+      notes,
+    });
+  };
+
+  // ✅ NEW: Reset payment for a month (clear all partial payments)
+  const resetMonthlyPayment = (studentId: string, month: number, year: number) => {
     setPayments((prev) =>
       prev.map((p) => {
         if (p.studentId !== studentId) return p;
@@ -620,8 +862,13 @@ export const useStudents = () => {
             if (pay.month !== month || pay.year !== year) return pay;
             return {
               ...pay,
-              isPaid: !pay.isPaid,
-              paidAt: !pay.isPaid ? new Date().toISOString() : undefined,
+              isPaid: false,
+              amountPaid: 0,
+              paymentStatus: "unpaid" as PaymentStatus,
+              paidAt: undefined,
+              method: undefined,
+              notes: undefined,
+              paymentRecords: [],
             };
           }),
         };
@@ -629,171 +876,7 @@ export const useStudents = () => {
     );
   };
 
-  const addPartialPayment = (
-    studentId: string,
-    month: number,
-    year: number,
-    amount: number,
-    method: PaymentMethod,
-    notes?: string,
-  ) => {
-    setStudents((prevStudents) =>
-      prevStudents.map((student) => {
-        if (student.id !== studentId) return student;
-
-        // Helper function to get session price
-        const getPrice = (): number => {
-          const defaultOnsite = 150;
-          const defaultOnline = 120;
-
-          if (student.useCustomSettings) {
-          if (student.sessionType === "online") {
-              return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
-                ? student.customPriceOnline
-                : (settings?.defaultPriceOnline ?? defaultOnline);
-            }
-            return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
-              ? student.customPriceOnsite
-              : (settings?.defaultPriceOnsite ?? defaultOnsite);
-          }
-
-          if (student.sessionType === "online") {
-            return typeof settings?.defaultPriceOnline === "number" && settings.defaultPriceOnline > 0
-              ? settings.defaultPriceOnline
-              : defaultOnline;
-          }
-          return typeof settings?.defaultPriceOnsite === "number" && settings.defaultPriceOnsite > 0
-            ? settings.defaultPriceOnsite
-            : defaultOnsite;
-        };
-
-        // Calculate total due for this month
-        const monthSessions = student.sessions.filter((s) => {
-          const sessionDate = new Date(s.date);
-          return (
-            sessionDate.getMonth() === month &&
-            sessionDate.getFullYear() === year &&
-            (s.status === "completed" || s.status === "scheduled")
-          );
-        });
-
-        const sessionPrice = getPrice();
-        const totalDue = monthSessions.length * sessionPrice;
-
-        return {
-          ...student,
-        };
-      }),
-    );
-
-    // Update payments separately
-    setPayments((prevPayments) =>
-      prevPayments.map((studentPayments) => {
-        if (studentPayments.studentId !== studentId) return studentPayments;
-
-        const existingPaymentIndex = studentPayments.payments.findIndex((p) => p.month === month && p.year === year);
-
-        // Get student to calculate totalDue
-        const student = students.find((s) => s.id === studentId);
-        if (!student) return studentPayments;
-
-        const getPrice = (): number => {
-          const defaultOnsite = 150;
-          const defaultOnline = 120;
-
-          if (student.useCustomSettings) {
-          if (student.sessionType === "online") {
-              return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
-                ? student.customPriceOnline
-                : (settings?.defaultPriceOnline ?? defaultOnline);
-            }
-            return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
-              ? student.customPriceOnsite
-              : (settings?.defaultPriceOnsite ?? defaultOnsite);
-          }
-
-          if (student.sessionType === "online") {
-            return typeof settings?.defaultPriceOnline === "number" && settings.defaultPriceOnline > 0
-              ? settings.defaultPriceOnline
-              : defaultOnline;
-          }
-          return typeof settings?.defaultPriceOnsite === "number" && settings.defaultPriceOnsite > 0
-            ? settings.defaultPriceOnsite
-            : defaultOnsite;
-        };
-
-        const monthSessions = student.sessions.filter((s) => {
-          const sessionDate = new Date(s.date);
-          return (
-            sessionDate.getMonth() === month &&
-            sessionDate.getFullYear() === year &&
-            (s.status === "completed" || s.status === "scheduled")
-          );
-        });
-
-        const sessionPrice = getPrice();
-        const totalDue = monthSessions.length * sessionPrice;
-
-        let updatedPayments = [...studentPayments.payments];
-
-        if (existingPaymentIndex >= 0) {
-          // Add to existing payment
-          const existingPayment = updatedPayments[existingPaymentIndex];
-          const newTotalPaid = (existingPayment.amountPaid || 0) + amount;
-
-          updatedPayments[existingPaymentIndex] = {
-            ...existingPayment,
-            amountPaid: newTotalPaid,
-            amountDue: totalDue,
-            isPaid: newTotalPaid >= totalDue,
-            amount: newTotalPaid,
-            paidAt: new Date().toISOString(),
-            method,
-            notes: notes || existingPayment.notes,
-            paymentRecords: [
-              ...(existingPayment.paymentRecords || []),
-              {
-                id: Date.now().toString(),
-                amount,
-                method,
-                paidAt: new Date().toISOString(),
-                notes,
-              },
-            ],
-          };
-        } else {
-          // Create new payment
-          updatedPayments.push({
-            month,
-            year,
-            isPaid: amount >= totalDue,
-            amount,
-            amountPaid: amount,
-            amountDue: totalDue,
-            method,
-            paidAt: new Date().toISOString(),
-            notes,
-            paymentRecords: [
-              {
-                id: Date.now().toString(),
-                amount,
-                method,
-                paidAt: new Date().toISOString(),
-                notes,
-              },
-            ],
-          });
-        }
-
-        return {
-          ...studentPayments,
-          payments: updatedPayments,
-        };
-      }),
-    );
-  };
-
-  // ✅ NEW: Update monthly amount due (called when calculating from sessions)
+  // ✅ Update monthly amount due (called when calculating from sessions)
   const updateMonthlyAmountDue = (studentId: string, month: number, year: number, amountDue: number) => {
     setPayments((prev) =>
       prev.map((p) => {
@@ -817,103 +900,6 @@ export const useStudents = () => {
         };
       }),
     );
-  };
-
-  const recordPayment = (
-    studentId: string,
-    paymentData: {
-      month: number;
-      year: number;
-      amount: number;
-      method: PaymentMethod;
-      paidAt: string;
-      notes?: string;
-    },
-  ) => {
-    setPayments((prev) => {
-      const updated = [...prev];
-      const studentPaymentIndex = updated.findIndex((p) => p.studentId === studentId);
-
-      if (studentPaymentIndex === -1) {
-        updated.push({
-          studentId,
-          payments: [
-            {
-              month: paymentData.month,
-              year: paymentData.year,
-              isPaid: true,
-              paidAt: paymentData.paidAt,
-              amount: paymentData.amount,
-              method: paymentData.method,
-              notes: paymentData.notes,
-              amountDue: paymentData.amount,
-              amountPaid: paymentData.amount,
-              paymentStatus: "paid" as PaymentStatus,
-              paymentRecords: [
-                {
-                  id: generateId(),
-                  amount: paymentData.amount,
-                  method: paymentData.method,
-                  paidAt: paymentData.paidAt,
-                  notes: paymentData.notes,
-                },
-              ],
-            },
-          ],
-        });
-      } else {
-        const studentPayments = updated[studentPaymentIndex];
-        const paymentIndex = studentPayments.payments.findIndex(
-          (p) => p.month === paymentData.month && p.year === paymentData.year,
-        );
-
-        if (paymentIndex === -1) {
-          studentPayments.payments.push({
-            month: paymentData.month,
-            year: paymentData.year,
-            isPaid: true,
-            paidAt: paymentData.paidAt,
-            amount: paymentData.amount,
-            method: paymentData.method,
-            notes: paymentData.notes,
-            amountDue: paymentData.amount,
-            amountPaid: paymentData.amount,
-            paymentStatus: "paid" as PaymentStatus,
-            paymentRecords: [
-              {
-                id: generateId(),
-                amount: paymentData.amount,
-                method: paymentData.method,
-                paidAt: paymentData.paidAt,
-                notes: paymentData.notes,
-              },
-            ],
-          });
-        } else {
-          studentPayments.payments[paymentIndex] = {
-            ...studentPayments.payments[paymentIndex],
-            isPaid: true,
-            paidAt: paymentData.paidAt,
-            amount: paymentData.amount,
-            method: paymentData.method,
-            notes: paymentData.notes,
-            amountPaid: paymentData.amount,
-            paymentStatus: "paid" as PaymentStatus,
-            paymentRecords: [
-              {
-                id: generateId(),
-                amount: paymentData.amount,
-                method: paymentData.method,
-                paidAt: paymentData.paidAt,
-                notes: paymentData.notes,
-              },
-            ],
-          };
-        }
-      }
-
-      return updated;
-    });
   };
 
   const getStudentPayments = (studentId: string): StudentPayments | undefined => {
@@ -953,8 +939,9 @@ export const useStudents = () => {
     toggleSessionComplete,
     togglePaymentStatus,
     recordPayment,
-    addPartialPayment, // ✅ NEW
-    updateMonthlyAmountDue, // ✅ NEW
+    addPartialPayment,
+    resetMonthlyPayment, // ✅ NEW
+    updateMonthlyAmountDue,
     getStudentPayments,
     isStudentPaidForMonth,
     bulkUpdateSessionTime,
