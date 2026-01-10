@@ -215,13 +215,24 @@ export const PaymentsDashboard = ({
     view: "student" | "monthly";
   }>({ open: false, view: "student" });
 
-  const getPaymentStatus = (studentId: string, month?: number, year?: number): boolean => {
+  const getPaymentStatusLocal = (studentId: string, month?: number, year?: number): "paid" | "partial" | "unpaid" => {
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return "unpaid";
+    
     const studentPayments = payments.find((p) => p.studentId === studentId);
-    if (!studentPayments) return false;
-    const payment = studentPayments.payments.find(
-      (p) => p.month === (month ?? selectedMonth) && p.year === (year ?? selectedYear),
-    );
-    return payment?.isPaid || false;
+    if (!studentPayments) return "unpaid";
+    
+    const m = month ?? selectedMonth;
+    const y = year ?? selectedYear;
+    const payment = studentPayments.payments.find((p) => p.month === m && p.year === y);
+    if (!payment) return "unpaid";
+    
+    const amountPaid = payment.amountPaid || payment.amount || 0;
+    const amountDue = payment.amountDue || getStudentMonthTotal(student, m, y, settings);
+    
+    if (amountPaid >= amountDue) return "paid";
+    if (amountPaid > 0) return "partial";
+    return "unpaid";
   };
 
   const getPaymentDetails = (studentId: string, month?: number, year?: number) => {
@@ -240,16 +251,17 @@ export const PaymentsDashboard = ({
       .sort((a, b) => (b.year !== a.year ? b.year - a.year : b.month - a.month));
   };
 
-  const paidCount = students.filter((s) => getPaymentStatus(s.id)).length;
-  const unpaidCount = students.length - paidCount;
-  const unpaidStudents = students.filter((s) => !getPaymentStatus(s.id));
+  const paidCount = students.filter((s) => getPaymentStatusLocal(s.id) === "paid").length;
+  const partialCount = students.filter((s) => getPaymentStatusLocal(s.id) === "partial").length;
+  const unpaidCount = students.length - paidCount - partialCount;
+  const unpaidStudents = students.filter((s) => getPaymentStatusLocal(s.id) !== "paid");
 
   const totalExpected = students.reduce((sum, student) => {
     return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
   }, 0);
 
   const totalCollected = students
-    .filter((s) => getPaymentStatus(s.id))
+    .filter((s) => getPaymentStatusLocal(s.id) === "paid")
     .reduce((sum, student) => {
       return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
     }, 0);
@@ -367,7 +379,7 @@ export const PaymentsDashboard = ({
         return unpaidStudents;
       case "upcoming":
         // Students with upcoming payment (next 3 days)
-        return students.filter((s) => !getPaymentStatus(s.id));
+        return students.filter((s) => getPaymentStatusLocal(s.id) !== "paid");
       case "all":
         return students;
       case "custom":
@@ -501,15 +513,15 @@ export const PaymentsDashboard = ({
     reportLines.push("");
 
     students.forEach((student) => {
-      const isPaid = getPaymentStatus(student.id);
+      const paymentStatus = getPaymentStatusLocal(student.id);
       const paymentDetails = getPaymentDetails(student.id);
       const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
       const billableCount = monthStats.completed + monthStats.scheduled;
       const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
       const pricePerSession = getStudentSessionPrice(student, settings);
 
-      const statusIcon = isPaid ? "✅" : "⏳";
-      const statusText = isPaid ? "(مدفوع)" : "(غير مدفوع)";
+      const statusIcon = paymentStatus === "paid" ? "✅" : paymentStatus === "partial" ? "🔶" : "⏳";
+      const statusText = paymentStatus === "paid" ? "(مدفوع)" : paymentStatus === "partial" ? "(جزئي)" : "(غير مدفوع)";
 
       reportLines.push(`${statusIcon} ${student.name} ${statusText}`);
 
@@ -517,7 +529,7 @@ export const PaymentsDashboard = ({
         reportLines.push(`   ${billableCount} حصص × ${pricePerSession} ${CURRENCY} = ${studentTotal} ${CURRENCY}`);
       }
 
-      if (isPaid && paymentDetails) {
+      if (paymentStatus !== "unpaid" && paymentDetails) {
         if (paymentDetails.paidAt) {
           reportLines.push(`   تاريخ الدفع: ${formatDateAr(paymentDetails.paidAt)}`);
         }
@@ -562,9 +574,9 @@ export const PaymentsDashboard = ({
   const filteredStudents = useMemo(() => {
     const searchLower = studentSearch.trim().toLowerCase();
     return students.filter((student) => {
-      const isPaid = getPaymentStatus(student.id);
-      if (paymentFilter === "paid" && !isPaid) return false;
-      if (paymentFilter === "unpaid" && isPaid) return false;
+      const paymentStatus = getPaymentStatusLocal(student.id);
+      if (paymentFilter === "paid" && paymentStatus !== "paid") return false;
+      if (paymentFilter === "unpaid" && paymentStatus === "paid") return false;
       if (studentFilter !== "all" && student.id !== studentFilter) return false;
       if (searchLower && !student.name.toLowerCase().includes(searchLower)) return false;
       return true;
@@ -1056,7 +1068,7 @@ export const PaymentsDashboard = ({
               <ScrollArea className="h-[400px]">
                 <div className="space-y-2 pr-2">
                   {students.map((student) => {
-                    const isPaid = getPaymentStatus(student.id);
+                    const paymentStatus = getPaymentStatusLocal(student.id);
                     const paymentDetails = getPaymentDetails(student.id);
                     const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
                     const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
@@ -1067,14 +1079,18 @@ export const PaymentsDashboard = ({
                         key={student.id}
                         className={cn(
                           "p-3 rounded-lg border",
-                          isPaid ? "bg-success/5 border-success/30" : "bg-muted/50 border-border",
+                          paymentStatus === "paid" && "bg-success/5 border-success/30",
+                          paymentStatus === "partial" && "bg-amber-500/5 border-amber-500/30",
+                          paymentStatus === "unpaid" && "bg-muted/50 border-border",
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              {isPaid ? (
+                              {paymentStatus === "paid" ? (
                                 <Check className="h-4 w-4 text-success" />
+                              ) : paymentStatus === "partial" ? (
+                                <Clock className="h-4 w-4 text-amber-500" />
                               ) : (
                                 <Clock className="h-4 w-4 text-warning" />
                               )}
@@ -1087,19 +1103,25 @@ export const PaymentsDashboard = ({
                                   {studentTotal} {CURRENCY}
                                 </p>
                               )}
-                              {isPaid && paymentDetails?.paidAt && (
+                              {paymentStatus !== "unpaid" && paymentDetails?.paidAt && (
                                 <p>تاريخ الدفع: {formatDateAr(paymentDetails.paidAt)}</p>
                               )}
-                              {isPaid && paymentDetails?.method && (
+                              {paymentStatus !== "unpaid" && paymentDetails?.method && (
                                 <p>الطريقة: {getPaymentMethodLabel(paymentDetails.method)}</p>
                               )}
-                              {isPaid && paymentDetails?.notes && (
+                              {paymentStatus !== "unpaid" && paymentDetails?.notes && (
                                 <p className="text-xs italic">"{paymentDetails.notes}"</p>
                               )}
                             </div>
                           </div>
-                          <Badge variant={isPaid ? "default" : "secondary"} className={cn(isPaid && "bg-success")}>
-                            {isPaid ? "مدفوع" : "معلق"}
+                          <Badge 
+                            variant={paymentStatus === "paid" ? "default" : "secondary"} 
+                            className={cn(
+                              paymentStatus === "paid" && "bg-success",
+                              paymentStatus === "partial" && "bg-amber-500"
+                            )}
+                          >
+                            {paymentStatus === "paid" ? "مدفوع" : paymentStatus === "partial" ? "جزئي" : "معلق"}
                           </Badge>
                         </div>
                       </div>

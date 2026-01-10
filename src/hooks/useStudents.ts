@@ -647,23 +647,23 @@ export const useStudents = () => {
           const defaultOnline = 120;
 
           if (student.useCustomSettings) {
-            if (student.sessionType === "online") {
+          if (student.sessionType === "online") {
               return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
                 ? student.customPriceOnline
-                : (appSettings?.defaultPriceOnline ?? defaultOnline);
+                : (settings?.defaultPriceOnline ?? defaultOnline);
             }
             return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
               ? student.customPriceOnsite
-              : (appSettings?.defaultPriceOnsite ?? defaultOnsite);
+              : (settings?.defaultPriceOnsite ?? defaultOnsite);
           }
 
           if (student.sessionType === "online") {
-            return typeof appSettings?.defaultPriceOnline === "number" && appSettings.defaultPriceOnline > 0
-              ? appSettings.defaultPriceOnline
+            return typeof settings?.defaultPriceOnline === "number" && settings.defaultPriceOnline > 0
+              ? settings.defaultPriceOnline
               : defaultOnline;
           }
-          return typeof appSettings?.defaultPriceOnsite === "number" && appSettings.defaultPriceOnsite > 0
-            ? appSettings.defaultPriceOnsite
+          return typeof settings?.defaultPriceOnsite === "number" && settings.defaultPriceOnsite > 0
+            ? settings.defaultPriceOnsite
             : defaultOnsite;
         };
 
@@ -702,23 +702,23 @@ export const useStudents = () => {
           const defaultOnline = 120;
 
           if (student.useCustomSettings) {
-            if (student.sessionType === "online") {
+          if (student.sessionType === "online") {
               return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
                 ? student.customPriceOnline
-                : (appSettings?.defaultPriceOnline ?? defaultOnline);
+                : (settings?.defaultPriceOnline ?? defaultOnline);
             }
             return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
               ? student.customPriceOnsite
-              : (appSettings?.defaultPriceOnsite ?? defaultOnsite);
+              : (settings?.defaultPriceOnsite ?? defaultOnsite);
           }
 
           if (student.sessionType === "online") {
-            return typeof appSettings?.defaultPriceOnline === "number" && appSettings.defaultPriceOnline > 0
-              ? appSettings.defaultPriceOnline
+            return typeof settings?.defaultPriceOnline === "number" && settings.defaultPriceOnline > 0
+              ? settings.defaultPriceOnline
               : defaultOnline;
           }
-          return typeof appSettings?.defaultPriceOnsite === "number" && appSettings.defaultPriceOnsite > 0
-            ? appSettings.defaultPriceOnsite
+          return typeof settings?.defaultPriceOnsite === "number" && settings.defaultPriceOnsite > 0
+            ? settings.defaultPriceOnsite
             : defaultOnsite;
         };
 
