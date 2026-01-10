@@ -20,6 +20,7 @@ interface QuickPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   student: Student | null;
+  sessionId: string;
   sessionDate: string;
   settings: AppSettings;
   payments?: StudentPayments[];
@@ -58,6 +59,7 @@ export const QuickPaymentDialog = ({
   open,
   onOpenChange,
   student,
+  sessionId,
   sessionDate,
   settings,
   payments,
@@ -66,9 +68,9 @@ export const QuickPaymentDialog = ({
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState<PaymentMethod>("cash");
 
-  // Calculate SESSION payment info (not monthly!)
+  // Calculate SESSION payment info using SESSION ID (not date!)
   const sessionPaymentInfo = useMemo(() => {
-    if (!student || !sessionDate) {
+    if (!student || !sessionId) {
       return {
         sessionPrice: 0,
         alreadyPaidForSession: 0,
@@ -79,8 +81,7 @@ export const QuickPaymentDialog = ({
 
     const sessionPrice = getStudentSessionPrice(student, settings);
 
-    // Get amount already paid for THIS SESSION from the monthly payment
-    // We track this by looking at the payment records that contain this session date in notes
+    // Get amount already paid for THIS SPECIFIC SESSION by session ID
     const date = new Date(sessionDate);
     const month = date.getMonth();
     const year = date.getFullYear();
@@ -92,10 +93,10 @@ export const QuickPaymentDialog = ({
       if (studentPayments) {
         const monthPayment = studentPayments.payments.find((p) => p.month === month && p.year === year);
         if (monthPayment && monthPayment.paymentRecords) {
-          // Sum payments made for this specific session date
-          // Notes format: "دفعة من حصة 2026-01-10"
+          // Sum payments made for this SPECIFIC SESSION ID
+          // Notes format: "session:abc123|date:2026-01-10"
           alreadyPaidForSession = monthPayment.paymentRecords
-            .filter((record) => record.notes && record.notes.includes(sessionDate))
+            .filter((record) => record.notes && record.notes.includes(`session:${sessionId}`))
             .reduce((sum, record) => sum + record.amount, 0);
         }
       }
@@ -112,7 +113,7 @@ export const QuickPaymentDialog = ({
       remainingForSession,
       isFullyPaid,
     };
-  }, [student, sessionDate, settings, payments]);
+  }, [student, sessionId, sessionDate, settings, payments]);
 
   // Quick amount buttons
   const quickAmounts = useMemo(() => {
@@ -156,7 +157,6 @@ export const QuickPaymentDialog = ({
 
   // Handle amount change - cap at remaining
   const handleAmountChange = (value: number) => {
-    // Allow typing any value but cap it
     const cappedValue = Math.min(Math.max(0, value), sessionPaymentInfo.remainingForSession);
     setAmount(cappedValue);
   };
