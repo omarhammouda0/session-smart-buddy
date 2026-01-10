@@ -71,20 +71,20 @@ const AnimatedBackground = memo(() => {
       `}</style>
 
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        {/* Base gradient - warmer */}
+        {/* Base gradient - more vibrant */}
         <div
           className="absolute inset-0"
           style={{
             background: `
-              radial-gradient(ellipse at top right, hsl(333 71% 50% / 0.08) 0%, transparent 50%),
-              radial-gradient(ellipse at bottom left, hsl(152 60% 42% / 0.06) 0%, transparent 50%),
-              radial-gradient(ellipse at center, hsl(38 92% 50% / 0.04) 0%, transparent 70%),
+              radial-gradient(ellipse at top right, hsl(333 71% 50% / 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at bottom left, hsl(152 60% 42% / 0.12) 0%, transparent 50%),
+              radial-gradient(ellipse at center, hsl(38 92% 50% / 0.08) 0%, transparent 70%),
               linear-gradient(180deg, hsl(30 25% 98%) 0%, hsl(30 20% 96%) 100%)
             `,
           }}
         />
 
-        {/* Animated Blobs */}
+        {/* Enhanced Animated Blobs - more visible */}
         <div
           className="absolute rounded-full bg-blob"
           style={{
@@ -92,8 +92,8 @@ const AnimatedBackground = memo(() => {
             right: "-5%",
             width: "600px",
             height: "600px",
-            background: "hsl(333 71% 50% / 0.12)",
-            filter: "blur(80px)",
+            background: "hsl(333 71% 50% / 0.2)",
+            filter: "blur(60px)",
           }}
         />
         <div
@@ -103,8 +103,8 @@ const AnimatedBackground = memo(() => {
             left: "-10%",
             width: "500px",
             height: "500px",
-            background: "hsl(152 60% 42% / 0.10)",
-            filter: "blur(80px)",
+            background: "hsl(152 60% 42% / 0.18)",
+            filter: "blur(60px)",
           }}
         />
         <div
@@ -114,33 +114,33 @@ const AnimatedBackground = memo(() => {
             right: "10%",
             width: "450px",
             height: "450px",
-            background: "hsl(38 92% 50% / 0.08)",
-            filter: "blur(80px)",
+            background: "hsl(38 92% 50% / 0.15)",
+            filter: "blur(60px)",
           }}
         />
 
-        {/* Grid pattern */}
+        {/* Grid pattern - slightly more visible */}
         <div
           className="absolute inset-0"
           style={{
             backgroundImage: `
-              linear-gradient(to right, hsl(333 71% 50% / 0.03) 1px, transparent 1px),
-              linear-gradient(to bottom, hsl(333 71% 50% / 0.03) 1px, transparent 1px)
+              linear-gradient(to right, hsl(333 71% 50% / 0.05) 1px, transparent 1px),
+              linear-gradient(to bottom, hsl(333 71% 50% / 0.05) 1px, transparent 1px)
             `,
             backgroundSize: "50px 50px",
           }}
         />
 
-        {/* ========== FLOATING EDUCATION ICONS - MORE VISIBLE ========== */}
+        {/* ========== ENHANCED FLOATING EDUCATION ICONS - MORE VISIBLE ========== */}
 
         {/* Book - top left */}
         <svg
           className="absolute bg-float"
-          style={{ top: "80px", left: "20px", width: "45px", height: "45px", opacity: 0.25 }}
+          style={{ top: "80px", left: "20px", width: "55px", height: "55px", opacity: 0.4 }}
           viewBox="0 0 24 24"
-          fill="hsl(333 71% 50% / 0.1)"
+          fill="hsl(333 71% 50% / 0.3)"
           stroke="hsl(333 71% 50%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
@@ -151,11 +151,11 @@ const AnimatedBackground = memo(() => {
         {/* Graduation Cap - top right area */}
         <svg
           className="absolute bg-float-1"
-          style={{ top: "120px", right: "30px", width: "55px", height: "55px", opacity: 0.2 }}
+          style={{ top: "120px", right: "30px", width: "65px", height: "65px", opacity: 0.45 }}
           viewBox="0 0 24 24"
-          fill="hsl(333 71% 50% / 0.1)"
+          fill="hsl(333 71% 50% / 0.3)"
           stroke="hsl(333 71% 50%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
           <path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5" />
@@ -164,11 +164,11 @@ const AnimatedBackground = memo(() => {
         {/* Pencil - left side */}
         <svg
           className="absolute bg-float-2"
-          style={{ top: "350px", left: "15px", width: "38px", height: "38px", opacity: 0.22 }}
+          style={{ top: "350px", left: "15px", width: "50px", height: "50px", opacity: 0.5 }}
           viewBox="0 0 24 24"
-          fill="hsl(152 60% 42% / 0.1)"
+          fill="hsl(152 60% 42% / 0.3)"
           stroke="hsl(152 60% 42%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
           <path d="M15 5l4 4" />
@@ -177,11 +177,11 @@ const AnimatedBackground = memo(() => {
         {/* Lightbulb - right side */}
         <svg
           className="absolute bg-float-3"
-          style={{ top: "400px", right: "20px", width: "42px", height: "42px", opacity: 0.25 }}
+          style={{ top: "400px", right: "20px", width: "52px", height: "52px", opacity: 0.55 }}
           viewBox="0 0 24 24"
-          fill="hsl(38 92% 50% / 0.15)"
+          fill="hsl(38 92% 50% / 0.4)"
           stroke="hsl(38 92% 50%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <path d="M9 18h6" />
           <path d="M10 22h4" />
@@ -191,11 +191,11 @@ const AnimatedBackground = memo(() => {
         {/* Calculator - bottom left */}
         <svg
           className="absolute bg-float-4"
-          style={{ bottom: "150px", left: "25px", width: "35px", height: "35px", opacity: 0.2 }}
+          style={{ bottom: "150px", left: "25px", width: "45px", height: "45px", opacity: 0.45 }}
           viewBox="0 0 24 24"
-          fill="hsl(200 80% 50% / 0.1)"
+          fill="hsl(200 80% 50% / 0.3)"
           stroke="hsl(200 80% 50%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <rect x="4" y="2" width="16" height="20" rx="2" />
           <path d="M8 6h8" />
@@ -209,11 +209,11 @@ const AnimatedBackground = memo(() => {
         {/* Star - bottom right */}
         <svg
           className="absolute bg-float-5"
-          style={{ bottom: "200px", right: "35px", width: "32px", height: "32px", opacity: 0.3 }}
+          style={{ bottom: "200px", right: "35px", width: "42px", height: "42px", opacity: 0.6 }}
           viewBox="0 0 24 24"
-          fill="hsl(38 92% 50% / 0.5)"
+          fill="hsl(38 92% 50% / 0.7)"
           stroke="hsl(38 92% 50%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
@@ -224,15 +224,15 @@ const AnimatedBackground = memo(() => {
           style={{
             bottom: "300px",
             left: "10px",
-            width: "40px",
-            height: "40px",
-            opacity: 0.18,
+            width: "50px",
+            height: "50px",
+            opacity: 0.4,
             transform: "rotate(-20deg)",
           }}
           viewBox="0 0 24 24"
           fill="none"
           stroke="hsl(280 60% 50%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <path d="M21.2 8.8l-9.9 9.9c-.8.8-2 .8-2.8 0l-5.4-5.4c-.8-.8-.8-2 0-2.8l9.9-9.9c.8-.8 2-.8 2.8 0l5.4 5.4c.8.8.8 2 0 2.8z" />
           <path d="M7 14l2-2" />
@@ -243,11 +243,11 @@ const AnimatedBackground = memo(() => {
         {/* Clock - right side upper */}
         <svg
           className="absolute bg-float-2"
-          style={{ top: "250px", right: "15px", width: "36px", height: "36px", opacity: 0.2 }}
+          style={{ top: "250px", right: "15px", width: "46px", height: "46px", opacity: 0.45 }}
           viewBox="0 0 24 24"
-          fill="hsl(333 71% 50% / 0.1)"
+          fill="hsl(333 71% 50% / 0.3)"
           stroke="hsl(333 71% 50%)"
-          strokeWidth="1.5"
+          strokeWidth="2"
         >
           <circle cx="12" cy="12" r="10" />
           <path d="M12 6v6l4 2" />
@@ -259,9 +259,9 @@ const AnimatedBackground = memo(() => {
           style={{
             top: "180px",
             right: "25px",
-            fontSize: "22px",
+            fontSize: "26px",
             fontWeight: "bold",
-            opacity: 0.15,
+            opacity: 0.35,
             color: "hsl(333 71% 50%)",
             fontFamily: "Tajawal, sans-serif",
           }}
@@ -275,9 +275,9 @@ const AnimatedBackground = memo(() => {
           style={{
             bottom: "100px",
             left: "30px",
-            fontSize: "20px",
+            fontSize: "24px",
             fontWeight: "bold",
-            opacity: 0.15,
+            opacity: 0.35,
             color: "hsl(152 60% 42%)",
             fontFamily: "Tajawal, sans-serif",
           }}
@@ -291,9 +291,9 @@ const AnimatedBackground = memo(() => {
           style={{
             top: "500px",
             right: "25px",
-            fontSize: "18px",
+            fontSize: "22px",
             fontWeight: "bold",
-            opacity: 0.15,
+            opacity: 0.35,
             color: "hsl(38 92% 50%)",
             fontFamily: "monospace",
           }}
@@ -304,16 +304,24 @@ const AnimatedBackground = memo(() => {
         {/* Decorative dots - more visible */}
         <div
           className="absolute rounded-full animate-pulse"
-          style={{ top: "150px", right: "120px", width: "8px", height: "8px", background: "hsl(333 71% 50% / 0.5)" }}
+          style={{
+            top: "150px",
+            right: "120px",
+            width: "12px",
+            height: "12px",
+            background: "hsl(333 71% 50% / 0.8)",
+            boxShadow: "0 0 10px hsl(333 71% 50% / 0.5)",
+          }}
         />
         <div
           className="absolute rounded-full animate-pulse"
           style={{
             top: "380px",
             left: "80px",
-            width: "10px",
-            height: "10px",
-            background: "hsl(152 60% 42% / 0.5)",
+            width: "14px",
+            height: "14px",
+            background: "hsl(152 60% 42% / 0.8)",
+            boxShadow: "0 0 10px hsl(152 60% 42% / 0.5)",
             animationDelay: "1s",
           }}
         />
@@ -322,9 +330,10 @@ const AnimatedBackground = memo(() => {
           style={{
             bottom: "250px",
             right: "100px",
-            width: "8px",
-            height: "8px",
-            background: "hsl(38 92% 50% / 0.5)",
+            width: "12px",
+            height: "12px",
+            background: "hsl(38 92% 50% / 0.8)",
+            boxShadow: "0 0 10px hsl(38 92% 50% / 0.5)",
             animationDelay: "2s",
           }}
         />
@@ -333,9 +342,10 @@ const AnimatedBackground = memo(() => {
           style={{
             top: "550px",
             left: "100px",
-            width: "6px",
-            height: "6px",
-            background: "hsl(200 80% 50% / 0.4)",
+            width: "10px",
+            height: "10px",
+            background: "hsl(200 80% 50% / 0.7)",
+            boxShadow: "0 0 8px hsl(200 80% 50% / 0.4)",
             animationDelay: "0.5s",
           }}
         />
@@ -344,10 +354,20 @@ const AnimatedBackground = memo(() => {
           style={{
             top: "280px",
             right: "80px",
-            width: "7px",
-            height: "7px",
-            background: "hsl(280 60% 50% / 0.4)",
+            width: "11px",
+            height: "11px",
+            background: "hsl(280 60% 50% / 0.7)",
+            boxShadow: "0 0 8px hsl(280 60% 50% / 0.4)",
             animationDelay: "1.5s",
+          }}
+        />
+
+        {/* Subtle glow effect */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `radial-gradient(circle at 20% 20%, hsl(333 71% 50% / 0.03) 0%, transparent 40%),
+                        radial-gradient(circle at 80% 80%, hsl(152 60% 42% / 0.03) 0%, transparent 40%)`,
           }}
         />
       </div>
