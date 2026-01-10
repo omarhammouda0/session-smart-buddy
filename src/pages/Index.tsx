@@ -877,6 +877,7 @@ const Index = () => {
         student={quickPaymentDialog.student}
         sessionDate={quickPaymentDialog.sessionDate}
         settings={settings}
+        payments={payments}
         onConfirm={handleQuickPaymentConfirm}
       />
 
