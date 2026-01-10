@@ -629,7 +629,6 @@ export const useStudents = () => {
     );
   };
 
-  // ✅ NEW: Add partial payment
   const addPartialPayment = (
     studentId: string,
     month: number,
@@ -642,6 +641,32 @@ export const useStudents = () => {
       prevStudents.map((student) => {
         if (student.id !== studentId) return student;
 
+        // Helper function to get session price
+        const getPrice = (): number => {
+          const defaultOnsite = 150;
+          const defaultOnline = 120;
+
+          if (student.useCustomSettings) {
+            if (student.sessionType === "online") {
+              return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
+                ? student.customPriceOnline
+                : (appSettings?.defaultPriceOnline ?? defaultOnline);
+            }
+            return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
+              ? student.customPriceOnsite
+              : (appSettings?.defaultPriceOnsite ?? defaultOnsite);
+          }
+
+          if (student.sessionType === "online") {
+            return typeof appSettings?.defaultPriceOnline === "number" && appSettings.defaultPriceOnline > 0
+              ? appSettings.defaultPriceOnline
+              : defaultOnline;
+          }
+          return typeof appSettings?.defaultPriceOnsite === "number" && appSettings.defaultPriceOnsite > 0
+            ? appSettings.defaultPriceOnsite
+            : defaultOnsite;
+        };
+
         // Calculate total due for this month
         const monthSessions = student.sessions.filter((s) => {
           const sessionDate = new Date(s.date);
@@ -652,13 +677,64 @@ export const useStudents = () => {
           );
         });
 
-        const sessionPrice = getStudentSessionPrice(student);
+        const sessionPrice = getPrice();
         const totalDue = monthSessions.length * sessionPrice;
 
-        // Find existing payment for this month
-        const existingPaymentIndex = student.payments.findIndex((p) => p.month === month && p.year === year);
+        return {
+          ...student,
+        };
+      }),
+    );
 
-        let updatedPayments = [...student.payments];
+    // Update payments separately
+    setPayments((prevPayments) =>
+      prevPayments.map((studentPayments) => {
+        if (studentPayments.studentId !== studentId) return studentPayments;
+
+        const existingPaymentIndex = studentPayments.payments.findIndex((p) => p.month === month && p.year === year);
+
+        // Get student to calculate totalDue
+        const student = students.find((s) => s.id === studentId);
+        if (!student) return studentPayments;
+
+        const getPrice = (): number => {
+          const defaultOnsite = 150;
+          const defaultOnline = 120;
+
+          if (student.useCustomSettings) {
+            if (student.sessionType === "online") {
+              return typeof student.customPriceOnline === "number" && student.customPriceOnline > 0
+                ? student.customPriceOnline
+                : (appSettings?.defaultPriceOnline ?? defaultOnline);
+            }
+            return typeof student.customPriceOnsite === "number" && student.customPriceOnsite > 0
+              ? student.customPriceOnsite
+              : (appSettings?.defaultPriceOnsite ?? defaultOnsite);
+          }
+
+          if (student.sessionType === "online") {
+            return typeof appSettings?.defaultPriceOnline === "number" && appSettings.defaultPriceOnline > 0
+              ? appSettings.defaultPriceOnline
+              : defaultOnline;
+          }
+          return typeof appSettings?.defaultPriceOnsite === "number" && appSettings.defaultPriceOnsite > 0
+            ? appSettings.defaultPriceOnsite
+            : defaultOnsite;
+        };
+
+        const monthSessions = student.sessions.filter((s) => {
+          const sessionDate = new Date(s.date);
+          return (
+            sessionDate.getMonth() === month &&
+            sessionDate.getFullYear() === year &&
+            (s.status === "completed" || s.status === "scheduled")
+          );
+        });
+
+        const sessionPrice = getPrice();
+        const totalDue = monthSessions.length * sessionPrice;
+
+        let updatedPayments = [...studentPayments.payments];
 
         if (existingPaymentIndex >= 0) {
           // Add to existing payment
@@ -670,7 +746,7 @@ export const useStudents = () => {
             amountPaid: newTotalPaid,
             amountDue: totalDue,
             isPaid: newTotalPaid >= totalDue,
-            amount: newTotalPaid, // Keep for backward compatibility
+            amount: newTotalPaid,
             paidAt: new Date().toISOString(),
             method,
             notes: notes || existingPayment.notes,
@@ -691,7 +767,7 @@ export const useStudents = () => {
             month,
             year,
             isPaid: amount >= totalDue,
-            amount, // Keep for backward compatibility
+            amount,
             amountPaid: amount,
             amountDue: totalDue,
             method,
@@ -710,7 +786,7 @@ export const useStudents = () => {
         }
 
         return {
-          ...student,
+          ...studentPayments,
           payments: updatedPayments,
         };
       }),

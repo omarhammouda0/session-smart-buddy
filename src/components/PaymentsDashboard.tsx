@@ -154,6 +154,27 @@ const formatDateAr = (dateStr?: string): string => {
   }
 };
 
+// Helper to get payment status - REPLACES the old boolean version
+const getPaymentStatusType = (
+  studentPayments: StudentPayments | undefined,
+  student: Student,
+  month: number,
+  year: number,
+  settings?: AppSettings,
+): "paid" | "partial" | "unpaid" => {
+  if (!studentPayments) return "unpaid";
+
+  const payment = studentPayments.payments.find((p) => p.month === month && p.year === year);
+  if (!payment) return "unpaid";
+
+  const amountPaid = payment.amountPaid || payment.amount || 0;
+  const amountDue = payment.amountDue || getStudentMonthTotal(student, month, year, settings);
+
+  if (amountPaid >= amountDue) return "paid";
+  if (amountPaid > 0) return "partial";
+  return "unpaid";
+};
+
 interface PaymentsDashboardProps {
   students: Student[];
   payments: StudentPayments[];
@@ -214,15 +235,6 @@ export const PaymentsDashboard = ({
     open: boolean;
     view: "student" | "monthly";
   }>({ open: false, view: "student" });
-
-  const getPaymentStatus = (studentId: string, month?: number, year?: number): boolean => {
-    const studentPayments = payments.find((p) => p.studentId === studentId);
-    if (!studentPayments) return false;
-    const payment = studentPayments.payments.find(
-      (p) => p.month === (month ?? selectedMonth) && p.year === (year ?? selectedYear),
-    );
-    return payment?.isPaid || false;
-  };
 
   const getPaymentDetails = (studentId: string, month?: number, year?: number) => {
     const studentPayments = payments.find((p) => p.studentId === studentId);
