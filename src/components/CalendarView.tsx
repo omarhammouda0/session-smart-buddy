@@ -15,7 +15,17 @@ import {
   parseISO,
 } from "date-fns";
 import { ar } from "date-fns/locale";
-import { ChevronRight, ChevronLeft, Calendar as CalendarIcon, GripVertical, Clock, MoreHorizontal } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  Calendar as CalendarIcon,
+  GripVertical,
+  Clock,
+  MoreHorizontal,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -26,6 +36,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 
 interface CalendarViewProps {
@@ -45,6 +56,13 @@ interface DragState {
   studentName: string;
   originalDate: string;
   originalTime: string;
+}
+
+interface ConflictInfo {
+  hasConflict: boolean;
+  conflictStudent?: string;
+  conflictTime?: string;
+  severity: "none" | "warning" | "error";
 }
 
 export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDateTime }: CalendarViewProps) => {
@@ -75,8 +93,10 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
     originalTime: string;
     newDate: string;
     newTime: string;
+    conflictInfo: ConflictInfo;
   } | null>(null);
 
+  // Build sessions map
   const sessionsByDate = useMemo(() => {
     const map = new Map<string, SessionWithStudent[]>();
 
@@ -88,8 +108,8 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
       });
     });
 
-    // Sort sessions by time (ascending)
-    map.forEach((sessions, date) => {
+    // Sort sessions by time
+    map.forEach((sessions) => {
       sessions.sort((a, b) => {
         const timeA = a.session.time || a.student.sessionTime;
         const timeB = b.session.time || b.student.sessionTime;
@@ -130,6 +150,78 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
     }
   }, [currentDate, viewMode]);
 
+  // ✅ IMPROVED: Check for time conflicts with more detailed info
+  const checkTimeConflict = useCallback(
+    (studentId: string, sessionId: string, newDate: string, newTime: string): ConflictInfo => {
+      const sessionsOnDate = sessionsByDate.get(newDate) || [];
+      const sessionDuration = 60; // Default duration
+
+      if (!newTime) {
+        return { hasConflict: false, severity: "none" };
+      }
+
+      const [newHour, newMin] = newTime.split(":").map(Number);
+      const newStartMinutes = newHour * 60 + newMin;
+      const newEndMinutes = newStartMinutes + sessionDuration;
+
+      for (const { session, student } of sessionsOnDate) {
+        // Skip same session or same student
+        if (session.id === sessionId || student.id === studentId) continue;
+
+        const otherTime = session.time || student.sessionTime;
+        if (!otherTime) continue;
+
+        const [otherHour, otherMin] = otherTime.split(":").map(Number);
+        const otherStartMinutes = otherHour * 60 + otherMin;
+        const otherEndMinutes = otherStartMinutes + sessionDuration;
+
+        // Check for overlap
+        const hasOverlap =
+          (newStartMinutes >= otherStartMinutes && newStartMinutes < otherEndMinutes) ||
+          (newEndMinutes > otherStartMinutes && newEndMinutes <= otherEndMinutes) ||
+          (newStartMinutes <= otherStartMinutes && newEndMinutes >= otherEndMinutes);
+
+        if (hasOverlap) {
+          return {
+            hasConflict: true,
+            conflictStudent: student.name,
+            conflictTime: otherTime,
+            severity: "error",
+          };
+        }
+
+        // Check for close proximity (within 15 minutes) - warning only
+        const timeDiff = Math.abs(newStartMinutes - otherStartMinutes);
+        if (timeDiff < 15 && timeDiff > 0) {
+          return {
+            hasConflict: false,
+            conflictStudent: student.name,
+            conflictTime: otherTime,
+            severity: "warning",
+          };
+        }
+      }
+
+      return { hasConflict: false, severity: "none" };
+    },
+    [sessionsByDate],
+  );
+
+  // ✅ NEW: Check conflict for drop target (used for visual feedback)
+  const getDropTargetConflict = useCallback(
+    (targetDate: string): ConflictInfo => {
+      if (!dragState && !touchDragState?.active) {
+        return { hasConflict: false, severity: "none" };
+      }
+
+      const state = dragState || touchDragState;
+      if (!state) return { hasConflict: false, severity: "none" };
+
+      return checkTimeConflict(state.studentId, state.sessionId, targetDate, state.originalTime);
+    },
+    [dragState, touchDragState, checkTimeConflict],
+  );
+
   const goToPrev = () => {
     if (viewMode === "week") {
       setCurrentDate(subWeeks(currentDate, 1));
@@ -148,43 +240,6 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
 
   const goToToday = () => {
     setCurrentDate(new Date());
-  };
-
-  const checkTimeConflict = (
-    studentId: string,
-    sessionId: string,
-    newDate: string,
-    newTime: string,
-  ): { hasConflict: boolean; conflictStudent?: string } => {
-    const sessionsOnDate = sessionsByDate.get(newDate) || [];
-    const sessionDuration = 60;
-
-    const [newHour, newMin] = newTime.split(":").map(Number);
-    const newStartMinutes = newHour * 60 + newMin;
-    const newEndMinutes = newStartMinutes + sessionDuration;
-
-    for (const { session, student } of sessionsOnDate) {
-      // Skip if it's the same session OR same student (allow multiple sessions per day for same student)
-      if (session.id === sessionId || student.id === studentId) continue;
-
-      const otherTime = session.time || student.sessionTime;
-      if (!otherTime) continue;
-
-      const [otherHour, otherMin] = otherTime.split(":").map(Number);
-      const otherStartMinutes = otherHour * 60 + otherMin;
-      const otherEndMinutes = otherStartMinutes + sessionDuration;
-
-      const hasOverlap =
-        (newStartMinutes >= otherStartMinutes && newStartMinutes < otherEndMinutes) ||
-        (newEndMinutes > otherStartMinutes && newEndMinutes <= otherEndMinutes) ||
-        (newStartMinutes <= otherStartMinutes && newEndMinutes >= otherEndMinutes);
-
-      if (hasOverlap) {
-        return { hasConflict: true, conflictStudent: student.name };
-      }
-    }
-
-    return { hasConflict: false };
   };
 
   const handleDragStart = (
@@ -280,6 +335,13 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
     }
 
     if (dropTargetDate && dropTargetDate !== touchDragState.originalDate) {
+      const conflictInfo = checkTimeConflict(
+        touchDragState.studentId,
+        touchDragState.sessionId,
+        dropTargetDate,
+        touchDragState.originalTime,
+      );
+
       setConfirmDialog({
         open: true,
         sessionId: touchDragState.sessionId,
@@ -289,12 +351,13 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
         originalTime: touchDragState.originalTime,
         newDate: dropTargetDate,
         newTime: touchDragState.originalTime,
+        conflictInfo,
       });
     }
 
     setTouchDragState(null);
     setDropTargetDate(null);
-  }, [touchDragState, dropTargetDate]);
+  }, [touchDragState, dropTargetDate, checkTimeConflict]);
 
   const handleDrop = (e: React.DragEvent, newDate: string) => {
     e.preventDefault();
@@ -306,6 +369,8 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
       return;
     }
 
+    const conflictInfo = checkTimeConflict(dragState.studentId, dragState.sessionId, newDate, dragState.originalTime);
+
     setConfirmDialog({
       open: true,
       sessionId: dragState.sessionId,
@@ -315,24 +380,37 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
       originalTime: dragState.originalTime,
       newDate,
       newTime: dragState.originalTime,
+      conflictInfo,
     });
     setDragState(null);
+  };
+
+  // ✅ Re-check conflict when time changes in dialog
+  const updateConfirmDialogTime = (newTime: string) => {
+    if (!confirmDialog) return;
+
+    const conflictInfo = checkTimeConflict(
+      confirmDialog.studentId,
+      confirmDialog.sessionId,
+      confirmDialog.newDate,
+      newTime,
+    );
+
+    setConfirmDialog({
+      ...confirmDialog,
+      newTime,
+      conflictInfo,
+    });
   };
 
   const confirmReschedule = () => {
     if (!confirmDialog) return;
 
-    const { hasConflict, conflictStudent } = checkTimeConflict(
-      confirmDialog.studentId,
-      confirmDialog.sessionId,
-      confirmDialog.newDate,
-      confirmDialog.newTime,
-    );
-
-    if (hasConflict) {
+    // Block if there's a hard conflict
+    if (confirmDialog.conflictInfo.hasConflict) {
       toast({
-        title: "تعارض في الموعد",
-        description: `يوجد تعارض مع حصة ${conflictStudent} في نفس الوقت`,
+        title: "❌ لا يمكن نقل الحصة",
+        description: `يوجد تعارض مع حصة ${confirmDialog.conflictInfo.conflictStudent} في نفس الوقت`,
         variant: "destructive",
       });
       return;
@@ -347,7 +425,6 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
         confirmDialog.newTime,
       );
     } else {
-      // Fallback to old method (only updates date)
       onRescheduleSession(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate);
     }
 
@@ -476,7 +553,7 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
 
       <CardContent className="p-3 sm:p-6">
         {/* Calendar Grid */}
-        <div className={cn("grid gap-3", "grid-cols-7")}>
+        <div className="grid gap-3 grid-cols-7">
           {/* Day headers */}
           {DAY_NAMES_SHORT_AR.map((day, i) => (
             <div
@@ -493,10 +570,17 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
             const daySessions = sessionsByDate.get(dateStr) || [];
             const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
             const isToday = isSameDay(day, today);
-            const isDragTarget =
+            const isDragging = dragState !== null || touchDragState?.active;
+            const isDropTarget =
               dropTargetDate === dateStr &&
               dragState?.originalDate !== dateStr &&
               touchDragState?.originalDate !== dateStr;
+
+            // ✅ Get conflict info for drop target
+            const dropConflict = isDropTarget ? getDropTargetConflict(dateStr) : null;
+            const hasDropConflict = dropConflict?.hasConflict;
+            const hasDropWarning = dropConflict?.severity === "warning";
+
             const maxVisible = viewMode === "week" ? 4 : 2;
 
             return (
@@ -504,24 +588,54 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
                 key={index}
                 data-date={dateStr}
                 className={cn(
-                  "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200 touch-manipulation",
+                  "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200 touch-manipulation relative",
                   viewMode === "week" ? "min-h-[160px] sm:min-h-[200px]" : "min-h-[100px] sm:min-h-[140px]",
                   !isCurrentMonth && "opacity-40 bg-muted/20",
                   isToday && "ring-2 ring-primary shadow-lg bg-primary/5",
-                  isDragTarget &&
+                  // ✅ Visual feedback for conflicts
+                  isDropTarget && hasDropConflict && "bg-rose-500/20 border-rose-500 border-dashed scale-105 shadow-xl",
+                  isDropTarget &&
+                    hasDropWarning &&
+                    "bg-amber-500/20 border-amber-500 border-dashed scale-105 shadow-xl",
+                  isDropTarget &&
+                    !hasDropConflict &&
+                    !hasDropWarning &&
                     "bg-gradient-to-br from-primary/20 to-primary/5 border-primary border-dashed scale-105 shadow-xl",
                   touchDragState?.active && "select-none",
-                  !isDragTarget && !isToday && "hover:border-primary/30 hover:shadow-md",
+                  !isDropTarget && !isToday && isDragging && "hover:border-primary/30 hover:shadow-md",
                 )}
                 onDragOver={(e) => handleDragOver(e, dateStr)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, dateStr)}
               >
+                {/* ✅ Conflict indicator on drop target */}
+                {isDropTarget && dropConflict && (dropConflict.hasConflict || dropConflict.severity === "warning") && (
+                  <div
+                    className={cn(
+                      "absolute top-1 left-1 right-1 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 z-10",
+                      hasDropConflict ? "bg-rose-500 text-white" : "bg-amber-500 text-white",
+                    )}
+                  >
+                    {hasDropConflict ? (
+                      <>
+                        <XCircle className="h-3 w-3" />
+                        تعارض مع {dropConflict.conflictStudent}
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-3 w-3" />
+                        قريب من {dropConflict.conflictStudent}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* Date header */}
                 <div
                   className={cn(
                     "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2",
                     isToday ? "border-primary" : "border-border/50",
+                    isDropTarget && (hasDropConflict || hasDropWarning) && "mt-6",
                   )}
                 >
                   <span
@@ -565,6 +679,7 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
                           canDrag && "cursor-grab active:cursor-grabbing hover:shadow-lg active:scale-95",
                           !canDrag && "cursor-default opacity-75",
                           touchDragState?.sessionId === session.id && touchDragState?.active && "opacity-50 scale-95",
+                          dragState?.sessionId === session.id && "opacity-50 scale-95",
                         )}
                       >
                         {canDrag && <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 opacity-50 mt-0.5" />}
@@ -668,17 +783,53 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
         </div>
       </CardContent>
 
-      {/* Reschedule Confirmation Dialog */}
+      {/* ✅ IMPROVED: Reschedule Confirmation Dialog with Conflict Warning */}
       <Dialog open={confirmDialog?.open || false} onOpenChange={(open) => !open && setConfirmDialog(null)}>
         <DialogContent dir="rtl" className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">تأكيد تغيير موعد الحصة</DialogTitle>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              {confirmDialog?.conflictInfo.hasConflict ? (
+                <XCircle className="h-6 w-6 text-rose-500" />
+              ) : confirmDialog?.conflictInfo.severity === "warning" ? (
+                <AlertTriangle className="h-6 w-6 text-amber-500" />
+              ) : (
+                <CheckCircle2 className="h-6 w-6 text-primary" />
+              )}
+              تأكيد تغيير موعد الحصة
+            </DialogTitle>
             <DialogDescription>
               حصة <span className="font-bold text-foreground">{confirmDialog?.studentName}</span>
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* ✅ Conflict Warning Banner */}
+            {confirmDialog?.conflictInfo.hasConflict && (
+              <div className="p-4 rounded-xl bg-rose-500/10 border-2 border-rose-500/30 flex items-start gap-3">
+                <XCircle className="h-5 w-5 text-rose-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-bold text-rose-700">لا يمكن نقل الحصة</p>
+                  <p className="text-sm text-rose-600 mt-1">
+                    يوجد تعارض مع حصة <span className="font-bold">{confirmDialog.conflictInfo.conflictStudent}</span> في
+                    الساعة {confirmDialog.conflictInfo.conflictTime}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {confirmDialog?.conflictInfo.severity === "warning" && !confirmDialog.conflictInfo.hasConflict && (
+              <div className="p-4 rounded-xl bg-amber-500/10 border-2 border-amber-500/30 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-bold text-amber-700">تحذير: حصة قريبة</p>
+                  <p className="text-sm text-amber-600 mt-1">
+                    يوجد حصة قريبة لـ <span className="font-bold">{confirmDialog.conflictInfo.conflictStudent}</span> في
+                    الساعة {confirmDialog.conflictInfo.conflictTime}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground font-medium">الموعد الحالي:</Label>
               <div className="p-3 bg-muted/50 rounded-xl border-2">
@@ -694,8 +845,20 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
 
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground font-medium">الموعد الجديد:</Label>
-              <div className="p-3 bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/30 rounded-xl">
-                <div className="text-sm font-bold text-primary">
+              <div
+                className={cn(
+                  "p-3 border-2 rounded-xl",
+                  confirmDialog?.conflictInfo.hasConflict
+                    ? "bg-rose-500/10 border-rose-500/30"
+                    : "bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30",
+                )}
+              >
+                <div
+                  className={cn(
+                    "text-sm font-bold",
+                    confirmDialog?.conflictInfo.hasConflict ? "text-rose-700" : "text-primary",
+                  )}
+                >
                   {confirmDialog && format(parseISO(confirmDialog.newDate), "EEEE dd/MM/yyyy", { locale: ar })}
                 </div>
               </div>
@@ -705,19 +868,48 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
               <Label htmlFor="new-time" className="text-sm font-medium">
                 اختر الوقت الجديد:
               </Label>
-              <Select
-                value={confirmDialog?.newTime}
-                onValueChange={(time) => setConfirmDialog((prev) => (prev ? { ...prev, newTime: time } : null))}
-              >
-                <SelectTrigger id="new-time" className="h-11 rounded-xl border-2">
+              <Select value={confirmDialog?.newTime} onValueChange={updateConfirmDialogTime}>
+                <SelectTrigger
+                  id="new-time"
+                  className={cn(
+                    "h-11 rounded-xl border-2",
+                    confirmDialog?.conflictInfo.hasConflict && "border-rose-500/50",
+                  )}
+                >
                   <SelectValue placeholder="اختر الوقت" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
-                  {timeOptions.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))}
+                  {timeOptions.map((time) => {
+                    // Check if this time has conflict
+                    const timeConflict = confirmDialog
+                      ? checkTimeConflict(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate, time)
+                      : null;
+
+                    return (
+                      <SelectItem
+                        key={time}
+                        value={time}
+                        className={cn(
+                          timeConflict?.hasConflict && "text-rose-500",
+                          timeConflict?.severity === "warning" && !timeConflict.hasConflict && "text-amber-500",
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          {time}
+                          {timeConflict?.hasConflict && (
+                            <Badge variant="destructive" className="text-[10px] px-1 py-0">
+                              تعارض
+                            </Badge>
+                          )}
+                          {timeConflict?.severity === "warning" && !timeConflict.hasConflict && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 text-amber-500 border-amber-500">
+                              قريب
+                            </Badge>
+                          )}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">💡 الوقت الحالي: {confirmDialog?.originalTime}</p>
@@ -730,10 +922,15 @@ export const CalendarView = ({ students, onRescheduleSession, onUpdateSessionDat
             </Button>
             <Button
               onClick={confirmReschedule}
-              disabled={!confirmDialog?.newTime}
-              className="rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl"
+              disabled={!confirmDialog?.newTime || confirmDialog?.conflictInfo.hasConflict}
+              className={cn(
+                "rounded-xl shadow-lg hover:shadow-xl",
+                confirmDialog?.conflictInfo.hasConflict
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-gradient-to-r from-primary to-primary/80",
+              )}
             >
-              تأكيد النقل
+              {confirmDialog?.conflictInfo.hasConflict ? "غير متاح" : "تأكيد النقل"}
             </Button>
           </div>
         </DialogContent>
