@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   Check,
   X,
@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  Bell,
   History,
   MessageCircle,
   Loader2,
@@ -16,11 +15,9 @@ import {
   Coins,
   Send,
   Download,
-  ChevronDown,
   DollarSign,
   FileText,
-  TrendingUp,
-  Filter,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +27,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
   DialogFooter,
   DialogClose,
@@ -50,36 +46,25 @@ import { cn } from "@/lib/utils";
 import { subMonths, format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const CURRENCY = "جنيه";
 
-// Helper to get payment status
-const getPaymentStatus = (
-  studentId: string,
-  month: number,
-  year: number,
-  students: Student[],
-  payments: StudentPayments[],
-  settings?: AppSettings,
-): "paid" | "partial" | "unpaid" => {
-  const student = students.find((s) => s.id === studentId);
-  if (!student) return "unpaid";
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
-  const studentPayments = payments.find((p) => p.studentId === studentId);
-  if (!studentPayments) return "unpaid";
-
-  const payment = studentPayments.payments.find((p) => p.month === month && p.year === year);
-  if (!payment) return "unpaid";
-
-  const amountPaid = payment.amountPaid || payment.amount || 0;
-  const amountDue = payment.amountDue || getStudentMonthTotal(student, month, year, settings);
-
-  if (amountPaid >= amountDue) return "paid";
-  if (amountPaid > 0) return "partial";
-  return "unpaid";
-};
-
-// Helper to count session stats for a student in a given month
+// Count session stats for a student in a given month
 const getStudentMonthStats = (student: Student, month: number, year: number) => {
   const sessions = student.sessions.filter((s) => {
     const sessionDate = new Date(s.date);
@@ -94,7 +79,7 @@ const getStudentMonthStats = (student: Student, month: number, year: number) => 
   return { completed, vacation, cancelled, scheduled, total: sessions.length };
 };
 
-// Helper to get session price for a student
+// Get session price for a student
 const getStudentSessionPrice = (student: Student, settings?: AppSettings): number => {
   const defaultOnsite = 150;
   const defaultOnline = 120;
@@ -120,7 +105,7 @@ const getStudentSessionPrice = (student: Student, settings?: AppSettings): numbe
     : defaultOnsite;
 };
 
-// Helper to calculate total price for a student in a month
+// Calculate total price (amount due) for a student in a month based on sessions
 const getStudentMonthTotal = (student: Student, month: number, year: number, settings?: AppSettings): number => {
   const stats = getStudentMonthStats(student, month, year);
   const pricePerSession = getStudentSessionPrice(student, settings);
@@ -128,7 +113,7 @@ const getStudentMonthTotal = (student: Student, month: number, year: number, set
   return billableCount * pricePerSession;
 };
 
-// Helper to get payment method label in Arabic
+// Get payment method label in Arabic
 const getPaymentMethodLabel = (method?: PaymentMethod): string => {
   if (!method) return "غير محدد";
   switch (method) {
@@ -143,7 +128,7 @@ const getPaymentMethodLabel = (method?: PaymentMethod): string => {
   }
 };
 
-// Helper to format date in Arabic
+// Format date in Arabic
 const formatDateAr = (dateStr?: string): string => {
   if (!dateStr) return "غير محدد";
   try {
@@ -153,6 +138,10 @@ const formatDateAr = (dateStr?: string): string => {
     return dateStr;
   }
 };
+
+// ============================================
+// COMPONENT PROPS
+// ============================================
 
 interface PaymentsDashboardProps {
   students: Student[];
@@ -171,11 +160,16 @@ interface PaymentsDashboardProps {
       notes?: string;
     },
   ) => void;
+  onResetPayment?: (studentId: string, month: number, year: number) => void;
   settings?: AppSettings;
 }
 
-type PaymentFilter = "all" | "paid" | "unpaid";
+type PaymentFilter = "all" | "paid" | "partial" | "unpaid";
 type WhatsAppTarget = "overdue" | "upcoming" | "all" | "custom";
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
 export const PaymentsDashboard = ({
   students,
@@ -184,11 +178,13 @@ export const PaymentsDashboard = ({
   selectedYear: initialYear,
   onTogglePayment,
   onRecordPayment,
+  onResetPayment,
   settings,
 }: PaymentsDashboardProps) => {
   const now = new Date();
+
+  // State
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
-  const [studentFilter, setStudentFilter] = useState<string>("all");
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(initialMonth);
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -203,7 +199,8 @@ export const PaymentsDashboard = ({
   const [recordPaymentDialog, setRecordPaymentDialog] = useState<{
     open: boolean;
     student: Student | null;
-  }>({ open: false, student: null });
+    isAddingToPartial: boolean;
+  }>({ open: false, student: null, isAddingToPartial: false });
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [paymentDate, setPaymentDate] = useState<string>(format(now, "yyyy-MM-dd"));
@@ -215,26 +212,11 @@ export const PaymentsDashboard = ({
     view: "student" | "monthly";
   }>({ open: false, view: "student" });
 
-  const getPaymentStatusLocal = (studentId: string, month?: number, year?: number): "paid" | "partial" | "unpaid" => {
-    const student = students.find((s) => s.id === studentId);
-    if (!student) return "unpaid";
-    
-    const studentPayments = payments.find((p) => p.studentId === studentId);
-    if (!studentPayments) return "unpaid";
-    
-    const m = month ?? selectedMonth;
-    const y = year ?? selectedYear;
-    const payment = studentPayments.payments.find((p) => p.month === m && p.year === y);
-    if (!payment) return "unpaid";
-    
-    const amountPaid = payment.amountPaid || payment.amount || 0;
-    const amountDue = payment.amountDue || getStudentMonthTotal(student, m, y, settings);
-    
-    if (amountPaid >= amountDue) return "paid";
-    if (amountPaid > 0) return "partial";
-    return "unpaid";
-  };
+  // ============================================
+  // PAYMENT DATA HELPERS
+  // ============================================
 
+  // Get payment details for a student in a specific month
   const getPaymentDetails = (studentId: string, month?: number, year?: number) => {
     const studentPayments = payments.find((p) => p.studentId === studentId);
     if (!studentPayments) return null;
@@ -243,32 +225,89 @@ export const PaymentsDashboard = ({
     );
   };
 
+  // Get the actual amount paid by a student for a specific month
+  const getAmountPaid = (studentId: string, month?: number, year?: number): number => {
+    const payment = getPaymentDetails(studentId, month, year);
+    if (!payment) return 0;
+    return payment.amountPaid || payment.amount || 0;
+  };
+
+  // Get payment status for a student
+  const getPaymentStatusLocal = (studentId: string, month?: number, year?: number): "paid" | "partial" | "unpaid" => {
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return "unpaid";
+
+    const m = month ?? selectedMonth;
+    const y = year ?? selectedYear;
+
+    const amountPaid = getAmountPaid(studentId, m, y);
+    const amountDue = getStudentMonthTotal(student, m, y, settings);
+
+    if (amountDue === 0) return "unpaid";
+    if (amountPaid >= amountDue) return "paid";
+    if (amountPaid > 0) return "partial";
+    return "unpaid";
+  };
+
+  // Get payment history for a student (all months with payments)
   const getPaymentHistory = (studentId: string) => {
     const studentPayments = payments.find((p) => p.studentId === studentId);
     if (!studentPayments) return [];
     return studentPayments.payments
-      .filter((p) => p.isPaid)
+      .filter((p) => p.isPaid || (p.amountPaid && p.amountPaid > 0))
       .sort((a, b) => (b.year !== a.year ? b.year - a.year : b.month - a.month));
   };
 
-  const paidCount = students.filter((s) => getPaymentStatusLocal(s.id) === "paid").length;
-  const partialCount = students.filter((s) => getPaymentStatusLocal(s.id) === "partial").length;
-  const unpaidCount = students.length - paidCount - partialCount;
-  const unpaidStudents = students.filter((s) => getPaymentStatusLocal(s.id) !== "paid");
+  // ============================================
+  // CALCULATED VALUES (MEMOIZED)
+  // ============================================
 
-  const totalExpected = students.reduce((sum, student) => {
-    return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
-  }, 0);
+  // Count students by payment status
+  const { paidCount, partialCount, unpaidCount, unpaidStudents } = useMemo(() => {
+    let paid = 0;
+    let partial = 0;
+    let unpaid = 0;
+    const unpaidList: Student[] = [];
 
-  const totalCollected = students
-    .filter((s) => getPaymentStatusLocal(s.id) === "paid")
-    .reduce((sum, student) => {
+    students.forEach((student) => {
+      const status = getPaymentStatusLocal(student.id);
+      if (status === "paid") {
+        paid++;
+      } else if (status === "partial") {
+        partial++;
+        unpaidList.push(student);
+      } else {
+        unpaid++;
+        unpaidList.push(student);
+      }
+    });
+
+    return { paidCount: paid, partialCount: partial, unpaidCount: unpaid, unpaidStudents: unpaidList };
+  }, [students, payments, selectedMonth, selectedYear, settings]);
+
+  // Calculate total expected (amount due from all students)
+  const totalExpected = useMemo(() => {
+    return students.reduce((sum, student) => {
       return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
     }, 0);
+  }, [students, selectedMonth, selectedYear, settings]);
 
+  // Calculate total collected (sum of ALL amountPaid including partial payments)
+  const totalCollected = useMemo(() => {
+    return students.reduce((sum, student) => {
+      const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
+      return sum + amountPaid;
+    }, 0);
+  }, [students, payments, selectedMonth, selectedYear]);
+
+  // Calculate total pending
   const totalPending = totalExpected - totalCollected;
 
-  const getRecentMonths = () => {
+  // Collection percentage
+  const collectionPercentage = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
+
+  // Get recent months for quick navigation
+  const recentMonths = useMemo(() => {
     const months = [];
     for (let i = 2; i >= -3; i--) {
       const date = subMonths(now, i);
@@ -280,31 +319,61 @@ export const PaymentsDashboard = ({
       });
     }
     return months;
-  };
+  }, []);
 
-  const recentMonths = getRecentMonths();
+  // Filter students based on search and filter
+  const filteredStudents = useMemo(() => {
+    const searchLower = studentSearch.trim().toLowerCase();
+    return students.filter((student) => {
+      const paymentStatus = getPaymentStatusLocal(student.id);
+      if (paymentFilter === "paid" && paymentStatus !== "paid") return false;
+      if (paymentFilter === "partial" && paymentStatus !== "partial") return false;
+      if (paymentFilter === "unpaid" && paymentStatus !== "unpaid") return false;
+      if (searchLower && !student.name.toLowerCase().includes(searchLower)) return false;
+      return true;
+    });
+  }, [students, paymentFilter, studentSearch, payments, selectedMonth, selectedYear, settings]);
+
+  // Selected student for history view
+  const selectedStudent = students.find((s) => s.id === selectedStudentHistory);
+
+  // ============================================
+  // NAVIGATION HANDLERS
+  // ============================================
 
   const goToPrevMonth = () => {
     if (selectedMonth === 0) {
       setSelectedMonth(11);
       setSelectedYear(selectedYear - 1);
-    } else setSelectedMonth(selectedMonth - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
   };
 
   const goToNextMonth = () => {
     if (selectedMonth === 11) {
       setSelectedMonth(0);
       setSelectedYear(selectedYear + 1);
-    } else setSelectedMonth(selectedMonth + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
   };
 
-  const openRecordPaymentDialog = (student: Student) => {
+  // ============================================
+  // PAYMENT DIALOG HANDLERS
+  // ============================================
+
+  const openRecordPaymentDialog = (student: Student, isAddingToPartial: boolean = false) => {
     const monthTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
-    setPaymentAmount(monthTotal.toString());
+    const alreadyPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
+    const remaining = monthTotal - alreadyPaid;
+
+    // Default amount: remaining for partial, full amount for new
+    setPaymentAmount(isAddingToPartial ? Math.max(0, remaining).toString() : monthTotal.toString());
     setPaymentMethod("cash");
     setPaymentDate(format(now, "yyyy-MM-dd"));
     setPaymentNotes("");
-    setRecordPaymentDialog({ open: true, student });
+    setRecordPaymentDialog({ open: true, student, isAddingToPartial });
   };
 
   const handleRecordPayment = () => {
@@ -328,10 +397,9 @@ export const PaymentsDashboard = ({
 
       toast({
         title: "✅ تم تسجيل الدفعة",
-        description: `تم تسجيل دفعة ${recordPaymentDialog.student.name} بنجاح`,
+        description: `${recordPaymentDialog.student.name}: ${amount.toLocaleString()} ${CURRENCY}`,
       });
     } else {
-      // Fallback to simple toggle if onRecordPayment not provided
       onTogglePayment(recordPaymentDialog.student.id, selectedMonth, selectedYear);
       toast({
         title: "✅ تم التأكيد",
@@ -339,8 +407,24 @@ export const PaymentsDashboard = ({
       });
     }
 
-    setRecordPaymentDialog({ open: false, student: null });
+    setRecordPaymentDialog({ open: false, student: null, isAddingToPartial: false });
   };
+
+  const handleResetPayment = (student: Student) => {
+    if (onResetPayment) {
+      onResetPayment(student.id, selectedMonth, selectedYear);
+      toast({
+        title: "تم إلغاء الدفع",
+        description: `تم إلغاء جميع دفعات ${student.name} لهذا الشهر`,
+      });
+    } else {
+      onTogglePayment(student.id, selectedMonth, selectedYear);
+    }
+  };
+
+  // ============================================
+  // WHATSAPP HANDLERS
+  // ============================================
 
   const sendWhatsAppReminder = async (student: Student) => {
     if (!student.phone) {
@@ -350,7 +434,7 @@ export const PaymentsDashboard = ({
 
     setSendingReminder(student.id);
     try {
-      const { data, error } = await supabase.functions.invoke("send-whatsapp-reminder", {
+      const { error } = await supabase.functions.invoke("send-whatsapp-reminder", {
         body: {
           studentName: student.name,
           phoneNumber: student.phone,
@@ -363,7 +447,6 @@ export const PaymentsDashboard = ({
       });
 
       if (error) throw error;
-
       toast({ title: "تم الإرسال", description: `تم إرسال تذكير WhatsApp إلى ${student.name}` });
     } catch (error: any) {
       console.error("WhatsApp error:", error);
@@ -378,7 +461,6 @@ export const PaymentsDashboard = ({
       case "overdue":
         return unpaidStudents;
       case "upcoming":
-        // Students with upcoming payment (next 3 days)
         return students.filter((s) => getPaymentStatusLocal(s.id) !== "paid");
       case "all":
         return students;
@@ -449,11 +531,13 @@ export const PaymentsDashboard = ({
       const student = studentsWithPhone[i];
       const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
       const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+      const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
+      const remaining = studentTotal - amountPaid;
 
       const message = `عزيزي ولي الأمر،
 تذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}
 عدد الجلسات: ${monthStats.completed + monthStats.scheduled}
-المبلغ المستحق: ${studentTotal} ${CURRENCY}
+المبلغ المستحق: ${studentTotal} ${CURRENCY}${amountPaid > 0 ? `\nالمدفوع: ${amountPaid} ${CURRENCY}\nالمتبقي: ${remaining} ${CURRENCY}` : ""}
 شكراً لتعاونكم`;
 
       try {
@@ -490,11 +574,9 @@ export const PaymentsDashboard = ({
     setBulkSendingReminders(false);
 
     let description = `تم إرسال ${successCount} تذكير بنجاح`;
-    if (failedCount > 0) {
-      description += `، فشل ${failedCount}`;
-    }
+    if (failedCount > 0) description += `، فشل ${failedCount}`;
     if (studentsWithoutPhone.length > 0) {
-      description += `\n${studentsWithoutPhone.length} طالب بدون رقم هاتف: ${studentsWithoutPhone.map((s) => s.name).join("، ")}`;
+      description += `\n${studentsWithoutPhone.length} طالب بدون رقم هاتف`;
     }
 
     toast({
@@ -505,8 +587,11 @@ export const PaymentsDashboard = ({
     });
   };
 
+  // ============================================
+  // EXPORT HANDLER
+  // ============================================
+
   const exportToPDF = () => {
-    // Generate detailed monthly report
     const reportLines: string[] = [];
     reportLines.push(`تقرير المدفوعات المفصل - ${formatMonthYearAr(selectedMonth, selectedYear)}`);
     reportLines.push("━".repeat(50));
@@ -519,6 +604,7 @@ export const PaymentsDashboard = ({
       const billableCount = monthStats.completed + monthStats.scheduled;
       const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
       const pricePerSession = getStudentSessionPrice(student, settings);
+      const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
 
       const statusIcon = paymentStatus === "paid" ? "✅" : paymentStatus === "partial" ? "🔶" : "⏳";
       const statusText = paymentStatus === "paid" ? "(مدفوع)" : paymentStatus === "partial" ? "(جزئي)" : "(غير مدفوع)";
@@ -529,15 +615,22 @@ export const PaymentsDashboard = ({
         reportLines.push(`   ${billableCount} حصص × ${pricePerSession} ${CURRENCY} = ${studentTotal} ${CURRENCY}`);
       }
 
+      if (paymentStatus === "partial") {
+        reportLines.push(`   المدفوع: ${amountPaid} ${CURRENCY} | المتبقي: ${studentTotal - amountPaid} ${CURRENCY}`);
+      }
+
       if (paymentStatus !== "unpaid" && paymentDetails) {
-        if (paymentDetails.paidAt) {
-          reportLines.push(`   تاريخ الدفع: ${formatDateAr(paymentDetails.paidAt)}`);
-        }
-        if (paymentDetails.method) {
-          reportLines.push(`   الطريقة: ${getPaymentMethodLabel(paymentDetails.method)}`);
-        }
-        if (paymentDetails.notes) {
-          reportLines.push(`   ملاحظات: ${paymentDetails.notes}`);
+        if (paymentDetails.paidAt) reportLines.push(`   تاريخ الدفع: ${formatDateAr(paymentDetails.paidAt)}`);
+        if (paymentDetails.method) reportLines.push(`   الطريقة: ${getPaymentMethodLabel(paymentDetails.method)}`);
+        if (paymentDetails.notes) reportLines.push(`   ملاحظات: ${paymentDetails.notes}`);
+
+        if (paymentDetails.paymentRecords && paymentDetails.paymentRecords.length > 1) {
+          reportLines.push(`   سجل الدفعات (${paymentDetails.paymentRecords.length}):`);
+          paymentDetails.paymentRecords.forEach((record, idx) => {
+            reportLines.push(
+              `      ${idx + 1}. ${record.amount} ${CURRENCY} - ${getPaymentMethodLabel(record.method)} - ${formatDateAr(record.paidAt)}`,
+            );
+          });
         }
       }
 
@@ -547,14 +640,11 @@ export const PaymentsDashboard = ({
     reportLines.push("━".repeat(50));
     reportLines.push("📊 الملخص:");
     reportLines.push(`   الإجمالي المتوقع: ${totalExpected.toLocaleString()} ${CURRENCY}`);
-    reportLines.push(
-      `   المحصّل: ${totalCollected.toLocaleString()} ${CURRENCY} (${totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0}%)`,
-    );
+    reportLines.push(`   المحصّل: ${totalCollected.toLocaleString()} ${CURRENCY} (${collectionPercentage}%)`);
     reportLines.push(`   المتبقي: ${totalPending.toLocaleString()} ${CURRENCY}`);
 
     const reportText = reportLines.join("\n");
 
-    // Create downloadable text file (PDF generation requires additional library)
     const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -565,25 +655,12 @@ export const PaymentsDashboard = ({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast({
-      title: "تم التصدير",
-      description: "تم تحميل التقرير بنجاح",
-    });
+    toast({ title: "تم التصدير", description: "تم تحميل التقرير بنجاح" });
   };
 
-  const filteredStudents = useMemo(() => {
-    const searchLower = studentSearch.trim().toLowerCase();
-    return students.filter((student) => {
-      const paymentStatus = getPaymentStatusLocal(student.id);
-      if (paymentFilter === "paid" && paymentStatus !== "paid") return false;
-      if (paymentFilter === "unpaid" && paymentStatus === "paid") return false;
-      if (studentFilter !== "all" && student.id !== studentFilter) return false;
-      if (searchLower && !student.name.toLowerCase().includes(searchLower)) return false;
-      return true;
-    });
-  }, [students, paymentFilter, studentFilter, studentSearch, payments, selectedMonth, selectedYear]);
-
-  const selectedStudent = students.find((s) => s.id === selectedStudentHistory);
+  // ============================================
+  // RENDER: EMPTY STATE
+  // ============================================
 
   if (students.length === 0) {
     return (
@@ -596,8 +673,13 @@ export const PaymentsDashboard = ({
     );
   }
 
+  // ============================================
+  // RENDER: MAIN COMPONENT
+  // ============================================
+
   return (
     <div className="space-y-4" dir="rtl">
+      {/* Month Navigation */}
       <div className="space-y-3">
         <div className="flex items-center justify-center gap-2">
           <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-8 w-8">
@@ -610,6 +692,7 @@ export const PaymentsDashboard = ({
             <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
+
         <div className="flex justify-center gap-1.5 overflow-x-auto pb-1">
           {recentMonths.map((m) => (
             <button
@@ -634,13 +717,14 @@ export const PaymentsDashboard = ({
         </div>
       </div>
 
-      {/* Pricing Summary */}
+      {/* Payment Summary Card */}
       <Card className="card-shadow bg-gradient-to-br from-primary/5 to-primary/10">
         <CardContent className="py-4">
           <div className="flex items-center gap-2 mb-3">
             <Coins className="h-5 w-5 text-primary" />
             <span className="font-heading font-semibold">ملخص المدفوعات</span>
           </div>
+
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-card rounded-lg p-2">
               <p className="text-lg font-heading font-bold">{totalExpected.toLocaleString()}</p>
@@ -655,49 +739,73 @@ export const PaymentsDashboard = ({
               <p className="text-[10px] text-warning/80">{CURRENCY} متبقي</p>
             </div>
           </div>
+
+          {/* Collection Progress Bar */}
+          {totalExpected > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs mb-1">
+                <span>نسبة التحصيل</span>
+                <span className="font-medium">{collectionPercentage}%</span>
+              </div>
+              <Progress value={collectionPercentage} className="h-2" />
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Status Cards - Clickable Filters */}
-      <div className="flex gap-2">
+      {/* Status Filter Cards */}
+      <div className="grid grid-cols-4 gap-2">
         <button
           onClick={() => setPaymentFilter("all")}
           className={cn(
-            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            "rounded-lg p-3 card-shadow transition-all text-center",
             paymentFilter === "all" ? "ring-2 ring-primary bg-card" : "bg-card",
           )}
         >
           <Users className="h-4 w-4 mx-auto mb-1" />
           <p className="text-xl font-heading font-bold">{students.length}</p>
-          <p className="text-xs text-muted-foreground">إجمالي الطلاب</p>
+          <p className="text-[10px] text-muted-foreground">إجمالي</p>
         </button>
+
         <button
           onClick={() => setPaymentFilter("paid")}
           className={cn(
-            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
+            "rounded-lg p-3 card-shadow transition-all text-center",
             paymentFilter === "paid" ? "ring-2 ring-success bg-success/10" : "bg-success/10",
           )}
         >
           <Check className="h-4 w-4 mx-auto mb-1 text-success" />
           <p className="text-xl font-heading font-bold text-success">{paidCount}</p>
-          <p className="text-xs text-success/80">دفعوا</p>
+          <p className="text-[10px] text-success/80">مدفوع</p>
         </button>
+
+        <button
+          onClick={() => setPaymentFilter("partial")}
+          className={cn(
+            "rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === "partial" ? "ring-2 ring-amber-500 bg-amber-500/10" : "bg-amber-500/10",
+          )}
+        >
+          <Clock className="h-4 w-4 mx-auto mb-1 text-amber-500" />
+          <p className="text-xl font-heading font-bold text-amber-500">{partialCount}</p>
+          <p className="text-[10px] text-amber-500/80">جزئي</p>
+        </button>
+
         <button
           onClick={() => setPaymentFilter("unpaid")}
           className={cn(
-            "flex-1 rounded-lg p-3 card-shadow transition-all text-center",
-            paymentFilter === "unpaid" ? "ring-2 ring-warning bg-warning/10" : "bg-warning/10",
+            "rounded-lg p-3 card-shadow transition-all text-center",
+            paymentFilter === "unpaid" ? "ring-2 ring-rose-500 bg-rose-500/10" : "bg-rose-500/10",
           )}
         >
-          <Clock className="h-4 w-4 mx-auto mb-1 text-warning" />
-          <p className="text-xl font-heading font-bold text-warning">{unpaidCount}</p>
-          <p className="text-xs text-warning/80">لم يدفعوا</p>
+          <X className="h-4 w-4 mx-auto mb-1 text-rose-500" />
+          <p className="text-xl font-heading font-bold text-rose-500">{unpaidCount}</p>
+          <p className="text-[10px] text-rose-500/80">غير مدفوع</p>
         </button>
       </div>
 
-      {/* Action Buttons Row */}
+      {/* Action Buttons */}
       <div className="flex gap-2">
-        {/* WhatsApp Dropdown Button */}
         {bulkSendingReminders ? (
           <div className="flex-1 p-4 rounded-lg border bg-card space-y-3">
             <div className="flex items-center justify-between text-sm">
@@ -726,9 +834,7 @@ export const PaymentsDashboard = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="overdue">⚡ للمتأخرين ({unpaidStudents.filter((s) => s.phone).length})</SelectItem>
-                <SelectItem value="upcoming">
-                  📅 للمستحقين قريباً ({unpaidStudents.filter((s) => s.phone).length})
-                </SelectItem>
+                <SelectItem value="upcoming">📅 للمستحقين ({unpaidStudents.filter((s) => s.phone).length})</SelectItem>
                 <SelectItem value="all">👥 للجميع ({students.filter((s) => s.phone).length})</SelectItem>
                 <SelectItem value="custom">✏️ رسالة مخصصة...</SelectItem>
               </SelectContent>
@@ -746,7 +852,6 @@ export const PaymentsDashboard = ({
           </>
         )}
 
-        {/* Export & History Buttons */}
         <Button variant="outline" size="icon" onClick={exportToPDF} title="تصدير التقرير">
           <Download className="h-4 w-4" />
         </Button>
@@ -761,6 +866,7 @@ export const PaymentsDashboard = ({
         </Button>
       </div>
 
+      {/* Students List */}
       <Card className="card-shadow">
         <CardHeader className="pb-3 space-y-3">
           <CardTitle className="font-heading text-lg flex items-center gap-2">
@@ -774,6 +880,7 @@ export const PaymentsDashboard = ({
             placeholder="ابحث عن طالب..."
           />
         </CardHeader>
+
         <CardContent className="space-y-2">
           {filteredStudents.length === 0 ? (
             <p className="text-center text-muted-foreground py-4 text-sm">
@@ -781,26 +888,15 @@ export const PaymentsDashboard = ({
             </p>
           ) : (
             filteredStudents.map((student) => {
-              const paymentStatus = getPaymentStatus(
-                student.id,
-                selectedMonth,
-                selectedYear,
-                students,
-                payments,
-                settings,
-              );
+              const paymentStatus = getPaymentStatusLocal(student.id);
               const isPaid = paymentStatus === "paid";
               const isPartial = paymentStatus === "partial";
               const isSending = sendingReminder === student.id;
               const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
               const billableCount = monthStats.completed + monthStats.scheduled;
               const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
-              const pricePerSession = getStudentSessionPrice(student, settings);
-
-              // Get payment details
-              const paymentDetails = getPaymentDetails(student.id);
-              const amountPaid = paymentDetails?.amountPaid || paymentDetails?.amount || 0;
-              const amountDue = paymentDetails?.amountDue || studentTotal;
+              const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
+              const remaining = studentTotal - amountPaid;
 
               return (
                 <div
@@ -813,6 +909,7 @@ export const PaymentsDashboard = ({
                   )}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* Status Icon */}
                     <div
                       className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
@@ -829,6 +926,8 @@ export const PaymentsDashboard = ({
                         <X className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
+
+                    {/* Student Info */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium truncate">{student.name}</span>
@@ -843,7 +942,7 @@ export const PaymentsDashboard = ({
                           >
                             {isPartial ? (
                               <>
-                                {amountPaid.toLocaleString()} / {amountDue.toLocaleString()} {CURRENCY}
+                                {amountPaid.toLocaleString()} / {studentTotal.toLocaleString()} {CURRENCY}
                               </>
                             ) : (
                               <>
@@ -853,13 +952,20 @@ export const PaymentsDashboard = ({
                           </span>
                         )}
                       </div>
+
                       <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                         <span>{student.scheduleDays.map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join("، ")}</span>
                         {billableCount > 0 && (
                           <>
                             <span>•</span>
-                            <span className={cn(isPartial ? "text-amber-600 font-medium" : "text-primary")}>
-                              {billableCount} جلسة
+                            <span className="text-primary">{billableCount} جلسة</span>
+                          </>
+                        )}
+                        {isPartial && (
+                          <>
+                            <span>•</span>
+                            <span className="text-amber-600 font-medium">
+                              متبقي: {remaining.toLocaleString()} {CURRENCY}
                             </span>
                           </>
                         )}
@@ -881,7 +987,10 @@ export const PaymentsDashboard = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* Action Buttons */}
                   <div className="flex items-center gap-2">
+                    {/* History Button */}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -893,6 +1002,8 @@ export const PaymentsDashboard = ({
                     >
                       <FileText className="h-4 w-4" />
                     </Button>
+
+                    {/* WhatsApp Reminder (only for unpaid/partial) */}
                     {!isPaid && (
                       <Button
                         size="sm"
@@ -909,18 +1020,88 @@ export const PaymentsDashboard = ({
                         تذكير
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant={isPaid ? "outline" : "default"}
-                      className={cn(!isPaid && "gradient-accent")}
-                      onClick={() =>
-                        isPaid || isPartial
-                          ? onTogglePayment(student.id, selectedMonth, selectedYear)
-                          : openRecordPaymentDialog(student)
-                      }
-                    >
-                      {isPaid ? "إلغاء الدفع" : isPartial ? "أضف دفعة" : "سجل دفع"}
-                    </Button>
+
+                    {/* Payment Action Button */}
+                    {isPaid ? (
+                      // PAID: Show cancel button with confirmation
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            إلغاء الدفع
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent dir="rtl">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>إلغاء الدفع</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              هل تريد إلغاء جميع دفعات {student.name} لشهر{" "}
+                              {formatMonthYearAr(selectedMonth, selectedYear)}؟
+                              <br />
+                              <span className="text-amber-600 font-medium">
+                                سيتم حذف {amountPaid.toLocaleString()} {CURRENCY}
+                              </span>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="flex-row-reverse gap-2">
+                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleResetPayment(student)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              تأكيد الإلغاء
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    ) : isPartial ? (
+                      // PARTIAL: Show add more button + reset option
+                      <div className="flex gap-1">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="إلغاء الدفع">
+                              <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent dir="rtl">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>إلغاء الدفع</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                هل تريد إلغاء جميع دفعات {student.name}؟
+                                <br />
+                                <span className="text-amber-600 font-medium">
+                                  سيتم حذف {amountPaid.toLocaleString()} {CURRENCY}
+                                </span>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="flex-row-reverse gap-2">
+                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleResetPayment(student)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                تأكيد الإلغاء
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                        <Button
+                          size="sm"
+                          className="gradient-accent"
+                          onClick={() => openRecordPaymentDialog(student, true)}
+                        >
+                          أضف دفعة
+                        </Button>
+                      </div>
+                    ) : (
+                      // UNPAID: Show record payment button
+                      <Button
+                        size="sm"
+                        className="gradient-accent"
+                        onClick={() => openRecordPaymentDialog(student, false)}
+                      >
+                        سجل دفع
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
@@ -932,19 +1113,46 @@ export const PaymentsDashboard = ({
       {/* Payment Recording Dialog */}
       <Dialog
         open={recordPaymentDialog.open}
-        onOpenChange={(open) => !open && setRecordPaymentDialog({ open: false, student: null })}
+        onOpenChange={(open) =>
+          !open && setRecordPaymentDialog({ open: false, student: null, isAddingToPartial: false })
+        }
       >
         <DialogContent dir="rtl" className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-success" />
-              تسجيل دفعة - {recordPaymentDialog.student?.name}
+              {recordPaymentDialog.isAddingToPartial ? "إضافة دفعة" : "تسجيل دفعة"} -{" "}
+              {recordPaymentDialog.student?.name}
             </DialogTitle>
             <DialogDescription>شهر {formatMonthYearAr(selectedMonth, selectedYear)}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Amount */}
+            {/* Show current status for partial payments */}
+            {recordPaymentDialog.isAddingToPartial && recordPaymentDialog.student && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <div className="flex justify-between text-sm">
+                  <span>المدفوع سابقاً:</span>
+                  <span className="font-medium text-amber-600">
+                    {getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear).toLocaleString()}{" "}
+                    {CURRENCY}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span>المتبقي:</span>
+                  <span className="font-medium">
+                    {Math.max(
+                      0,
+                      getStudentMonthTotal(recordPaymentDialog.student, selectedMonth, selectedYear, settings) -
+                        getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear),
+                    ).toLocaleString()}{" "}
+                    {CURRENCY}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Amount Input */}
             <div className="space-y-2">
               <Label htmlFor="amount">المبلغ المدفوع</Label>
               <div className="flex gap-2">
@@ -961,7 +1169,7 @@ export const PaymentsDashboard = ({
               </div>
               {recordPaymentDialog.student && (
                 <p className="text-xs text-muted-foreground">
-                  المستحق:{" "}
+                  الإجمالي المستحق:{" "}
                   {getStudentMonthTotal(
                     recordPaymentDialog.student,
                     selectedMonth,
@@ -1058,7 +1266,7 @@ export const PaymentsDashboard = ({
               <TabsTrigger value="student">👤 طالب واحد</TabsTrigger>
             </TabsList>
 
-            {/* Monthly View - All Students */}
+            {/* Monthly View */}
             <TabsContent value="monthly" className="space-y-3">
               <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
                 <Calendar className="h-4 w-4 text-primary" />
@@ -1073,6 +1281,7 @@ export const PaymentsDashboard = ({
                     const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
                     const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
                     const billableCount = monthStats.completed + monthStats.scheduled;
+                    const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
 
                     return (
                       <div
@@ -1092,7 +1301,7 @@ export const PaymentsDashboard = ({
                               ) : paymentStatus === "partial" ? (
                                 <Clock className="h-4 w-4 text-amber-500" />
                               ) : (
-                                <Clock className="h-4 w-4 text-warning" />
+                                <X className="h-4 w-4 text-muted-foreground" />
                               )}
                               <span className="font-medium">{student.name}</span>
                             </div>
@@ -1100,25 +1309,30 @@ export const PaymentsDashboard = ({
                               {billableCount > 0 && (
                                 <p>
                                   {billableCount} حصص × {getStudentSessionPrice(student, settings)} {CURRENCY} ={" "}
-                                  {studentTotal} {CURRENCY}
+                                  {studentTotal.toLocaleString()} {CURRENCY}
+                                </p>
+                              )}
+                              {paymentStatus === "partial" && (
+                                <p className="text-amber-600 font-medium">
+                                  المدفوع: {amountPaid.toLocaleString()} {CURRENCY} | المتبقي:{" "}
+                                  {(studentTotal - amountPaid).toLocaleString()} {CURRENCY}
                                 </p>
                               )}
                               {paymentStatus !== "unpaid" && paymentDetails?.paidAt && (
-                                <p>تاريخ الدفع: {formatDateAr(paymentDetails.paidAt)}</p>
+                                <p>آخر دفعة: {formatDateAr(paymentDetails.paidAt)}</p>
                               )}
-                              {paymentStatus !== "unpaid" && paymentDetails?.method && (
-                                <p>الطريقة: {getPaymentMethodLabel(paymentDetails.method)}</p>
-                              )}
-                              {paymentStatus !== "unpaid" && paymentDetails?.notes && (
-                                <p className="text-xs italic">"{paymentDetails.notes}"</p>
+                              {paymentDetails?.paymentRecords && paymentDetails.paymentRecords.length > 1 && (
+                                <p className="text-primary font-medium">
+                                  {paymentDetails.paymentRecords.length} دفعات مسجلة
+                                </p>
                               )}
                             </div>
                           </div>
-                          <Badge 
-                            variant={paymentStatus === "paid" ? "default" : "secondary"} 
+                          <Badge
                             className={cn(
                               paymentStatus === "paid" && "bg-success",
-                              paymentStatus === "partial" && "bg-amber-500"
+                              paymentStatus === "partial" && "bg-amber-500",
+                              paymentStatus === "unpaid" && "bg-muted text-muted-foreground",
                             )}
                           >
                             {paymentStatus === "paid" ? "مدفوع" : paymentStatus === "partial" ? "جزئي" : "معلق"}
@@ -1149,7 +1363,7 @@ export const PaymentsDashboard = ({
               </div>
             </TabsContent>
 
-            {/* Student View - Single Student History */}
+            {/* Student View */}
             <TabsContent value="student" className="space-y-3">
               <Select value={selectedStudentHistory || ""} onValueChange={setSelectedStudentHistory}>
                 <SelectTrigger>
@@ -1182,28 +1396,63 @@ export const PaymentsDashboard = ({
                         );
                         const monthStats = getStudentMonthStats(selectedStudent, payment.month, payment.year);
                         const billableCount = monthStats.completed + monthStats.scheduled;
+                        const amountPaid = payment.amountPaid || payment.amount || 0;
+                        const isFullyPaid = amountPaid >= studentTotal;
 
                         return (
                           <div
                             key={`${payment.year}-${payment.month}`}
-                            className="p-3 rounded-lg border bg-success/5 border-success/30"
+                            className={cn(
+                              "p-3 rounded-lg border",
+                              isFullyPaid ? "bg-success/5 border-success/30" : "bg-amber-500/5 border-amber-500/30",
+                            )}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <Check className="h-4 w-4 text-success" />
+                                  {isFullyPaid ? (
+                                    <Check className="h-4 w-4 text-success" />
+                                  ) : (
+                                    <Clock className="h-4 w-4 text-amber-500" />
+                                  )}
                                   <span className="font-medium">{formatMonthYearAr(payment.month, payment.year)}</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground space-y-0.5">
                                   <p>
-                                    {billableCount} حصص = {payment.amount || studentTotal} {CURRENCY}
+                                    {billableCount} حصص = {studentTotal.toLocaleString()} {CURRENCY}
                                   </p>
-                                  {payment.paidAt && <p>تاريخ الدفع: {formatDateAr(payment.paidAt)}</p>}
+                                  <p
+                                    className={isFullyPaid ? "text-success font-medium" : "text-amber-600 font-medium"}
+                                  >
+                                    المدفوع: {amountPaid.toLocaleString()} {CURRENCY}
+                                    {!isFullyPaid &&
+                                      ` | المتبقي: ${(studentTotal - amountPaid).toLocaleString()} ${CURRENCY}`}
+                                  </p>
+                                  {payment.paidAt && <p>آخر دفعة: {formatDateAr(payment.paidAt)}</p>}
                                   {payment.method && <p>الطريقة: {getPaymentMethodLabel(payment.method)}</p>}
-                                  {payment.notes && <p className="italic">"{payment.notes}"</p>}
+
+                                  {/* Payment Records */}
+                                  {payment.paymentRecords && payment.paymentRecords.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-border/50">
+                                      <p className="font-medium text-foreground mb-1">
+                                        سجل الدفعات ({payment.paymentRecords.length}):
+                                      </p>
+                                      {payment.paymentRecords.map((record, idx) => (
+                                        <div key={record.id || idx} className="flex justify-between text-xs py-0.5">
+                                          <span>
+                                            {idx + 1}. {record.amount.toLocaleString()} {CURRENCY} (
+                                            {getPaymentMethodLabel(record.method)})
+                                          </span>
+                                          <span>{formatDateAr(record.paidAt)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                              <Badge className="bg-success">مدفوع</Badge>
+                              <Badge className={isFullyPaid ? "bg-success" : "bg-amber-500"}>
+                                {isFullyPaid ? "مدفوع" : "جزئي"}
+                              </Badge>
                             </div>
                           </div>
                         );
@@ -1242,8 +1491,7 @@ export const PaymentsDashboard = ({
               {getWhatsAppTargetLabel(whatsappTarget)}) لشهر {formatMonthYearAr(selectedMonth, selectedYear)}.
               {getWhatsAppTargetStudents(whatsappTarget).filter((s) => !s.phone).length > 0 && (
                 <span className="block mt-2 text-warning">
-                  ⚠️ {getWhatsAppTargetStudents(whatsappTarget).filter((s) => !s.phone).length} طالب بدون رقم هاتف لن
-                  يتم إرسال تذكير لهم.
+                  ⚠️ {getWhatsAppTargetStudents(whatsappTarget).filter((s) => !s.phone).length} طالب بدون رقم هاتف
                 </span>
               )}
             </DialogDescription>
