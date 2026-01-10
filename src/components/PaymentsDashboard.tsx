@@ -53,6 +53,32 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CURRENCY = "جنيه";
 
+// Helper to get payment status
+const getPaymentStatus = (
+  studentId: string,
+  month: number,
+  year: number,
+  students: Student[],
+  payments: StudentPayments[],
+  settings?: AppSettings,
+): "paid" | "partial" | "unpaid" => {
+  const student = students.find((s) => s.id === studentId);
+  if (!student) return "unpaid";
+
+  const studentPayments = payments.find((p) => p.studentId === studentId);
+  if (!studentPayments) return "unpaid";
+
+  const payment = studentPayments.payments.find((p) => p.month === month && p.year === year);
+  if (!payment) return "unpaid";
+
+  const amountPaid = payment.amountPaid || payment.amount || 0;
+  const amountDue = payment.amountDue || getStudentMonthTotal(student, month, year, settings);
+
+  if (amountPaid >= amountDue) return "paid";
+  if (amountPaid > 0) return "partial";
+  return "unpaid";
+};
+
 // Helper to count session stats for a student in a given month
 const getStudentMonthStats = (student: Student, month: number, year: number) => {
   const sessions = student.sessions.filter((s) => {
