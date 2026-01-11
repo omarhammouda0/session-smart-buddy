@@ -91,24 +91,33 @@ serve(async (req) => {
     console.log(`Message preview: ${message.substring(0, 100)}...`);
 
     // ============================================
-    // CLEAN PHONE NUMBER
+    // CLEAN PHONE NUMBER - INTERNATIONAL SUPPORT
+    // Handles numbers from ANY country
     // ============================================
-    let cleanedPhone = String(phone).replace(/\D/g, "");
+    let cleanedPhone = String(phone).trim();
 
-    // Handle Saudi numbers starting with 0
-    if (cleanedPhone.startsWith("0") && cleanedPhone.length === 10) {
-      cleanedPhone = "966" + cleanedPhone.substring(1);
-    }
+    // Remove all non-digits (keeps the number, removes +, spaces, dashes, etc.)
+    cleanedPhone = cleanedPhone.replace(/\D/g, "");
 
+    // Phone numbers should already include country code
+    // Examples:
+    //   "+201234567890" -> "201234567890" (Egypt)
+    //   "+966501234567" -> "966501234567" (Saudi)
+    //   "+15551234567"  -> "15551234567"  (USA)
+    //   "+491234567890" -> "491234567890" (Germany)
+    //   "201234567890"  -> "201234567890" (already without +)
+
+    console.log("Original phone:", phone);
     console.log("Cleaned phone:", cleanedPhone);
 
-    // Validate phone length
+    // Validate phone length (minimum 10 digits for most countries)
     if (cleanedPhone.length < 10) {
       return new Response(
         JSON.stringify({
           success: false,
           error: "Invalid phone number",
           details: `Number too short: ${cleanedPhone.length} digits (minimum 10)`,
+          hint: "Make sure to include country code (e.g., +20 for Egypt, +966 for Saudi)",
           original: phone,
           cleaned: cleanedPhone,
         }),
@@ -147,12 +156,13 @@ serve(async (req) => {
 
     // ============================================
     // SEND VIA TWILIO
+    // Twilio requires format: whatsapp:+[country_code][number]
     // ============================================
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
 
     const formData = new URLSearchParams();
     formData.append("From", `whatsapp:${twilioPhone}`);
-    formData.append("To", `whatsapp:+${cleanedPhone}`);
+    formData.append("To", `whatsapp:+${cleanedPhone}`); // Add + for Twilio
     formData.append("Body", message);
 
     console.log("Sending to Twilio:", {
@@ -188,7 +198,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`✅ WhatsApp sent to ${cleanedPhone} for ${studentName}`, {
+    console.log(`✅ WhatsApp sent to +${cleanedPhone} for ${studentName}`, {
       sid: twilioData.sid,
       status: twilioData.status,
     });
