@@ -50,15 +50,21 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 );
 
 // Helper function to format phone number for WhatsApp
-
 const formatWhatsAppNumber = (phone: string): string => {
   // Remove all non-digit characters except +
   let cleaned = phone.replace(/[^\d+]/g, "");
 
-  // Remove + sign for wa.me URL
-  cleaned = cleaned.replace("+", "");
+  // If starts with 0, assume Saudi Arabia and replace with +966
+  if (cleaned.startsWith("0")) {
+    cleaned = "+966" + cleaned.substring(1);
+  }
 
-  return cleaned;
+  // If no + prefix, add it
+  if (!cleaned.startsWith("+")) {
+    cleaned = "+" + cleaned;
+  }
+
+  return cleaned.replace("+", "");
 };
 
 // Helper function to open WhatsApp
