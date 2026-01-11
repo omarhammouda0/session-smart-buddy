@@ -522,10 +522,14 @@
    COMPONENT OVERRIDES
    ===================================================== */
 @layer components {
-  /* Enhanced cards */
+  /* Enhanced cards with premium feel */
   .card-enhanced {
-    @apply relative overflow-hidden rounded-2xl bg-card border border-border/50 shadow-lg;
-    @apply transition-all duration-300 hover:shadow-xl hover:border-primary/20;
+    @apply relative overflow-hidden rounded-2xl bg-card border border-border/50;
+    box-shadow: 
+      0 1px 2px hsl(var(--foreground) / 0.04),
+      0 4px 8px hsl(var(--foreground) / 0.04),
+      0 8px 16px hsl(var(--foreground) / 0.02);
+    @apply transition-all duration-300;
   }
 
   .card-enhanced::before {
@@ -533,8 +537,34 @@
     @apply absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 transition-opacity duration-300;
   }
 
+  .card-enhanced:hover {
+    @apply border-primary/30;
+    box-shadow: 
+      0 2px 4px hsl(var(--foreground) / 0.04),
+      0 8px 16px hsl(var(--foreground) / 0.06),
+      0 16px 32px hsl(var(--foreground) / 0.04),
+      0 0 0 1px hsl(var(--primary) / 0.1);
+    transform: translateY(-2px);
+  }
+
   .card-enhanced:hover::before {
     @apply opacity-100;
+  }
+
+  /* Premium glass card */
+  .card-glass {
+    @apply relative overflow-hidden rounded-2xl;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card) / 0.9) 0%,
+      hsl(var(--card) / 0.7) 100%
+    );
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid hsl(var(--border) / 0.5);
+    box-shadow: 
+      0 4px 6px hsl(var(--foreground) / 0.02),
+      0 12px 24px hsl(var(--foreground) / 0.04),
+      inset 0 1px 0 hsl(255 255 255 / 0.1);
   }
 
   /* Button enhancements */
@@ -549,6 +579,29 @@
 
   .btn-glow:hover::after {
     @apply translate-x-[100%];
+  }
+
+  /* Premium button with gradient */
+  .btn-premium {
+    @apply relative overflow-hidden font-medium;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
+    box-shadow: 
+      0 2px 4px hsl(var(--primary) / 0.3),
+      0 4px 8px hsl(var(--primary) / 0.2),
+      inset 0 1px 0 hsl(255 255 255 / 0.15);
+    @apply transition-all duration-200;
+  }
+
+  .btn-premium:hover {
+    box-shadow: 
+      0 4px 8px hsl(var(--primary) / 0.4),
+      0 8px 16px hsl(var(--primary) / 0.25),
+      inset 0 1px 0 hsl(255 255 255 / 0.2);
+    transform: translateY(-1px);
+  }
+
+  .btn-premium:active {
+    transform: translateY(0);
   }
 
   /* Input focus glow */
@@ -567,15 +620,110 @@
     @apply absolute inset-0 rounded-full animate-ping bg-current opacity-20;
   }
 
-  /* Stat card */
+  /* Stat card with premium styling */
   .stat-card {
-    @apply relative p-6 rounded-2xl bg-gradient-to-br from-card to-card/80;
-    @apply border border-border/50 shadow-lg overflow-hidden;
+    @apply relative p-6 rounded-2xl overflow-hidden;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card)) 0%,
+      hsl(var(--card) / 0.95) 100%
+    );
+    border: 1px solid hsl(var(--border) / 0.5);
+    box-shadow: 
+      0 2px 4px hsl(var(--foreground) / 0.02),
+      0 8px 16px hsl(var(--foreground) / 0.04);
   }
 
   .stat-card::before {
     content: "";
-    @apply absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2;
+    @apply absolute top-0 right-0 w-40 h-40 rounded-full -translate-y-1/2 translate-x-1/2;
+    background: radial-gradient(circle, hsl(var(--primary) / 0.1) 0%, transparent 70%);
+  }
+
+  .stat-card::after {
+    content: "";
+    @apply absolute bottom-0 left-0 w-24 h-24 rounded-full translate-y-1/2 -translate-x-1/2;
+    background: radial-gradient(circle, hsl(var(--success) / 0.08) 0%, transparent 70%);
+  }
+
+  /* Session card with status indicator */
+  .session-card {
+    @apply relative overflow-hidden rounded-xl transition-all duration-200;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .session-card:hover {
+    border-color: hsl(var(--primary) / 0.3);
+    box-shadow: 0 4px 12px hsl(var(--foreground) / 0.05);
+  }
+
+  .session-card-completed {
+    border-left: 4px solid hsl(var(--success));
+    background: linear-gradient(90deg, hsl(var(--success) / 0.05) 0%, hsl(var(--card)) 20%);
+  }
+
+  .session-card-cancelled {
+    border-left: 4px solid hsl(var(--destructive));
+    background: linear-gradient(90deg, hsl(var(--destructive) / 0.05) 0%, hsl(var(--card)) 20%);
+  }
+
+  .session-card-vacation {
+    border-left: 4px solid hsl(var(--warning));
+    background: linear-gradient(90deg, hsl(var(--warning) / 0.05) 0%, hsl(var(--card)) 20%);
+  }
+
+  /* Floating action button */
+  .fab {
+    @apply fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
+    box-shadow: 
+      0 4px 8px hsl(var(--primary) / 0.3),
+      0 8px 16px hsl(var(--primary) / 0.2);
+    @apply transition-all duration-200;
+  }
+
+  .fab:hover {
+    transform: scale(1.05);
+    box-shadow: 
+      0 6px 12px hsl(var(--primary) / 0.35),
+      0 12px 24px hsl(var(--primary) / 0.25);
+  }
+
+  .fab:active {
+    transform: scale(0.98);
+  }
+
+  /* Progress ring */
+  .progress-ring {
+    @apply relative inline-flex items-center justify-center;
+  }
+
+  .progress-ring::before {
+    content: "";
+    @apply absolute inset-0 rounded-full;
+    background: conic-gradient(
+      hsl(var(--primary)) var(--progress, 0%),
+      hsl(var(--muted)) var(--progress, 0%)
+    );
+  }
+
+  /* Shimmer effect for loading states */
+  .shimmer {
+    @apply relative overflow-hidden;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.7) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 }
 
