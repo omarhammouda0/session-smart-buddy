@@ -28,6 +28,22 @@ import {
   User,
   Monitor,
   MapPin,
+  Plus,
+  Filter,
+  Download,
+  Printer,
+  BarChart3,
+  Users,
+  X,
+  Trash2,
+  Sunrise,
+  Sunset,
+  Moon,
+  TrendingUp,
+  Zap,
+  Coffee,
+  Star,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -36,9 +52,24 @@ import { Student, Session } from "@/types/student";
 import { DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,7 +87,9 @@ interface CalendarViewProps {
   onUpdateSessionDateTime?: (studentId: string, sessionId: string, newDate: string, newTime: string) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
   onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
+  onDeleteSession?: (studentId: string, sessionId: string) => void;
   onQuickPayment?: (studentId: string, sessionId: string, sessionDate: string) => void;
+  onAddSession?: (studentId: string, date: string, time?: string) => void;
 }
 
 interface SessionWithStudent {
@@ -83,12 +116,25 @@ export const CalendarView = ({
   onUpdateSessionDateTime,
   onToggleComplete,
   onCancelSession,
+  onDeleteSession,
   onQuickPayment,
+  onAddSession,
 }: CalendarViewProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>("all");
+  const [showWeeklySummary, setShowWeeklySummary] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
+
+  // Add Session Dialog State
+  const [addSessionDialog, setAddSessionDialog] = useState<{
+    open: boolean;
+    date: string;
+    selectedStudentId: string;
+    time: string;
+  } | null>(null);
+
   const [touchDragState, setTouchDragState] = useState<{
     active: boolean;
     startX: number;
@@ -126,10 +172,28 @@ export const CalendarView = ({
     session: Session;
     student: Student;
   } | null>(null);
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{
+    open: boolean;
+    session: Session;
+    student: Student;
+  } | null>(null);
+
+  // Day details dialog - shows all sessions for a specific day
+  const [dayDetailsDialog, setDayDetailsDialog] = useState<{
+    open: boolean;
+    date: string;
+    sessions: SessionWithStudent[];
+  } | null>(null);
+
+  // Filter students based on selection
+  const filteredStudents = useMemo(() => {
+    if (selectedStudentFilter === "all") return students;
+    return students.filter(s => s.id === selectedStudentFilter);
+  }, [students, selectedStudentFilter]);
 
   const sessionsByDate = useMemo(() => {
     const map = new Map<string, SessionWithStudent[]>();
-    students.forEach((student) => {
+    filteredStudents.forEach((student) => {
       student.sessions.forEach((session) => {
         const existing = map.get(session.date) || [];
         existing.push({ session, student });
@@ -144,7 +208,7 @@ export const CalendarView = ({
       });
     });
     return map;
-  }, [students]);
+  }, [filteredStudents]);
 
   const days = useMemo(() => {
     if (viewMode === "week") {
@@ -172,6 +236,106 @@ export const CalendarView = ({
       return [...paddingStart, ...monthDays, ...paddingEnd];
     }
   }, [currentDate, viewMode]);
+
+  // Weekly/Monthly Summary Calculation
+  const periodSummary = useMemo(() => {
+    let totalSessions = 0;
+    let completedSessions = 0;
+    let cancelledSessions = 0;
+    let scheduledSessions = 0;
+    let totalMinutes = 0;
+    const studentStats = new Map<string, { name: string; sessions: number; hours: number }>();
+
+    days.forEach(day => {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const isInCurrentPeriod = viewMode === "month" ? isSameMonth(day, currentDate) : true;
+
+      if (isInCurrentPeriod) {
+        const daySessions = sessionsByDate.get(dateStr) || [];
+        daySessions.forEach(({ session, student }) => {
+          totalSessions++;
+          const duration = session.duration || student.sessionDuration || 60;
+
+          if (session.status === "completed") {
+            completedSessions++;
+            totalMinutes += duration;
+          } else if (session.status === "cancelled") {
+            cancelledSessions++;
+          } else if (session.status === "scheduled") {
+            scheduledSessions++;
+            totalMinutes += duration;
+          }
+
+          // Track per-student stats
+          const existing = studentStats.get(student.id) || { name: student.name, sessions: 0, hours: 0 };
+          existing.sessions++;
+          if (session.status !== "cancelled") {
+            existing.hours += duration / 60;
+          }
+          studentStats.set(student.id, existing);
+        });
+      }
+    });
+
+    const totalHours = Math.round(totalMinutes / 60 * 10) / 10;
+    const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+    // Additional insights
+    // Find busiest day
+    let busiestDay = { date: "", count: 0 };
+    const dayOfWeekStats = new Array(7).fill(0);
+    const timeSlotStats = { morning: 0, afternoon: 0, evening: 0 };
+
+    days.forEach(day => {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const isInCurrentPeriod = viewMode === "month" ? isSameMonth(day, currentDate) : true;
+      if (!isInCurrentPeriod) return;
+
+      const daySessions = sessionsByDate.get(dateStr) || [];
+      if (daySessions.length > busiestDay.count) {
+        busiestDay = { date: dateStr, count: daySessions.length };
+      }
+
+      // Day of week distribution
+      dayOfWeekStats[day.getDay()] += daySessions.length;
+
+      // Time slot distribution
+      daySessions.forEach(({ session, student }) => {
+        const time = session.time || student.sessionTime || "12:00";
+        const hour = parseInt(time.split(":")[0]);
+        if (hour < 12) timeSlotStats.morning++;
+        else if (hour < 17) timeSlotStats.afternoon++;
+        else timeSlotStats.evening++;
+      });
+    });
+
+    // Find most popular day of week
+    const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+    const busiestDayOfWeek = dayOfWeekStats.indexOf(Math.max(...dayOfWeekStats));
+
+    return {
+      totalSessions,
+      completedSessions,
+      cancelledSessions,
+      scheduledSessions,
+      totalHours,
+      completionRate,
+      studentStats: Array.from(studentStats.values()).sort((a, b) => b.sessions - a.sessions),
+      busiestDay,
+      busiestDayOfWeek: dayNames[busiestDayOfWeek],
+      busiestDayOfWeekCount: dayOfWeekStats[busiestDayOfWeek],
+      timeSlotStats,
+      averageSessionsPerDay: days.length > 0 ? Math.round(totalSessions / days.length * 10) / 10 : 0,
+    };
+  }, [days, sessionsByDate, currentDate, viewMode]);
+
+  // Get time of day icon and color
+  const getTimeOfDayInfo = (time: string) => {
+    const hour = parseInt(time?.split(":")[0] || "12");
+    if (hour < 12) return { icon: Sunrise, color: "text-amber-500", label: "صباحاً" };
+    if (hour < 17) return { icon: Sunset, color: "text-orange-500", label: "ظهراً" };
+    return { icon: Moon, color: "text-indigo-500", label: "مساءً" };
+  };
 
   const checkTimeConflict = useCallback(
     (studentId: string, sessionId: string, newDate: string, newTime: string): ConflictInfo => {
@@ -428,11 +592,102 @@ export const CalendarView = ({
     setCancelConfirmDialog(null);
   };
 
+  const handleDeleteClick = () => {
+    if (!sessionActionDialog) return;
+    setSessionActionDialog(null);
+    setDeleteConfirmDialog({ open: true, session: sessionActionDialog.session, student: sessionActionDialog.student });
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirmDialog || !onDeleteSession) return;
+    onDeleteSession(deleteConfirmDialog.student.id, deleteConfirmDialog.session.id);
+    setDeleteConfirmDialog(null);
+    toast({
+      title: "✓ تم حذف الحصة",
+      description: `تم حذف حصة ${deleteConfirmDialog.student.name} نهائياً`,
+    });
+  };
+
   const handlePaymentClick = () => {
     if (!sessionActionDialog || !onQuickPayment) return;
     const { session, student } = sessionActionDialog;
     setSessionActionDialog(null);
     onQuickPayment(student.id, session.id, session.date);
+  };
+
+  // Add new session
+  const handleAddNewSession = () => {
+    if (!addSessionDialog || !onAddSession || !addSessionDialog.selectedStudentId) return;
+    onAddSession(addSessionDialog.selectedStudentId, addSessionDialog.date, addSessionDialog.time || undefined);
+    setAddSessionDialog(null);
+    toast({
+      title: "✓ تمت إضافة الحصة",
+      description: `تمت إضافة حصة جديدة في ${format(parseISO(addSessionDialog.date), "dd/MM/yyyy", { locale: ar })}`,
+    });
+  };
+
+  // Export to text/clipboard
+  const handleExport = (type: "copy" | "print") => {
+    const periodLabel = viewMode === "week"
+      ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
+      : format(currentDate, "MMMM yyyy", { locale: ar });
+
+    let exportText = `📅 تقرير التقويم - ${periodLabel}\n`;
+    exportText += `${"═".repeat(40)}\n\n`;
+
+    exportText += `📊 ملخص الفترة:\n`;
+    exportText += `• إجمالي الحصص: ${periodSummary.totalSessions}\n`;
+    exportText += `• المكتملة: ${periodSummary.completedSessions}\n`;
+    exportText += `• الملغاة: ${periodSummary.cancelledSessions}\n`;
+    exportText += `• المجدولة: ${periodSummary.scheduledSessions}\n`;
+    exportText += `• إجمالي الساعات: ${periodSummary.totalHours} ساعة\n`;
+    exportText += `• نسبة الإنجاز: ${periodSummary.completionRate}%\n\n`;
+
+    exportText += `📋 تفاصيل الحصص:\n`;
+    exportText += `${"─".repeat(40)}\n`;
+
+    days.forEach(day => {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const isInCurrentPeriod = viewMode === "month" ? isSameMonth(day, currentDate) : true;
+      if (!isInCurrentPeriod) return;
+
+      const daySessions = sessionsByDate.get(dateStr) || [];
+      if (daySessions.length === 0) return;
+
+      exportText += `\n📆 ${format(day, "EEEE dd/MM/yyyy", { locale: ar })}\n`;
+      daySessions.forEach(({ session, student }) => {
+        const time = session.time || student.sessionTime;
+        const status = getStatusLabel(session.status);
+        exportText += `   • ${time} - ${student.name} (${status})\n`;
+      });
+    });
+
+    if (type === "copy") {
+      navigator.clipboard.writeText(exportText);
+      toast({
+        title: "✓ تم النسخ",
+        description: "تم نسخ التقرير إلى الحافظة",
+      });
+    } else {
+      // Print
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(`
+          <html dir="rtl" lang="ar">
+            <head>
+              <title>تقرير التقويم - ${periodLabel}</title>
+              <style>
+                body { font-family: 'Cairo', 'Tajawal', Arial, sans-serif; padding: 20px; line-height: 1.8; }
+                pre { white-space: pre-wrap; font-family: inherit; }
+              </style>
+            </head>
+            <body><pre>${exportText}</pre></body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+      }
+    }
   };
 
   const getStatusColor = (status: Session["status"]) => {
@@ -475,51 +730,242 @@ export const CalendarView = ({
   };
 
   const today = new Date();
-  const timeOptions = useMemo(() => {
-    const options = [];
-    for (let h = 0; h < 24; h++) {
-      for (let m = 0; m < 60; m += 30) {
-        options.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-      }
-    }
-    return options;
-  }, []);
+
+  // Handle day click to show all sessions
+  const handleDayClick = (dateStr: string, sessions: SessionWithStudent[]) => {
+    if (dragState || touchDragState?.active) return;
+    setDayDetailsDialog({
+      open: true,
+      date: dateStr,
+      sessions,
+    });
+  };
 
   return (
-    <Card className="w-full border-2 shadow-lg">
+    <Card className="w-full border-2 shadow-xl overflow-hidden">
       <CardHeader className="space-y-4 pb-4 bg-gradient-to-br from-primary/5 via-background to-background border-b">
-        <div className="flex items-center justify-between">
+        {/* Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-primary/10 text-primary ring-2 ring-primary/20">
-              <CalendarIcon className="h-5 w-5" />
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-purple-500 text-white shadow-lg shadow-primary/25">
+              <CalendarIcon className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">
                 عرض التقويم
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">اضغط على حصة لإدارتها</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 font-medium">
+                {selectedStudentFilter === "all"
+                  ? `${students.length} طالب • ${periodSummary.totalSessions} حصة`
+                  : `${periodSummary.totalSessions} حصة`
+                }
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 bg-muted/50 p-1.5 rounded-xl shadow-inner">
-            {[
-              { value: "week", label: "أسبوعي" },
-              { value: "month", label: "شهري" },
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setViewMode(value as "week" | "month")}
-                className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                  viewMode === value
-                    ? "bg-background text-primary shadow-md scale-105"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background/50",
-                )}
-              >
-                {label}
-              </button>
-            ))}
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Student Filter */}
+            <Select value={selectedStudentFilter} onValueChange={setSelectedStudentFilter}>
+              <SelectTrigger className="w-[160px] h-9 rounded-lg border-2 text-sm">
+                <Filter className="h-3.5 w-3.5 ml-2 text-muted-foreground" />
+                <SelectValue placeholder="كل الطلاب" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <span className="flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5" />
+                    كل الطلاب
+                  </span>
+                </SelectItem>
+                {students.map(student => (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Summary Toggle */}
+            <Button
+              variant={showWeeklySummary ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowWeeklySummary(!showWeeklySummary)}
+              className="h-9 gap-1.5 rounded-lg"
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">ملخص</span>
+            </Button>
+
+            {/* Export Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg">
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">تصدير</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport("copy")}>
+                  <Download className="h-4 w-4 ml-2" />
+                  نسخ للحافظة
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("print")}>
+                  <Printer className="h-4 w-4 ml-2" />
+                  طباعة
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
+
+        {/* Weekly Summary Panel - Enhanced */}
+        {showWeeklySummary && (
+          <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-muted/40 to-muted/20 border-2">
+            {/* Main Stats Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="text-center p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 hover:scale-105 transition-transform">
+                <CalendarIcon className="h-5 w-5 mx-auto mb-1 text-blue-500" />
+                <p className="text-2xl font-bold text-blue-600 tabular-nums">{periodSummary.totalSessions}</p>
+                <p className="text-xs text-muted-foreground font-medium">إجمالي الحصص</p>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:scale-105 transition-transform">
+                <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
+                <p className="text-2xl font-bold text-emerald-600 tabular-nums">{periodSummary.completedSessions}</p>
+                <p className="text-xs text-muted-foreground font-medium">مكتملة</p>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:scale-105 transition-transform">
+                <Clock className="h-5 w-5 mx-auto mb-1 text-purple-500" />
+                <p className="text-2xl font-bold text-purple-600 tabular-nums">{periodSummary.totalHours}</p>
+                <p className="text-xs text-muted-foreground font-medium">ساعة</p>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:scale-105 transition-transform">
+                <TrendingUp className="h-5 w-5 mx-auto mb-1 text-amber-500" />
+                <p className="text-2xl font-bold text-amber-600 tabular-nums">{periodSummary.completionRate}%</p>
+                <p className="text-xs text-muted-foreground font-medium">نسبة الإنجاز</p>
+              </div>
+            </div>
+
+            {/* Completion Progress Bar */}
+            {periodSummary.totalSessions > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>تقدم الإنجاز</span>
+                  <span>{periodSummary.completedSessions} من {periodSummary.totalSessions}</span>
+                </div>
+                <Progress value={periodSummary.completionRate} className="h-2" />
+              </div>
+            )}
+
+            {/* Insights Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t">
+              {/* Busiest Day of Week */}
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Star className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">أكثر يوم ازدحاماً</p>
+                  <p className="text-sm font-bold">{periodSummary.busiestDayOfWeek}</p>
+                  <p className="text-xs text-muted-foreground">{periodSummary.busiestDayOfWeekCount} حصة</p>
+                </div>
+              </div>
+
+              {/* Time Distribution */}
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                <div className="p-2 rounded-lg bg-orange-500/10">
+                  <Sunset className="h-4 w-4 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">توزيع الأوقات</p>
+                  <div className="flex gap-2 text-xs mt-1">
+                    <span className="flex items-center gap-1">
+                      <Sunrise className="h-3 w-3 text-amber-500" />
+                      {periodSummary.timeSlotStats.morning}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Sunset className="h-3 w-3 text-orange-500" />
+                      {periodSummary.timeSlotStats.afternoon}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Moon className="h-3 w-3 text-indigo-500" />
+                      {periodSummary.timeSlotStats.evening}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Average Per Day */}
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                <div className="p-2 rounded-lg bg-cyan-500/10">
+                  <Zap className="h-4 w-4 text-cyan-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">متوسط يومي</p>
+                  <p className="text-sm font-bold">{periodSummary.averageSessionsPerDay} حصة/يوم</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Students */}
+            {periodSummary.studentStats.length > 0 && (
+              <div className="pt-3 border-t">
+                <p className="text-xs text-muted-foreground font-semibold mb-2 flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  أكثر الطلاب حصصاً:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {periodSummary.studentStats.slice(0, 5).map((stat, i) => (
+                    <Badge
+                      key={i}
+                      variant="secondary"
+                      className={cn(
+                        "text-xs transition-all hover:scale-105",
+                        i === 0 && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                      )}
+                    >
+                      {i === 0 && <Star className="h-3 w-3 ml-1 fill-current" />}
+                      {stat.name}: {stat.sessions} حصة
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Tip */}
+            {periodSummary.cancelledSessions > 0 && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/5 border border-rose-500/20 text-sm">
+                <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" />
+                <p className="text-rose-700 dark:text-rose-400">
+                  لديك <strong>{periodSummary.cancelledSessions}</strong> حصة ملغاة هذا الأسبوع
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1.5 bg-muted/50 p-1.5 rounded-xl shadow-inner w-fit">
+          {[
+            { value: "week", label: "أسبوعي" },
+            { value: "month", label: "شهري" },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setViewMode(value as "week" | "month")}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200",
+                viewMode === value
+                  ? "bg-background text-primary shadow-md scale-105"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Navigation Bar */}
         <div className="flex items-center justify-between bg-background/80 backdrop-blur-sm p-3 rounded-xl border-2 border-border/50 shadow-sm">
           <div className="flex items-center gap-2">
             <Button
@@ -539,7 +985,7 @@ export const CalendarView = ({
               <ChevronLeft className="h-5 w-5" />
             </Button>
           </div>
-          <h3 className="font-bold text-sm sm:text-base text-center px-3 py-1.5 bg-primary/5 rounded-lg">
+          <h3 className="font-display font-bold text-base sm:text-lg text-center px-4 py-2 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-xl">
             {viewMode === "week"
               ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
               : format(currentDate, "MMMM yyyy", { locale: ar })}
@@ -548,7 +994,7 @@ export const CalendarView = ({
             variant="outline"
             size="sm"
             onClick={goToToday}
-            className="h-10 px-4 rounded-xl border-2 hover:border-primary hover:bg-primary/5 hover:scale-105 transition-all shadow-sm font-medium"
+            className="h-10 px-4 rounded-xl border-2 hover:border-primary hover:bg-primary/5 hover:scale-105 transition-all shadow-sm font-semibold"
           >
             اليوم
           </Button>
@@ -556,6 +1002,27 @@ export const CalendarView = ({
       </CardHeader>
 
       <CardContent className="p-3 sm:p-6">
+        {/* Filter indicator */}
+        {selectedStudentFilter !== "all" && (
+          <div className="mb-4 p-3 rounded-xl bg-primary/5 border-2 border-primary/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">
+                عرض حصص: <span className="font-bold text-primary">{students.find(s => s.id === selectedStudentFilter)?.name}</span>
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedStudentFilter("all")}
+              className="h-7 px-2 text-xs"
+            >
+              <X className="h-3.5 w-3.5 ml-1" />
+              إزالة الفلتر
+            </Button>
+          </div>
+        )}
+
         <div className="grid gap-3 grid-cols-7">
           {DAY_NAMES_SHORT_AR.map((day, i) => (
             <div
@@ -625,13 +1092,14 @@ export const CalendarView = ({
                     )}
                   </div>
                 )}
-                {/* Date header - fixed */}
+                {/* Date header - clickable to see all sessions */}
                 <div
                   className={cn(
-                    "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2 shrink-0",
+                    "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2 shrink-0 cursor-pointer hover:bg-muted/30 rounded-t-lg -mx-2 -mt-2 sm:-mx-3 sm:-mt-3 px-2 pt-2 sm:px-3 sm:pt-3 transition-colors",
                     isToday ? "border-primary" : "border-border/50",
                     isDropTarget && (hasDropConflict || hasDropWarning) && "mt-6",
                   )}
+                  onClick={() => handleDayClick(dateStr, daySessions)}
                 >
                   <span
                     className={cn(
@@ -643,7 +1111,7 @@ export const CalendarView = ({
                     {format(day, "d")}
                   </span>
                   {daySessions.length > 0 && (
-                    <span className="text-[10px] sm:text-xs bg-primary text-primary-foreground px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-bold shadow-sm">
+                    <span className="text-[10px] sm:text-xs bg-primary text-primary-foreground px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-bold shadow-sm cursor-pointer hover:scale-110 transition-transform">
                       {daySessions.length}
                     </span>
                   )}
@@ -677,9 +1145,21 @@ export const CalendarView = ({
                       >
                         {canDrag && <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 opacity-50 mt-0.5" />}
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold truncate text-xs sm:text-sm">{student.name}</div>
+                          <div className="flex items-center gap-1">
+                            <div className="font-bold truncate text-xs sm:text-sm flex-1">{student.name}</div>
+                            {/* Session type indicator */}
+                            {student.sessionType === "online" ? (
+                              <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
+                            ) : (
+                              <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                            )}
+                          </div>
                           <div className="text-[10px] sm:text-xs opacity-80 flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1">
-                            <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                            {(() => {
+                              const timeInfo = getTimeOfDayInfo(time || "12:00");
+                              const TimeIcon = timeInfo.icon;
+                              return <TimeIcon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", timeInfo.color)} />;
+                            })()}
                             <span className="font-medium">{time}</span>
                           </div>
                         </div>
@@ -691,16 +1171,20 @@ export const CalendarView = ({
             );
           })}
         </div>
-        <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t-2 text-sm bg-muted/20 p-4 rounded-xl">
+
+        {/* Legend Footer */}
+        <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t-2 text-sm bg-gradient-to-r from-muted/30 to-muted/10 p-4 rounded-xl">
           <span className="text-muted-foreground font-bold">الحالة:</span>
           {[
-            { color: "bg-blue-500/40", label: "مجدولة" },
-            { color: "bg-emerald-500/40", label: "مكتملة" },
-            { color: "bg-rose-500/40", label: "ملغاة" },
-            { color: "bg-amber-500/40", label: "إجازة" },
-          ].map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-2">
-              <div className={cn("w-4 h-4 rounded-md border-2 border-current", color)} />
+            { color: "bg-blue-500/40", label: "مجدولة", icon: CalendarIcon },
+            { color: "bg-emerald-500/40", label: "مكتملة", icon: CheckCircle2 },
+            { color: "bg-rose-500/40", label: "ملغاة", icon: XCircle },
+            { color: "bg-amber-500/40", label: "إجازة", icon: Coffee },
+          ].map(({ color, label, icon: Icon }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className={cn("w-4 h-4 rounded-md border-2 border-current flex items-center justify-center", color)}>
+                <Icon className="h-2.5 w-2.5" />
+              </div>
               <span className="font-medium">{label}</span>
             </div>
           ))}
@@ -814,6 +1298,20 @@ export const CalendarView = ({
                     هذه الحصة إجازة
                   </div>
                 )}
+
+                {/* Delete button - available for all session statuses */}
+                {onDeleteSession && (
+                  <div className="pt-3 mt-3 border-t">
+                    <Button
+                      onClick={handleDeleteClick}
+                      variant="outline"
+                      className="w-full h-10 border-slate-300 text-slate-600 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-400 gap-2 text-sm"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      حذف الحصة نهائياً
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -865,6 +1363,37 @@ export const CalendarView = ({
             <AlertDialogCancel>رجوع</AlertDialogCancel>
             <AlertDialogAction onClick={confirmCancel} className="bg-rose-600 text-white hover:bg-rose-700">
               تأكيد الإلغاء
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={deleteConfirmDialog?.open || false}
+        onOpenChange={(open) => !open && setDeleteConfirmDialog(null)}
+      >
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-slate-700">
+              <Trash2 className="h-5 w-5" />
+              تأكيد حذف الحصة
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                هل تريد حذف حصة <strong>{deleteConfirmDialog?.student.name}</strong> في{" "}
+                <strong>{deleteConfirmDialog?.session.time || deleteConfirmDialog?.student.sessionTime}</strong> نهائياً؟
+              </p>
+              <p className="text-rose-600 text-sm font-medium">
+                ⚠️ هذا الإجراء لا يمكن التراجع عنه. سيتم حذف الحصة من جميع السجلات.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-slate-700 text-white hover:bg-slate-800">
+              <Trash2 className="h-4 w-4 ml-2" />
+              حذف نهائياً
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -949,48 +1478,31 @@ export const CalendarView = ({
               <Label htmlFor="new-time" className="text-sm font-medium">
                 اختر الوقت الجديد:
               </Label>
-              <Select value={confirmDialog?.newTime} onValueChange={updateConfirmDialogTime}>
-                <SelectTrigger
+              <div className="relative">
+                <Input
                   id="new-time"
+                  type="time"
+                  value={confirmDialog?.newTime || ""}
+                  onChange={(e) => updateConfirmDialogTime(e.target.value)}
                   className={cn(
-                    "h-11 rounded-xl border-2",
-                    confirmDialog?.conflictInfo.hasConflict && "border-rose-500/50",
+                    "h-12 rounded-xl border-2 text-center text-lg font-bold",
+                    confirmDialog?.conflictInfo.hasConflict && "border-rose-500/50 text-rose-600",
+                    confirmDialog?.conflictInfo.severity === "warning" && !confirmDialog?.conflictInfo.hasConflict && "border-amber-500/50 text-amber-600",
                   )}
-                >
-                  <SelectValue placeholder="اختر الوقت" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  {timeOptions.map((time) => {
-                    const timeConflict = confirmDialog
-                      ? checkTimeConflict(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate, time)
-                      : null;
-                    return (
-                      <SelectItem
-                        key={time}
-                        value={time}
-                        className={cn(
-                          timeConflict?.hasConflict && "text-rose-500",
-                          timeConflict?.severity === "warning" && !timeConflict.hasConflict && "text-amber-500",
-                        )}
-                      >
-                        <span className="flex items-center gap-2">
-                          {time}
-                          {timeConflict?.hasConflict && (
-                            <Badge variant="destructive" className="text-[10px] px-1 py-0">
-                              تعارض
-                            </Badge>
-                          )}
-                          {timeConflict?.severity === "warning" && !timeConflict.hasConflict && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 text-amber-500 border-amber-500">
-                              قريب
-                            </Badge>
-                          )}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                />
+                {confirmDialog?.conflictInfo.hasConflict && (
+                  <div className="mt-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs flex items-center gap-1.5">
+                    <XCircle className="h-3.5 w-3.5" />
+                    تعارض مع {confirmDialog.conflictInfo.conflictStudent} في الساعة {confirmDialog.conflictInfo.conflictTime}
+                  </div>
+                )}
+                {confirmDialog?.conflictInfo.severity === "warning" && !confirmDialog?.conflictInfo.hasConflict && (
+                  <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 text-xs flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    قريب من {confirmDialog.conflictInfo.conflictStudent} في الساعة {confirmDialog.conflictInfo.conflictTime}
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">💡 الوقت الحالي: {confirmDialog?.originalTime}</p>
             </div>
           </div>
@@ -1009,6 +1521,306 @@ export const CalendarView = ({
               )}
             >
               {confirmDialog?.conflictInfo.hasConflict ? "غير متاح" : "تأكيد النقل"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Day Details Dialog - Shows all sessions for a specific day */}
+      <Dialog open={dayDetailsDialog?.open || false} onOpenChange={(open) => !open && setDayDetailsDialog(null)}>
+        <DialogContent dir="rtl" className="sm:max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-xl font-display font-bold flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-purple-500 text-white">
+                  <CalendarIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <div>{dayDetailsDialog && format(parseISO(dayDetailsDialog.date), "EEEE", { locale: ar })}</div>
+                  <div className="text-sm font-normal text-muted-foreground">
+                    {dayDetailsDialog && format(parseISO(dayDetailsDialog.date), "dd MMMM yyyy", { locale: ar })}
+                  </div>
+                </div>
+              </DialogTitle>
+              {onAddSession && dayDetailsDialog && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setDayDetailsDialog(null);
+                    setAddSessionDialog({
+                      open: true,
+                      date: dayDetailsDialog.date,
+                      selectedStudentId: "",
+                      time: "",
+                    });
+                  }}
+                  className="h-8 gap-1.5 rounded-lg bg-gradient-to-r from-primary to-purple-500"
+                >
+                  <Plus className="h-4 w-4" />
+                  إضافة حصة
+                </Button>
+              )}
+            </div>
+            <DialogDescription>
+              {dayDetailsDialog?.sessions.length === 0
+                ? "لا توجد حصص في هذا اليوم"
+                : `${dayDetailsDialog?.sessions.length} حصة مجدولة`
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {dayDetailsDialog && dayDetailsDialog.sessions.length > 0 ? (
+            <>
+              {/* Day Summary Stats - Compact inline version */}
+              <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 border text-xs shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <CalendarIcon className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="font-bold text-blue-600">{dayDetailsDialog.sessions.length}</span>
+                    <span className="text-muted-foreground">حصص</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="font-bold text-emerald-600">
+                      {dayDetailsDialog.sessions.filter(s => s.session.status === "completed").length}
+                    </span>
+                    <span className="text-muted-foreground">مكتملة</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-purple-500" />
+                    <span className="font-bold text-purple-600">
+                      {Math.round(dayDetailsDialog.sessions.reduce((acc, { session, student }) =>
+                        acc + (session.status !== "cancelled" ? (session.duration || student.sessionDuration || 60) : 0), 0) / 60 * 10) / 10}
+                    </span>
+                    <span className="text-muted-foreground">س</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto min-h-0 -mx-6 px-6">
+                <div className="space-y-1.5 py-2">
+                  {dayDetailsDialog.sessions.map(({ session, student }) => {
+                    const time = session.time || student.sessionTime;
+                    const timeInfo = getTimeOfDayInfo(time || "12:00");
+                    const TimeIcon = timeInfo.icon;
+
+                    return (
+                      <div
+                        key={session.id}
+                        className={cn(
+                          "p-2 rounded-lg border transition-all hover:shadow-sm cursor-pointer group",
+                          getStatusColor(session.status),
+                        )}
+                        onClick={() => {
+                          setDayDetailsDialog(null);
+                          setSessionActionDialog({ open: true, session, student });
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center shrink-0">
+                              <User className="h-3 w-3" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-semibold text-xs truncate block">{student.name}</span>
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                <TimeIcon className={cn("h-2.5 w-2.5", timeInfo.color)} />
+                                <span>{time}</span>
+                                {student.sessionType === "online" ? (
+                                  <Monitor className="h-2.5 w-2.5 text-blue-500" />
+                                ) : (
+                                  <MapPin className="h-2.5 w-2.5 text-emerald-500" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Badge className={cn("text-[9px] h-4 px-1.5", getStatusBadgeColor(session.status))}>
+                              {getStatusLabel(session.status)}
+                            </Badge>
+                            {/* Inline action buttons */}
+                            {session.status === "scheduled" && onToggleComplete && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-5 w-5 p-0 text-emerald-600 hover:bg-emerald-500/10 opacity-0 group-hover:opacity-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDayDetailsDialog(null);
+                                  setCompleteConfirmDialog({ open: true, session, student });
+                                }}
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                            {onDeleteSession && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-5 w-5 p-0 text-slate-400 hover:bg-slate-500/10 hover:text-slate-600 opacity-0 group-hover:opacity-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDayDetailsDialog(null);
+                                  setDeleteConfirmDialog({ open: true, session, student });
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="py-12 text-center text-muted-foreground">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                <CalendarIcon className="h-8 w-8 opacity-50" />
+              </div>
+              <p className="text-lg font-medium">لا توجد حصص</p>
+              <p className="text-sm mb-4">هذا اليوم فارغ من الحصص</p>
+              {onAddSession && dayDetailsDialog && (
+                <Button
+                  onClick={() => {
+                    setDayDetailsDialog(null);
+                    setAddSessionDialog({
+                      open: true,
+                      date: dayDetailsDialog.date,
+                      selectedStudentId: "",
+                      time: "",
+                    });
+                  }}
+                  className="gap-2 bg-gradient-to-r from-primary to-purple-500"
+                >
+                  <Plus className="h-4 w-4" />
+                  إضافة حصة جديدة
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t shrink-0">
+            <Button variant="outline" onClick={() => setDayDetailsDialog(null)} className="rounded-xl">
+              إغلاق
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Session Dialog */}
+      <Dialog open={addSessionDialog?.open || false} onOpenChange={(open) => !open && setAddSessionDialog(null)}>
+        <DialogContent dir="rtl" className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display font-bold flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              إضافة حصة جديدة
+            </DialogTitle>
+            <DialogDescription>
+              {addSessionDialog && format(parseISO(addSessionDialog.date), "EEEE dd MMMM yyyy", { locale: ar })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Student Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">اختر الطالب</Label>
+              <Select
+                value={addSessionDialog?.selectedStudentId || ""}
+                onValueChange={(value) => {
+                  if (addSessionDialog) {
+                    const student = students.find(s => s.id === value);
+                    setAddSessionDialog({
+                      ...addSessionDialog,
+                      selectedStudentId: value,
+                      time: student?.sessionTime || addSessionDialog.time,
+                    });
+                  }
+                }}
+              >
+                <SelectTrigger className="h-11 rounded-xl border-2">
+                  <SelectValue placeholder="اختر طالب..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map(student => (
+                    <SelectItem key={student.id} value={student.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5" />
+                        <span>{student.name}</span>
+                        <span className="text-xs text-muted-foreground">({student.sessionTime})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Time Input */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">وقت الحصة</Label>
+              <Input
+                type="time"
+                value={addSessionDialog?.time || ""}
+                onChange={(e) => {
+                  if (addSessionDialog) {
+                    setAddSessionDialog({
+                      ...addSessionDialog,
+                      time: e.target.value,
+                    });
+                  }
+                }}
+                className="h-11 rounded-xl border-2 text-center text-lg font-bold"
+              />
+              {addSessionDialog?.selectedStudentId && (
+                <p className="text-xs text-muted-foreground">
+                  💡 الوقت الافتراضي للطالب: {students.find(s => s.id === addSessionDialog.selectedStudentId)?.sessionTime}
+                </p>
+              )}
+            </div>
+
+            {/* Conflict Warning */}
+            {addSessionDialog?.selectedStudentId && addSessionDialog?.time && (
+              (() => {
+                const conflict = checkTimeConflict(
+                  addSessionDialog.selectedStudentId,
+                  "",
+                  addSessionDialog.date,
+                  addSessionDialog.time
+                );
+                if (conflict.hasConflict) {
+                  return (
+                    <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-600 text-sm flex items-center gap-2">
+                      <XCircle className="h-4 w-4" />
+                      تعارض مع {conflict.conflictStudent} في الساعة {conflict.conflictTime}
+                    </div>
+                  );
+                }
+                if (conflict.severity === "warning") {
+                  return (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 text-sm flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      قريب من {conflict.conflictStudent} في الساعة {conflict.conflictTime}
+                    </div>
+                  );
+                }
+                return null;
+              })()
+            )}
+          </div>
+
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => setAddSessionDialog(null)} className="rounded-xl">
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleAddNewSession}
+              disabled={!addSessionDialog?.selectedStudentId}
+              className="rounded-xl bg-gradient-to-r from-primary to-purple-500"
+            >
+              <Plus className="h-4 w-4 ml-2" />
+              إضافة الحصة
             </Button>
           </div>
         </DialogContent>

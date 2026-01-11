@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2 } from 'lucide-react';
-import { SessionType, Student, DEFAULT_DURATION } from '@/types/student';
+import { Switch } from '@/components/ui/switch';
+import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign } from 'lucide-react';
+import { SessionType, Student, DEFAULT_DURATION, StudentMaterial } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateSessionsForSchedule } from '@/lib/dateUtils';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
 import { DurationPicker } from '@/components/DurationPicker';
+import { StudentMaterialsSection } from '@/components/StudentMaterialsSection';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,14 +25,16 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number, materials?: StudentMaterial[], useCustomPrices?: boolean, customPriceOnsite?: number, customPriceOnline?: number) => void;
   defaultStart: string;
   defaultEnd: string;
   students?: Student[];
   defaultDuration?: number;
+  defaultPriceOnsite?: number;
+  defaultPriceOnline?: number;
 }
 
-export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [], defaultDuration = DEFAULT_DURATION }: AddStudentDialogProps) => {
+export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [], defaultDuration = DEFAULT_DURATION, defaultPriceOnsite = 150, defaultPriceOnline = 120 }: AddStudentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -42,7 +46,13 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [showCustomDates, setShowCustomDates] = useState(false);
   const [customStart, setCustomStart] = useState(defaultStart);
   const [customEnd, setCustomEnd] = useState(defaultEnd);
-  
+  const [materials, setMaterials] = useState<StudentMaterial[]>([]);
+
+  // Custom pricing state
+  const [useCustomPrices, setUseCustomPrices] = useState(false);
+  const [customPriceOnsite, setCustomPriceOnsite] = useState<number>(defaultPriceOnsite);
+  const [customPriceOnline, setCustomPriceOnline] = useState<number>(defaultPriceOnline);
+
   // Conflict detection state
   const [isChecking, setIsChecking] = useState(false);
   const [conflictResults, setConflictResults] = useState<Map<string, ConflictResult>>(new Map());
@@ -148,7 +158,11 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       parentPhone.trim() || undefined,
       useCustom ? customStart : undefined,
       useCustom ? customEnd : undefined,
-      sessionDuration
+      sessionDuration,
+      materials.length > 0 ? materials : undefined,
+      useCustomPrices || undefined,
+      useCustomPrices ? customPriceOnsite : undefined,
+      useCustomPrices ? customPriceOnline : undefined
     );
     resetForm();
     setOpen(false);
@@ -167,6 +181,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     setCustomStart(defaultStart);
     setCustomEnd(defaultEnd);
     setConflictResults(new Map());
+    setMaterials([]);
+    setUseCustomPrices(false);
+    setCustomPriceOnsite(defaultPriceOnsite);
+    setCustomPriceOnline(defaultPriceOnline);
   };
 
   const toggleDay = (day: number) => {
@@ -289,6 +307,62 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               </div>
             </div>
 
+            {/* Custom Pricing Section */}
+            <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="customPrices" className="flex items-center gap-2 cursor-pointer">
+                  <DollarSign className="h-4 w-4 text-amber-500" />
+                  <span>سعر مخصص للحصة</span>
+                </Label>
+                <Switch
+                  id="customPrices"
+                  checked={useCustomPrices}
+                  onCheckedChange={setUseCustomPrices}
+                />
+              </div>
+
+              {useCustomPrices && (
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="priceOnsite" className="text-xs flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      سعر الحضوري (ج.م)
+                    </Label>
+                    <Input
+                      id="priceOnsite"
+                      type="number"
+                      min="0"
+                      value={customPriceOnsite}
+                      onChange={(e) => setCustomPriceOnsite(Number(e.target.value) || 0)}
+                      placeholder={String(defaultPriceOnsite)}
+                      className="text-center"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="priceOnline" className="text-xs flex items-center gap-1">
+                      <Monitor className="h-3 w-3" />
+                      سعر الأونلاين (ج.م)
+                    </Label>
+                    <Input
+                      id="priceOnline"
+                      type="number"
+                      min="0"
+                      value={customPriceOnline}
+                      onChange={(e) => setCustomPriceOnline(Number(e.target.value) || 0)}
+                      placeholder={String(defaultPriceOnline)}
+                      className="text-center"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!useCustomPrices && (
+                <p className="text-xs text-muted-foreground">
+                  السعر الافتراضي: حضوري {defaultPriceOnsite} ج.م | أونلاين {defaultPriceOnline} ج.م
+                </p>
+              )}
+            </div>
+
             {/* Duration Picker */}
             <DurationPicker
               startTime={sessionTime || '00:00'}
@@ -370,6 +444,12 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                 ))}
               </div>
             </div>
+
+            {/* Student Materials Section */}
+            <StudentMaterialsSection
+              materials={materials}
+              onMaterialsChange={setMaterials}
+            />
 
             <Collapsible open={showCustomDates} onOpenChange={setShowCustomDates}>
               <CollapsibleTrigger asChild>

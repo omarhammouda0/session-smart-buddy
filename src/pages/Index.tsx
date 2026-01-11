@@ -14,11 +14,13 @@ import {
   CheckCircle2,
   XCircle,
   DollarSign,
-  User,
   Timer,
   ChevronDown,
   ChevronUp,
   Check,
+  Phone,
+  MoreVertical,
+  Pencil,
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -41,7 +43,6 @@ import { RestoreConflictDialog } from "@/components/RestoreConflictDialog";
 import { ReminderSettingsDialog } from "@/components/ReminderSettingsDialog";
 import { ReminderHistoryDialog } from "@/components/ReminderHistoryDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
-import { StudentNotesHistory } from "@/components/StudentNotesHistory";
 import { CalendarView } from "@/components/CalendarView";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +63,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Student, PaymentMethod, Session } from "@/types/student";
+import { SessionNotesDialog } from "@/components/SessionNotesDialog";
+import { useSessionNotifications } from "@/hooks/useSessionNotifications";
+import { SessionNotificationBanner } from "@/components/SessionNotificationBanner";
+import { SessionCompletionDialog } from "@/components/SessionCompletionDialog";
+import { useStudentMaterials } from "@/hooks/useStudentMaterials";
+import { StudentMaterialsDialog } from "@/components/StudentMaterialsDialog";
+import { TodaySessionsStats } from "@/components/TodaySessionsStats";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -87,7 +98,7 @@ interface SessionWithStudent {
 }
 
 const Index = () => {
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const [activeTab, setActiveTab] = useState("sessions");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
   const [showAllSessions, setShowAllSessions] = useState(false);
@@ -105,6 +116,20 @@ const Index = () => {
     sessionId: string;
     sessionDate: string;
   }>({ open: false, student: null, sessionId: "", sessionDate: "" });
+
+  const [completionDialog, setCompletionDialog] = useState<{
+    open: boolean;
+    student: Student | null;
+    session: Session | null;
+  }>({ open: false, student: null, session: null });
+
+  // Time edit dialog for quick time changes
+  const [timeEditDialog, setTimeEditDialog] = useState<{
+    open: boolean;
+    student: Student | null;
+    session: Session | null;
+    newTime: string;
+  }>({ open: false, student: null, session: null, newTime: "" });
 
   const {
     students,
@@ -148,6 +173,50 @@ const Index = () => {
   } = useCancellationTracking(students);
 
   const { checkConflict } = useConflictDetection(students);
+
+  // Session Notifications
+  const {
+    upcomingNotification,
+    dismissNotification,
+    endedSessionNotification,
+    dismissEndedNotification,
+  } = useSessionNotifications(students);
+
+  // Student Materials
+  const { getMaterials, addMaterials, addMaterial, removeMaterial } = useStudentMaterials();
+
+  // Handle adding a new student with materials
+  const handleAddStudent = async (
+    name: string,
+    scheduleDays: number[],
+    sessionTime: string,
+    sessionType: "online" | "onsite",
+    phone?: string,
+    parentPhone?: string,
+    customStart?: string,
+    customEnd?: string,
+    sessionDuration?: number,
+    materials?: import("@/types/student").StudentMaterial[],
+    useCustomPrices?: boolean,
+    customPriceOnsite?: number,
+    customPriceOnline?: number
+  ) => {
+    // First add the student to the database
+    await addStudent(name, scheduleDays, sessionTime, sessionType, phone, parentPhone, customStart, customEnd, sessionDuration, materials, useCustomPrices, customPriceOnsite, customPriceOnline);
+
+    // If materials were added, save them
+    // We need to find the newly created student by name (since we don't have the ID yet)
+    // The student will be in the students array after loadData is called
+    if (materials && materials.length > 0) {
+      // Wait a bit for the students list to update
+      setTimeout(() => {
+        const newStudent = students.find(s => s.name === name);
+        if (newStudent) {
+          addMaterials(newStudent.id, materials);
+        }
+      }, 1000);
+    }
+  };
 
   // Session Handlers
   const handleAddSession = (studentId: string, date: string, customTime?: string) => {
@@ -219,6 +288,54 @@ const Index = () => {
   const handleDeleteSession = (studentId: string, sessionId: string) => {
     deleteSession(studentId, sessionId);
     toast({ title: "تم حذف الحصة", description: "تم حذف الحصة نهائياً" });
+  };
+
+  // Handle quick time edit
+  const handleQuickTimeEdit = (student: Student, session: Session) => {
+    const currentTime = session.time || student.sessionTime || "16:00";
+    setTimeEditDialog({
+      open: true,
+      student,
+      session,
+      newTime: currentTime,
+    });
+  };
+
+  // Check for time conflict when editing session time
+  const getTimeEditConflict = () => {
+    if (!timeEditDialog.student || !timeEditDialog.session || !timeEditDialog.newTime) return null;
+    return checkConflict(
+      { date: timeEditDialog.session.date, startTime: timeEditDialog.newTime },
+      timeEditDialog.session.id,
+      timeEditDialog.student.id
+    );
+  };
+
+  const confirmTimeEdit = () => {
+    if (!timeEditDialog.student || !timeEditDialog.session || !timeEditDialog.newTime) return;
+
+    const conflict = getTimeEditConflict();
+    if (conflict?.severity === "error") {
+      const firstConflict = conflict.conflicts[0];
+      toast({
+        title: "⚠️ تعارض في الوقت",
+        description: firstConflict ? `لا يمكن تغيير الوقت - يوجد تعارض مع ${firstConflict.student.name}` : "يوجد تعارض في الوقت",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateSessionDateTime(
+      timeEditDialog.student.id,
+      timeEditDialog.session.id,
+      timeEditDialog.session.date,
+      timeEditDialog.newTime
+    );
+    toast({
+      title: "✓ تم تعديل الوقت",
+      description: `تم تغيير وقت حصة ${timeEditDialog.student.name} إلى ${timeEditDialog.newTime}`,
+    });
+    setTimeEditDialog({ open: false, student: null, session: null, newTime: "" });
   };
 
   const handleRestoreSession = async (studentId: string, sessionId: string) => {
@@ -362,8 +479,49 @@ const Index = () => {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        {/* Dynamic Background */}
+        <div className="fixed inset-0 -z-20">
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-violet-50 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+          <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-to-br from-primary/25 via-purple-500/15 to-pink-500/10 rounded-full blur-3xl animate-blob" />
+          <div className="absolute top-1/3 -left-40 w-[400px] h-[400px] bg-gradient-to-tr from-cyan-500/15 via-blue-500/10 to-indigo-500/15 rounded-full blur-3xl animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-40 right-1/4 w-[450px] h-[450px] bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/15 rounded-full blur-3xl animate-blob animation-delay-4000" />
+        </div>
+
+        {/* Loading content */}
+        <div className="relative text-center space-y-6 z-10">
+          {/* Animated logo */}
+          <div className="relative">
+            <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-primary via-purple-500 to-pink-500 shadow-2xl shadow-primary/40 flex items-center justify-center">
+              <GraduationCap className="h-12 w-12 text-white animate-pulse" />
+            </div>
+            {/* Glow ring */}
+            <div className="absolute inset-0 w-24 h-24 mx-auto rounded-3xl border-4 border-primary/30 animate-ping" />
+            {/* Orbiting dots */}
+            <div className="absolute inset-0 w-32 h-32 mx-auto -mt-4 animate-spin-slow" style={{ marginRight: '-1rem' }}>
+              <div className="absolute top-0 left-1/2 w-2 h-2 bg-primary rounded-full" />
+              <div className="absolute bottom-0 left-1/2 w-2 h-2 bg-purple-500 rounded-full" />
+              <div className="absolute left-0 top-1/2 w-2 h-2 bg-pink-500 rounded-full" />
+              <div className="absolute right-0 top-1/2 w-2 h-2 bg-cyan-500 rounded-full" />
+            </div>
+          </div>
+
+          {/* Loading text */}
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              متابعة الطلاب
+            </h2>
+            <p className="text-sm text-muted-foreground">جاري تحميل بياناتك...</p>
+          </div>
+
+          {/* Loading bar */}
+          <div className="w-48 mx-auto">
+            <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-full w-1/3 bg-gradient-to-r from-primary via-purple-500 to-pink-500 rounded-full animate-pulse" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -371,38 +529,95 @@ const Index = () => {
   return (
     <div
       dir="rtl"
-      className="min-h-screen safe-bottom relative bg-gradient-to-br from-background via-background to-primary/5"
+      className="min-h-screen safe-bottom relative overflow-x-hidden"
     >
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
+      {/* Dynamic Background */}
+      <div className="fixed inset-0 -z-20">
+        {/* Base gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-violet-50 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950" />
+
+        {/* Mesh gradient overlay */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+
+        {/* Animated gradient orbs */}
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-to-br from-primary/25 via-purple-500/15 to-pink-500/10 rounded-full blur-3xl animate-blob" />
+        <div className="absolute top-1/3 -left-40 w-[400px] h-[400px] bg-gradient-to-tr from-cyan-500/15 via-blue-500/10 to-indigo-500/15 rounded-full blur-3xl animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-40 right-1/4 w-[450px] h-[450px] bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/15 rounded-full blur-3xl animate-blob animation-delay-4000" />
+        <div className="absolute bottom-1/4 left-1/3 w-[300px] h-[300px] bg-gradient-to-tl from-emerald-500/10 via-teal-500/10 to-cyan-500/10 rounded-full blur-3xl animate-blob animation-delay-3000" />
+
+        {/* Subtle noise texture */}
+        <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.03]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
+
+        {/* Grid pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1.5px,transparent_1.5px),linear-gradient(90deg,rgba(139,92,246,0.03)_1.5px,transparent_1.5px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_40%,transparent_100%)]" />
       </div>
 
-      <header className="bg-card/95 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
-        <div className="px-3 py-3 sm:px-4 sm:py-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg flex items-center justify-center shrink-0">
-                <GraduationCap className="h-5 w-5 text-primary-foreground" />
+      {/* Floating particles layer */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        {/* Animated dots */}
+        <div className="absolute top-20 right-[10%] w-2 h-2 bg-primary/30 rounded-full animate-float" />
+        <div className="absolute top-[30%] left-[5%] w-3 h-3 bg-purple-500/20 rounded-full animate-float animation-delay-1000" />
+        <div className="absolute top-[60%] right-[15%] w-2 h-2 bg-amber-500/25 rounded-full animate-float animation-delay-2000" />
+        <div className="absolute top-[45%] left-[20%] w-1.5 h-1.5 bg-cyan-500/30 rounded-full animate-float animation-delay-3000" />
+        <div className="absolute bottom-[25%] right-[25%] w-2 h-2 bg-pink-500/20 rounded-full animate-float animation-delay-1500" />
+        <div className="absolute bottom-[40%] left-[10%] w-2.5 h-2.5 bg-emerald-500/20 rounded-full animate-float animation-delay-2500" />
+
+        {/* Sparkle effects */}
+        <div className="absolute top-[15%] right-[30%] animate-pulse">
+          <svg className="w-4 h-4 text-primary/20" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+          </svg>
+        </div>
+        <div className="absolute top-[50%] left-[15%] animate-pulse animation-delay-2000">
+          <svg className="w-3 h-3 text-amber-500/25" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+          </svg>
+        </div>
+        <div className="absolute bottom-[30%] right-[8%] animate-pulse animation-delay-1000">
+          <svg className="w-3.5 h-3.5 text-purple-500/20" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+          </svg>
+        </div>
+
+        {/* Light rays effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-primary/5 via-transparent to-transparent [mask-image:linear-gradient(to_bottom,white,transparent)] opacity-50" />
+      </div>
+
+      {/* Session Notification Banner */}
+      {upcomingNotification && (
+        <SessionNotificationBanner
+          student={upcomingNotification.student}
+          session={upcomingNotification.session}
+          minutesUntil={upcomingNotification.minutesUntil}
+          onDismiss={dismissNotification}
+        />
+      )}
+
+      <header className="bg-card/70 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
+        <div className="px-4 py-3 sm:px-5 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary via-primary to-purple-500 shadow-lg shadow-primary/25 flex items-center justify-center shrink-0">
+                <GraduationCap className="h-6 w-6 text-primary-foreground" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-heading font-bold text-base sm:text-lg leading-tight truncate">متابعة الطلاب</h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block">
+                <h1 className="font-display font-bold text-lg sm:text-xl leading-tight truncate">متابعة الطلاب</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden xs:block font-medium">
                   {format(now, "EEEE، d MMMM", { locale: ar })}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <Sheet>
                 <SheetTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-9 w-9 sm:w-auto sm:px-3 gap-1.5 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all"
+                    className="h-10 w-10 sm:w-auto sm:px-4 gap-2 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all font-medium"
                   >
                     <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline text-sm">الطلاب</span>
-                    <Badge variant="secondary" className="hidden sm:flex h-5 px-1.5 text-xs">
+                    <span className="hidden sm:inline text-sm font-semibold">الطلاب</span>
+                    <Badge variant="secondary" className="hidden sm:flex h-5 px-2 text-xs font-bold">
                       {students.length}
                     </Badge>
                   </Button>
@@ -476,7 +691,13 @@ const Index = () => {
                                 updateStudentCancellationPolicy(student.id, policy)
                               }
                             />
-                            <StudentNotesHistory studentId={student.id} studentName={student.name} />
+                            <StudentMaterialsDialog
+                              studentName={student.name}
+                              studentId={student.id}
+                              materials={getMaterials(student.id)}
+                              onAddMaterial={(material) => addMaterial(student.id, material)}
+                              onRemoveMaterial={(materialId) => removeMaterial(student.id, materialId)}
+                            />
 
                             {student.phone && (
                               <Button
@@ -528,7 +749,7 @@ const Index = () => {
               <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <BulkEditSessionsDialog
                 students={students}
-                onBulkUpdateTime={bulkUpdateSessionTime}
+                onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }}
                 onUpdateSessionDate={updateSessionDateTime}
                 onBulkMarkAsVacation={bulkMarkAsVacation}
               />
@@ -537,11 +758,13 @@ const Index = () => {
               <ReminderSettingsDialog />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
-                onAdd={addStudent}
+                onAdd={handleAddStudent}
                 defaultStart={settings.defaultSemesterStart}
                 defaultEnd={settings.defaultSemesterEnd}
                 students={students}
                 defaultDuration={settings.defaultSessionDuration}
+                defaultPriceOnsite={settings.defaultPriceOnsite}
+                defaultPriceOnline={settings.defaultPriceOnline}
               />
             </div>
           </div>
@@ -625,41 +848,83 @@ const Index = () => {
             {students.length === 0 ? (
               <EmptyState />
             ) : allTodaySessions.length === 0 ? (
-              <Card className="border-2 border-dashed">
+              <Card className="border-2 border-dashed bg-gradient-to-br from-muted/30 to-muted/10">
                 <CardContent className="p-10 text-center">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted flex items-center justify-center">
-                    <CalendarDays className="h-8 w-8 text-muted-foreground" />
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/10 to-purple-500/10 flex items-center justify-center">
+                    <CalendarDays className="h-10 w-10 text-primary/60" />
                   </div>
-                  <h3 className="font-bold text-lg mb-2">لا توجد حصص اليوم</h3>
-                  <p className="text-sm text-muted-foreground">{format(now, "EEEE، d MMMM yyyy", { locale: ar })}</p>
+                  <h3 className="font-display font-bold text-xl mb-2">لا توجد حصص اليوم 🎉</h3>
+                  <p className="text-sm text-muted-foreground mb-1">{format(now, "EEEE، d MMMM yyyy", { locale: ar })}</p>
+                  <p className="text-xs text-muted-foreground">استمتع بيوم إجازة! أو أضف حصصاً جديدة من التقويم</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-4">
+                {/* Today's Stats Dashboard */}
+                <TodaySessionsStats students={students} settings={settings} payments={payments} />
+
                 {nextSession && (
-                  <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-transparent overflow-hidden">
+                  <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-purple-500/5 to-transparent overflow-hidden shadow-lg shadow-primary/5">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                            <Timer className="h-6 w-6 text-primary" />
+                          <div className="relative">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shrink-0 shadow-lg">
+                              <Timer className="h-7 w-7 text-white" />
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground mb-0.5">الحصة القادمة</p>
-                            <p className="font-bold text-lg truncate">{nextSession.student.name}</p>
+                            <p className="text-xs text-muted-foreground mb-0.5 font-medium">⏰ الحصة القادمة</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-display font-bold text-lg truncate">{nextSession.student.name}</p>
+                              {/* Contact Buttons for Next Session */}
+                              {nextSession.student.phone && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                                    onClick={() => openWhatsApp(nextSession.student.phone!)}
+                                    title="رسالة واتساب"
+                                  >
+                                    <WhatsAppIcon className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
+                                    onClick={() => window.open(`tel:${nextSession.student.phone}`, "_self")}
+                                    title="اتصال هاتفي"
+                                  >
+                                    <Phone className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-3.5 w-3.5" />
-                              <span>{nextSession.session.time || nextSession.student.sessionTime}</span>
+                              <span className="font-medium">{nextSession.session.time || nextSession.student.sessionTime}</span>
                               {timeUntilNext && (
                                 <>
                                   <span>•</span>
-                                  <span className="text-primary font-medium">{timeUntilNext}</span>
+                                  <span className="text-primary font-bold">{timeUntilNext}</span>
                                 </>
                               )}
+                              <span>•</span>
+                              <span className={nextSession.student.sessionType === "online" ? "text-blue-600" : "text-emerald-600"}>
+                                {nextSession.student.sessionType === "online" ? "أونلاين" : "حضوري"}
+                              </span>
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          {/* Session Notes for Next Session */}
+                          <SessionNotesDialog
+                            session={nextSession.session}
+                            studentName={nextSession.student.name}
+                            onSave={(details) => updateSessionDetails(nextSession.student.id, nextSession.session.id, details)}
+                          />
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
@@ -724,30 +989,43 @@ const Index = () => {
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 h-9 px-3"
+                            onClick={() => setCompletionDialog({ open: true, student: nextSession.student, session: nextSession.session })}
+                            title="خيارات الحصة"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 )}
 
-                <Card className="border overflow-hidden">
-                  <CardHeader className="pb-3 border-b bg-muted/30">
+                <Card className="border overflow-hidden shadow-lg">
+                  <CardHeader className="pb-3 border-b bg-gradient-to-r from-muted/50 to-muted/30">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-semibold flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-base font-display font-bold flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-primary/10">
+                          <Clock className="h-4 w-4 text-primary" />
+                        </div>
                         جدول اليوم
                       </CardTitle>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {todayStats.scheduled > 0 && (
-                          <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/30">
-                            {todayStats.scheduled} مجدولة
-                          </Badge>
-                        )}
-                        {todayStats.completed > 0 && (
-                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
-                            {todayStats.completed} مكتملة
-                          </Badge>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          {todayStats.scheduled > 0 && (
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/30 font-semibold">
+                              {todayStats.scheduled} مجدولة
+                            </Badge>
+                          )}
+                          {todayStats.completed > 0 && (
+                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30 font-semibold">
+                              {todayStats.completed} مكتملة
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -756,34 +1034,48 @@ const Index = () => {
                       {visibleSessions.map((item, index) => {
                         const { session, student } = item;
                         const sessionTime = session.time || student.sessionTime || "16:00";
+                        const sessionDuration = session.duration || student.sessionDuration || 60;
                         const isCompleted = session.status === "completed";
                         const isCancelled = session.status === "cancelled";
                         const isVacation = session.status === "vacation";
                         const isScheduled = session.status === "scheduled";
                         const isNextSession = nextSession?.session.id === session.id;
+                        const isOnline = student.sessionType === "online";
                         return (
                           <div
                             key={session.id}
                             className={cn(
-                              "flex gap-3 sm:gap-4 p-3 sm:p-4 transition-all",
+                              "flex gap-3 sm:gap-4 p-3 sm:p-4 transition-all group",
                               isCompleted && "bg-emerald-500/5",
-                              isCancelled && "bg-rose-500/5",
+                              isCancelled && "bg-rose-500/5 opacity-60",
                               isVacation && "bg-amber-500/5",
                               isScheduled && !isNextSession && "hover:bg-muted/50",
-                              isNextSession && "bg-primary/5",
+                              isNextSession && "bg-gradient-to-r from-primary/10 to-transparent ring-1 ring-primary/20",
                             )}
                           >
                             <div className="flex flex-col items-center">
                               <div
                                 className={cn(
-                                  "w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-sm border-2 shadow-sm",
+                                  "w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-sm border-2 shadow-sm relative overflow-hidden",
                                   isCompleted && "bg-emerald-500 text-white border-emerald-600",
                                   isCancelled && "bg-rose-500 text-white border-rose-600",
                                   isVacation && "bg-amber-500 text-white border-amber-600",
                                   isScheduled && "bg-blue-500 text-white border-blue-600",
+                                  isScheduled && "cursor-pointer hover:scale-105 transition-transform",
                                 )}
+                                onClick={() => isScheduled && handleQuickTimeEdit(student, session)}
+                                title={isScheduled ? "اضغط لتعديل الوقت" : undefined}
                               >
                                 <span className="text-base font-bold">{sessionTime.substring(0, 5)}</span>
+                                <span className="text-[9px] opacity-80">{sessionDuration}د</span>
+                                {isScheduled && (
+                                  <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Pencil className="h-2.5 w-2.5" />
+                                  </div>
+                                )}
+                                {isNextSession && (
+                                  <div className="absolute inset-0 bg-gradient-to-t from-white/20 to-transparent animate-pulse" />
+                                )}
                               </div>
                               {index < visibleSessions.length - 1 && (
                                 <div
@@ -800,31 +1092,68 @@ const Index = () => {
                             <div className="flex-1 min-w-0 py-1">
                               <div className="flex items-start justify-between gap-2 mb-2">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <User
-                                    className={cn(
-                                      "h-4 w-4 shrink-0",
-                                      isCompleted && "text-emerald-600",
-                                      isCancelled && "text-rose-600",
-                                      isVacation && "text-amber-600",
-                                      isScheduled && "text-blue-600",
+                                  <div className={cn(
+                                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                                    isOnline ? "bg-blue-500/10" : "bg-emerald-500/10"
+                                  )}>
+                                    {isOnline ? (
+                                      <Monitor className="h-4 w-4 text-blue-600" />
+                                    ) : (
+                                      <MapPin className="h-4 w-4 text-emerald-600" />
                                     )}
-                                  />
-                                  <h4 className="font-bold text-base truncate">{student.name}</h4>
-                                </div>
-                                <Badge
-                                  className={cn(
-                                    "shrink-0 text-xs font-semibold",
-                                    isCompleted && "bg-emerald-500 text-white",
-                                    isCancelled && "bg-rose-500 text-white",
-                                    isVacation && "bg-amber-500 text-white",
-                                    isScheduled && "bg-blue-500 text-white",
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h4 className="font-bold text-base truncate">{student.name}</h4>
+                                    <p className="text-xs text-muted-foreground">
+                                      {isOnline ? "أونلاين" : "حضوري"} • {sessionDuration} دقيقة
+                                    </p>
+                                  </div>
+                                  {/* Contact Buttons */}
+                                  {student.phone && (
+                                    <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                                        onClick={() => openWhatsApp(student.phone!)}
+                                        title="رسالة واتساب"
+                                      >
+                                        <WhatsAppIcon className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
+                                        onClick={() => window.open(`tel:${student.phone}`, "_self")}
+                                        title="اتصال هاتفي"
+                                      >
+                                        <Phone className="h-4 w-4" />
+                                      </Button>
+                                    </div>
                                   )}
-                                >
-                                  {isCompleted && "✓ مكتملة"}
-                                  {isCancelled && "✕ ملغاة"}
-                                  {isVacation && "🏖 إجازة"}
-                                  {isScheduled && "◉ مجدولة"}
-                                </Badge>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {/* Session Notes Button */}
+                                  <SessionNotesDialog
+                                    session={session}
+                                    studentName={student.name}
+                                    onSave={(details) => updateSessionDetails(student.id, session.id, details)}
+                                  />
+                                  <Badge
+                                    className={cn(
+                                      "shrink-0 text-xs font-semibold",
+                                      isCompleted && "bg-emerald-500 text-white",
+                                      isCancelled && "bg-rose-500 text-white",
+                                      isVacation && "bg-amber-500 text-white",
+                                      isScheduled && "bg-blue-500 text-white",
+                                    )}
+                                  >
+                                    {isCompleted && "✓ مكتملة"}
+                                    {isCancelled && "✕ ملغاة"}
+                                    {isVacation && "🏖 إجازة"}
+                                    {isScheduled && "◉ مجدولة"}
+                                  </Badge>
+                                </div>
                               </div>
                               {isScheduled && !isNextSession && (
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -899,6 +1228,15 @@ const Index = () => {
                                     <DollarSign className="h-4 w-4" />
                                     دفع
                                   </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1.5 h-9 px-3"
+                                    onClick={() => setCompletionDialog({ open: true, student, session })}
+                                    title="خيارات الحصة"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
                                 </div>
                               )}
                               {isCompleted && (
@@ -923,10 +1261,10 @@ const Index = () => {
                       })}
                     </div>
                     {hasMoreSessions && (
-                      <div className="border-t p-3">
+                      <div className="border-t p-3 bg-muted/20">
                         <Button
                           variant="ghost"
-                          className="w-full gap-2 text-muted-foreground hover:text-foreground"
+                          className="w-full gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 font-medium"
                           onClick={() => setShowAllSessions(!showAllSessions)}
                         >
                           {showAllSessions ? (
@@ -937,7 +1275,7 @@ const Index = () => {
                           ) : (
                             <>
                               <ChevronDown className="h-4 w-4" />
-                              عرض الكل ({allTodaySessions.length - 5} إضافية)
+                              عرض {allTodaySessions.length - 5} حصص إضافية
                             </>
                           )}
                         </Button>
@@ -956,7 +1294,9 @@ const Index = () => {
               onUpdateSessionDateTime={updateSessionDateTime}
               onToggleComplete={handleToggleComplete}
               onCancelSession={handleCancelSession}
+              onDeleteSession={handleDeleteSession}
               onQuickPayment={handleQuickPayment}
+              onAddSession={handleAddSession}
             />
           </TabsContent>
           <TabsContent value="history" className="mt-0">
@@ -1025,6 +1365,148 @@ const Index = () => {
           confirmText={addConflictDialog.conflictResult.severity === "warning" ? "إضافة على أي حال" : undefined}
         />
       )}
+      {completionDialog.student && completionDialog.session && (
+        <SessionCompletionDialog
+          open={completionDialog.open}
+          onOpenChange={(open) => !open && setCompletionDialog({ open: false, student: null, session: null })}
+          student={completionDialog.student}
+          session={completionDialog.session}
+          onComplete={() => {
+            handleToggleComplete(completionDialog.student!.id, completionDialog.session!.id);
+            setCompletionDialog({ open: false, student: null, session: null });
+          }}
+          onCancel={(reason) => {
+            handleCancelSession(completionDialog.student!.id, completionDialog.session!.id, reason);
+            setCompletionDialog({ open: false, student: null, session: null });
+          }}
+          onDelete={() => {
+            handleDeleteSession(completionDialog.student!.id, completionDialog.session!.id);
+            setCompletionDialog({ open: false, student: null, session: null });
+          }}
+        />
+      )}
+      {/* Auto-triggered completion dialog when session ends */}
+      {endedSessionNotification && (
+        <SessionCompletionDialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              dismissEndedNotification();
+            }
+          }}
+          student={endedSessionNotification.student}
+          session={endedSessionNotification.session}
+          isAutoTriggered={true}
+          onComplete={() => {
+            handleToggleComplete(endedSessionNotification.student.id, endedSessionNotification.session.id);
+            dismissEndedNotification();
+          }}
+          onCancel={(reason) => {
+            handleCancelSession(endedSessionNotification.student.id, endedSessionNotification.session.id, reason);
+            dismissEndedNotification();
+          }}
+          onDelete={() => {
+            handleDeleteSession(endedSessionNotification.student.id, endedSessionNotification.session.id);
+            dismissEndedNotification();
+          }}
+        />
+      )}
+
+      {/* Quick Time Edit Dialog */}
+      <Dialog
+        open={timeEditDialog.open}
+        onOpenChange={(open) => !open && setTimeEditDialog({ open: false, student: null, session: null, newTime: "" })}
+      >
+        <DialogContent dir="rtl" className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Clock className="h-5 w-5 text-primary" />
+              تعديل وقت الحصة
+            </DialogTitle>
+            <DialogDescription>
+              {timeEditDialog.student?.name} - {timeEditDialog.session && format(parseISO(timeEditDialog.session.date), "dd/MM/yyyy")}
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const conflict = getTimeEditConflict();
+            const hasError = conflict?.severity === "error";
+            const hasWarning = conflict?.severity === "warning";
+            return (
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="session-time" className="text-sm font-medium">
+                    الوقت الجديد
+                  </Label>
+                  <Input
+                    id="session-time"
+                    type="time"
+                    value={timeEditDialog.newTime}
+                    onChange={(e) => setTimeEditDialog({ ...timeEditDialog, newTime: e.target.value })}
+                    className={cn(
+                      "h-12 text-center text-xl font-bold rounded-xl border-2",
+                      hasError && "border-rose-500 text-rose-600",
+                      hasWarning && "border-amber-500 text-amber-600"
+                    )}
+                  />
+                </div>
+
+                {/* Conflict Warning */}
+                {hasError && conflict && conflict.conflicts[0] && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-sm">
+                    <XCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                    <span className="text-rose-700">
+                      تعارض مع حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span> في الساعة {conflict.conflicts[0].session.time}
+                    </span>
+                  </div>
+                )}
+                {hasWarning && conflict && conflict.conflicts[0] && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
+                    <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="text-amber-700">
+                      قريب من حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span> في الساعة {conflict.conflicts[0].session.time}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">
+                    الوقت الحالي: <span className="font-bold text-foreground">{timeEditDialog.session?.time || timeEditDialog.student?.sessionTime}</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+          {(() => {
+            const conflict = getTimeEditConflict();
+            const hasError = conflict?.severity === "error";
+            return (
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setTimeEditDialog({ open: false, student: null, session: null, newTime: "" })}
+                  className="rounded-xl"
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  onClick={confirmTimeEdit}
+                  disabled={!timeEditDialog.newTime || hasError}
+                  className={cn(
+                    "rounded-xl",
+                    hasError
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : "bg-gradient-to-r from-primary to-blue-500"
+                  )}
+                >
+                  <Check className="h-4 w-4 ml-2" />
+                  {hasError ? "غير متاح" : "حفظ"}
+                </Button>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

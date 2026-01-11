@@ -1,12 +1,12 @@
+/* =====================================================
+   FONTS - Must be at the very top
+   ===================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Cairo:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* =====================================================
-   FONTS
-   ===================================================== */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap");
 
 /* =====================================================
    CSS VARIABLES
@@ -133,31 +133,63 @@
 
   html {
     scroll-behavior: smooth;
+    font-size: 16px;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Inter", "Tajawal", sans-serif;
+    font-family: "Inter", "Cairo", "Tajawal", sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     min-height: 100vh;
     min-height: 100dvh;
+    line-height: 1.6;
+    letter-spacing: 0.01em;
   }
 
-  /* Arabic RTL Support */
+  /* Arabic RTL Support - Use Cairo for better readability */
   [dir="rtl"] body,
   body:has([dir="rtl"]) {
-    font-family: "Tajawal", "Inter", sans-serif;
+    font-family: "Cairo", "Tajawal", "Inter", sans-serif;
+    letter-spacing: 0;
+    line-height: 1.8;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: "Poppins", "Tajawal", sans-serif;
+  /* Headings - Better sizing and weights */
+  h1 {
+    font-family: "Poppins", "Cairo", "Tajawal", sans-serif;
+    @apply font-bold tracking-tight text-2xl sm:text-3xl lg:text-4xl;
+  }
+
+  h2 {
+    font-family: "Poppins", "Cairo", "Tajawal", sans-serif;
+    @apply font-bold tracking-tight text-xl sm:text-2xl lg:text-3xl;
+  }
+
+  h3 {
+    font-family: "Poppins", "Cairo", "Tajawal", sans-serif;
+    @apply font-semibold tracking-tight text-lg sm:text-xl;
+  }
+
+  h4, h5, h6 {
+    font-family: "Poppins", "Cairo", "Tajawal", sans-serif;
     @apply font-semibold tracking-tight;
+  }
+
+  /* Arabic headings - Cairo font */
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3,
+  [dir="rtl"] h4,
+  [dir="rtl"] h5,
+  [dir="rtl"] h6 {
+    font-family: "Cairo", "Tajawal", sans-serif;
+    letter-spacing: 0;
+  }
+
+  /* Paragraphs */
+  p {
+    @apply leading-relaxed;
   }
 
   /* Better touch targets */
@@ -414,6 +446,47 @@
 
   .text-shadow-lg {
     text-shadow: 0 4px 8px hsl(var(--foreground) / 0.15);
+  }
+
+  /* Typography utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  .font-display {
+    font-family: "Cairo", "Poppins", "Tajawal", sans-serif;
+    font-weight: 700;
+  }
+
+  .font-arabic {
+    font-family: "Cairo", "Tajawal", sans-serif;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-purple-500 to-pink-500;
+  }
+
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500;
+  }
+
+  /* Better number styling */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-mono-numbers {
+    font-family: "Inter", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Improved focus states */
+  .focus-ring {
+    @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
   }
 
   /* Interactive states */

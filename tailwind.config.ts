@@ -16,6 +16,7 @@ export default {
       fontFamily: {
         sans: [
           "Inter",
+          "Cairo",
           "Tajawal",
           "ui-sans-serif",
           "system-ui",
@@ -27,8 +28,16 @@ export default {
           "Arial",
           "sans-serif",
         ],
-        heading: ["Poppins", "Tajawal", "sans-serif"],
-        arabic: ["Tajawal", "Inter", "sans-serif"],
+        heading: ["Poppins", "Cairo", "Tajawal", "sans-serif"],
+        arabic: ["Cairo", "Tajawal", "Inter", "sans-serif"],
+        display: ["Cairo", "Poppins", "Tajawal", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
+      },
+      fontSize: {
+        "2xs": ["0.625rem", { lineHeight: "1rem" }],
+        "3xl": ["1.875rem", { lineHeight: "2.25rem", letterSpacing: "-0.02em" }],
+        "4xl": ["2.25rem", { lineHeight: "2.5rem", letterSpacing: "-0.02em" }],
+        "5xl": ["3rem", { lineHeight: "1.1", letterSpacing: "-0.02em" }],
       },
       colors: {
         border: "hsl(var(--border))",

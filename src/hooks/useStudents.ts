@@ -12,6 +12,7 @@ import {
   PaymentRecord,
   PaymentStatus,
   ScheduleDay,
+  StudentMaterial,
 } from "@/types/student";
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from "@/lib/dateUtils";
 
@@ -31,7 +32,7 @@ interface DbStudent {
   custom_price_onsite: number | null;
   custom_price_online: number | null;
   use_custom_settings: boolean | null;
-  schedule_days: any; // JSON
+  schedule_days: { dayOfWeek: number }[] | null; // JSON array of schedule days
   semester_start: string;
   semester_end: string;
   cancellation_monthly_limit: number | null;
@@ -118,7 +119,7 @@ const dbStudentToStudent = (dbStudent: DbStudent, sessions: Session[]): Student 
   let scheduleDays: ScheduleDay[] = [];
   if (dbStudent.schedule_days) {
     if (Array.isArray(dbStudent.schedule_days)) {
-      scheduleDays = dbStudent.schedule_days.map((d: any) => ({
+      scheduleDays = dbStudent.schedule_days.map((d: { dayOfWeek?: number; day_of_week?: number } | number) => ({
         dayOfWeek: typeof d === "number" ? d : (d.dayOfWeek ?? d.day_of_week ?? 0),
       }));
     }
@@ -521,6 +522,10 @@ export const useStudents = () => {
       customSemesterStart?: string,
       customSemesterEnd?: string,
       sessionDuration?: number,
+      _materials?: StudentMaterial[], // Materials will be stored when we implement student_materials table
+      useCustomPrices?: boolean,
+      customPriceOnsite?: number,
+      customPriceOnline?: number,
     ) => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
@@ -540,7 +545,9 @@ export const useStudents = () => {
           session_type: sessionType,
           session_time: sessionTime,
           session_duration: duration,
-          use_custom_settings: false,
+          use_custom_settings: useCustomPrices || false,
+          custom_price_onsite: useCustomPrices ? customPriceOnsite : null,
+          custom_price_online: useCustomPrices ? customPriceOnline : null,
           schedule_days: scheduleDays.map((d) => ({ dayOfWeek: d })),
           semester_start: semesterStart,
           semester_end: semesterEnd,
@@ -774,7 +781,7 @@ export const useStudents = () => {
         }),
       );
 
-      const updateData: any = { updated_at: new Date().toISOString() };
+      const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (customSettings.useCustomSettings !== undefined) {
         updateData.use_custom_settings = customSettings.useCustomSettings;
       }
@@ -847,7 +854,7 @@ export const useStudents = () => {
         .eq("student_id", studentId)
         .eq("user_id", currentUserId);
 
-      const existingDates = new Map((existingSessions || []).map((s: any) => [s.date, s]));
+      const existingDates = new Map((existingSessions || []).map((s: { date: string }) => [s.date, s]));
 
       // Sessions to add (new dates)
       const sessionsToAdd = sessionDates
@@ -896,7 +903,7 @@ export const useStudents = () => {
           .eq("student_id", studentId)
           .eq("user_id", currentUserId);
 
-        const existingPaymentKeys = new Set((existingPayments || []).map((p: any) => `${p.year}-${p.month}`));
+        const existingPaymentKeys = new Set((existingPayments || []).map((p: { year: number; month: number }) => `${p.year}-${p.month}`));
 
         // Add missing payment months
         const paymentsToAdd = months
@@ -1294,7 +1301,7 @@ export const useStudents = () => {
       studentIds: string[],
       sessionIds: string[],
       newTime: string,
-    ): { success: boolean; updatedCount: number; conflicts: any[] } => {
+    ): { success: boolean; updatedCount: number; conflicts: never[] } => {
       let updatedCount = 0;
 
       // Optimistic update (synchronous)
@@ -1371,7 +1378,7 @@ export const useStudents = () => {
         }),
       );
 
-      const updateData: any = { updated_at: new Date().toISOString() };
+      const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (details.topic !== undefined) updateData.topic = details.topic || null;
       if (details.notes !== undefined) updateData.notes = details.notes || null;
       if (details.homework !== undefined) updateData.homework = details.homework || null;

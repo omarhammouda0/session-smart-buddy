@@ -39,6 +39,22 @@ export interface CancellationPolicy {
   autoNotifyParent: boolean; // Auto-send WhatsApp to parent
 }
 
+// Student material (text notes or files)
+export type MaterialType = "text" | "file";
+
+export interface StudentMaterial {
+  id: string;
+  type: MaterialType;
+  title: string;
+  content?: string; // For text type
+  fileUrl?: string; // For file type
+  fileName?: string; // For file type
+  fileSize?: number; // For file type (in bytes)
+  fileType?: string; // MIME type (e.g., "application/pdf")
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Student {
   id: string;
   sessionTime: string; // HH:mm format like "16:30"
@@ -57,6 +73,8 @@ export interface Student {
   createdAt: string;
   // Cancellation policy
   cancellationPolicy?: CancellationPolicy;
+  // Student materials (notes, PDFs, etc.)
+  materials?: StudentMaterial[];
 }
 
 // ✅ NEW: Payment method type
