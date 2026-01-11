@@ -23,16 +23,16 @@ serve(async (req) => {
 
     // Validate required fields
     if (!phone || !message) {
-      return new Response(
-        JSON.stringify({ error: "Phone and message are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Phone and message are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Clean phone number
     let cleanedPhone = phone.replace(/[^\d+]/g, "");
     if (cleanedPhone.startsWith("0")) {
-      cleanedPhone = "966" + cleanedPhone.substring(1);
+      cleanedPhone = "20" + cleanedPhone.substring(1);
     }
     cleanedPhone = cleanedPhone.replace("+", "");
 
@@ -48,15 +48,15 @@ serve(async (req) => {
           success: true,
           mock: true,
           message: "WhatsApp credentials not configured. Message not sent.",
-          data: { phone: cleanedPhone, messagePreview: message.substring(0, 100) }
+          data: { phone: cleanedPhone, messagePreview: message.substring(0, 100) },
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Send via Twilio WhatsApp API
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    
+
     const formData = new URLSearchParams();
     formData.append("From", `whatsapp:${twilioPhone}`);
     formData.append("To", `whatsapp:+${cleanedPhone}`);
@@ -65,7 +65,7 @@ serve(async (req) => {
     const twilioResponse = await fetch(twilioUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: formData,
@@ -79,9 +79,9 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: twilioData.message || "Failed to send WhatsApp message",
-          code: twilioData.code
+          code: twilioData.code,
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -92,17 +92,16 @@ serve(async (req) => {
         success: true,
         messageSid: twilioData.sid,
         status: twilioData.status,
-        to: cleanedPhone
+        to: cleanedPhone,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error: unknown) {
     console.error("Error in send-whatsapp-reminder:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
