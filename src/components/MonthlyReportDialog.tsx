@@ -401,11 +401,9 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
 
       const { error } = await supabase.functions.invoke('send-whatsapp-reminder', {
         body: {
-          to: selectedStudent.phone,
-          message,
-          studentId: selectedStudent.id,
+          phoneNumber: selectedStudent.phone,
+          customMessage: message,
           studentName: selectedStudent.name,
-          type: 'report',
         }
       });
 

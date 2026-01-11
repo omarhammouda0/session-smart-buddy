@@ -434,23 +434,37 @@ export const PaymentsDashboard = ({
 
     setSendingReminder(student.id);
     try {
+      // Calculate student stats for the message
+      const monthSessions = student.sessions.filter((s) => {
+        const d = new Date(s.date);
+        return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+      });
+      const completedCount = monthSessions.filter((s) => s.status === "completed").length;
+      const scheduledCount = monthSessions.filter((s) => s.status === "scheduled").length;
+      const totalSessions = completedCount + scheduledCount;
+
+      // Calculate amount
+      const pricePerSession = student.sessionType === "online"
+        ? (student.customPriceOnline || settings.defaultPriceOnline || 100)
+        : (student.customPriceOnsite || settings.defaultPriceOnsite || 150);
+      const totalAmount = totalSessions * pricePerSession;
+
       const { error } = await supabase.functions.invoke("send-whatsapp-reminder", {
         body: {
           studentName: student.name,
           phoneNumber: student.phone,
           month: MONTH_NAMES_AR[selectedMonth],
-          year: selectedYear,
-          studentId: student.id,
-          type: "payment",
-          logToDb: true,
+          amount: totalAmount,
+          sessions: totalSessions,
         },
       });
 
       if (error) throw error;
       toast({ title: "تم الإرسال", description: `تم إرسال تذكير WhatsApp إلى ${student.name}` });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("WhatsApp error:", error);
-      toast({ title: "خطأ", description: error.message || "فشل إرسال الرسالة", variant: "destructive" });
+      const errorMessage = error instanceof Error ? error.message : "فشل إرسال الرسالة";
+      toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
     } finally {
       setSendingReminder(null);
     }
