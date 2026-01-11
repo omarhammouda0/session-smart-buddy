@@ -74,10 +74,9 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 // Helper function to open WhatsApp
 const openWhatsApp = (phone: string) => {
   if (!phone) return;
+
   let cleaned = phone.replace(/[^\d+]/g, "");
-  if (cleaned.startsWith("0")) {
-    cleaned = "49" + cleaned.substring(1);
-  }
+
   cleaned = cleaned.replace("+", "");
   window.open(`https://wa.me/${cleaned}`, "_blank");
 };

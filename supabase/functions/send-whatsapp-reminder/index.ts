@@ -31,11 +31,10 @@ serve(async (req) => {
 
     // Clean phone number
     let cleanedPhone = phone.replace(/[^\d+]/g, "");
-    if (cleanedPhone.startsWith("0")) {
-      cleanedPhone = "49" + cleanedPhone.substring(1);
+    // Just ensure it starts with + for Twilio
+    if (!cleanedPhone.startsWith("+")) {
+      cleanedPhone = "+" + cleanedPhone;
     }
-    cleanedPhone = cleanedPhone.replace("+", "");
-
     // Get Twilio credentials from environment
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
