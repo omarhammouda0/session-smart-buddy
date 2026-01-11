@@ -23,6 +23,7 @@ import {
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
 import { useStudents } from "@/hooks/useStudents";
+import { useAutoReminders } from "@/hooks/useAutoReminders";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
 import { useConflictDetection, ConflictResult } from "@/hooks/useConflictDetection";
 import { AddStudentDialog } from "@/components/AddStudentDialog";
@@ -148,6 +149,9 @@ const Index = () => {
   } = useCancellationTracking(students);
 
   const { checkConflict } = useConflictDetection(students);
+
+  // Auto reminders hook - sends WhatsApp 1 hour before session & 3 days before month end for payments
+  useAutoReminders({ students, payments, settings });
 
   // Session Handlers
   const handleAddSession = (studentId: string, date: string, customTime?: string) => {
