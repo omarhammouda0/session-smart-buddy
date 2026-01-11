@@ -62,11 +62,15 @@ export const ReminderSettingsDialog = () => {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
+      const testMessage = 'رسالة تجريبية من تطبيق متابعة الطلاب\nTwilio configured successfully!';
       const { data, error } = await supabase.functions.invoke('send-whatsapp-reminder', {
         body: {
-          studentName: 'اختبار',
+          // Both old and new field names for compatibility
+          phone: '+201000000000',
+          message: testMessage,
           phoneNumber: '+201000000000',
-          customMessage: 'رسالة تجريبية من تطبيق متابعة الطلاب\nTwilio configured successfully!',
+          customMessage: testMessage,
+          studentName: 'اختبار',
           testMode: true,
         },
       });

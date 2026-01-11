@@ -449,13 +449,16 @@ export const PaymentsDashboard = ({
         : (student.customPriceOnsite || settings.defaultPriceOnsite || 150);
       const totalAmount = totalSessions * pricePerSession;
 
+      // Build custom message
+      const customMessage = `عزيزي ولي الأمر،\nتذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}\nعدد الجلسات: ${totalSessions}\nالمبلغ المستحق: ${totalAmount} جنيه\nشكراً لتعاونكم`;
+
       const { error } = await supabase.functions.invoke("send-whatsapp-reminder", {
         body: {
+          phone: student.phone,
+          message: customMessage,
           studentName: student.name,
           phoneNumber: student.phone,
-          month: MONTH_NAMES_AR[selectedMonth],
-          amount: totalAmount,
-          sessions: totalSessions,
+          customMessage: customMessage,
         },
       });
 
@@ -548,7 +551,7 @@ export const PaymentsDashboard = ({
       const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
       const remaining = studentTotal - amountPaid;
 
-      const message = `عزيزي ولي الأمر،
+      const messageText = `عزيزي ولي الأمر،
 تذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}
 عدد الجلسات: ${monthStats.completed + monthStats.scheduled}
 المبلغ المستحق: ${studentTotal} ${CURRENCY}${amountPaid > 0 ? `\nالمدفوع: ${amountPaid} ${CURRENCY}\nالمتبقي: ${remaining} ${CURRENCY}` : ""}
@@ -557,12 +560,12 @@ export const PaymentsDashboard = ({
       try {
         const { error } = await supabase.functions.invoke("send-whatsapp-reminder", {
           body: {
-            studentName: student.name,
+            // Both old and new field names for compatibility
+            phone: student.phone,
+            message: messageText,
             phoneNumber: student.phone,
-            customMessage: message,
-            studentId: student.id,
-            type: "payment",
-            logToDb: true,
+            customMessage: messageText,
+            studentName: student.name,
           },
         });
 

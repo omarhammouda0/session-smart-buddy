@@ -153,9 +153,12 @@ export const useReminderSettings = () => {
       try {
         const { data, error } = await supabase.functions.invoke('send-whatsapp-reminder', {
           body: {
-            studentName: log.student_name,
+            // Both old and new field names for compatibility
+            phone: log.phone_number,
+            message: log.message_text,
             phoneNumber: log.phone_number,
             customMessage: log.message_text,
+            studentName: log.student_name,
           },
         });
 

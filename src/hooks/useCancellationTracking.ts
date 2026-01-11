@@ -552,12 +552,12 @@ ${cancellationsText}
 
         const { data, error } = await supabase.functions.invoke("send-whatsapp-reminder", {
           body: {
-            studentName,
+            // Both old and new field names for compatibility
+            phone: parentPhone,
+            message: message,
             phoneNumber: parentPhone,
             customMessage: message,
-            studentId,
-            type: "cancellation",
-            logToDb: true,
+            studentName,
           },
         });
 
