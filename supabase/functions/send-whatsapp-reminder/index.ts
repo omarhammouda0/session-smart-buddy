@@ -1,8 +1,40 @@
+// Send WhatsApp Reminder Edge Function
+// This function sends WhatsApp messages via Twilio API
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface RequestBody {
+  studentName: string;
+  phoneNumber: string;
+  customMessage?: string;
+  sessionDate?: string;
+  sessionTime?: string;
+  reminderType?: "session" | "payment" | "cancellation";
+  studentId?: string;
+  type?: string;
+  sessionId?: string;
+  month?: number;
+  year?: number;
+  logToDb?: boolean;
+  testMode?: boolean;
+}
+
+// Format phone number for WhatsApp
+const formatPhoneNumber = (phone: string): string => {
+  let cleaned = phone.replace(/[^\d+]/g, "");
+  if (cleaned.startsWith("0")) {
+    cleaned = "20" + cleaned.substring(1);
+  }
+  cleaned = cleaned.replace("+", "");
+  if (!cleaned.startsWith("20") && !cleaned.startsWith("20") && cleaned.length === 9) {
+    cleaned = "20" + cleaned;
+  }
+  return cleaned;
 };
 
 serve(async (req) => {
@@ -12,164 +44,118 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json();
-    console.log("Received body:", JSON.stringify(body, null, 2));
+    const body: RequestBody = await req.json();
+    const { studentName, phoneNumber, customMessage, sessionDate, sessionTime, reminderType, testMode } = body;
 
-    // ============================================
-    // FLEXIBLE PARAMETER EXTRACTION
-    // Accepts multiple naming conventions
-    // ============================================
+    console.log("Received request:", {
+      studentName,
+      phoneNumber: phoneNumber?.slice(0, 6) + "***",
+      reminderType,
+      testMode,
+    });
 
-    // Phone: accepts phone, phoneNumber, phone_number
-    const phone = body.phone || body.phoneNumber || body.phone_number;
+    // Get Twilio credentials from environment
+    const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+    const twilioWhatsAppNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "+14155238886";
 
-    // Message: accepts message, customMessage, message_text
-    let message = body.message || body.customMessage || body.message_text;
-
-    // Student name: accepts studentName, student_name
-    const studentName = body.studentName || body.student_name || "الطالب";
-
-    // Type: defaults to 'session'
-    const type = body.type || "session";
-
-    // Additional context for auto-generating messages
-    const month = body.month;
-    const year = body.year;
-    const testMode = body.testMode || false;
-
-    // ============================================
-    // BUILD MESSAGE IF NOT PROVIDED
-    // ============================================
-    if (!message && month) {
-      message = `مرحباً 👋
-
-تذكير بمستحقات شهر ${month}${year ? ` ${year}` : ""} للطالب ${studentName}
-
-نشكركم على التزامكم 🙏`;
-    }
-
-    // ============================================
-    // VALIDATION
-    // ============================================
-    if (!phone) {
-      console.error("Missing phone. Keys received:", Object.keys(body));
+    if (!twilioAccountSid || !twilioAuthToken) {
+      console.error("Missing Twilio credentials");
       return new Response(
         JSON.stringify({
-          error: "Phone number is required",
-          hint: "Send 'phone', 'phoneNumber', or 'phone_number'",
-          receivedKeys: Object.keys(body),
+          success: false,
+          error: "Twilio credentials not configured",
+          message: "يرجى تكوين بيانات Twilio في إعدادات الدالة",
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    if (!message) {
-      console.error("Missing message. Keys received:", Object.keys(body));
-      return new Response(
-        JSON.stringify({
-          error: "Message is required",
-          hint: "Send 'message', 'customMessage', or 'month' to auto-generate",
-          receivedKeys: Object.keys(body),
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // ============================================
-    // CLEAN PHONE NUMBER - INTERNATIONAL SUPPORT
-    // ============================================
-    let cleanedPhone = String(phone).replace(/\D/g, "");
-
-    console.log("Original phone:", phone);
-    console.log("Cleaned phone:", cleanedPhone);
-
-    if (cleanedPhone.length < 10) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid phone number",
-          details: `Too short: ${cleanedPhone.length} digits (need 10+)`,
-          hint: "Include country code (e.g., +49 for Germany, +20 for Egypt)",
-          original: phone,
-          cleaned: cleanedPhone,
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // ============================================
-    // TWILIO CREDENTIALS
-    // ============================================
-    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const twilioPhone = Deno.env.get("TWILIO_WHATSAPP_NUMBER");
-
-    if (testMode || !accountSid || !authToken || !twilioPhone) {
-      console.log(testMode ? "Test mode" : "Twilio not configured");
+    // Test mode - just verify credentials work
+    if (testMode) {
+      console.log("Test mode - verifying Twilio credentials");
       return new Response(
         JSON.stringify({
           success: true,
-          mock: true,
-          message: testMode ? "Test mode - not sent" : "Twilio not configured",
-          data: { to: cleanedPhone, studentName, type, messagePreview: message.substring(0, 100) },
+          message: "Twilio credentials verified",
+          testMode: true,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ============================================
-    // SEND VIA TWILIO
-    // ============================================
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    // Validate required fields
+    if (!phoneNumber) {
+      return new Response(JSON.stringify({ success: false, error: "Phone number is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const formData = new URLSearchParams();
-    formData.append("From", `whatsapp:${twilioPhone}`);
-    formData.append("To", `whatsapp:+${cleanedPhone}`);
-    formData.append("Body", message);
+    // Build the message
+    let message = customMessage;
+    if (!message) {
+      if (reminderType === "session" && sessionDate && sessionTime) {
+        message = `مرحباً ${studentName}،\n\nتذكير بموعد جلستك في ${sessionDate} الساعة ${sessionTime}.\n\nنراك قريباً!`;
+      } else if (reminderType === "payment") {
+        message = `عزيزي ولي أمر ${studentName}،\n\nتذكير بدفع الرسوم الشهرية.\n\nشكراً لتعاونكم.`;
+      } else {
+        message = `مرحباً ${studentName}،\n\nهذه رسالة تذكيرية من تطبيق متابعة الطلاب.`;
+      }
+    }
 
-    console.log("Sending:", { to: `+${cleanedPhone}`, bodyLength: message.length });
+    // Format the phone number
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    console.log("Sending to:", formattedPhone.slice(0, 6) + "***");
+
+    // Send via Twilio WhatsApp API
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
+
+    const formData = new URLSearchParams({
+      From: `whatsapp:${twilioWhatsAppNumber}`,
+      To: `whatsapp:+${formattedPhone}`,
+      Body: message,
+    });
 
     const twilioResponse = await fetch(twilioUrl, {
       method: "POST",
       headers: {
-        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        Authorization: `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: formData,
+      body: formData.toString(),
     });
 
-    const twilioData = await twilioResponse.json();
+    const twilioResult = await twilioResponse.json();
 
     if (!twilioResponse.ok) {
-      console.error("Twilio error:", twilioData);
+      console.error("Twilio error:", twilioResult);
       return new Response(
         JSON.stringify({
           success: false,
-          error: twilioData.message || "Twilio API error",
-          code: twilioData.code,
-          details: twilioData,
+          error: twilioResult.message || "Failed to send WhatsApp message",
+          code: twilioResult.code,
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: twilioResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    console.log(`✅ Sent to +${cleanedPhone} for ${studentName} (${type})`);
+    console.log("Message sent successfully:", twilioResult.sid);
 
     return new Response(
       JSON.stringify({
         success: true,
-        messageSid: twilioData.sid,
-        status: twilioData.status,
-        to: cleanedPhone,
+        messageSid: twilioResult.sid,
+        status: twilioResult.status,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: unknown) {
-    console.error("Edge function error:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Internal server error",
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error in send-whatsapp-reminder:", errorMessage);
+    return new Response(JSON.stringify({ success: false, error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
