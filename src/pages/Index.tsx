@@ -21,6 +21,8 @@ import {
   Phone,
   MoreVertical,
   Pencil,
+  Plus,
+  User,
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -66,6 +68,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Student, PaymentMethod, Session } from "@/types/student";
 import { SessionNotesDialog } from "@/components/SessionNotesDialog";
 import { useSessionNotifications } from "@/hooks/useSessionNotifications";
@@ -130,6 +133,13 @@ const Index = () => {
     session: Session | null;
     newTime: string;
   }>({ open: false, student: null, session: null, newTime: "" });
+
+  // Add session for today dialog
+  const [addTodaySessionDialog, setAddTodaySessionDialog] = useState<{
+    open: boolean;
+    selectedStudentId: string;
+    time: string;
+  }>({ open: false, selectedStudentId: "", time: "" });
 
   const {
     students,
@@ -336,6 +346,39 @@ const Index = () => {
       description: `تم تغيير وقت حصة ${timeEditDialog.student.name} إلى ${timeEditDialog.newTime}`,
     });
     setTimeEditDialog({ open: false, student: null, session: null, newTime: "" });
+  };
+
+  // Add session for today handlers
+  const getAddTodaySessionConflict = () => {
+    if (!addTodaySessionDialog.selectedStudentId || !addTodaySessionDialog.time) return null;
+    return checkConflict(
+      { date: todayStr, startTime: addTodaySessionDialog.time },
+      undefined,
+      addTodaySessionDialog.selectedStudentId
+    );
+  };
+
+  const handleAddTodaySession = () => {
+    if (!addTodaySessionDialog.selectedStudentId || !addTodaySessionDialog.time) return;
+
+    const conflict = getAddTodaySessionConflict();
+    if (conflict?.severity === "error") {
+      const firstConflict = conflict.conflicts[0];
+      toast({
+        title: "⚠️ تعارض في الوقت",
+        description: firstConflict ? `لا يمكن إضافة الحصة - يوجد تعارض مع ${firstConflict.student.name}` : "يوجد تعارض في الوقت",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const student = students.find(s => s.id === addTodaySessionDialog.selectedStudentId);
+    addExtraSession(addTodaySessionDialog.selectedStudentId, todayStr, addTodaySessionDialog.time);
+    toast({
+      title: "✓ تمت إضافة الحصة",
+      description: `تمت إضافة حصة لـ ${student?.name} اليوم الساعة ${addTodaySessionDialog.time}`,
+    });
+    setAddTodaySessionDialog({ open: false, selectedStudentId: "", time: "" });
   };
 
   const handleRestoreSession = async (studentId: string, sessionId: string) => {
@@ -1014,6 +1057,15 @@ const Index = () => {
                         جدول اليوم
                       </CardTitle>
                       <div className="flex items-center gap-2">
+                        {/* Add Session Button */}
+                        <Button
+                          size="sm"
+                          onClick={() => setAddTodaySessionDialog({ open: true, selectedStudentId: "", time: "" })}
+                          className="h-8 gap-1.5 bg-gradient-to-r from-primary to-blue-500 text-xs"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          إضافة حصة
+                        </Button>
                         <div className="flex items-center gap-1.5 text-xs">
                           {todayStats.scheduled > 0 && (
                             <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/30 font-semibold">
@@ -1503,6 +1555,130 @@ const Index = () => {
                   {hasError ? "غير متاح" : "حفظ"}
                 </Button>
               </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Session for Today Dialog */}
+      <Dialog
+        open={addTodaySessionDialog.open}
+        onOpenChange={(open) => !open && setAddTodaySessionDialog({ open: false, selectedStudentId: "", time: "" })}
+      >
+        <DialogContent dir="rtl" className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-blue-500 text-white">
+                <Plus className="h-5 w-5" />
+              </div>
+              إضافة حصة لليوم
+            </DialogTitle>
+            <DialogDescription>
+              {format(now, "EEEE، d MMMM yyyy", { locale: ar })}
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const conflict = getAddTodaySessionConflict();
+            const hasError = conflict?.severity === "error";
+            const hasWarning = conflict?.severity === "warning";
+            const selectedStudent = students.find(s => s.id === addTodaySessionDialog.selectedStudentId);
+
+            return (
+              <>
+                <div className="space-y-4 py-4">
+                  {/* Student Selection */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">اختر الطالب</Label>
+                    <Select
+                      value={addTodaySessionDialog.selectedStudentId}
+                      onValueChange={(value) => {
+                        const student = students.find(s => s.id === value);
+                        setAddTodaySessionDialog({
+                          ...addTodaySessionDialog,
+                          selectedStudentId: value,
+                          time: student?.sessionTime || addTodaySessionDialog.time || "16:00",
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-2">
+                        <SelectValue placeholder="اختر طالب..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {students.map(student => (
+                          <SelectItem key={student.id} value={student.id}>
+                            <div className="flex items-center gap-2">
+                              <User className="h-3.5 w-3.5" />
+                              <span>{student.name}</span>
+                              <span className="text-xs text-muted-foreground">({student.sessionTime})</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Time Input */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">وقت الحصة</Label>
+                    <Input
+                      type="time"
+                      value={addTodaySessionDialog.time}
+                      onChange={(e) => setAddTodaySessionDialog({ ...addTodaySessionDialog, time: e.target.value })}
+                      className={cn(
+                        "h-12 text-center text-xl font-bold rounded-xl border-2",
+                        hasError && "border-rose-500 text-rose-600",
+                        hasWarning && "border-amber-500 text-amber-600"
+                      )}
+                    />
+                    {selectedStudent && (
+                      <p className="text-xs text-muted-foreground">
+                        💡 الوقت الافتراضي للطالب: {selectedStudent.sessionTime}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Conflict Warning */}
+                  {hasError && conflict && conflict.conflicts[0] && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-sm">
+                      <XCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                      <span className="text-rose-700">
+                        تعارض مع حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span> في الساعة {conflict.conflicts[0].session.time}
+                      </span>
+                    </div>
+                  )}
+                  {hasWarning && conflict && conflict.conflicts[0] && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
+                      <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                      <span className="text-amber-700">
+                        قريب من حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span> في الساعة {conflict.conflicts[0].session.time}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setAddTodaySessionDialog({ open: false, selectedStudentId: "", time: "" })}
+                    className="rounded-xl"
+                  >
+                    إلغاء
+                  </Button>
+                  <Button
+                    onClick={handleAddTodaySession}
+                    disabled={!addTodaySessionDialog.selectedStudentId || !addTodaySessionDialog.time || hasError}
+                    className={cn(
+                      "rounded-xl",
+                      hasError
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : "bg-gradient-to-r from-primary to-blue-500"
+                    )}
+                  >
+                    <Plus className="h-4 w-4 ml-2" />
+                    {hasError ? "غير متاح" : "إضافة الحصة"}
+                  </Button>
+                </div>
+              </>
             );
           })()}
         </DialogContent>

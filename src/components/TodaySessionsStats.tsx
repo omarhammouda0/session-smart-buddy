@@ -408,3 +408,4 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
     </div>
   );
 }
+

@@ -1572,7 +1572,7 @@ export const CalendarView = ({
           {dayDetailsDialog && dayDetailsDialog.sessions.length > 0 ? (
             <>
               {/* Day Summary Stats - Compact inline version */}
-              <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 border text-xs shrink-0">
+gi              <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 border text-xs shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1">
                     <CalendarIcon className="h-3.5 w-3.5 text-blue-500" />

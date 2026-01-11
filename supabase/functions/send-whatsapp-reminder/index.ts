@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -7,6 +8,7 @@ const TWILIO_WHATSAPP_FROM = Deno.env.get("TWILIO_WHATSAPP_FROM") || "whatsapp:+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 interface RequestBody {
@@ -118,14 +120,22 @@ serve(async (req) => {
 
     // Send via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-    const authHeader = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+
+    // Use TextEncoder for proper base64 encoding in Deno
+    const encoder = new TextEncoder();
+    const credentials = encoder.encode(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+    const authHeader = base64Encode(credentials);
 
     const formData = new URLSearchParams();
     formData.append("To", whatsappTo);
-    formData.append("From", TWILIO_WHATSAPP_FROM);
+    // Ensure From number has whatsapp: prefix
+    const fromNumber = TWILIO_WHATSAPP_FROM?.startsWith("whatsapp:")
+      ? TWILIO_WHATSAPP_FROM
+      : `whatsapp:${TWILIO_WHATSAPP_FROM}`;
+    formData.append("From", fromNumber);
     formData.append("Body", message);
 
-    console.log("Sending WhatsApp message:", { to: whatsappTo, from: TWILIO_WHATSAPP_FROM });
+    console.log("Sending WhatsApp message:", { to: whatsappTo, from: fromNumber, messageLength: message.length });
 
     const twilioResponse = await fetch(twilioUrl, {
       method: "POST",
@@ -136,14 +146,31 @@ serve(async (req) => {
       body: formData.toString(),
     });
 
-    const twilioData = await twilioResponse.json();
+    // Get response text first, then try to parse as JSON
+    const responseText = await twilioResponse.text();
+    let twilioData;
 
-    if (!twilioResponse.ok) {
-      console.error("Twilio error:", twilioData);
+    try {
+      twilioData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse Twilio response:", responseText);
       return new Response(
         JSON.stringify({
           success: false,
-          error: twilioData.message || "Failed to send WhatsApp message",
+          error: "Failed to parse Twilio response",
+          rawResponse: responseText.substring(0, 500),
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!twilioResponse.ok) {
+      console.error("Twilio error:", JSON.stringify(twilioData));
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: twilioData.message || twilioData.error_message || "Failed to send WhatsApp message",
+          errorCode: twilioData.code || twilioData.error_code,
           twilioError: twilioData,
         }),
         { status: twilioResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -163,10 +190,26 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in send-whatsapp-reminder:", error);
+
+    // Handle different error types
+    let errorMessage = "An unexpected error occurred";
+    let errorDetails = {};
+
+    if (error instanceof SyntaxError) {
+      errorMessage = "Invalid JSON in request body";
+    } else if (error instanceof TypeError) {
+      errorMessage = "Invalid request format or network error";
+      errorDetails = { type: "TypeError", name: error.name };
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = { stack: error.stack };
+    }
+
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || "An unexpected error occurred",
+        error: errorMessage,
+        details: errorDetails,
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
