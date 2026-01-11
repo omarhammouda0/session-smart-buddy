@@ -5,13 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface WhatsAppRequest {
-  phone: string;
-  message: string;
-  studentName: string;
-  type: "session" | "payment" | "cancellation";
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -19,24 +12,57 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Edge Function called - Raw request:", {
-      method: req.method,
-      url: req.url,
-      headers: Object.fromEntries(req.headers.entries()),
-    });
+    console.log("Edge Function called");
 
     const body = await req.json();
-    console.log("Received body:", body);
+    console.log("Received body:", JSON.stringify(body, null, 2));
 
-    const { phone, message, studentName, type }: WhatsAppRequest = body;
+    // ============================================
+    // FLEXIBLE PARAMETER EXTRACTION
+    // Accepts multiple naming conventions
+    // ============================================
 
-    // Validate required fields
-    if (!phone || !message) {
-      console.error("Missing required fields:", { phone, message });
+    // Phone: accepts phone, phoneNumber, phone_number
+    const phone = body.phone || body.phoneNumber || body.phone_number;
+
+    // Message: accepts message, customMessage, message_text
+    // If no message provided, build one from other parameters
+    let message = body.message || body.customMessage || body.message_text;
+
+    // Student name: accepts studentName, student_name
+    const studentName = body.studentName || body.student_name || "الطالب";
+
+    // Type: accepts type (defaults to 'session')
+    const type = body.type || "session";
+
+    // Additional context for building messages
+    const month = body.month;
+    const year = body.year;
+    const testMode = body.testMode || false;
+
+    // ============================================
+    // BUILD MESSAGE IF NOT PROVIDED
+    // ============================================
+    if (!message && month) {
+      // Build a default payment reminder message
+      message = `مرحباً 👋
+
+تذكير بمستحقات شهر ${month}${year ? ` ${year}` : ""} للطالب ${studentName}
+
+نشكركم على التزامكم 🙏`;
+    }
+
+    // ============================================
+    // VALIDATION
+    // ============================================
+    if (!phone) {
+      console.error("Missing phone number. Received keys:", Object.keys(body));
       return new Response(
         JSON.stringify({
-          error: "Phone and message are required",
-          received: { phone, message },
+          success: false,
+          error: "Phone number is required",
+          hint: "Send 'phone', 'phoneNumber', or 'phone_number' parameter",
+          receivedKeys: Object.keys(body),
         }),
         {
           status: 400,
@@ -45,19 +71,46 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing reminder for ${studentName} (${type}) to ${phone}`);
+    if (!message) {
+      console.error("Missing message. Received keys:", Object.keys(body));
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Message is required",
+          hint: "Send 'message', 'customMessage', or 'message_text' parameter, OR send 'month' to auto-generate",
+          receivedKeys: Object.keys(body),
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
 
-    // Clean phone number - remove all non-digits
-    let cleanedPhone = phone.replace(/\D/g, "");
-    console.log("Cleaned phone (digits only):", cleanedPhone);
+    console.log(`Processing ${type} reminder for ${studentName} to ${phone}`);
+    console.log(`Message preview: ${message.substring(0, 100)}...`);
+
+    // ============================================
+    // CLEAN PHONE NUMBER
+    // ============================================
+    let cleanedPhone = String(phone).replace(/\D/g, "");
+
+    // Handle Saudi numbers starting with 0
+    if (cleanedPhone.startsWith("0") && cleanedPhone.length === 10) {
+      cleanedPhone = "966" + cleanedPhone.substring(1);
+    }
+
+    console.log("Cleaned phone:", cleanedPhone);
 
     // Validate phone length
     if (cleanedPhone.length < 10) {
-      console.error("Phone number too short:", cleanedPhone);
       return new Response(
         JSON.stringify({
+          success: false,
           error: "Invalid phone number",
-          details: "Number too short",
+          details: `Number too short: ${cleanedPhone.length} digits (minimum 10)`,
+          original: phone,
+          cleaned: cleanedPhone,
         }),
         {
           status: 400,
@@ -66,42 +119,46 @@ serve(async (req) => {
       );
     }
 
-    // Get Twilio credentials from environment
+    // ============================================
+    // TWILIO CREDENTIALS
+    // ============================================
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
     const twilioPhone = Deno.env.get("TWILIO_WHATSAPP_NUMBER");
 
-    if (!accountSid || !authToken || !twilioPhone) {
-      console.log("Twilio credentials not configured, returning mock success");
+    // Test mode or no credentials = mock success
+    if (testMode || !accountSid || !authToken || !twilioPhone) {
+      console.log(testMode ? "Test mode enabled" : "Twilio credentials not configured");
       return new Response(
         JSON.stringify({
           success: true,
           mock: true,
-          message: "WhatsApp credentials not configured. Message not sent.",
+          message: testMode ? "Test mode - message not sent" : "Twilio not configured - message not sent",
           data: {
-            originalPhone: phone,
-            cleanedPhone: cleanedPhone,
-            messagePreview: message.substring(0, 100),
+            to: cleanedPhone,
             studentName,
             type,
+            messagePreview: message.substring(0, 100),
           },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Send via Twilio WhatsApp API
+    // ============================================
+    // SEND VIA TWILIO
+    // ============================================
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
 
     const formData = new URLSearchParams();
     formData.append("From", `whatsapp:${twilioPhone}`);
-    formData.append("To", `whatsapp:+${cleanedPhone}`); // Add + for Twilio
+    formData.append("To", `whatsapp:+${cleanedPhone}`);
     formData.append("Body", message);
 
     console.log("Sending to Twilio:", {
       to: `whatsapp:+${cleanedPhone}`,
       from: `whatsapp:${twilioPhone}`,
-      messageLength: message.length,
+      bodyLength: message.length,
     });
 
     const twilioResponse = await fetch(twilioUrl, {
@@ -116,11 +173,11 @@ serve(async (req) => {
     const twilioData = await twilioResponse.json();
 
     if (!twilioResponse.ok) {
-      console.error("Twilio API error:", twilioData);
+      console.error("Twilio error:", twilioData);
       return new Response(
         JSON.stringify({
           success: false,
-          error: twilioData.message || "Failed to send WhatsApp message",
+          error: twilioData.message || "Twilio API error",
           code: twilioData.code,
           details: twilioData,
         }),
@@ -131,8 +188,8 @@ serve(async (req) => {
       );
     }
 
-    console.log(`WhatsApp message sent successfully to ${cleanedPhone} for ${studentName} (${type})`, {
-      messageSid: twilioData.sid,
+    console.log(`✅ WhatsApp sent to ${cleanedPhone} for ${studentName}`, {
+      sid: twilioData.sid,
       status: twilioData.status,
     });
 
@@ -142,16 +199,15 @@ serve(async (req) => {
         messageSid: twilioData.sid,
         status: twilioData.status,
         to: cleanedPhone,
-        originalPhone: phone,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: unknown) {
-    console.error("Error in send-whatsapp-reminder:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    console.error("Edge function error:", error);
     return new Response(
       JSON.stringify({
-        error: errorMessage,
+        success: false,
+        error: error instanceof Error ? error.message : "Internal server error",
         timestamp: new Date().toISOString(),
       }),
       {
