@@ -14,30 +14,41 @@ serve(async (req) => {
     const body = await req.json();
     console.log("Received body:", JSON.stringify(body, null, 2));
 
+    // Flexible parameter extraction
     const phone = body.phone || body.phoneNumber || body.phone_number;
     let message = body.message || body.customMessage || body.message_text;
     const studentName = body.studentName || body.student_name || "الطالب";
+    const type = body.type || "session";
     const month = body.month;
     const year = body.year;
 
+    // Auto-generate message if not provided
     if (!message && month) {
-      message = `مرحباً 👋\n\nتذكير بمستحقات شهر ${month}${year ? ` ${year}` : ""} للطالب ${studentName}\n\nنشكركم على التزامكم 🙏`;
+      message =
+        "مرحباً 👋\n\nتذكير بمستحقات شهر " +
+        month +
+        (year ? " " + year : "") +
+        " للطالب " +
+        studentName +
+        "\n\nنشكركم على التزامكم 🙏";
     }
 
+    // Validation
     if (!phone) {
-      return new Response(
-        JSON.stringify({ error: "NEW FUNCTION - Phone number is required", receivedKeys: Object.keys(body) }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Phone number is required", receivedKeys: Object.keys(body) }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!message) {
-      return new Response(
-        JSON.stringify({ error: "NEW FUNCTION - Message is required", receivedKeys: Object.keys(body) }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Message is required", receivedKeys: Object.keys(body) }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    // Clean phone number
     const cleanedPhone = String(phone).replace(/\D/g, "");
 
     if (cleanedPhone.length < 10) {
@@ -47,6 +58,7 @@ serve(async (req) => {
       });
     }
 
+    // Twilio credentials
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
     const twilioPhone = Deno.env.get("TWILIO_WHATSAPP_NUMBER");
@@ -58,13 +70,17 @@ serve(async (req) => {
       );
     }
 
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    // Send via Twilio
+    const twilioUrl = "https://api.twilio.com/2010-04-01/Accounts/" + accountSid + "/Messages.json";
+
     const formData = new URLSearchParams();
-    formData.append("From", `whatsapp:${twilioPhone}`);
-    formData.append("To", `whatsapp:+${cleanedPhone}`);
+    formData.append("From", "whatsapp:" + twilioPhone);
+    formData.append("To", "whatsapp:+" + cleanedPhone);
     formData.append("Body", message);
 
-    const authHeader = "Basic " + btoa(accountSid + ":" + authToken);
+    // Build auth header without nested template literals
+    const authString = accountSid + ":" + authToken;
+    const authHeader = "Basic " + btoa(authString);
 
     const twilioResponse = await fetch(twilioUrl, {
       method: "POST",
