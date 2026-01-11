@@ -23,7 +23,6 @@ import {
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
 import { useStudents } from "@/hooks/useStudents";
-import { useAutoReminders } from "@/hooks/useAutoReminders";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
 import { useConflictDetection, ConflictResult } from "@/hooks/useConflictDetection";
 import { AddStudentDialog } from "@/components/AddStudentDialog";
@@ -74,8 +73,11 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 // Helper function to open WhatsApp
 const openWhatsApp = (phone: string) => {
   if (!phone) return;
-  // Remove everything except digits
-  let cleaned = phone.replace(/\D/g, ""); // \D = non-digit
+  let cleaned = phone.replace(/[^\d+]/g, "");
+  if (cleaned.startsWith("0")) {
+    cleaned = "966" + cleaned.substring(1);
+  }
+  cleaned = cleaned.replace("+", "");
   window.open(`https://wa.me/${cleaned}`, "_blank");
 };
 
@@ -146,9 +148,6 @@ const Index = () => {
   } = useCancellationTracking(students);
 
   const { checkConflict } = useConflictDetection(students);
-
-  // Auto reminders hook - sends WhatsApp 1 hour before session & 3 days before month end for payments
-  useAutoReminders({ students, payments, settings });
 
   // Session Handlers
   const handleAddSession = (studentId: string, date: string, customTime?: string) => {
