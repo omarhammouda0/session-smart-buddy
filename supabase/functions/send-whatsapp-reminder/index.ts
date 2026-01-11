@@ -12,9 +12,12 @@ const corsHeaders = {
 };
 
 interface RequestBody {
-  studentName: string;
-  phoneNumber: string;
+  studentName?: string;
+  // Accept both field names for compatibility
+  phoneNumber?: string;
+  phone?: string;
   customMessage?: string;
+  message?: string;
   testMode?: boolean;
   // Session reminder fields
   sessionDate?: string;
@@ -36,24 +39,29 @@ serve(async (req) => {
 
   try {
     const body: RequestBody = await req.json();
-    const {
-      studentName,
-      phoneNumber,
-      customMessage,
-      testMode = false,
-      sessionDate,
-      sessionTime,
-      month,
-      amount,
-      sessions,
-      cancellationCount,
-      cancellationLimit,
-    } = body;
+
+    // Log incoming request for debugging
+    console.log("Received request body:", JSON.stringify(body));
+
+    // Support both field names for compatibility
+    const studentName = body.studentName || "";
+    const phoneNumber = body.phoneNumber || body.phone || "";
+    const customMessage = body.customMessage || body.message || "";
+    const testMode = body.testMode || false;
+    const sessionDate = body.sessionDate;
+    const sessionTime = body.sessionTime;
+    const month = body.month;
+    const amount = body.amount;
+    const sessions = body.sessions;
+    const cancellationCount = body.cancellationCount;
+    const cancellationLimit = body.cancellationLimit;
+
+    console.log("Parsed fields:", { studentName, phoneNumber: phoneNumber ? "***" : "empty", hasCustomMessage: !!customMessage, testMode });
 
     // Validate required fields
     if (!phoneNumber) {
       return new Response(
-        JSON.stringify({ success: false, error: "Phone number is required" }),
+        JSON.stringify({ success: false, error: "Phone number is required (use 'phoneNumber' or 'phone' field)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
