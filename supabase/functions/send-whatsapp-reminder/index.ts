@@ -32,7 +32,7 @@ serve(async (req) => {
     // Clean phone number
     let cleanedPhone = phone.replace(/[^\d+]/g, "");
     if (cleanedPhone.startsWith("0")) {
-      cleanedPhone = "20" + cleanedPhone.substring(1);
+      cleanedPhone = "49" + cleanedPhone.substring(1);
     }
     cleanedPhone = cleanedPhone.replace("+", "");
 
