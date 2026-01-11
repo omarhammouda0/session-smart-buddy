@@ -1,251 +1,266 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useReminderSettings } from './useReminderSettings';
-import { Student } from '@/types/student';
-import { format, addHours, parseISO, getDaysInMonth, differenceInHours } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  ReminderSettings,
+  ReminderLog,
+  DEFAULT_SESSION_TEMPLATE,
+  DEFAULT_PAYMENT_TEMPLATE,
+  DEFAULT_CANCELLATION_TEMPLATE,
+} from "@/types/reminder";
+import { toast } from "@/hooks/use-toast";
 
-interface UseAutoRemindersProps {
-  students: Student[];
-  payments: { studentId: string; payments: { month: number; year: number; isPaid: boolean; amountDue?: number }[] }[];
-  settings: { defaultPriceOnsite?: number; defaultPriceOnline?: number };
-}
+const DEFAULT_SETTINGS: ReminderSettings = {
+  session_reminders_enabled: false,
+  session_reminder_hours: 24,
+  session_reminder_send_time: "09:00",
+  session_reminder_template: DEFAULT_SESSION_TEMPLATE,
+  payment_reminders_enabled: false,
+  payment_reminder_days_before: 3,
+  payment_reminder_template: DEFAULT_PAYMENT_TEMPLATE,
+  cancellation_reminders_enabled: false,
+  cancellation_reminder_template: DEFAULT_CANCELLATION_TEMPLATE,
+};
 
-export const useAutoReminders = ({ students, payments, settings: appSettings }: UseAutoRemindersProps) => {
-  const { settings, logReminder, checkReminderSent } = useReminderSettings();
-  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastCheckRef = useRef<string>('');
+export const useReminderSettings = () => {
+  const [settings, setSettings] = useState<ReminderSettings>(DEFAULT_SETTINGS);
+  const [logs, setLogs] = useState<ReminderLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Format message with template variables
-  const formatMessage = useCallback((template: string, variables: Record<string, string>) => {
-    let message = template;
-    Object.entries(variables).forEach(([key, value]) => {
-      message = message.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
-    });
-    return message;
+  // Fetch settings on mount
+  useEffect(() => {
+    fetchSettings();
+    fetchLogs();
   }, []);
 
-  // Send WhatsApp reminder via edge function
-  const sendReminder = useCallback(async (
-    phone: string,
-    message: string,
-    studentName: string,
-    type: 'session' | 'payment' | 'cancellation'
-  ) => {
+  const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('send-whatsapp-reminder', {
-        body: { phone, message, studentName, type },
-      });
+      const { data, error } = await supabase
+        .from("reminder_settings")
+        .select("*")
+        .eq("user_id", "default")
+        .maybeSingle();
 
       if (error) throw error;
 
-      return { success: true, messageSid: data?.messageSid };
-    } catch (error) {
-      console.error('Error sending reminder:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  }, []);
-
-  // Check and send session reminders (1 hour before session)
-  const checkSessionReminders = useCallback(async () => {
-    if (!settings.session_reminders_enabled) return;
-
-    const now = new Date();
-    const reminderHours = settings.session_reminder_hours || 1; // Default 1 hour
-    const targetTime = addHours(now, reminderHours);
-    const targetDateStr = format(targetTime, 'yyyy-MM-dd');
-    const targetTimeStr = format(targetTime, 'HH:mm');
-    const currentTimeStr = format(now, 'HH:mm');
-
-    for (const student of students) {
-      if (!student.phone) continue;
-
-      // Find sessions that need reminders
-      const upcomingSessions = student.sessions.filter(session => {
-        if (session.status !== 'scheduled') return false;
-        if (session.date !== targetDateStr) return false;
-
-        const sessionTime = session.time || student.sessionTime || '16:00';
-        const sessionHour = parseInt(sessionTime.split(':')[0]);
-        const targetHour = parseInt(targetTimeStr.split(':')[0]);
-        const currentHour = parseInt(currentTimeStr.split(':')[0]);
-
-        // Check if session is within the reminder window (1 hour before)
-        const hoursUntilSession = sessionHour - currentHour;
-        return hoursUntilSession > 0 && hoursUntilSession <= reminderHours;
-      });
-
-      for (const session of upcomingSessions) {
-        // Check if reminder already sent
-        const alreadySent = await checkReminderSent('session', student.id, session.id);
-        if (alreadySent) continue;
-
-        const sessionTime = session.time || student.sessionTime || '16:00';
-        const sessionDate = parseISO(session.date);
-
-        const message = formatMessage(settings.session_reminder_template, {
-          student_name: student.name,
-          date: format(sessionDate, 'EEEE، d MMMM', { locale: ar }),
-          time: sessionTime,
-          day: format(sessionDate, 'EEEE', { locale: ar }),
-        });
-
-        const result = await sendReminder(student.phone, message, student.name, 'session');
-
-        // Log the reminder
-        await logReminder({
-          type: 'session',
-          student_id: student.id,
-          student_name: student.name,
-          phone_number: student.phone,
-          message_text: message,
-          status: result.success ? 'sent' : 'failed',
-          twilio_message_sid: result.messageSid,
-          error_message: result.error,
-          session_id: session.id,
-          session_date: session.date,
-        });
-
-        console.log(`Session reminder ${result.success ? 'sent' : 'failed'} for ${student.name}`);
+      if (data) {
+        setSettings(data as ReminderSettings);
       }
+    } catch (error) {
+      console.error("Error fetching reminder settings:", error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [students, settings, checkReminderSent, formatMessage, sendReminder, logReminder]);
+  };
 
-  // Check and send payment reminders (3 days before end of month)
-  const checkPaymentReminders = useCallback(async () => {
-    if (!settings.payment_reminders_enabled) return;
+  const fetchLogs = async (limit = 50) => {
+    try {
+      const { data, error } = await supabase
+        .from("reminder_log")
+        .select("*")
+        .eq("user_id", "default")
+        .order("sent_at", { ascending: false })
+        .limit(limit);
 
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const daysInMonth = getDaysInMonth(now);
-    const currentDay = now.getDate();
-    const daysBeforeEnd = settings.payment_reminder_days_before || 3;
+      if (error) throw error;
 
-    // Check if we're at the reminder day (e.g., 3 days before month end)
-    const reminderDay = daysInMonth - daysBeforeEnd;
-    if (currentDay !== reminderDay) return;
+      setLogs((data as ReminderLog[]) || []);
+    } catch (error) {
+      console.error("Error fetching reminder logs:", error);
+    }
+  };
 
-    // Only send once per day
-    const todayKey = format(now, 'yyyy-MM-dd');
-    const lastPaymentCheck = localStorage.getItem('lastPaymentReminderCheck');
-    if (lastPaymentCheck === todayKey) return;
+  const saveSettings = async (newSettings: Partial<ReminderSettings>) => {
+    setIsSaving(true);
+    try {
+      const updatedSettings = { ...settings, ...newSettings };
 
-    for (const student of students) {
-      const parentPhone = student.parentPhone;
-      if (!parentPhone) continue;
-
-      // Check if already paid this month
-      const studentPayment = payments.find(p => p.studentId === student.id);
-      const monthlyPayment = studentPayment?.payments.find(
-        p => p.month === currentMonth && p.year === currentYear
+      const { error } = await supabase.from("reminder_settings").upsert(
+        {
+          user_id: "default",
+          ...updatedSettings,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        },
       );
 
-      if (monthlyPayment?.isPaid) continue;
+      if (error) throw error;
 
-      // Check if reminder already sent
-      const alreadySent = await checkReminderSent('payment', student.id, undefined, currentMonth, currentYear);
-      if (alreadySent) continue;
-
-      // Calculate amount due
-      const sessionPrice = student.sessionType === 'online'
-        ? (student.customPriceOnline || appSettings.defaultPriceOnline || 120)
-        : (student.customPriceOnsite || appSettings.defaultPriceOnsite || 150);
-
-      const monthSessions = student.sessions.filter(s => {
-        const sessionDate = parseISO(s.date);
-        return sessionDate.getMonth() === currentMonth &&
-               sessionDate.getFullYear() === currentYear &&
-               (s.status === 'scheduled' || s.status === 'completed');
+      setSettings(updatedSettings);
+      toast({
+        title: "تم الحفظ",
+        description: "تم حفظ إعدادات التذكيرات بنجاح",
       });
-
-      const amountDue = monthSessions.length * sessionPrice;
-
-      const monthNames = [
-        'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
-      ];
-
-      const message = formatMessage(settings.payment_reminder_template, {
-        student_name: student.name,
-        month: monthNames[currentMonth],
-        sessions: String(monthSessions.length),
-        amount: String(amountDue),
-      });
-
-      const result = await sendReminder(parentPhone, message, student.name, 'payment');
-
-      // Log the reminder
-      await logReminder({
-        type: 'payment',
-        student_id: student.id,
-        student_name: student.name,
-        phone_number: parentPhone,
-        message_text: message,
-        status: result.success ? 'sent' : 'failed',
-        twilio_message_sid: result.messageSid,
-        error_message: result.error,
-        month: currentMonth,
-        year: currentYear,
-      });
-
-      console.log(`Payment reminder ${result.success ? 'sent' : 'failed'} for ${student.name}'s parent`);
-    }
-
-    localStorage.setItem('lastPaymentReminderCheck', todayKey);
-  }, [students, payments, settings, appSettings, checkReminderSent, formatMessage, sendReminder, logReminder]);
-
-  // Main check function
-  const runChecks = useCallback(async () => {
-    const now = new Date();
-    const checkKey = format(now, 'yyyy-MM-dd-HH');
-
-    // Avoid checking more than once per hour
-    if (lastCheckRef.current === checkKey) return;
-    lastCheckRef.current = checkKey;
-
-    console.log('Running auto reminder checks...');
-
-    try {
-      await checkSessionReminders();
-      await checkPaymentReminders();
+      return true;
     } catch (error) {
-      console.error('Error in auto reminder checks:', error);
+      console.error("Error saving reminder settings:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل حفظ الإعدادات",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsSaving(false);
     }
-  }, [checkSessionReminders, checkPaymentReminders]);
+  };
 
-  // Set up interval to check reminders
-  useEffect(() => {
-    // Run initial check after a short delay
-    const initialTimeout = setTimeout(() => {
-      runChecks();
-    }, 5000);
+  const logReminder = async (log: Omit<ReminderLog, "id" | "created_at" | "sent_at" | "user_id">) => {
+    try {
+      const { error } = await supabase.from("reminder_log").insert({
+        ...log,
+        user_id: "default",
+        sent_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      });
 
-    // Set up interval to check every 15 minutes
-    checkIntervalRef.current = setInterval(() => {
-      runChecks();
-    }, 15 * 60 * 1000); // 15 minutes
+      if (error) throw error;
+      await fetchLogs();
+    } catch (error) {
+      console.error("Error logging reminder:", error);
+    }
+  };
 
-    return () => {
-      clearTimeout(initialTimeout);
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
+  const checkReminderSent = async (
+    type: "session" | "payment",
+    studentId: string,
+    sessionId?: string,
+    month?: number,
+    year?: number,
+  ): Promise<boolean> => {
+    try {
+      let query = supabase
+        .from("reminder_log")
+        .select("id")
+        .eq("user_id", "default")
+        .eq("type", type)
+        .eq("student_id", studentId)
+        .eq("status", "sent");
+
+      if (type === "session" && sessionId) {
+        query = query.eq("session_id", sessionId);
       }
+
+      if (type === "payment" && month !== undefined && year !== undefined) {
+        query = query.eq("month", month).eq("year", year);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) throw error;
+
+      return !!data;
+    } catch (error) {
+      console.error("Error checking reminder status:", error);
+      return false;
+    }
+  };
+
+  const retryFailedReminders = async () => {
+    const failedLogs = logs.filter((l) => l.status === "failed");
+    let successCount = 0;
+    let failedCount = 0;
+
+    console.log(`Retrying ${failedLogs.length} failed reminders...`);
+
+    for (const log of failedLogs) {
+      try {
+        console.log(`Retrying reminder for ${log.student_name} to ${log.phone_number}`, {
+          type: log.type,
+          messageLength: log.message_text.length,
+        });
+
+        // ✅ FIXED: Use correct parameter names that match Edge Function
+        const { data, error } = await supabase.functions.invoke("send-whatsapp-reminder", {
+          body: {
+            phone: log.phone_number, // ✅ Changed from phoneNumber to phone
+            message: log.message_text, // ✅ Changed from customMessage to message
+            studentName: log.student_name,
+            type: log.type,
+          },
+        });
+
+        if (error) {
+          console.error("Edge Function error for retry:", error);
+          throw error;
+        }
+
+        console.log("Retry successful:", data);
+
+        // Update log status
+        const { error: updateError } = await supabase
+          .from("reminder_log")
+          .update({
+            status: "sent",
+            twilio_message_sid: data.messageSid,
+            error_message: null,
+            sent_at: new Date().toISOString(),
+          })
+          .eq("id", log.id);
+
+        if (updateError) {
+          console.error("Failed to update log status:", updateError);
+          throw updateError;
+        }
+
+        successCount++;
+        console.log(`Successfully resent reminder to ${log.student_name}`);
+      } catch (error) {
+        failedCount++;
+        console.error(`Retry failed for log ${log.id}:`, error);
+
+        // Update with error message
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        await supabase
+          .from("reminder_log")
+          .update({
+            error_message: `Retry failed: ${errorMessage}`,
+            sent_at: new Date().toISOString(),
+          })
+          .eq("id", log.id)
+          .then(({ error: updateError }) => {
+            if (updateError) console.error("Failed to update error message:", updateError);
+          });
+      }
+    }
+
+    // Refresh logs
+    await fetchLogs();
+
+    // Show toast with results
+    if (successCount > 0) {
+      toast({
+        title: "تمت إعادة المحاولة",
+        description: `تم إعادة إرسال ${successCount} من أصل ${failedLogs.length} تذكير`,
+      });
+    }
+
+    if (failedCount > 0) {
+      toast({
+        title: "بعض المحاولات فشلت",
+        description: `فشل إعادة إرسال ${failedCount} تذكير`,
+        variant: "destructive",
+      });
+    }
+
+    return {
+      total: failedLogs.length,
+      success: successCount,
+      failed: failedCount,
     };
-  }, [runChecks]);
-
-  // Manual trigger for testing
-  const triggerSessionReminders = useCallback(async () => {
-    await checkSessionReminders();
-  }, [checkSessionReminders]);
-
-  const triggerPaymentReminders = useCallback(async () => {
-    await checkPaymentReminders();
-  }, [checkPaymentReminders]);
+  };
 
   return {
-    triggerSessionReminders,
-    triggerPaymentReminders,
-    runChecks,
+    settings,
+    logs,
+    isLoading,
+    isSaving,
+    saveSettings,
+    logReminder,
+    checkReminderSent,
+    fetchLogs,
+    retryFailedReminders,
   };
 };
