@@ -1,188 +1,115 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+export type SessionStatus = "scheduled" | "completed" | "cancelled" | "vacation";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-interface WhatsAppRequest {
-  phone?: string;
-  phoneNumber?: string;
-  message?: string;
-  customMessage?: string;
-  studentName: string;
-  type: "session" | "payment" | "cancellation";
-  studentId?: string;
-  month?: string;
-  year?: number;
-  logToDb?: boolean;
+export interface SessionHistory {
+  status: SessionStatus;
+  timestamp: string;
+  note?: string;
 }
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+export type HomeworkStatus = "none" | "assigned" | "completed" | "incomplete";
 
-  try {
-    // Log the raw request body for debugging
-    const rawBody = await req.text();
-    console.log("Raw request body:", rawBody);
+export interface Session {
+  id: string;
+  date: string; // YYYY-MM-DD format
+  time?: string; // HH:mm format - overrides student's default sessionTime
+  duration?: number; // Session duration in minutes (default: 60)
+  completed: boolean;
+  status: SessionStatus;
+  history: SessionHistory[];
+  cancelledAt?: string;
+  completedAt?: string;
+  vacationAt?: string;
+  // Session notes and homework tracking
+  topic?: string; // Session topic/subject
+  notes?: string; // Tutor notes about the session
+  homework?: string; // Homework description
+  homeworkStatus?: HomeworkStatus; // Homework completion status
+}
 
-    let data: WhatsAppRequest;
-    try {
-      data = JSON.parse(rawBody);
-      console.log("Parsed data:", data);
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      return new Response(JSON.stringify({ error: "Invalid JSON format" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+export interface ScheduleDay {
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+}
 
-    // Get phone from either phone or phoneNumber field
-    const phone = data.phone || data.phoneNumber;
-    console.log("Phone extracted:", phone);
+export type SessionType = "online" | "onsite";
 
-    // Get message from either message or customMessage field
-    const message = data.message || data.customMessage || "";
-    console.log("Message extracted:", message.substring(0, 100));
+// Cancellation policy settings per student
+export interface CancellationPolicy {
+  monthlyLimit: number | null; // null = unlimited
+  alertTutor: boolean; // Notify tutor when limit reached
+  autoNotifyParent: boolean; // Auto-send WhatsApp to parent
+}
 
-    const { studentName, type, studentId, month, year, logToDb } = data;
-    console.log("Other fields:", { studentName, type, studentId, month, year, logToDb });
+export interface Student {
+  id: string;
+  sessionTime: string; // HH:mm format like "16:30"
+  sessionDuration?: number; // Default session duration in minutes for this student
+  customPriceOnsite?: number; // Custom on-site price for this student
+  customPriceOnline?: number; // Custom online price for this student
+  useCustomSettings?: boolean; // Whether to use custom settings or global defaults
+  name: string;
+  phone?: string; // Student's WhatsApp contact number
+  parentPhone?: string; // Parent's WhatsApp number for notifications
+  sessionType: SessionType; // online or on-site
+  scheduleDays: ScheduleDay[]; // Which days of the week they have sessions
+  semesterStart: string; // YYYY-MM-DD
+  semesterEnd: string; // YYYY-MM-DD
+  sessions: Session[];
+  createdAt: string;
+  // Cancellation policy
+  cancellationPolicy?: CancellationPolicy;
+}
 
-    // Validate required fields
-    if (!phone) {
-      console.error("Phone is missing. Available fields:", {
-        phone: data.phone,
-        phoneNumber: data.phoneNumber,
-      });
-      return new Response(JSON.stringify({ error: "Phone is required", receivedData: data }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+// ✅ NEW: Payment method type
+export type PaymentMethod = "cash" | "bank" | "wallet";
 
-    if (!message || message.trim() === "") {
-      console.error("Message is missing. Available fields:", {
-        message: data.message,
-        customMessage: data.customMessage,
-      });
-      return new Response(JSON.stringify({ error: "Message is required", receivedData: data }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+// ✅ NEW: Payment status for partial payments
+export type PaymentStatus = "unpaid" | "partial" | "paid";
 
-    // Log to database if requested
-    if (logToDb && studentId) {
-      try {
-        console.log(`Logging WhatsApp reminder for student ${studentId} (${type})`);
-        // Add your Supabase logging code here if needed
-      } catch (dbError) {
-        console.error("Failed to log to database:", dbError);
-      }
-    }
+// ✅ NEW: Individual payment record (for tracking multiple payments in same month)
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  paidAt: string;
+  notes?: string;
+}
 
-    // Clean phone number
-    console.log("Original phone:", phone);
-    let cleanedPhone = phone.replace(/[^\d+]/g, "");
-    console.log("After removing non-digits:", cleanedPhone);
+// ✅ UPDATED: MonthlyPayment with partial payment support
+export interface MonthlyPayment {
+  month: number; // 0-11
+  year: number;
+  isPaid: boolean; // Kept for backwards compatibility
+  paidAt?: string;
+  // ✅ NEW FIELDS FOR PARTIAL PAYMENTS:
+  amountDue?: number; // Total amount expected for this month
+  amountPaid?: number; // Total amount paid so far
+  paymentStatus?: PaymentStatus; // unpaid | partial | paid
+  paymentRecords?: PaymentRecord[]; // Array of all payments made
+  // Legacy fields (still supported):
+  amount?: number;
+  method?: PaymentMethod;
+  notes?: string;
+}
 
-    if (cleanedPhone.startsWith("0")) {
-      cleanedPhone = "966" + cleanedPhone.substring(1);
-      console.log("After converting leading 0:", cleanedPhone);
-    }
-    cleanedPhone = cleanedPhone.replace("+", "");
-    console.log("Final cleaned phone:", cleanedPhone);
+export interface StudentPayments {
+  studentId: string;
+  payments: MonthlyPayment[];
+}
 
-    // Get Twilio credentials from environment
-    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const twilioPhone = Deno.env.get("TWILIO_WHATSAPP_NUMBER");
+export interface AppSettings {
+  defaultSemesterMonths: number;
+  defaultSemesterStart: string;
+  defaultSemesterEnd: string;
+  defaultSessionDuration: number; // Default session duration in minutes (default: 60)
+  defaultPriceOnsite?: number; // Default on-site session price
+  defaultPriceOnline?: number; // Default online session price
+}
 
-    console.log("Twilio credentials check:", {
-      hasAccountSid: !!accountSid,
-      hasAuthToken: !!authToken,
-      hasTwilioPhone: !!twilioPhone,
-    });
+// Duration constants
+export const DURATION_OPTIONS = [30, 45, 60, 90, 120] as const;
+export const DEFAULT_DURATION = 60;
+export const MIN_DURATION = 15;
+export const MAX_DURATION = 240;
 
-    if (!accountSid || !authToken || !twilioPhone) {
-      console.log("Twilio credentials not configured, returning mock success");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          mock: true,
-          message: "WhatsApp credentials not configured. Message not sent.",
-          data: { phone: cleanedPhone, messagePreview: message.substring(0, 100), studentName },
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // Send via Twilio WhatsApp API
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-
-    const formData = new URLSearchParams();
-    formData.append("From", `whatsapp:${twilioPhone}`);
-    formData.append("To", `whatsapp:+${cleanedPhone}`);
-    formData.append("Body", message);
-
-    console.log("Sending to Twilio:", {
-      to: `whatsapp:+${cleanedPhone}`,
-      from: `whatsapp:${twilioPhone}`,
-      messageLength: message.length,
-    });
-
-    const twilioResponse = await fetch(twilioUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formData,
-    });
-
-    const twilioData = await twilioResponse.json();
-    console.log("Twilio response:", twilioData);
-
-    if (!twilioResponse.ok) {
-      console.error("Twilio error:", twilioData);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: twilioData.message || "Failed to send WhatsApp message",
-          code: twilioData.code,
-          details: twilioData,
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    console.log(`WhatsApp message sent successfully to ${cleanedPhone} for ${studentName} (${type})`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        messageSid: twilioData.sid,
-        status: twilioData.status,
-        to: cleanedPhone,
-        studentName,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  } catch (error: unknown) {
-    console.error("Error in send-whatsapp-reminder:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    const errorStack = error instanceof Error ? error.stack : "No stack trace";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-        stack: errorStack,
-        timestamp: Date.now(),
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  }
-});
+export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
