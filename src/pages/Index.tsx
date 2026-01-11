@@ -477,6 +477,19 @@ const Index = () => {
                               }
                             />
                             <StudentNotesHistory studentId={student.id} studentName={student.name} />
+
+                            {student.phone && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-500/10 shrink-0"
+                                onClick={() => openWhatsApp(student.phone!)}
+                                title="فتح واتساب"
+                              >
+                                <WhatsAppIcon className="h-4 w-4" />
+                              </Button>
+                            )}
+
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
