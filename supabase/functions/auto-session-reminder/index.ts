@@ -4,10 +4,37 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Auto Session Reminder - v2.0
 // Runs on schedule to send dual WhatsApp reminders at configurable intervals
 
+// Germany timezone: CET (UTC+1) in winter, CEST (UTC+2) in summer
+// Helper to check if date is in daylight saving time (last Sunday of March to last Sunday of October)
+function isDaylightSavingTime(date: Date): boolean {
+  const year = date.getUTCFullYear();
+
+  // Last Sunday of March
+  const marchLast = new Date(Date.UTC(year, 2, 31));
+  const dstStart = new Date(Date.UTC(year, 2, 31 - marchLast.getUTCDay(), 1, 0, 0)); // 1:00 UTC
+
+  // Last Sunday of October
+  const octLast = new Date(Date.UTC(year, 9, 31));
+  const dstEnd = new Date(Date.UTC(year, 9, 31 - octLast.getUTCDay(), 1, 0, 0)); // 1:00 UTC
+
+  return date >= dstStart && date < dstEnd;
+}
+
+function getGermanyTimezoneOffset(date: Date): number {
+  return isDaylightSavingTime(date) ? 2 : 1; // CEST (UTC+2) or CET (UTC+1)
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Helper function to get local time (Germany timezone)
+function getLocalTime(date: Date): Date {
+  const timezoneOffset = getGermanyTimezoneOffset(date);
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  return new Date(utc + (timezoneOffset * 3600000));
+}
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -23,8 +50,12 @@ serve(async (req) => {
 
   try {
     const now = new Date();
+    const localNow = getLocalTime(now);
+    const tzOffset = getGermanyTimezoneOffset(now);
+    const tzName = tzOffset === 2 ? 'CEST' : 'CET';
 
-    console.log(`Current time: ${now.toISOString()}`);
+    console.log(`Current UTC time: ${now.toISOString()}`);
+    console.log(`Current Germany time (${tzName}/UTC+${tzOffset}): ${localNow.toISOString()}`);
 
     // Check if session reminders are enabled
     const { data: settings, error: settingsError } = await supabase
@@ -71,11 +102,12 @@ serve(async (req) => {
     for (const reminder of reminderIntervals) {
       const { hours, interval } = reminder;
 
-      // Calculate the target datetime for this reminder
-      const targetDateTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
+      // Calculate the target datetime for this reminder (in local time)
+      const targetDateTime = new Date(localNow.getTime() + hours * 60 * 60 * 1000);
       const targetDateStr = targetDateTime.toISOString().split('T')[0];
-      const targetHour = targetDateTime.getUTCHours();
-      const targetMinute = targetDateTime.getUTCMinutes();
+      // Get hours/minutes from the local target time
+      const targetHour = targetDateTime.getHours();
+      const targetMinute = targetDateTime.getMinutes();
 
       console.log(`Processing reminder interval ${interval} (${hours}h before) - target datetime: ${targetDateStr} ${targetHour}:${targetMinute}`);
 
