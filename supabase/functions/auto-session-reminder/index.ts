@@ -83,14 +83,21 @@ serve(async (req) => {
 
     const reminderHours1 = settings.session_reminder_hours || 24;
     const reminderHours2 = settings.session_reminder_hours_2 || 1;
-    const reminderTemplate = settings.session_reminder_template || 'مرحباً {student_name}،\nتذكير بموعد جلستك اليوم الساعة {time}\nنراك قريباً!';
+
+    // Separate templates for each reminder interval
+    const reminderTemplate1 = settings.session_reminder_template_1 ||
+      settings.session_reminder_template ||
+      'مرحباً {student_name}،\nتذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.\nنراك قريباً!';
+
+    const reminderTemplate2 = settings.session_reminder_template_2 ||
+      'مرحباً {student_name}،\nجلستك تبدأ خلال ساعة واحدة الساعة {time}!\nالرجاء الاستعداد.';
 
     console.log(`Reminder intervals: ${reminderHours1}h and ${reminderHours2}h`);
 
-    // Array of reminder intervals to check
+    // Array of reminder intervals to check (with their specific templates)
     const reminderIntervals = [
-      { hours: reminderHours1, interval: 1 },
-      { hours: reminderHours2, interval: 2 }
+      { hours: reminderHours1, interval: 1, template: reminderTemplate1 },
+      { hours: reminderHours2, interval: 2, template: reminderTemplate2 }
     ];
 
     let totalSent = 0;
@@ -100,7 +107,7 @@ serve(async (req) => {
 
     // Process each reminder interval
     for (const reminder of reminderIntervals) {
-      const { hours, interval } = reminder;
+      const { hours, interval, template } = reminder;
 
       // Calculate the target datetime for this reminder (in local time)
       const targetDateTime = new Date(localNow.getTime() + hours * 60 * 60 * 1000);
@@ -192,8 +199,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Build message from template
-        const message = reminderTemplate
+        // Build message from interval-specific template
+        const message = template
           .replace(/{student_name}/g, studentName)
           .replace(/{date}/g, session.date)
           .replace(/{time}/g, sessionTime || '');

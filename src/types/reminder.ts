@@ -6,6 +6,8 @@ export interface ReminderSettings {
   session_reminder_hours_2: number;
   session_reminder_send_time: string;
   session_reminder_template: string;
+  session_reminder_template_1: string;
+  session_reminder_template_2: string;
   payment_reminders_enabled: boolean;
   payment_reminder_days_before: number;
   payment_reminder_template: string;
@@ -38,6 +40,14 @@ export interface ReminderLog {
 export const DEFAULT_SESSION_TEMPLATE = `مرحباً {student_name}،
 تذكير بموعد جلستك غداً {date} الساعة {time}
 نراك قريباً!`;
+
+export const DEFAULT_SESSION_TEMPLATE_1 = `مرحباً {student_name}،
+تذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.
+نراك قريباً!`;
+
+export const DEFAULT_SESSION_TEMPLATE_2 = `مرحباً {student_name}،
+جلستك تبدأ خلال ساعة واحدة الساعة {time}!
+الرجاء الاستعداد.`;
 
 export const DEFAULT_PAYMENT_TEMPLATE = `عزيزي ولي الأمر،
 تذكير بدفع رسوم شهر {month} لـ {student_name}

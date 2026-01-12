@@ -24,6 +24,8 @@ export const ReminderSettingsDialog = () => {
   const [sessionHours2, setSessionHours2] = useState(1);
   const [sessionSendTime, setSessionSendTime] = useState('09:00');
   const [sessionTemplate, setSessionTemplate] = useState('');
+  const [sessionTemplate1, setSessionTemplate1] = useState('');
+  const [sessionTemplate2, setSessionTemplate2] = useState('');
   const [paymentEnabled, setPaymentEnabled] = useState(false);
   const [paymentDays, setPaymentDays] = useState(3);
   const [paymentTemplate, setPaymentTemplate] = useState('');
@@ -38,6 +40,8 @@ export const ReminderSettingsDialog = () => {
       setSessionHours2(settings.session_reminder_hours_2 || 1);
       setSessionSendTime(settings.session_reminder_send_time);
       setSessionTemplate(settings.session_reminder_template);
+      setSessionTemplate1(settings.session_reminder_template_1 || settings.session_reminder_template || '');
+      setSessionTemplate2(settings.session_reminder_template_2 || '');
       setPaymentEnabled(settings.payment_reminders_enabled);
       setPaymentDays(settings.payment_reminder_days_before);
       setPaymentTemplate(settings.payment_reminder_template);
@@ -53,6 +57,8 @@ export const ReminderSettingsDialog = () => {
       setSessionHours2(settings.session_reminder_hours_2 || 1);
       setSessionSendTime(settings.session_reminder_send_time);
       setSessionTemplate(settings.session_reminder_template);
+      setSessionTemplate1(settings.session_reminder_template_1 || settings.session_reminder_template || '');
+      setSessionTemplate2(settings.session_reminder_template_2 || '');
       setPaymentEnabled(settings.payment_reminders_enabled);
       setPaymentDays(settings.payment_reminder_days_before);
       setPaymentTemplate(settings.payment_reminder_template);
@@ -103,6 +109,8 @@ export const ReminderSettingsDialog = () => {
       session_reminder_hours_2: sessionHours2,
       session_reminder_send_time: sessionSendTime,
       session_reminder_template: sessionTemplate,
+      session_reminder_template_1: sessionTemplate1,
+      session_reminder_template_2: sessionTemplate2,
       payment_reminders_enabled: paymentEnabled,
       payment_reminder_days_before: paymentDays,
       payment_reminder_template: paymentTemplate,
@@ -225,17 +233,34 @@ export const ReminderSettingsDialog = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">نص الرسالة (للتذكيرين):</Label>
+                    <Label className="text-xs">نص التذكير الأول ({sessionHours} ساعة قبل):</Label>
                     <Textarea
-                      value={sessionTemplate}
-                      onChange={(e) => setSessionTemplate(e.target.value)}
-                      rows={4}
+                      value={sessionTemplate1}
+                      onChange={(e) => setSessionTemplate1(e.target.value)}
+                      rows={3}
                       className="text-sm resize-none"
                       maxLength={1600}
+                      placeholder="مرحباً {student_name}، تذكير: لديك جلسة غداً..."
                     />
                     <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>المتغيرات: {'{student_name}'}, {'{date}'}, {'{time}'}, {'{day}'}</span>
-                      <span>{sessionTemplate.length} / 1600</span>
+                      <span>المتغيرات: {'{student_name}'}, {'{date}'}, {'{time}'}</span>
+                      <span>{sessionTemplate1.length} / 1600</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">نص التذكير الثاني ({sessionHours2} ساعة قبل):</Label>
+                    <Textarea
+                      value={sessionTemplate2}
+                      onChange={(e) => setSessionTemplate2(e.target.value)}
+                      rows={3}
+                      className="text-sm resize-none"
+                      maxLength={1600}
+                      placeholder="مرحباً {student_name}، جلستك تبدأ خلال ساعة..."
+                    />
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>المتغيرات: {'{student_name}'}, {'{date}'}, {'{time}'}</span>
+                      <span>{sessionTemplate2.length} / 1600</span>
                     </div>
                   </div>
                 </div>
