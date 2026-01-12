@@ -21,6 +21,7 @@ export const ReminderSettingsDialog = () => {
   // Local state for editing
   const [sessionEnabled, setSessionEnabled] = useState(false);
   const [sessionHours, setSessionHours] = useState(24);
+  const [sessionHours2, setSessionHours2] = useState(1);
   const [sessionSendTime, setSessionSendTime] = useState('09:00');
   const [sessionTemplate, setSessionTemplate] = useState('');
   const [paymentEnabled, setPaymentEnabled] = useState(false);
@@ -34,6 +35,7 @@ export const ReminderSettingsDialog = () => {
     if (settings) {
       setSessionEnabled(settings.session_reminders_enabled);
       setSessionHours(settings.session_reminder_hours);
+      setSessionHours2(settings.session_reminder_hours_2 || 1);
       setSessionSendTime(settings.session_reminder_send_time);
       setSessionTemplate(settings.session_reminder_template);
       setPaymentEnabled(settings.payment_reminders_enabled);
@@ -48,6 +50,7 @@ export const ReminderSettingsDialog = () => {
     if (isOpen && settings) {
       setSessionEnabled(settings.session_reminders_enabled);
       setSessionHours(settings.session_reminder_hours);
+      setSessionHours2(settings.session_reminder_hours_2 || 1);
       setSessionSendTime(settings.session_reminder_send_time);
       setSessionTemplate(settings.session_reminder_template);
       setPaymentEnabled(settings.payment_reminders_enabled);
@@ -97,6 +100,7 @@ export const ReminderSettingsDialog = () => {
     const success = await saveSettings({
       session_reminders_enabled: sessionEnabled,
       session_reminder_hours: sessionHours,
+      session_reminder_hours_2: sessionHours2,
       session_reminder_send_time: sessionSendTime,
       session_reminder_template: sessionTemplate,
       payment_reminders_enabled: paymentEnabled,
@@ -189,7 +193,7 @@ export const ReminderSettingsDialog = () => {
                 <div className="space-y-4 pr-6 border-r-2 border-primary/20">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label className="text-xs">إرسال قبل:</Label>
+                      <Label className="text-xs">التذكير الأول (قبل):</Label>
                       <Select value={String(sessionHours)} onValueChange={(v) => setSessionHours(parseInt(v))}>
                         <SelectTrigger className="h-9">
                           <SelectValue />
@@ -204,15 +208,15 @@ export const ReminderSettingsDialog = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs">وقت الإرسال:</Label>
-                      <Select value={sessionSendTime} onValueChange={setSessionSendTime}>
+                      <Label className="text-xs">التذكير الثاني (قبل):</Label>
+                      <Select value={String(sessionHours2)} onValueChange={(v) => setSessionHours2(parseInt(v))}>
                         <SelectTrigger className="h-9">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {SEND_TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {formatTimeDisplay(t)}
+                          {REMINDER_HOURS_OPTIONS.map((h) => (
+                            <SelectItem key={h} value={String(h)}>
+                              {h} ساعة
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -221,7 +225,7 @@ export const ReminderSettingsDialog = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">نص الرسالة:</Label>
+                    <Label className="text-xs">نص الرسالة (للتذكيرين):</Label>
                     <Textarea
                       value={sessionTemplate}
                       onChange={(e) => setSessionTemplate(e.target.value)}

@@ -3,6 +3,7 @@ export interface ReminderSettings {
   user_id?: string;
   session_reminders_enabled: boolean;
   session_reminder_hours: number;
+  session_reminder_hours_2: number;
   session_reminder_send_time: string;
   session_reminder_template: string;
   payment_reminders_enabled: boolean;
@@ -29,6 +30,7 @@ export interface ReminderLog {
   session_date?: string;
   month?: number;
   year?: number;
+  reminder_interval?: number;
   sent_at: string;
   created_at: string;
 }

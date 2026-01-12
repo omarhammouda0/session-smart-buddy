@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 const DEFAULT_SETTINGS: ReminderSettings = {
   session_reminders_enabled: false,
   session_reminder_hours: 24,
+  session_reminder_hours_2: 1,
   session_reminder_send_time: '09:00',
   session_reminder_template: DEFAULT_SESSION_TEMPLATE,
   payment_reminders_enabled: false,
