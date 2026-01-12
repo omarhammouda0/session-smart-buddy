@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
-// Version 2.1 - Fixed duplicate code issue - 2026-01-12
+// Version 2.2 - Fixed base64 encoding - 2026-01-12
 
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -143,10 +142,8 @@ serve(async (req) => {
     // Send via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
 
-    // Use TextEncoder for proper base64 encoding in Deno
-    const encoder = new TextEncoder();
-    const credentials = encoder.encode(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
-    const authHeader = base64Encode(credentials);
+    // Use btoa for base64 encoding (simpler and works in Deno)
+    const authHeader = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
 
     const formData = new URLSearchParams();
     formData.append("To", whatsappTo);
