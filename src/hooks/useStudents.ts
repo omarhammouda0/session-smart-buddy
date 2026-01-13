@@ -98,6 +98,8 @@ interface DbAppSettings {
   default_session_duration: number | null;
   default_price_onsite: number | null;
   default_price_online: number | null;
+  working_hours_start: string | null;
+  working_hours_end: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -214,6 +216,8 @@ const dbSettingsToAppSettings = (dbSettings: DbAppSettings | null): AppSettings 
       defaultSessionDuration: 60,
       defaultPriceOnsite: 150,
       defaultPriceOnline: 120,
+      workingHoursStart: "14:00",
+      workingHoursEnd: "22:00",
     };
   }
 
@@ -224,6 +228,8 @@ const dbSettingsToAppSettings = (dbSettings: DbAppSettings | null): AppSettings 
     defaultSessionDuration: dbSettings.default_session_duration || 60,
     defaultPriceOnsite: dbSettings.default_price_onsite || 150,
     defaultPriceOnline: dbSettings.default_price_online || 120,
+    workingHoursStart: dbSettings.working_hours_start || "14:00",
+    workingHoursEnd: dbSettings.working_hours_end || "22:00",
   };
 };
 
@@ -491,6 +497,8 @@ export const useStudents = () => {
           default_session_duration: updatedSettings.defaultSessionDuration,
           default_price_onsite: updatedSettings.defaultPriceOnsite,
           default_price_online: updatedSettings.defaultPriceOnline,
+          working_hours_start: updatedSettings.workingHoursStart || "14:00",
+          working_hours_end: updatedSettings.workingHoursEnd || "22:00",
           updated_at: new Date().toISOString(),
         },
         {

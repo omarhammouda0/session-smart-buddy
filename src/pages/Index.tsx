@@ -24,6 +24,9 @@ import {
   Plus,
   User,
   FileText,
+  Sunrise,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -45,6 +48,7 @@ import { AddVacationDialog } from "@/components/AddVacationDialog";
 import { RestoreConflictDialog } from "@/components/RestoreConflictDialog";
 import { ReminderSettingsDialog } from "@/components/ReminderSettingsDialog";
 import { ReminderHistoryDialog } from "@/components/ReminderHistoryDialog";
+import { NotificationSettingsDialog } from "@/components/NotificationSettingsDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { CalendarView } from "@/components/CalendarView";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -252,10 +256,12 @@ const Index = () => {
     clearMonthCancellations,
   } = useCancellationTracking(students);
 
-  const { checkConflict } = useConflictDetection(students);
+  const { checkConflict, getSuggestedSlots } = useConflictDetection(students);
 
   // Session Notifications
   const {
+    settings: notificationSettings,
+    updateSettings: updateNotificationSettings,
     upcomingNotification,
     dismissNotification,
     endedSessionNotification,
@@ -869,12 +875,17 @@ const Index = () => {
               <MonthlyReportDialog students={students} payments={payments} settings={settings} />
               <ReminderHistoryDialog />
               <ReminderSettingsDialog />
+              <NotificationSettingsDialog
+                settings={notificationSettings}
+                onSave={updateNotificationSettings}
+              />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
               <AddStudentDialog
                 onAdd={handleAddStudent}
                 defaultStart={settings.defaultSemesterStart}
                 defaultEnd={settings.defaultSemesterEnd}
                 students={students}
+                settings={settings}
                 defaultDuration={settings.defaultSessionDuration}
                 defaultPriceOnsite={settings.defaultPriceOnsite}
                 defaultPriceOnline={settings.defaultPriceOnline}
@@ -1548,6 +1559,7 @@ const Index = () => {
           <TabsContent value="calendar" className="mt-0">
             <CalendarView
               students={students}
+              settings={settings}
               onRescheduleSession={rescheduleSession}
               onUpdateSessionDateTime={updateSessionDateTime}
               onToggleComplete={handleToggleComplete}
@@ -1842,6 +1854,49 @@ const Index = () => {
                       </p>
                     )}
                   </div>
+
+                  {/* Available Time Slots */}
+                  {(() => {
+                    const todayStr = format(now, "yyyy-MM-dd");
+                    const availableSlots = getSuggestedSlots(
+                      todayStr,
+                      selectedStudent?.sessionDuration || settings.defaultSessionDuration || 60,
+                      settings.workingHoursStart || "08:00",
+                      settings.workingHoursEnd || "22:00",
+                      8
+                    );
+
+                    if (availableSlots.length === 0) return null;
+
+                    return (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-1.5 text-emerald-700">
+                          <Sparkles className="h-4 w-4" />
+                          أوقات متاحة
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                          {availableSlots.map((slot) => (
+                            <Button
+                              key={slot.time}
+                              type="button"
+                              size="sm"
+                              variant={addTodaySessionDialog.time === slot.time ? "default" : "outline"}
+                              className={cn(
+                                "gap-1.5 h-9 text-sm",
+                                addTodaySessionDialog.time === slot.time && "ring-2 ring-primary ring-offset-1"
+                              )}
+                              onClick={() => setAddTodaySessionDialog({ ...addTodaySessionDialog, time: slot.time })}
+                            >
+                              {slot.type === "morning" && <Sunrise className="h-3.5 w-3.5" />}
+                              {slot.type === "afternoon" && <Sun className="h-3.5 w-3.5" />}
+                              {slot.type === "evening" && <Moon className="h-3.5 w-3.5" />}
+                              {slot.timeAr}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Conflict Warning */}
                   {hasError && conflict && conflict.conflicts[0] && (

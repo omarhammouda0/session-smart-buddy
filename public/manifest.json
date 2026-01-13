@@ -1,0 +1,33 @@
+{
+  "name": "Session Smart Buddy - متابعة الطلاب",
+  "short_name": "متابعة الطلاب",
+  "description": "تطبيق متابعة جلسات الطلاب والمدفوعات",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait-primary",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "حصص اليوم",
+      "short_name": "اليوم",
+      "url": "/?tab=sessions"
+    },
+    {
+      "name": "التقويم",
+      "short_name": "التقويم",
+      "url": "/?tab=calendar"
+    }
+  ]
+}
+

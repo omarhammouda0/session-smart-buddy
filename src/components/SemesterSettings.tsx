@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings, Clock, Banknote, Monitor, MapPin } from 'lucide-react';
+import { Settings, Clock, Banknote, Monitor, MapPin, Briefcase } from 'lucide-react';
 import { AppSettings, DURATION_OPTIONS, DEFAULT_DURATION } from '@/types/student';
 import { format, addMonths, parseISO } from 'date-fns';
 import { formatDurationAr } from '@/lib/arabicConstants';
@@ -28,6 +28,8 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
   const [duration, setDuration] = useState(settings.defaultSessionDuration || DEFAULT_DURATION);
   const [priceOnsite, setPriceOnsite] = useState<string>((settings.defaultPriceOnsite ?? 150).toString());
   const [priceOnline, setPriceOnline] = useState<string>((settings.defaultPriceOnline ?? 120).toString());
+  const [workStart, setWorkStart] = useState(settings.workingHoursStart || '14:00');
+  const [workEnd, setWorkEnd] = useState(settings.workingHoursEnd || '22:00');
 
   const handleSave = () => {
     const onsitePrice = priceOnsite.trim() === ''
@@ -52,6 +54,8 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
       defaultSessionDuration: duration,
       defaultPriceOnsite: onsitePrice,
       defaultPriceOnline: onlinePrice,
+      workingHoursStart: workStart,
+      workingHoursEnd: workEnd,
     });
     setOpen(false);
   };
@@ -69,6 +73,8 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
       setDuration(settings.defaultSessionDuration || DEFAULT_DURATION);
       setPriceOnsite((settings.defaultPriceOnsite ?? 150).toString());
       setPriceOnline((settings.defaultPriceOnline ?? 120).toString());
+      setWorkStart(settings.workingHoursStart || '14:00');
+      setWorkEnd(settings.workingHoursEnd || '22:00');
     }
     setOpen(isOpen);
   };
@@ -214,6 +220,40 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
                     جنيه
                   </span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Working Hours Settings */}
+          <div className="space-y-3">
+            <h3 className="font-medium text-sm flex items-center gap-2">
+              <Briefcase className="h-4 w-4" />
+              ساعات العمل
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              حدد ساعات العمل لعرض الأوقات المتاحة عند إضافة حصص جديدة
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="work-start" className="text-xs">بداية العمل</Label>
+                <Input
+                  id="work-start"
+                  type="time"
+                  value={workStart}
+                  onChange={(e) => setWorkStart(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="work-end" className="text-xs">نهاية العمل</Label>
+                <Input
+                  id="work-end"
+                  type="time"
+                  value={workEnd}
+                  onChange={(e) => setWorkEnd(e.target.value)}
+                />
               </div>
             </div>
           </div>

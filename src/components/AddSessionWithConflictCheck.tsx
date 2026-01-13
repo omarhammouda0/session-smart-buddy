@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Calendar, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { Calendar, AlertTriangle, Clock, Sparkles, Sunrise, Sun, Moon } from 'lucide-react';
 import { Student } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -47,8 +47,8 @@ export const AddSessionWithConflictCheck = ({
   const [selectedTime, setSelectedTime] = useState<string>(student.sessionTime || '16:00');
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   
-  const { checkConflict } = useConflictDetection(students);
-  
+  const { checkConflict, getSuggestedSlots } = useConflictDetection(students);
+
   // Reset when dialog opens
   useEffect(() => {
     if (open) {
@@ -64,7 +64,15 @@ export const AddSessionWithConflictCheck = ({
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     return checkConflict({ date: dateStr, startTime: selectedTime });
   }, [selectedDate, selectedTime, checkConflict]);
-  
+
+  // Get available slots for selected date
+  const availableSlots = useMemo(() => {
+    if (!selectedDate) return [];
+
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return getSuggestedSlots(dateStr, student.sessionDuration || 60, "08:00", "22:00", 8);
+  }, [selectedDate, getSuggestedSlots, student.sessionDuration]);
+
   const handleTimeChange = (time: string) => {
     setSelectedTime(time);
   };
@@ -164,7 +172,42 @@ export const AddSessionWithConflictCheck = ({
                 الوقت الافتراضي: {formatTimeAr(student.sessionTime || '16:00')}
               </p>
             </div>
-            
+
+            {/* Available Slots */}
+            {selectedDate && availableSlots.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5 text-green-700">
+                  <Sparkles className="h-4 w-4" />
+                  أوقات متاحة
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {availableSlots.map((slot) => (
+                    <Button
+                      key={slot.time}
+                      type="button"
+                      size="sm"
+                      variant={selectedTime === slot.time ? "default" : "outline"}
+                      className={cn(
+                        "gap-1.5 h-8 text-xs",
+                        selectedTime === slot.time && "ring-2 ring-primary ring-offset-1"
+                      )}
+                      onClick={() => handleSuggestionSelect(slot.time)}
+                    >
+                      {slot.type === "morning" && <Sunrise className="h-3 w-3" />}
+                      {slot.type === "afternoon" && <Sun className="h-3 w-3" />}
+                      {slot.type === "evening" && <Moon className="h-3 w-3" />}
+                      {slot.timeAr}
+                    </Button>
+                  ))}
+                </div>
+                {availableSlots.length === 0 && (
+                  <p className="text-xs text-amber-600">
+                    لا توجد أوقات متاحة في هذا اليوم
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Conflict Status */}
             {selectedDate && conflictResult && (
               <ConflictWarning
@@ -216,7 +259,7 @@ export const AddSessionWithConflictCheck = ({
                 ))}
                 
                 <p className="text-sm">
-                  ⚠️ قد لا يكون لديك وقت كافٍ للتحضير والراحة. نوصي بفاصل 15 دقيقة على الأقل.
+                  ⚠️ قد لا يكون لديك وقت كافٍ للتحضير والراحة. نوصي بفاصل 30 دقيقة على الأقل.
                 </p>
                 
                 <p className="font-medium">هل تريد الإضافة على أي حال؟</p>

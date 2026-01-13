@@ -121,6 +121,14 @@ export interface AppSettings {
   defaultSessionDuration: number; // Default session duration in minutes (default: 60)
   defaultPriceOnsite?: number; // Default on-site session price
   defaultPriceOnline?: number; // Default online session price
+  // Working hours settings
+  workingHoursStart?: string; // e.g., "14:00" (2 PM)
+  workingHoursEnd?: string;   // e.g., "22:00" (10 PM)
+  // Notification settings
+  notificationsEnabled?: boolean;
+  notificationMinutesBefore?: number; // Minutes before session to notify (default: 60)
+  notificationSound?: boolean;
+  browserNotifications?: boolean;
 }
 
 // Duration constants

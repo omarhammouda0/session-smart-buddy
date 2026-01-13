@@ -38,6 +38,7 @@ import {
   Trash2,
   Sunrise,
   Sunset,
+  Sun,
   Moon,
   TrendingUp,
   Zap,
@@ -46,11 +47,12 @@ import {
   Phone,
   Pencil,
   Save,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Student, Session } from "@/types/student";
+import { Student, Session, AppSettings } from "@/types/student";
 import { DAY_NAMES_SHORT_AR } from "@/lib/arabicConstants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -66,6 +68,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useConflictDetection } from "@/hooks/useConflictDetection";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,6 +82,7 @@ import {
 
 interface CalendarViewProps {
   students: Student[];
+  settings?: AppSettings;
   onRescheduleSession: (studentId: string, sessionId: string, newDate: string) => void;
   onUpdateSessionDateTime?: (studentId: string, sessionId: string, newDate: string, newTime: string) => void;
   onToggleComplete?: (studentId: string, sessionId: string) => void;
@@ -104,10 +108,12 @@ interface ConflictInfo {
   conflictStudent?: string;
   conflictTime?: string;
   severity: "none" | "warning" | "error";
+  gapMinutes?: number; // Gap in minutes between sessions
 }
 
 export const CalendarView = ({
   students,
+  settings,
   onRescheduleSession,
   onUpdateSessionDateTime,
   onToggleComplete,
@@ -122,6 +128,9 @@ export const CalendarView = ({
   const [showWeeklySummary, setShowWeeklySummary] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
+
+  // Get available slots from conflict detection hook
+  const { getSuggestedSlots } = useConflictDetection(students);
 
   // Add Session Dialog State
   const [addSessionDialog, setAddSessionDialog] = useState<{
@@ -378,7 +387,10 @@ export const CalendarView = ({
         if (!otherTime) continue;
         const [otherHour, otherMin] = otherTime.split(":").map(Number);
         const otherStartMinutes = otherHour * 60 + otherMin;
-        const otherEndMinutes = otherStartMinutes + sessionDuration;
+        const otherDuration = session.duration || student.sessionDuration || sessionDuration;
+        const otherEndMinutes = otherStartMinutes + otherDuration;
+
+        // Check for overlap (error)
         const hasOverlap =
           (newStartMinutes >= otherStartMinutes && newStartMinutes < otherEndMinutes) ||
           (newEndMinutes > otherStartMinutes && newEndMinutes <= otherEndMinutes) ||
@@ -392,14 +404,28 @@ export const CalendarView = ({
             severity: "error",
           };
         }
-        const timeDiff = Math.abs(newStartMinutes - otherStartMinutes);
-        if (timeDiff < 15 && timeDiff > 0) {
+
+        // Calculate actual gap between sessions (end of first to start of second)
+        let gapMinutes: number;
+        if (newStartMinutes >= otherEndMinutes) {
+          // New session is after the other session
+          gapMinutes = newStartMinutes - otherEndMinutes;
+        } else if (otherStartMinutes >= newEndMinutes) {
+          // New session is before the other session
+          gapMinutes = otherStartMinutes - newEndMinutes;
+        } else {
+          gapMinutes = 0; // Overlapping (shouldn't reach here)
+        }
+
+        // Warning if gap is less than 30 minutes
+        if (gapMinutes < 30 && gapMinutes >= 0) {
           const isSameStudent = student.id === studentId;
           return {
             hasConflict: false,
             conflictStudent: isSameStudent ? `${student.name} (نفس الطالب)` : student.name,
             conflictTime: otherTime,
             severity: "warning",
+            gapMinutes,
           };
         }
       }
@@ -1665,11 +1691,15 @@ export const CalendarView = ({
               <div className="p-4 rounded-xl bg-amber-500/10 border-2 border-amber-500/30 flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="font-bold text-amber-700">تحذير: حصة قريبة</p>
+                  <p className="font-bold text-amber-700">تحذير: فاصل أقل من 30 دقيقة</p>
                   <p className="text-sm text-amber-600 mt-1">
-                    يوجد حصة قريبة لـ <span className="font-bold">{confirmDialog.conflictInfo.conflictStudent}</span> في
+                    {confirmDialog.conflictInfo.gapMinutes !== undefined
+                      ? `فاصل ${confirmDialog.conflictInfo.gapMinutes} دقيقة فقط`
+                      : 'حصة قريبة جداً'
+                    } مع <span className="font-bold">{confirmDialog.conflictInfo.conflictStudent}</span> في
                     الساعة {confirmDialog.conflictInfo.conflictTime}
                   </p>
+                  <p className="text-xs text-amber-500 mt-1">ننصح بفاصل 30 دقيقة على الأقل بين الحصص</p>
                 </div>
               </div>
             )}
@@ -1733,8 +1763,7 @@ export const CalendarView = ({
                 {confirmDialog?.conflictInfo.severity === "warning" && !confirmDialog?.conflictInfo.hasConflict && (
                   <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 text-xs flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    قريب من {confirmDialog.conflictInfo.conflictStudent} في الساعة{" "}
-                    {confirmDialog.conflictInfo.conflictTime}
+                    فاصل {confirmDialog.conflictInfo.gapMinutes !== undefined ? `${confirmDialog.conflictInfo.gapMinutes} دقيقة` : 'أقل من 30 دقيقة'} مع {confirmDialog.conflictInfo.conflictStudent}
                   </div>
                 )}
               </div>
@@ -2026,6 +2055,49 @@ export const CalendarView = ({
                 </p>
               )}
             </div>
+
+            {/* Available Time Slots */}
+            {addSessionDialog && (() => {
+              const selectedStudent = students.find((s) => s.id === addSessionDialog.selectedStudentId);
+              const availableSlots = getSuggestedSlots(
+                addSessionDialog.date,
+                selectedStudent?.sessionDuration || settings?.defaultSessionDuration || 60,
+                settings?.workingHoursStart || "08:00",
+                settings?.workingHoursEnd || "22:00",
+                8
+              );
+
+              if (availableSlots.length === 0) return null;
+
+              return (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5 text-emerald-700">
+                    <Sparkles className="h-4 w-4" />
+                    أوقات متاحة
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableSlots.map((slot) => (
+                      <Button
+                        key={slot.time}
+                        type="button"
+                        size="sm"
+                        variant={addSessionDialog.time === slot.time ? "default" : "outline"}
+                        className={cn(
+                          "gap-1.5 h-9 text-sm",
+                          addSessionDialog.time === slot.time && "ring-2 ring-primary ring-offset-1"
+                        )}
+                        onClick={() => setAddSessionDialog({ ...addSessionDialog, time: slot.time })}
+                      >
+                        {slot.type === "morning" && <Sunrise className="h-3.5 w-3.5" />}
+                        {slot.type === "afternoon" && <Sun className="h-3.5 w-3.5" />}
+                        {slot.type === "evening" && <Moon className="h-3.5 w-3.5" />}
+                        {slot.timeAr}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Conflict Warning */}
             {/* Conflict Warning */}

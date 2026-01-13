@@ -1300,7 +1300,7 @@ export const BulkEditSessionsDialog = ({
                               </div>
 
                               {isWarning && (
-                                <p className="text-xs text-yellow-700 mt-1 mr-6">تحذير: فاصل أقل من 15 دقيقة</p>
+                                <p className="text-xs text-yellow-700 mt-1 mr-6">تحذير: فاصل أقل من 30 دقيقة</p>
                               )}
                               {isConflict && (
                                 <p className="text-xs text-red-700 mt-1 mr-6">تعارض: توجد جلسة أخرى في نفس الوقت</p>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { Student, Session } from "@/types/student";
 
 export type ConflictSeverity = "none" | "warning" | "error";
@@ -33,7 +33,7 @@ export interface SessionTimeInfo {
 }
 
 const DEFAULT_SESSION_DURATION = 60; // minutes
-const MIN_GAP_MINUTES = 15;
+const MIN_GAP_MINUTES = 30; // Minimum gap between sessions (warning if less)
 
 // Helper to parse time to minutes
 const timeToMinutes = (time: string): number => {
@@ -371,11 +371,151 @@ export const useConflictDetection = (students: Student[]) => {
     return results;
   }, [students, checkConflict]);
 
+  /**
+   * Get all available time slots for a given date
+   * @param date - The date to check (YYYY-MM-DD)
+   * @param duration - Session duration in minutes (default: 60)
+   * @param workingHoursStart - Start of working hours (default: "08:00")
+   * @param workingHoursEnd - End of working hours (default: "22:00")
+   * @returns Array of available time slots
+   */
+  const getAvailableSlots = useCallback(
+    (
+      date: string,
+      duration: number = DEFAULT_SESSION_DURATION,
+      workingHoursStart: string = "08:00",
+      workingHoursEnd: string = "22:00",
+    ): Array<{
+      time: string;
+      timeAr: string;
+      duration: number;
+      type: "morning" | "afternoon" | "evening";
+    }> => {
+      const workStart = timeToMinutes(workingHoursStart);
+      const workEnd = timeToMinutes(workingHoursEnd);
+
+      // Get all sessions on the date
+      const sessionsOnDate: Array<{ start: number; end: number }> = [];
+
+      students.forEach((student) => {
+        student.sessions.forEach((session) => {
+          if (session.date !== date) return;
+          if (session.status === "cancelled" || session.status === "vacation") return;
+
+          const time = session.time || student.sessionTime || "16:00";
+          const start = timeToMinutes(time);
+          const sessionDuration = session.duration || DEFAULT_SESSION_DURATION;
+          sessionsOnDate.push({ start, end: start + sessionDuration });
+        });
+      });
+
+      // Sort by start time
+      sessionsOnDate.sort((a, b) => a.start - b.start);
+
+      // Find available slots
+      const availableSlots: Array<{
+        time: string;
+        timeAr: string;
+        duration: number;
+        type: "morning" | "afternoon" | "evening";
+      }> = [];
+
+      // Generate slots every 30 minutes during working hours
+      const slotInterval = 30; // Check every 30 minutes
+
+      for (let slotStart = workStart; slotStart + duration <= workEnd; slotStart += slotInterval) {
+        const slotEnd = slotStart + duration;
+
+        // Check if this slot conflicts with any existing session
+        let hasConflict = false;
+
+        for (const session of sessionsOnDate) {
+          // Check for overlap (with MIN_GAP_MINUTES buffer)
+          const overlapStart = slotStart < session.end + MIN_GAP_MINUTES;
+          const overlapEnd = slotEnd + MIN_GAP_MINUTES > session.start;
+
+          if (overlapStart && overlapEnd) {
+            hasConflict = true;
+            break;
+          }
+        }
+
+        if (!hasConflict) {
+          const timeStr = minutesToTime(slotStart);
+          const hour = Math.floor(slotStart / 60);
+
+          let type: "morning" | "afternoon" | "evening";
+          if (hour < 12) {
+            type = "morning";
+          } else if (hour < 17) {
+            type = "afternoon";
+          } else {
+            type = "evening";
+          }
+
+          availableSlots.push({
+            time: timeStr,
+            timeAr: formatTimeAr(timeStr),
+            duration,
+            type,
+          });
+        }
+      }
+
+      return availableSlots;
+    },
+    [students],
+  );
+
+  /**
+   * Get suggested time slots (limited to best options)
+   */
+  const getSuggestedSlots = useCallback(
+    (
+      date: string,
+      duration: number = DEFAULT_SESSION_DURATION,
+      workingHoursStart: string = "14:00",
+      workingHoursEnd: string = "22:00",
+      maxSuggestions: number = 6,
+    ): Array<{
+      time: string;
+      timeAr: string;
+      type: "morning" | "afternoon" | "evening";
+      label: string;
+    }> => {
+      const allSlots = getAvailableSlots(date, duration, workingHoursStart, workingHoursEnd);
+
+      // Prioritize common session times
+      const preferredTimes = ["14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
+
+      // Sort slots: preferred times first, then by time
+      const sortedSlots = allSlots.sort((a, b) => {
+        const aPreferred = preferredTimes.indexOf(a.time);
+        const bPreferred = preferredTimes.indexOf(b.time);
+
+        if (aPreferred !== -1 && bPreferred === -1) return -1;
+        if (bPreferred !== -1 && aPreferred === -1) return 1;
+        if (aPreferred !== -1 && bPreferred !== -1) return aPreferred - bPreferred;
+
+        return timeToMinutes(a.time) - timeToMinutes(b.time);
+      });
+
+      // Return top suggestions with labels
+      return sortedSlots.slice(0, maxSuggestions).map((slot) => ({
+        ...slot,
+        label: slot.type === "morning" ? "صباحاً" : slot.type === "afternoon" ? "ظهراً" : "مساءً",
+      }));
+    },
+    [getAvailableSlots],
+  );
+
   return {
     checkConflict,
     checkRestoreConflict,
     getSessionsWithGaps,
     scanAllConflicts,
+    getAvailableSlots,
+    getSuggestedSlots,
     formatTimeAr,
   };
 };

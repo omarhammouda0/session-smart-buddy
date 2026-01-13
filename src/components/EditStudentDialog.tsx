@@ -424,7 +424,7 @@ export const EditStudentDialog = ({
                       ⚠️ قريب من {conflictSummary.warningCount} جلسة
                     </p>
                     <p className="text-xs text-amber-600 dark:text-amber-500">
-                      فاصل أقل من 15 دقيقة مع: {conflictSummary.conflictingStudents.slice(0, 3).join('، ')}
+                      فاصل أقل من 30 دقيقة مع: {conflictSummary.conflictingStudents.slice(0, 3).join('، ')}
                     </p>
                   </div>
                 </div>
@@ -636,7 +636,7 @@ export const EditStudentDialog = ({
             </AlertDialogTitle>
             <AlertDialogDescription className="text-right space-y-2">
               <p>
-                تغيير الوقت إلى {formatTimeAr(sessionTime)} سيجعل {conflictSummary.warningCount} جلسة بفاصل أقل من 15 دقيقة.
+                تغيير الوقت إلى {formatTimeAr(sessionTime)} سيجعل {conflictSummary.warningCount} جلسة بفاصل أقل من 30 دقيقة.
               </p>
               <p className="text-muted-foreground text-sm">
                 الطلاب المتأثرون: {conflictSummary.conflictingStudents.join('، ')}

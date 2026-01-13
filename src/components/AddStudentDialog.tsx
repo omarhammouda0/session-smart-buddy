@@ -5,14 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign } from 'lucide-react';
-import { SessionType, Student, DEFAULT_DURATION, StudentMaterial } from '@/types/student';
+import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign, Sparkles, Sunrise, Sun, Moon } from 'lucide-react';
+import { SessionType, Student, DEFAULT_DURATION, StudentMaterial, AppSettings } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateSessionsForSchedule } from '@/lib/dateUtils';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
 import { DurationPicker } from '@/components/DurationPicker';
 import { StudentMaterialsSection } from '@/components/StudentMaterialsSection';
+import { cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,12 +30,13 @@ interface AddStudentDialogProps {
   defaultStart: string;
   defaultEnd: string;
   students?: Student[];
+  settings?: AppSettings;
   defaultDuration?: number;
   defaultPriceOnsite?: number;
   defaultPriceOnline?: number;
 }
 
-export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [], defaultDuration = DEFAULT_DURATION, defaultPriceOnsite = 150, defaultPriceOnline = 120 }: AddStudentDialogProps) => {
+export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [], settings, defaultDuration = DEFAULT_DURATION, defaultPriceOnsite = 150, defaultPriceOnline = 120 }: AddStudentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -271,6 +273,136 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                     </div>
                   )}
                 </div>
+
+                {/* Available Time Slots - Based on working hours and selected days */}
+                {(() => {
+                  // Show available slots based on working hours even without selected days
+                  const workStart = settings?.workingHoursStart || "14:00";
+                  const workEnd = settings?.workingHoursEnd || "22:00";
+
+                  // Parse working hours to minutes
+                  const parseTime = (time: string) => {
+                    const [h, m] = time.split(':').map(Number);
+                    return h * 60 + (m || 0);
+                  };
+
+                  const formatTimeArabic = (minutes: number) => {
+                    const h = Math.floor(minutes / 60);
+                    const m = minutes % 60;
+                    const period = h >= 12 ? 'م' : 'ص';
+                    const hour12 = h % 12 || 12;
+                    return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+                  };
+
+                  const minutesToTimeStr = (minutes: number) => {
+                    const h = Math.floor(minutes / 60);
+                    const m = minutes % 60;
+                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                  };
+
+                  const workStartMin = parseTime(workStart);
+                  const workEndMin = parseTime(workEnd);
+                  const duration = sessionDuration || defaultDuration || 60;
+
+                  // Generate all possible slots within working hours (every 30 min)
+                  const allSlots: Array<{
+                    time: string;
+                    timeAr: string;
+                    type: 'morning' | 'afternoon' | 'evening';
+                    hasConflict: boolean;
+                    conflictDays: string[];
+                  }> = [];
+
+                  for (let min = workStartMin; min + duration <= workEndMin; min += 30) {
+                    const timeStr = minutesToTimeStr(min);
+                    const hour = Math.floor(min / 60);
+
+                    let type: 'morning' | 'afternoon' | 'evening';
+                    if (hour < 12) type = 'morning';
+                    else if (hour < 17) type = 'afternoon';
+                    else type = 'evening';
+
+                    // Check conflicts on selected days
+                    let hasConflict = false;
+                    const conflictDays: string[] = [];
+
+                    if (selectedDays.length > 0) {
+                      const semesterStart = showCustomDates ? customStart : defaultStart;
+                      const semesterEnd = showCustomDates ? customEnd : defaultEnd;
+                      const sessionDates = generateSessionsForSchedule(selectedDays, semesterStart, semesterEnd);
+
+                      // Check first 5 dates of each day
+                      const sampleDates = sessionDates.slice(0, Math.min(10, sessionDates.length));
+
+                      sampleDates.forEach(date => {
+                        const result = checkConflict({ date, startTime: timeStr });
+                        if (result.severity === 'error') {
+                          hasConflict = true;
+                          const dayOfWeek = new Date(date).getDay();
+                          const dayName = DAY_NAMES_AR[dayOfWeek];
+                          if (!conflictDays.includes(dayName)) {
+                            conflictDays.push(dayName);
+                          }
+                        }
+                      });
+                    }
+
+                    allSlots.push({
+                      time: timeStr,
+                      timeAr: formatTimeArabic(min),
+                      type,
+                      hasConflict,
+                      conflictDays,
+                    });
+                  }
+
+                  if (allSlots.length === 0) return null;
+
+                  // Count conflicting slots for legend
+                  const conflictCount = allSlots.filter(s => s.hasConflict).length;
+
+                  return (
+                    <div className="space-y-2 pt-2">
+                      <Label className="text-xs font-medium flex items-center gap-1 text-emerald-700">
+                        <Sparkles className="h-3 w-3" />
+                        ساعات العمل ({formatTimeArabic(workStartMin)} - {formatTimeArabic(workEndMin)})
+                      </Label>
+
+                      {/* Available Slots */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {allSlots.map((slot) => (
+                          <Button
+                            key={slot.time}
+                            type="button"
+                            size="sm"
+                            variant={sessionTime === slot.time ? "default" : slot.hasConflict ? "ghost" : "outline"}
+                            disabled={slot.hasConflict}
+                            className={cn(
+                              "gap-1 h-7 text-xs px-2",
+                              sessionTime === slot.time && "ring-2 ring-primary ring-offset-1",
+                              slot.hasConflict && "opacity-40 line-through cursor-not-allowed text-muted-foreground"
+                            )}
+                            onClick={() => !slot.hasConflict && setSessionTime(slot.time)}
+                            title={slot.hasConflict ? `تعارض في: ${slot.conflictDays.join('، ')}` : ''}
+                          >
+                            {slot.type === "morning" && <Sunrise className="h-3 w-3" />}
+                            {slot.type === "afternoon" && <Sun className="h-3 w-3" />}
+                            {slot.type === "evening" && <Moon className="h-3 w-3" />}
+                            {slot.timeAr}
+                          </Button>
+                        ))}
+                      </div>
+
+                      {/* Legend */}
+                      {selectedDays.length > 0 && conflictCount > 0 && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <span className="line-through opacity-50">2:00 م</span>
+                          <span>= وقت مشغول في أحد الأيام المحددة</span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="space-y-2">
                 <Label>نوع الحصة</Label>
@@ -402,7 +534,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                       ⚠️ قريب من {conflictSummary.warningCount} جلسة
                     </p>
                     <p className="text-xs text-amber-600 dark:text-amber-500">
-                      فاصل أقل من 15 دقيقة مع: {conflictSummary.conflictingStudents.slice(0, 3).join('، ')}
+                      فاصل أقل من 30 دقيقة مع: {conflictSummary.conflictingStudents.slice(0, 3).join('، ')}
                     </p>
                     <p className="text-xs text-amber-500 dark:text-amber-600">
                       يمكنك الاستمرار، لكن ننصح بفاصل أكبر
@@ -518,7 +650,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
             </AlertDialogTitle>
             <AlertDialogDescription className="text-right space-y-2">
               <p>
-                سيتم إنشاء {conflictSummary.warningCount} جلسة بفاصل أقل من 15 دقيقة عن جلسات أخرى.
+                سيتم إنشاء {conflictSummary.warningCount} جلسة بفاصل أقل من 30 دقيقة عن جلسات أخرى.
               </p>
               <p className="text-muted-foreground text-sm">
                 الطلاب المتأثرون: {conflictSummary.conflictingStudents.join('، ')}
