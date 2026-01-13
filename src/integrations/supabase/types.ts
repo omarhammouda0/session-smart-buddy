@@ -335,6 +335,7 @@ export type Database = {
           message_text: string
           month: number | null
           phone_number: string
+          reminder_interval: number | null
           sent_at: string
           session_date: string | null
           session_id: string | null
@@ -353,6 +354,7 @@ export type Database = {
           message_text: string
           month?: number | null
           phone_number: string
+          reminder_interval?: number | null
           sent_at?: string
           session_date?: string | null
           session_id?: string | null
@@ -371,6 +373,7 @@ export type Database = {
           message_text?: string
           month?: number | null
           phone_number?: string
+          reminder_interval?: number | null
           sent_at?: string
           session_date?: string | null
           session_id?: string | null
@@ -394,8 +397,11 @@ export type Database = {
           payment_reminder_template: string
           payment_reminders_enabled: boolean
           session_reminder_hours: number
+          session_reminder_hours_2: number
           session_reminder_send_time: string
           session_reminder_template: string
+          session_reminder_template_1: string
+          session_reminder_template_2: string
           session_reminders_enabled: boolean
           updated_at: string
           user_id: string
@@ -409,8 +415,11 @@ export type Database = {
           payment_reminder_template?: string
           payment_reminders_enabled?: boolean
           session_reminder_hours?: number
+          session_reminder_hours_2?: number
           session_reminder_send_time?: string
           session_reminder_template?: string
+          session_reminder_template_1?: string
+          session_reminder_template_2?: string
           session_reminders_enabled?: boolean
           updated_at?: string
           user_id?: string
@@ -424,8 +433,11 @@ export type Database = {
           payment_reminder_template?: string
           payment_reminders_enabled?: boolean
           session_reminder_hours?: number
+          session_reminder_hours_2?: number
           session_reminder_send_time?: string
           session_reminder_template?: string
+          session_reminder_template_1?: string
+          session_reminder_template_2?: string
           session_reminders_enabled?: boolean
           updated_at?: string
           user_id?: string
