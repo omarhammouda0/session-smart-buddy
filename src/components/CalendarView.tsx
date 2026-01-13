@@ -44,6 +44,8 @@ import {
   Coffee,
   Star,
   Phone,
+  Pencil,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -57,13 +59,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -161,6 +157,8 @@ export const CalendarView = ({
     open: boolean;
     session: Session;
     student: Student;
+    isEditingTime?: boolean;
+    editedTime?: string;
   } | null>(null);
   const [cancelConfirmDialog, setCancelConfirmDialog] = useState<{
     open: boolean;
@@ -188,7 +186,7 @@ export const CalendarView = ({
   // Filter students based on selection
   const filteredStudents = useMemo(() => {
     if (selectedStudentFilter === "all") return students;
-    return students.filter(s => s.id === selectedStudentFilter);
+    return students.filter((s) => s.id === selectedStudentFilter);
   }, [students, selectedStudentFilter]);
 
   const sessionsByDate = useMemo(() => {
@@ -246,7 +244,7 @@ export const CalendarView = ({
     let totalMinutes = 0;
     const studentStats = new Map<string, { name: string; sessions: number; hours: number }>();
 
-    days.forEach(day => {
+    days.forEach((day) => {
       const dateStr = format(day, "yyyy-MM-dd");
       const isInCurrentPeriod = viewMode === "month" ? isSameMonth(day, currentDate) : true;
 
@@ -277,7 +275,7 @@ export const CalendarView = ({
       }
     });
 
-    const totalHours = Math.round(totalMinutes / 60 * 10) / 10;
+    const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
     const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
 
     // Additional insights
@@ -286,7 +284,7 @@ export const CalendarView = ({
     const dayOfWeekStats = new Array(7).fill(0);
     const timeSlotStats = { morning: 0, afternoon: 0, evening: 0 };
 
-    days.forEach(day => {
+    days.forEach((day) => {
       const dateStr = format(day, "yyyy-MM-dd");
       const isInCurrentPeriod = viewMode === "month" ? isSameMonth(day, currentDate) : true;
       if (!isInCurrentPeriod) return;
@@ -325,7 +323,7 @@ export const CalendarView = ({
       busiestDayOfWeek: dayNames[busiestDayOfWeek],
       busiestDayOfWeekCount: dayOfWeekStats[busiestDayOfWeek],
       timeSlotStats,
-      averageSessionsPerDay: days.length > 0 ? Math.round(totalSessions / days.length * 10) / 10 : 0,
+      averageSessionsPerDay: days.length > 0 ? Math.round((totalSessions / days.length) * 10) / 10 : 0,
     };
   }, [days, sessionsByDate, currentDate, viewMode]);
 
@@ -615,9 +613,101 @@ export const CalendarView = ({
     onQuickPayment(student.id, session.id, session.date);
   };
 
-  // Add new session
+  // Handle time edit in session action dialog
+  const handleStartTimeEdit = () => {
+    if (!sessionActionDialog) return;
+    const currentTime = sessionActionDialog.session.time || sessionActionDialog.student.sessionTime || "16:00";
+    setSessionActionDialog({
+      ...sessionActionDialog,
+      isEditingTime: true,
+      editedTime: currentTime,
+    });
+  };
+
+  const handleTimeEditChange = (newTime: string) => {
+    if (!sessionActionDialog) return;
+    setSessionActionDialog({
+      ...sessionActionDialog,
+      editedTime: newTime,
+    });
+  };
+
+  const handleSaveTimeEdit = () => {
+    if (!sessionActionDialog || !sessionActionDialog.editedTime || !onUpdateSessionDateTime) return;
+
+    const { session, student, editedTime } = sessionActionDialog;
+    const originalTime = session.time || student.sessionTime || "16:00";
+
+    // Check for conflicts
+    const conflictInfo = checkTimeConflict(student.id, session.id, session.date, editedTime);
+
+    if (conflictInfo.hasConflict) {
+      toast({
+        title: "❌ لا يمكن تغيير الوقت",
+        description: `يوجد تعارض مع حصة ${conflictInfo.conflictStudent} في ${conflictInfo.conflictTime}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (conflictInfo.severity === "warning") {
+      // Show warning but allow
+      toast({
+        title: "⚠️ تحذير",
+        description: `الحصة قريبة جداً من حصة ${conflictInfo.conflictStudent} (${conflictInfo.conflictTime})`,
+      });
+    }
+
+    // Save the new time
+    onUpdateSessionDateTime(student.id, session.id, session.date, editedTime);
+
+    toast({
+      title: "✓ تم تعديل الوقت",
+      description: `تم تغيير وقت حصة ${student.name} من ${originalTime} إلى ${editedTime}`,
+    });
+
+    setSessionActionDialog(null);
+  };
+
+  const handleCancelTimeEdit = () => {
+    if (!sessionActionDialog) return;
+    setSessionActionDialog({
+      ...sessionActionDialog,
+      isEditingTime: false,
+      editedTime: undefined,
+    });
+  };
+
+  // Add new session with conflict check
   const handleAddNewSession = () => {
     if (!addSessionDialog || !onAddSession || !addSessionDialog.selectedStudentId) return;
+
+    // Check for conflicts before adding
+    if (addSessionDialog.time) {
+      const conflict = checkTimeConflict(
+        addSessionDialog.selectedStudentId,
+        "",
+        addSessionDialog.date,
+        addSessionDialog.time,
+      );
+
+      if (conflict.hasConflict) {
+        toast({
+          title: "❌ لا يمكن إضافة الحصة",
+          description: `يوجد تعارض مع حصة ${conflict.conflictStudent} في ${conflict.conflictTime}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (conflict.severity === "warning") {
+        toast({
+          title: "⚠️ تحذير",
+          description: `الحصة قريبة جداً من حصة ${conflict.conflictStudent} (${conflict.conflictTime})`,
+        });
+      }
+    }
+
     onAddSession(addSessionDialog.selectedStudentId, addSessionDialog.date, addSessionDialog.time || undefined);
     setAddSessionDialog(null);
     toast({
@@ -628,9 +718,10 @@ export const CalendarView = ({
 
   // Export to text/clipboard
   const handleExport = (type: "copy" | "print") => {
-    const periodLabel = viewMode === "week"
-      ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
-      : format(currentDate, "MMMM yyyy", { locale: ar });
+    const periodLabel =
+      viewMode === "week"
+        ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
+        : format(currentDate, "MMMM yyyy", { locale: ar });
 
     let exportText = `📅 تقرير التقويم - ${periodLabel}\n`;
     exportText += `${"═".repeat(40)}\n\n`;
@@ -646,7 +737,7 @@ export const CalendarView = ({
     exportText += `📋 تفاصيل الحصص:\n`;
     exportText += `${"─".repeat(40)}\n`;
 
-    days.forEach(day => {
+    days.forEach((day) => {
       const dateStr = format(day, "yyyy-MM-dd");
       const isInCurrentPeriod = viewMode === "month" ? isSameMonth(day, currentDate) : true;
       if (!isInCurrentPeriod) return;
@@ -751,14 +842,11 @@ export const CalendarView = ({
               <CalendarIcon className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">
-                عرض التقويم
-              </h2>
+              <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">عرض التقويم</h2>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 font-medium">
                 {selectedStudentFilter === "all"
                   ? `${students.length} طالب • ${periodSummary.totalSessions} حصة`
-                  : `${periodSummary.totalSessions} حصة`
-                }
+                  : `${periodSummary.totalSessions} حصة`}
               </p>
             </div>
           </div>
@@ -778,7 +866,7 @@ export const CalendarView = ({
                     كل الطلاب
                   </span>
                 </SelectItem>
-                {students.map(student => (
+                {students.map((student) => (
                   <SelectItem key={student.id} value={student.id}>
                     {student.name}
                   </SelectItem>
@@ -851,7 +939,9 @@ export const CalendarView = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>تقدم الإنجاز</span>
-                  <span>{periodSummary.completedSessions} من {periodSummary.totalSessions}</span>
+                  <span>
+                    {periodSummary.completedSessions} من {periodSummary.totalSessions}
+                  </span>
                 </div>
                 <Progress value={periodSummary.completionRate} className="h-2" />
               </div>
@@ -921,7 +1011,7 @@ export const CalendarView = ({
                       variant="secondary"
                       className={cn(
                         "text-xs transition-all hover:scale-105",
-                        i === 0 && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                        i === 0 && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
                       )}
                     >
                       {i === 0 && <Star className="h-3 w-3 ml-1 fill-current" />}
@@ -1008,7 +1098,10 @@ export const CalendarView = ({
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">
-                عرض حصص: <span className="font-bold text-primary">{students.find(s => s.id === selectedStudentFilter)?.name}</span>
+                عرض حصص:{" "}
+                <span className="font-bold text-primary">
+                  {students.find((s) => s.id === selectedStudentFilter)?.name}
+                </span>
               </span>
             </div>
             <Button
@@ -1212,13 +1305,49 @@ export const CalendarView = ({
           {sessionActionDialog && (
             <div className="space-y-4 py-4">
               <div className="p-4 rounded-xl bg-muted/50 border-2 space-y-3">
+                {/* Time display/edit section */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-bold">
-                      {sessionActionDialog.session.time || sessionActionDialog.student.sessionTime}
-                    </span>
-                  </div>
+                  {sessionActionDialog.isEditingTime ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <Input
+                        type="time"
+                        value={sessionActionDialog.editedTime || ""}
+                        onChange={(e) => handleTimeEditChange(e.target.value)}
+                        className="w-28 h-9 text-center font-bold"
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSaveTimeEdit}
+                        className="h-9 bg-emerald-500 hover:bg-emerald-600 text-white gap-1"
+                      >
+                        <Save className="h-4 w-4" />
+                        حفظ
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancelTimeEdit} className="h-9">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-bold">
+                        {sessionActionDialog.session.time || sessionActionDialog.student.sessionTime}
+                      </span>
+                      {sessionActionDialog.session.status === "scheduled" && onUpdateSessionDateTime && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleStartTimeEdit}
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                          title="تعديل الوقت"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   <Badge className={getStatusBadgeColor(sessionActionDialog.session.status)}>
                     {getStatusLabel(sessionActionDialog.session.status)}
                   </Badge>
@@ -1382,7 +1511,8 @@ export const CalendarView = ({
             <AlertDialogDescription className="space-y-2">
               <p>
                 هل تريد حذف حصة <strong>{deleteConfirmDialog?.student.name}</strong> في{" "}
-                <strong>{deleteConfirmDialog?.session.time || deleteConfirmDialog?.student.sessionTime}</strong> نهائياً؟
+                <strong>{deleteConfirmDialog?.session.time || deleteConfirmDialog?.student.sessionTime}</strong>{" "}
+                نهائياً؟
               </p>
               <p className="text-rose-600 text-sm font-medium">
                 ⚠️ هذا الإجراء لا يمكن التراجع عنه. سيتم حذف الحصة من جميع السجلات.
@@ -1487,19 +1617,23 @@ export const CalendarView = ({
                   className={cn(
                     "h-12 rounded-xl border-2 text-center text-lg font-bold",
                     confirmDialog?.conflictInfo.hasConflict && "border-rose-500/50 text-rose-600",
-                    confirmDialog?.conflictInfo.severity === "warning" && !confirmDialog?.conflictInfo.hasConflict && "border-amber-500/50 text-amber-600",
+                    confirmDialog?.conflictInfo.severity === "warning" &&
+                      !confirmDialog?.conflictInfo.hasConflict &&
+                      "border-amber-500/50 text-amber-600",
                   )}
                 />
                 {confirmDialog?.conflictInfo.hasConflict && (
                   <div className="mt-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs flex items-center gap-1.5">
                     <XCircle className="h-3.5 w-3.5" />
-                    تعارض مع {confirmDialog.conflictInfo.conflictStudent} في الساعة {confirmDialog.conflictInfo.conflictTime}
+                    تعارض مع {confirmDialog.conflictInfo.conflictStudent} في الساعة{" "}
+                    {confirmDialog.conflictInfo.conflictTime}
                   </div>
                 )}
                 {confirmDialog?.conflictInfo.severity === "warning" && !confirmDialog?.conflictInfo.hasConflict && (
                   <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 text-xs flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    قريب من {confirmDialog.conflictInfo.conflictStudent} في الساعة {confirmDialog.conflictInfo.conflictTime}
+                    قريب من {confirmDialog.conflictInfo.conflictStudent} في الساعة{" "}
+                    {confirmDialog.conflictInfo.conflictTime}
                   </div>
                 )}
               </div>
@@ -1564,15 +1698,14 @@ export const CalendarView = ({
             <DialogDescription>
               {dayDetailsDialog?.sessions.length === 0
                 ? "لا توجد حصص في هذا اليوم"
-                : `${dayDetailsDialog?.sessions.length} حصة مجدولة`
-              }
+                : `${dayDetailsDialog?.sessions.length} حصة مجدولة`}
             </DialogDescription>
           </DialogHeader>
 
           {dayDetailsDialog && dayDetailsDialog.sessions.length > 0 ? (
             <>
               {/* Day Summary Stats - Compact inline version */}
-gi              <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 border text-xs shrink-0">
+              <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 border text-xs shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1">
                     <CalendarIcon className="h-3.5 w-3.5 text-blue-500" />
@@ -1582,15 +1715,23 @@ gi              <div className="flex items-center justify-between py-1.5 px-2 ro
                   <div className="flex items-center gap-1">
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                     <span className="font-bold text-emerald-600">
-                      {dayDetailsDialog.sessions.filter(s => s.session.status === "completed").length}
+                      {dayDetailsDialog.sessions.filter((s) => s.session.status === "completed").length}
                     </span>
                     <span className="text-muted-foreground">مكتملة</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="h-3.5 w-3.5 text-purple-500" />
                     <span className="font-bold text-purple-600">
-                      {Math.round(dayDetailsDialog.sessions.reduce((acc, { session, student }) =>
-                        acc + (session.status !== "cancelled" ? (session.duration || student.sessionDuration || 60) : 0), 0) / 60 * 10) / 10}
+                      {Math.round(
+                        (dayDetailsDialog.sessions.reduce(
+                          (acc, { session, student }) =>
+                            acc +
+                            (session.status !== "cancelled" ? session.duration || student.sessionDuration || 60 : 0),
+                          0,
+                        ) /
+                          60) *
+                          10,
+                      ) / 10}
                     </span>
                     <span className="text-muted-foreground">س</span>
                   </div>
@@ -1731,7 +1872,7 @@ gi              <div className="flex items-center justify-between py-1.5 px-2 ro
                 value={addSessionDialog?.selectedStudentId || ""}
                 onValueChange={(value) => {
                   if (addSessionDialog) {
-                    const student = students.find(s => s.id === value);
+                    const student = students.find((s) => s.id === value);
                     setAddSessionDialog({
                       ...addSessionDialog,
                       selectedStudentId: value,
@@ -1744,7 +1885,7 @@ gi              <div className="flex items-center justify-between py-1.5 px-2 ro
                   <SelectValue placeholder="اختر طالب..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {students.map(student => (
+                  {students.map((student) => (
                     <SelectItem key={student.id} value={student.id}>
                       <div className="flex items-center gap-2">
                         <User className="h-3.5 w-3.5" />
@@ -1775,19 +1916,22 @@ gi              <div className="flex items-center justify-between py-1.5 px-2 ro
               />
               {addSessionDialog?.selectedStudentId && (
                 <p className="text-xs text-muted-foreground">
-                  💡 الوقت الافتراضي للطالب: {students.find(s => s.id === addSessionDialog.selectedStudentId)?.sessionTime}
+                  💡 الوقت الافتراضي للطالب:{" "}
+                  {students.find((s) => s.id === addSessionDialog.selectedStudentId)?.sessionTime}
                 </p>
               )}
             </div>
 
             {/* Conflict Warning */}
-            {addSessionDialog?.selectedStudentId && addSessionDialog?.time && (
+            {/* Conflict Warning */}
+            {addSessionDialog?.selectedStudentId &&
+              addSessionDialog?.time &&
               (() => {
                 const conflict = checkTimeConflict(
                   addSessionDialog.selectedStudentId,
                   "",
                   addSessionDialog.date,
-                  addSessionDialog.time
+                  addSessionDialog.time,
                 );
                 if (conflict.hasConflict) {
                   return (
@@ -1806,8 +1950,7 @@ gi              <div className="flex items-center justify-between py-1.5 px-2 ro
                   );
                 }
                 return null;
-              })()
-            )}
+              })()}
           </div>
 
           <div className="flex gap-3 justify-end">
@@ -1816,8 +1959,30 @@ gi              <div className="flex items-center justify-between py-1.5 px-2 ro
             </Button>
             <Button
               onClick={handleAddNewSession}
-              disabled={!addSessionDialog?.selectedStudentId}
-              className="rounded-xl bg-gradient-to-r from-primary to-purple-500"
+              disabled={
+                !addSessionDialog?.selectedStudentId ||
+                (addSessionDialog?.time
+                  ? checkTimeConflict(
+                      addSessionDialog.selectedStudentId,
+                      "",
+                      addSessionDialog.date,
+                      addSessionDialog.time,
+                    ).hasConflict
+                  : false)
+              }
+              className={cn(
+                "rounded-xl",
+                addSessionDialog?.time &&
+                  addSessionDialog?.selectedStudentId &&
+                  checkTimeConflict(
+                    addSessionDialog.selectedStudentId,
+                    "",
+                    addSessionDialog.date,
+                    addSessionDialog.time,
+                  ).hasConflict
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-gradient-to-r from-primary to-purple-500",
+              )}
             >
               <Plus className="h-4 w-4 ml-2" />
               إضافة الحصة
