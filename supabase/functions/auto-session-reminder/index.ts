@@ -109,17 +109,29 @@ serve(async (req) => {
     for (const reminder of reminderIntervals) {
       const { hours, interval, template } = reminder;
 
-      // Calculate the target datetime for this reminder (in local time)
-      const targetDateTime = new Date(localNow.getTime() + hours * 60 * 60 * 1000);
-      const targetDateStr = targetDateTime.toISOString().split('T')[0];
-      // Get hours/minutes from the local target time
-      const targetHour = targetDateTime.getHours();
-      const targetMinute = targetDateTime.getMinutes();
+      // Calculate the window: sessions starting within the next X hours should be notified
+      // We check for sessions that are:
+      // - Starting within the next {hours} hours
+      // - AND have not been notified for this interval yet
 
-      console.log(`Processing reminder interval ${interval} (${hours}h before) - target datetime: ${targetDateStr} ${targetHour}:${targetMinute}`);
+      const windowEndTime = new Date(localNow.getTime() + hours * 60 * 60 * 1000);
 
-      // Fetch scheduled sessions for the target date
-      const { data: sessions, error: sessionsError } = await supabase
+      // For interval 1 (e.g., 24h), we want sessions between now and 24h from now
+      // For interval 2 (e.g., 1h), we want sessions between now and 1h from now
+      // But we exclude sessions that are too close (less than the next smaller interval for interval 1)
+
+      const windowStartTime = localNow;
+
+      // Get dates to query (could span two days)
+      const startDateStr = windowStartTime.toISOString().split('T')[0];
+      const endDateStr = windowEndTime.toISOString().split('T')[0];
+
+      console.log(`Processing reminder interval ${interval} (${hours}h before)`);
+      console.log(`Window: ${windowStartTime.toISOString()} to ${windowEndTime.toISOString()}`);
+      console.log(`Checking dates: ${startDateStr} to ${endDateStr}`);
+
+      // Fetch scheduled sessions for the date range
+      let query = supabase
         .from('sessions')
         .select(`
           id,
@@ -134,15 +146,23 @@ serve(async (req) => {
             session_time
           )
         `)
-        .eq('status', 'scheduled')
-        .eq('date', targetDateStr);
+        .eq('status', 'scheduled');
+
+      // Handle date range
+      if (startDateStr === endDateStr) {
+        query = query.eq('date', startDateStr);
+      } else {
+        query = query.gte('date', startDateStr).lte('date', endDateStr);
+      }
+
+      const { data: sessions, error: sessionsError } = await query;
 
       if (sessionsError) {
         console.error("Error fetching sessions:", sessionsError);
         throw sessionsError;
       }
 
-      console.log(`Found ${sessions?.length || 0} sessions for target date ${targetDateStr}`);
+      console.log(`Found ${sessions?.length || 0} sessions in date range`);
 
       if (!sessions || sessions.length === 0) {
         continue;
@@ -156,21 +176,30 @@ serve(async (req) => {
         // students is returned as first item of array from join
         const studentData = Array.isArray(session.students) ? session.students[0] : session.students;
         const phone = studentData?.phone || studentData?.parent_phone;
-        const sessionTime = session.time || studentData?.session_time;
+        const sessionTime = session.time || studentData?.session_time || '16:00';
         const studentName = studentData?.name || 'الطالب';
         const studentId = studentData?.id;
 
-        // Check if session time matches the target time (within 30 minute window)
-        if (sessionTime) {
-          const [sessionHour, sessionMinute] = sessionTime.split(':').map(Number);
-          const timeDiffMinutes = Math.abs((sessionHour * 60 + sessionMinute) - (targetHour * 60 + targetMinute));
+        // Calculate the exact session datetime
+        const [sessionHour, sessionMinute] = sessionTime.split(':').map(Number);
+        const sessionDateTime = new Date(session.date + 'T00:00:00');
+        sessionDateTime.setHours(sessionHour, sessionMinute, 0, 0);
 
-          // Skip if session time is more than 30 minutes away from target time
-          if (timeDiffMinutes > 30) {
-            const targetTimeStr = (targetHour < 10 ? '0' : '') + targetHour + ':' + (targetMinute < 10 ? '0' : '') + targetMinute;
-            console.log(`Skipping session ${session.id} - time ${sessionTime} not within window of target ${targetTimeStr}`);
-            continue;
-          }
+        // The session time is in local (Germany) timezone, so we use it directly
+        const sessionLocalTime = sessionDateTime;
+
+        // Check if session is within the window (now to now+hours)
+        const minutesUntilSession = (sessionLocalTime.getTime() - localNow.getTime()) / (1000 * 60);
+        const hoursUntilSession = minutesUntilSession / 60;
+
+        // For interval 1 (24h): session should be within 24h but more than interval 2 hours away
+        // For interval 2 (1h): session should be within 1h and more than 0 (not in the past)
+        const maxHoursForThisInterval = hours;
+        const minHoursForThisInterval = interval === 1 ? reminderHours2 : 0;
+
+        if (hoursUntilSession > maxHoursForThisInterval || hoursUntilSession <= minHoursForThisInterval) {
+          console.log(`Skipping session ${session.id} - ${hoursUntilSession.toFixed(2)}h until session, outside window [${minHoursForThisInterval}, ${maxHoursForThisInterval}]`);
+          continue;
         }
 
         if (!phone) {
@@ -199,6 +228,7 @@ serve(async (req) => {
           continue;
         }
 
+        console.log(`Sending reminder for session ${session.id} (${hoursUntilSession.toFixed(2)}h until session, interval ${interval})`);
         // Build message from interval-specific template
         const message = template
           .replace(/{student_name}/g, studentName)

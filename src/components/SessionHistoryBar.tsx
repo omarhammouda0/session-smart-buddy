@@ -68,9 +68,35 @@ import { GapIndicator } from "@/components/GapIndicator";
 import { ConflictWarning } from "@/components/ConflictWarning";
 import { RestoreConflictDialog } from "@/components/RestoreConflictDialog";
 import { CancelSessionDialog } from "@/components/CancelSessionDialog";
-import { SessionNotesDialog } from "@/components/notes/SessionNotesDialog";
+import { SessionNotesDialog } from "@/components/SessionNotesDialog";
 import { SessionHomeworkDialog } from "@/components/notes/SessionHomeworkDialog";
 import { toast } from "@/hooks/use-toast";
+
+// Helper function to check if a session has ended
+const isSessionEnded = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sessionDateObj = parseISO(sessionDate);
+
+  // If session is in the past (before today), it has ended
+  if (sessionDateObj < today) {
+    return true;
+  }
+
+  // If session is in the future (after today), it has NOT ended
+  if (sessionDateObj > today) {
+    return false;
+  }
+
+  // Session is today - check if current time is past the session end time
+  if (!sessionTime) return false;
+
+  const [sessionHour, sessionMin] = sessionTime.split(":").map(Number);
+  const sessionEndMinutes = sessionHour * 60 + sessionMin + sessionDuration;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return currentMinutes >= sessionEndMinutes;
+};
 
 interface CancellationRecord {
   id: string;
@@ -1170,23 +1196,37 @@ export const SessionHistoryBar = ({
                               <div className="flex items-center gap-1 shrink-0">
                                 <SessionNotesDialog
                                   session={session}
-                                  studentId={session.studentId}
                                   studentName={session.studentName}
+                                  onSave={(details) => onUpdateSessionDetails?.(session.studentId, session.id, details)}
                                 />
                                 <SessionHomeworkDialog
                                   session={session}
                                   studentId={session.studentId}
                                   studentName={session.studentName}
                                 />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-success hover:bg-success/10"
-                                  onClick={() => openCompleteDialog(session.studentId, session.id)}
-                                  title="إكمال"
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
+                                {/* Complete button - only show if session has ended */}
+                                {isSessionEnded(
+                                  session.date,
+                                  session.time || selectedStudent.sessionTime || "16:00",
+                                  session.duration || selectedStudent.sessionDuration || 60
+                                ) ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-success hover:bg-success/10"
+                                    onClick={() => openCompleteDialog(session.studentId, session.id)}
+                                    title="إكمال"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <div
+                                    className="h-8 w-8 flex items-center justify-center text-blue-500"
+                                    title="الحصة لم تنتهِ بعد"
+                                  >
+                                    <Clock className="h-4 w-4 animate-pulse" />
+                                  </div>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -1332,8 +1372,8 @@ export const SessionHistoryBar = ({
 
                                 <SessionNotesDialog
                                   session={session}
-                                  studentId={session.studentId}
                                   studentName={session.studentName}
+                                  onSave={(details) => onUpdateSessionDetails?.(session.studentId, session.id, details)}
                                 />
                                 <SessionHomeworkDialog
                                   session={session}

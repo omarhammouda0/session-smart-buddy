@@ -23,6 +23,7 @@ import {
   Pencil,
   Plus,
   User,
+  FileText,
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -77,6 +78,7 @@ import { SessionCompletionDialog } from "@/components/SessionCompletionDialog";
 import { useStudentMaterials } from "@/hooks/useStudentMaterials";
 import { StudentMaterialsDialog } from "@/components/StudentMaterialsDialog";
 import { TodaySessionsStats } from "@/components/TodaySessionsStats";
+import { EndOfDayChecker } from "@/components/EndOfDayChecker";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -99,6 +101,74 @@ interface SessionWithStudent {
   session: Session;
   student: Student;
 }
+
+// Helper function to check if a session has ended
+const isSessionEnded = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sessionDateObj = new Date(sessionDate);
+
+  // If session is in the past (before today), it has ended
+  if (sessionDateObj < today) {
+    return true;
+  }
+
+  // If session is in the future (after today), it has NOT ended
+  if (sessionDateObj > today) {
+    return false;
+  }
+
+  // Session is today - check if current time is past the session end time
+  if (!sessionTime) return false;
+
+  const [sessionHour, sessionMin] = sessionTime.split(":").map(Number);
+  const sessionEndMinutes = sessionHour * 60 + sessionMin + sessionDuration;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return currentMinutes >= sessionEndMinutes;
+};
+
+// Helper function to check if a session is currently in progress
+const isSessionInProgress = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sessionDateObj = new Date(sessionDate);
+
+  // Session must be today
+  if (sessionDateObj.getTime() !== today.getTime()) {
+    return false;
+  }
+
+  if (!sessionTime) return false;
+
+  const [sessionHour, sessionMin] = sessionTime.split(":").map(Number);
+  const sessionStartMinutes = sessionHour * 60 + sessionMin;
+  const sessionEndMinutes = sessionStartMinutes + sessionDuration;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // In progress = current time is between start and end
+  return currentMinutes >= sessionStartMinutes && currentMinutes < sessionEndMinutes;
+};
+
+// Helper function to get the last session with notes for a student (excluding today)
+// Prioritizes sessions with content, then falls back to completed sessions
+const getLastSessionWithNotes = (student: Student, todayStr: string): Session | null => {
+  // First, try to find the most recent past session with notes/topic/homework
+  const pastSessionsWithContent = student.sessions
+    .filter(s => s.date < todayStr && (s.notes || s.homework || s.topic))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  if (pastSessionsWithContent.length > 0) {
+    return pastSessionsWithContent[0];
+  }
+
+  // If no sessions with content, return the most recent completed session
+  const pastCompletedSessions = student.sessions
+    .filter(s => s.date < todayStr && s.status === "completed")
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  return pastCompletedSessions[0] || null;
+};
 
 const Index = () => {
   const now = useMemo(() => new Date(), []);
@@ -906,6 +976,9 @@ const Index = () => {
                 {/* Today's Stats Dashboard */}
                 <TodaySessionsStats students={students} settings={settings} payments={payments} />
 
+                {/* End of Day Checker - Floating button that appears after all sessions end */}
+                <EndOfDayChecker students={students} onToggleComplete={handleToggleComplete} />
+
                 {nextSession && (
                   <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-purple-500/5 to-transparent overflow-hidden shadow-lg shadow-primary/5">
                     <CardContent className="p-4">
@@ -959,6 +1032,51 @@ const Index = () => {
                                 {nextSession.student.sessionType === "online" ? "أونلاين" : "حضوري"}
                               </span>
                             </div>
+
+                            {/* Last Session Notes for Next Session */}
+                            {(() => {
+                              const todayStr = format(now, "yyyy-MM-dd");
+                              const lastSession = getLastSessionWithNotes(nextSession.student, todayStr);
+
+                              // If no past completed sessions, don't show anything
+                              if (!lastSession) return null;
+
+                              const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
+
+                              return (
+                                <div className="mt-2 p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs space-y-1">
+                                  <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 font-medium">
+                                    <FileText className="h-3 w-3" />
+                                    <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
+                                  </div>
+                                  {!hasContent && (
+                                    <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
+                                  )}
+                                  {lastSession.topic && (
+                                    <p className="text-muted-foreground flex items-center gap-1">
+                                      <BookOpen className="h-3 w-3 text-indigo-500" />
+                                      <span className="font-medium">{lastSession.topic}</span>
+                                    </p>
+                                  )}
+                                  {lastSession.notes && (
+                                    <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
+                                  )}
+                                  {lastSession.homework && (
+                                    <div className="flex items-center gap-1 p-1.5 rounded bg-amber-500/10 text-amber-700">
+                                      <BookOpen className="h-3 w-3" />
+                                      <span className="font-medium">واجب:</span>
+                                      <span className="line-clamp-1">{lastSession.homework}</span>
+                                      {lastSession.homeworkStatus === "completed" && (
+                                        <Badge className="h-4 px-1 text-[10px] bg-emerald-500/20 text-emerald-700">✓</Badge>
+                                      )}
+                                      {lastSession.homeworkStatus === "incomplete" && (
+                                        <Badge className="h-4 px-1 text-[10px] bg-rose-500/20 text-rose-700">✗</Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -968,34 +1086,55 @@ const Index = () => {
                             studentName={nextSession.student.name}
                             onSave={(details) => updateSessionDetails(nextSession.student.id, nextSession.session.id, details)}
                           />
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
-                              >
-                                <Check className="h-4 w-4" />
-                                <span className="hidden sm:inline">إكمال</span>
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent dir="rtl">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>تأكيد إكمال الحصة</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  هل تريد تسجيل حصة <strong>{nextSession.student.name}</strong> كمكتملة؟
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter className="flex-row-reverse gap-2">
-                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleToggleComplete(nextSession.student.id, nextSession.session.id)}
-                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          {/* Complete button - only show if session has ended */}
+                          {isSessionEnded(
+                            nextSession.session.date,
+                            nextSession.session.time || nextSession.student.sessionTime || "16:00",
+                            nextSession.session.duration || nextSession.student.sessionDuration || 60
+                          ) ? (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
                                 >
-                                  تأكيد الإكمال
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  <Check className="h-4 w-4" />
+                                  <span className="hidden sm:inline">إكمال</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent dir="rtl">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>تأكيد إكمال الحصة</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    هل تريد تسجيل حصة <strong>{nextSession.student.name}</strong> كمكتملة؟
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="flex-row-reverse gap-2">
+                                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleToggleComplete(nextSession.student.id, nextSession.session.id)}
+                                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                  >
+                                    تأكيد الإكمال
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : isSessionInProgress(
+                            nextSession.session.date,
+                            nextSession.session.time || nextSession.student.sessionTime || "16:00",
+                            nextSession.session.duration || nextSession.student.sessionDuration || 60
+                          ) ? (
+                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-amber-500/10 text-amber-600 text-sm font-medium">
+                              <Clock className="h-4 w-4 animate-pulse" />
+                              <span className="hidden sm:inline">جارية</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-blue-500/10 text-blue-600 text-sm font-medium">
+                              <Clock className="h-4 w-4" />
+                              <span className="hidden sm:inline">مجدولة</span>
+                            </div>
+                          )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
@@ -1207,37 +1346,104 @@ const Index = () => {
                                   </Badge>
                                 </div>
                               </div>
+
+                              {/* Last Session Notes - Show notes from the student's previous session */}
+                              {(() => {
+                                const todayStr = format(now, "yyyy-MM-dd");
+                                const lastSession = getLastSessionWithNotes(student, todayStr);
+
+                                // If no past completed sessions, don't show anything
+                                if (!lastSession) return null;
+
+                                const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
+
+                                return (
+                                  <div className="mt-2 p-2 rounded-lg bg-purple-500/5 border border-purple-500/20 text-xs space-y-1">
+                                    <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 font-medium">
+                                      <FileText className="h-3 w-3" />
+                                      <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
+                                    </div>
+                                    {!hasContent && (
+                                      <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
+                                    )}
+                                    {lastSession.topic && (
+                                      <p className="text-muted-foreground flex items-center gap-1">
+                                        <BookOpen className="h-3 w-3 text-indigo-500" />
+                                        <span className="font-medium">{lastSession.topic}</span>
+                                      </p>
+                                    )}
+                                    {lastSession.notes && (
+                                      <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
+                                    )}
+                                    {lastSession.homework && (
+                                      <div className="flex items-center gap-1 p-1.5 rounded bg-amber-500/10 text-amber-700">
+                                        <BookOpen className="h-3 w-3" />
+                                        <span className="font-medium">واجب:</span>
+                                        <span className="line-clamp-1">{lastSession.homework}</span>
+                                        {lastSession.homeworkStatus === "completed" && (
+                                          <Badge className="h-4 px-1 text-[10px] bg-emerald-500/20 text-emerald-700">✓</Badge>
+                                        )}
+                                        {lastSession.homeworkStatus === "incomplete" && (
+                                          <Badge className="h-4 px-1 text-[10px] bg-rose-500/20 text-rose-700">✗</Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
                               {isScheduled && !isNextSession && (
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        size="sm"
-                                        className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
-                                      >
-                                        <CheckCircle2 className="h-4 w-4" />
-                                        إكمال
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent dir="rtl">
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>تأكيد إكمال الحصة</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          هل تريد تسجيل حصة <strong>{student.name}</strong> في{" "}
-                                          <strong>{sessionTime}</strong> كمكتملة؟
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter className="flex-row-reverse gap-2">
-                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => handleToggleComplete(student.id, session.id)}
-                                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                  {/* Status/Complete button based on session timing */}
+                                  {isSessionEnded(
+                                    session.date,
+                                    sessionTime,
+                                    session.duration || student.sessionDuration || 60
+                                  ) ? (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          size="sm"
+                                          className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
                                         >
-                                          تأكيد الإكمال
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                          <CheckCircle2 className="h-4 w-4" />
+                                          إكمال
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent dir="rtl">
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>تأكيد إكمال الحصة</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            هل تريد تسجيل حصة <strong>{student.name}</strong> في{" "}
+                                            <strong>{sessionTime}</strong> كمكتملة؟
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter className="flex-row-reverse gap-2">
+                                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleToggleComplete(student.id, session.id)}
+                                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                          >
+                                            تأكيد الإكمال
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  ) : isSessionInProgress(
+                                    session.date,
+                                    sessionTime,
+                                    session.duration || student.sessionDuration || 60
+                                  ) ? (
+                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-amber-500/10 text-amber-600 text-sm font-medium">
+                                      <Clock className="h-4 w-4 animate-pulse" />
+                                      <span>جارية</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-blue-500/10 text-blue-600 text-sm font-medium">
+                                      <Clock className="h-4 w-4" />
+                                      <span>مجدولة</span>
+                                    </div>
+                                  )}
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                       <Button

@@ -1,4 +1,4 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check, DollarSign } from "lucide-react";
+import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check, DollarSign, FileText, BookOpen, ChevronDown, ChevronUp, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,17 @@ import { Student, SessionType, AppSettings, Session } from "@/types/student";
 import { EditStudentDialog } from "@/components/EditStudentDialog";
 import { cn } from "@/lib/utils";
 import { DAY_NAMES_SHORT_AR, formatDurationAr } from "@/lib/arabicConstants";
+import { useState, useMemo } from "react";
+import { format } from "date-fns";
+import { ar } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +28,54 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+// Helper function to check if a session has ended
+const isSessionEnded = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sessionDateObj = new Date(sessionDate);
+
+  // If session is in the past (before today), it has ended
+  if (sessionDateObj < today) {
+    return true;
+  }
+
+  // If session is in the future (after today), it has NOT ended
+  if (sessionDateObj > today) {
+    return false;
+  }
+
+  // Session is today - check if current time is past the session end time
+  if (!sessionTime) return false;
+
+  const [sessionHour, sessionMin] = sessionTime.split(":").map(Number);
+  const sessionEndMinutes = sessionHour * 60 + sessionMin + sessionDuration;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return currentMinutes >= sessionEndMinutes;
+};
+
+// Helper function to check if a session is currently in progress
+const isSessionInProgress = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sessionDateObj = new Date(sessionDate);
+
+  // Session must be today
+  if (sessionDateObj.getTime() !== today.getTime()) {
+    return false;
+  }
+
+  if (!sessionTime) return false;
+
+  const [sessionHour, sessionMin] = sessionTime.split(":").map(Number);
+  const sessionStartMinutes = sessionHour * 60 + sessionMin;
+  const sessionEndMinutes = sessionStartMinutes + sessionDuration;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // In progress = current time is between start and end
+  return currentMinutes >= sessionStartMinutes && currentMinutes < sessionEndMinutes;
+};
 
 interface StudentCardProps {
   student: Student;
@@ -93,6 +152,71 @@ export const StudentCard = ({
   onCancelSession,
   onQuickPayment,
 }: StudentCardProps) => {
+  const [showNotesExpanded, setShowNotesExpanded] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+
+  // Get today's date string for comparison
+  const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+
+  // Get the last session with notes (excluding today) - prioritize sessions with content
+  const lastSessionWithNotes = useMemo(() => {
+    // First, try to find the most recent past session with notes/topic/homework
+    const pastSessionsWithContent = student.sessions
+      .filter(s =>
+        s.date < todayStr && // Only past sessions
+        (s.notes || s.homework || s.topic) // Has some content
+      )
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    if (pastSessionsWithContent.length > 0) {
+      return pastSessionsWithContent[0];
+    }
+
+    // If no sessions with content, return the most recent completed session
+    const pastCompletedSessions = student.sessions
+      .filter(s => s.date < todayStr && s.status === "completed")
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    return pastCompletedSessions[0] || null;
+  }, [student.sessions, todayStr]);
+
+  // Get all past sessions for history (with notes or completed)
+  const allPastSessions = useMemo(() => {
+    return student.sessions
+      .filter(s =>
+        s.date < todayStr && // Only past sessions
+        (s.status === "completed" || s.notes || s.homework || s.topic)
+      )
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [student.sessions, todayStr]);
+
+  // Check if last session has any content
+  const lastSessionHasContent = lastSessionWithNotes &&
+    (lastSessionWithNotes.notes || lastSessionWithNotes.homework || lastSessionWithNotes.topic);
+
+  // Format date in Arabic
+  const formatDateAr = (dateStr: string) => {
+    try {
+      return format(new Date(dateStr), "EEEE d MMMM", { locale: ar });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Get homework status badge
+  const getHomeworkStatusBadge = (status?: string) => {
+    switch (status) {
+      case "completed":
+        return <Badge className="bg-emerald-500/20 text-emerald-700 text-xs">✓ تم حله</Badge>;
+      case "incomplete":
+        return <Badge className="bg-rose-500/20 text-rose-700 text-xs">✗ لم يُحل</Badge>;
+      case "assigned":
+        return <Badge className="bg-amber-500/20 text-amber-700 text-xs">⏳ مطلوب</Badge>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className={cn("card-shadow transition-all duration-300 overflow-hidden border-2")} dir="rtl">
       <CardHeader className="p-4 sm:p-5 bg-gradient-to-r from-card to-primary/5">
@@ -214,6 +338,155 @@ export const StudentCard = ({
 
       {todaySessions && todaySessions.length > 0 && (
         <CardContent className="p-4 sm:p-5 space-y-3">
+          {/* Last Session Notes & Homework */}
+          {lastSessionWithNotes && (
+            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/5 to-indigo-500/5 border-2 border-purple-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-sm text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" />
+                  الحصة السابقة
+                </h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {formatDateAr(lastSessionWithNotes.date)}
+                  </span>
+                  {allPastSessions.length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs gap-1 text-purple-600 hover:bg-purple-500/10"
+                      onClick={() => setShowHistoryDialog(true)}
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      السجل ({allPastSessions.length})
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Show message if no notes */}
+              {!lastSessionHasContent && (
+                <p className="text-sm text-muted-foreground italic">لا توجد ملاحظات للحصة السابقة</p>
+              )}
+
+              {/* Topic */}
+              {lastSessionWithNotes.topic && (
+                <div className="flex items-start gap-2">
+                  <BookOpen className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
+                  <p className="text-sm font-medium text-foreground">{lastSessionWithNotes.topic}</p>
+                </div>
+              )}
+
+              {/* Notes - collapsible if long */}
+              {lastSessionWithNotes.notes && (
+                <div className="space-y-1">
+                  <p className={cn(
+                    "text-sm text-muted-foreground",
+                    !showNotesExpanded && lastSessionWithNotes.notes.length > 100 && "line-clamp-2"
+                  )}>
+                    {lastSessionWithNotes.notes}
+                  </p>
+                  {lastSessionWithNotes.notes.length > 100 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-purple-600 hover:text-purple-700"
+                      onClick={() => setShowNotesExpanded(!showNotesExpanded)}
+                    >
+                      {showNotesExpanded ? (
+                        <>
+                          <ChevronUp className="h-3 w-3 ml-1" />
+                          عرض أقل
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3 ml-1" />
+                          عرض المزيد
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Homework */}
+              {lastSessionWithNotes.homework && (
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <BookOpen className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-semibold text-amber-700">الواجب:</span>
+                      {getHomeworkStatusBadge(lastSessionWithNotes.homeworkStatus)}
+                    </div>
+                    <p className="text-sm text-amber-800 dark:text-amber-300">{lastSessionWithNotes.homework}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* History Dialog */}
+          <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+            <DialogContent dir="rtl" className="sm:max-w-lg max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-purple-600" />
+                  سجل حصص {student.name}
+                </DialogTitle>
+                <DialogDescription>
+                  {allPastSessions.length} حصة سابقة
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <div className="space-y-4">
+                  {allPastSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="p-3 rounded-xl border-2 space-y-2 bg-muted/30"
+                    >
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs">
+                          {formatDateAr(session.date)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {session.time || student.sessionTime}
+                        </span>
+                      </div>
+
+                      {session.topic && (
+                        <div className="flex items-start gap-2">
+                          <BookOpen className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
+                          <p className="text-sm font-medium">{session.topic}</p>
+                        </div>
+                      )}
+
+                      {session.notes && (
+                        <p className="text-sm text-muted-foreground pr-5">{session.notes}</p>
+                      )}
+
+                      {session.homework && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                          <BookOpen className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-semibold text-amber-700">الواجب:</span>
+                              {getHomeworkStatusBadge(session.homeworkStatus)}
+                            </div>
+                            <p className="text-sm text-amber-800 dark:text-amber-300">{session.homework}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {!session.topic && !session.notes && !session.homework && (
+                        <p className="text-sm text-muted-foreground italic">لا توجد ملاحظات</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-sm text-muted-foreground">حصص اليوم ({todaySessions.length})</h4>
           </div>
@@ -282,7 +555,12 @@ export const StudentCard = ({
                         </Button>
                       )}
 
-                      {onToggleComplete && (
+                      {/* Complete button - only show if session has ended */}
+                      {onToggleComplete && isSessionEnded(
+                        session.date,
+                        sessionTime || "16:00",
+                        session.duration || student.sessionDuration || 60
+                      ) && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -312,6 +590,38 @@ export const StudentCard = ({
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                      )}
+
+                      {/* Show in progress indicator if session is ongoing */}
+                      {onToggleComplete && isSessionInProgress(
+                        session.date,
+                        sessionTime || "16:00",
+                        session.duration || student.sessionDuration || 60
+                      ) && (
+                        <div
+                          className="h-8 w-8 flex items-center justify-center text-amber-500"
+                          title="الحصة جارية الآن"
+                        >
+                          <Clock className="h-4 w-4 animate-pulse" />
+                        </div>
+                      )}
+
+                      {/* Show scheduled indicator if session hasn't started yet */}
+                      {onToggleComplete && !isSessionEnded(
+                        session.date,
+                        sessionTime || "16:00",
+                        session.duration || student.sessionDuration || 60
+                      ) && !isSessionInProgress(
+                        session.date,
+                        sessionTime || "16:00",
+                        session.duration || student.sessionDuration || 60
+                      ) && (
+                        <div
+                          className="h-8 w-8 flex items-center justify-center text-blue-500"
+                          title="الحصة مجدولة"
+                        >
+                          <Clock className="h-4 w-4" />
+                        </div>
                       )}
 
                       {onCancelSession && (

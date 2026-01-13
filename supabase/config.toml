@@ -5,5 +5,5 @@ verify_jwt = false
 
 [functions.auto-session-reminder]
 verify_jwt = false
-# This function is triggered by pg_cron every 15 minutes
+# This function is triggered by pg_cron every 5 minutes
 # See migration: 20260113_auto_session_reminder_cron.sql

@@ -8,11 +8,11 @@ WHERE EXISTS (
   SELECT 1 FROM cron.job WHERE jobname = 'auto-session-reminder-job'
 );
 
--- Schedule the auto-session-reminder function to run every 15 minutes
--- This ensures reminders are sent within the 30-minute window for both 24h and 1h intervals
+-- Schedule the auto-session-reminder function to run every 5 minutes
+-- This ensures reminders are sent promptly for sessions that fall between checks
 SELECT cron.schedule(
   'auto-session-reminder-job',  -- job name
-  '*/15 * * * *',               -- every 15 minutes (at :00, :15, :30, :45)
+  '*/5 * * * *',                -- every 5 minutes (at :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55)
   $$
   SELECT
     net.http_post(

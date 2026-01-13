@@ -157,7 +157,8 @@ export const CalendarView = ({
     open: boolean;
     session: Session;
     student: Student;
-    isEditingTime?: boolean;
+    isEditing?: boolean;
+    editedDate?: string;
     editedTime?: string;
   } | null>(null);
   const [cancelConfirmDialog, setCancelConfirmDialog] = useState<{
@@ -327,6 +328,31 @@ export const CalendarView = ({
     };
   }, [days, sessionsByDate, currentDate, viewMode]);
 
+  // Check if a session has ended (for showing Complete button only after session time has passed)
+  const isSessionEnded = useCallback((sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
+    const now = new Date();
+    const sessionDateObj = parseISO(sessionDate);
+
+    // If session is in the past (before today), it has ended
+    if (sessionDateObj < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+      return true;
+    }
+
+    // If session is in the future (after today), it has NOT ended
+    if (sessionDateObj > new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+      return false;
+    }
+
+    // Session is today - check if current time is past the session end time
+    if (!sessionTime) return false;
+
+    const [sessionHour, sessionMin] = sessionTime.split(":").map(Number);
+    const sessionEndMinutes = sessionHour * 60 + sessionMin + sessionDuration;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    return currentMinutes >= sessionEndMinutes;
+  }, []);
+
   // Get time of day icon and color
   const getTimeOfDayInfo = (time: string) => {
     const hour = parseInt(time?.split(":")[0] || "12");
@@ -344,7 +370,10 @@ export const CalendarView = ({
       const newStartMinutes = newHour * 60 + newMin;
       const newEndMinutes = newStartMinutes + sessionDuration;
       for (const { session, student } of sessionsOnDate) {
+        // Skip the session being edited
         if (session.id === sessionId) continue;
+        // Skip cancelled sessions - they don't block time slots
+        if (session.status === "cancelled") continue;
         const otherTime = session.time || student.sessionTime;
         if (!otherTime) continue;
         const [otherHour, otherMin] = otherTime.split(":").map(Number);
@@ -613,14 +642,24 @@ export const CalendarView = ({
     onQuickPayment(student.id, session.id, session.date);
   };
 
-  // Handle time edit in session action dialog
-  const handleStartTimeEdit = () => {
+  // Handle starting date/time edit in session action dialog
+  const handleStartEdit = () => {
     if (!sessionActionDialog) return;
     const currentTime = sessionActionDialog.session.time || sessionActionDialog.student.sessionTime || "16:00";
+    const currentDate = sessionActionDialog.session.date;
     setSessionActionDialog({
       ...sessionActionDialog,
-      isEditingTime: true,
+      isEditing: true,
+      editedDate: currentDate,
       editedTime: currentTime,
+    });
+  };
+
+  const handleDateEditChange = (newDate: string) => {
+    if (!sessionActionDialog) return;
+    setSessionActionDialog({
+      ...sessionActionDialog,
+      editedDate: newDate,
     });
   };
 
@@ -632,18 +671,19 @@ export const CalendarView = ({
     });
   };
 
-  const handleSaveTimeEdit = () => {
-    if (!sessionActionDialog || !sessionActionDialog.editedTime || !onUpdateSessionDateTime) return;
+  const handleSaveEdit = () => {
+    if (!sessionActionDialog || !sessionActionDialog.editedTime || !sessionActionDialog.editedDate || !onUpdateSessionDateTime) return;
 
-    const { session, student, editedTime } = sessionActionDialog;
+    const { session, student, editedTime, editedDate } = sessionActionDialog;
     const originalTime = session.time || student.sessionTime || "16:00";
+    const originalDate = session.date;
 
     // Check for conflicts
-    const conflictInfo = checkTimeConflict(student.id, session.id, session.date, editedTime);
+    const conflictInfo = checkTimeConflict(student.id, session.id, editedDate, editedTime);
 
     if (conflictInfo.hasConflict) {
       toast({
-        title: "❌ لا يمكن تغيير الوقت",
+        title: "❌ لا يمكن تغيير الموعد",
         description: `يوجد تعارض مع حصة ${conflictInfo.conflictStudent} في ${conflictInfo.conflictTime}`,
         variant: "destructive",
       });
@@ -658,22 +698,37 @@ export const CalendarView = ({
       });
     }
 
-    // Save the new time
-    onUpdateSessionDateTime(student.id, session.id, session.date, editedTime);
+    // Save the new date and time
+    onUpdateSessionDateTime(student.id, session.id, editedDate, editedTime);
+
+    const dateChanged = originalDate !== editedDate;
+    const timeChanged = originalTime !== editedTime;
+
+    let description = "";
+    if (dateChanged && timeChanged) {
+      description = `تم تغيير موعد حصة ${student.name} من ${format(parseISO(originalDate), "dd/MM")} الساعة ${originalTime} إلى ${format(parseISO(editedDate), "dd/MM")} الساعة ${editedTime}`;
+    } else if (dateChanged) {
+      description = `تم تغيير تاريخ حصة ${student.name} من ${format(parseISO(originalDate), "dd/MM")} إلى ${format(parseISO(editedDate), "dd/MM")}`;
+    } else if (timeChanged) {
+      description = `تم تغيير وقت حصة ${student.name} من ${originalTime} إلى ${editedTime}`;
+    } else {
+      description = "لم يتم إجراء أي تغييرات";
+    }
 
     toast({
-      title: "✓ تم تعديل الوقت",
-      description: `تم تغيير وقت حصة ${student.name} من ${originalTime} إلى ${editedTime}`,
+      title: "✓ تم تعديل الموعد",
+      description,
     });
 
     setSessionActionDialog(null);
   };
 
-  const handleCancelTimeEdit = () => {
+  const handleCancelEdit = () => {
     if (!sessionActionDialog) return;
     setSessionActionDialog({
       ...sessionActionDialog,
-      isEditingTime: false,
+      isEditing: false,
+      editedDate: undefined,
       editedTime: undefined,
     });
   };
@@ -1305,71 +1360,106 @@ export const CalendarView = ({
           {sessionActionDialog && (
             <div className="space-y-4 py-4">
               <div className="p-4 rounded-xl bg-muted/50 border-2 space-y-3">
-                {/* Time display/edit section */}
-                <div className="flex items-center justify-between">
-                  {sessionActionDialog.isEditingTime ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <Clock className="h-4 w-4 text-primary" />
+                {/* Edit mode - shows date and time inputs */}
+                {sessionActionDialog.isEditing ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-primary" />
+                        التاريخ الجديد
+                      </Label>
+                      <Input
+                        type="date"
+                        value={sessionActionDialog.editedDate || ""}
+                        onChange={(e) => handleDateEditChange(e.target.value)}
+                        className="h-11 text-center font-bold rounded-lg"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        الوقت الجديد
+                      </Label>
                       <Input
                         type="time"
                         value={sessionActionDialog.editedTime || ""}
                         onChange={(e) => handleTimeEditChange(e.target.value)}
-                        className="w-28 h-9 text-center font-bold"
-                        autoFocus
+                        className="h-11 text-center font-bold rounded-lg"
                       />
+                    </div>
+                    <div className="flex gap-2 pt-2">
                       <Button
-                        size="sm"
-                        onClick={handleSaveTimeEdit}
-                        className="h-9 bg-emerald-500 hover:bg-emerald-600 text-white gap-1"
+                        onClick={handleSaveEdit}
+                        className="flex-1 h-11 bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
                       >
                         <Save className="h-4 w-4" />
-                        حفظ
+                        حفظ التغييرات
                       </Button>
-                      <Button size="sm" variant="outline" onClick={handleCancelTimeEdit} className="h-9">
+                      <Button
+                        variant="outline"
+                        onClick={handleCancelEdit}
+                        className="h-11 px-4"
+                      >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                  ) : (
+                  </div>
+                ) : (
+                  <>
+                    {/* Display mode - shows current date and time */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-bold">
+                          {format(parseISO(sessionActionDialog.session.date), "dd/MM/yyyy", { locale: ar })}
+                        </span>
+                      </div>
+                      <Badge className={getStatusBadgeColor(sessionActionDialog.session.status)}>
+                        {getStatusLabel(sessionActionDialog.session.status)}
+                      </Badge>
+                    </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span className="font-bold">
                         {sessionActionDialog.session.time || sessionActionDialog.student.sessionTime}
                       </span>
-                      {sessionActionDialog.session.status === "scheduled" && onUpdateSessionDateTime && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={handleStartTimeEdit}
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
-                          title="تعديل الوقت"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      {sessionActionDialog.student.sessionType === "online" ? (
+                        <>
+                          <Monitor className="h-4 w-4" />
+                          <span>أونلاين</span>
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="h-4 w-4" />
+                          <span>حضوري</span>
+                        </>
                       )}
                     </div>
-                  )}
-                  <Badge className={getStatusBadgeColor(sessionActionDialog.session.status)}>
-                    {getStatusLabel(sessionActionDialog.session.status)}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  {sessionActionDialog.student.sessionType === "online" ? (
-                    <>
-                      <Monitor className="h-4 w-4" />
-                      <span>أونلاين</span>
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="h-4 w-4" />
-                      <span>حضوري</span>
-                    </>
-                  )}
-                </div>
+                    {/* Edit Button - only for scheduled sessions */}
+                    {sessionActionDialog.session.status === "scheduled" && onUpdateSessionDateTime && (
+                      <Button
+                        onClick={handleStartEdit}
+                        variant="outline"
+                        className="w-full h-10 mt-2 gap-2 border-primary/50 text-primary hover:bg-primary/10"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        تعديل التاريخ والوقت
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
+              {!sessionActionDialog.isEditing && (
               <div className="space-y-2">
                 {sessionActionDialog.session.status === "scheduled" && (
                   <>
-                    {onToggleComplete && (
+                    {onToggleComplete && isSessionEnded(
+                      sessionActionDialog.session.date,
+                      sessionActionDialog.session.time || sessionActionDialog.student.sessionTime || "16:00",
+                      sessionActionDialog.session.duration || sessionActionDialog.student.sessionDuration || 60
+                    ) && (
                       <Button
                         onClick={handleCompleteClick}
                         className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white gap-2 text-base"
@@ -1377,6 +1467,16 @@ export const CalendarView = ({
                         <CheckCircle2 className="h-5 w-5" />
                         تسجيل كمكتملة
                       </Button>
+                    )}
+                    {onToggleComplete && !isSessionEnded(
+                      sessionActionDialog.session.date,
+                      sessionActionDialog.session.time || sessionActionDialog.student.sessionTime || "16:00",
+                      sessionActionDialog.session.duration || sessionActionDialog.student.sessionDuration || 60
+                    ) && (
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-500/10 text-blue-700 text-sm font-medium">
+                        <Clock className="h-4 w-4" />
+                        الحصة لم تنتهِ بعد - يمكن تسجيلها كمكتملة بعد انتهاء الوقت
+                      </div>
                     )}
                     {onCancelSession && (
                       <Button
@@ -1442,6 +1542,7 @@ export const CalendarView = ({
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
           <div className="flex justify-end">
@@ -1779,8 +1880,12 @@ export const CalendarView = ({
                             <Badge className={cn("text-[9px] h-4 px-1.5", getStatusBadgeColor(session.status))}>
                               {getStatusLabel(session.status)}
                             </Badge>
-                            {/* Inline action buttons */}
-                            {session.status === "scheduled" && onToggleComplete && (
+                            {/* Inline action buttons - Complete only shows if session has ended */}
+                            {session.status === "scheduled" && onToggleComplete && isSessionEnded(
+                              session.date,
+                              time || "16:00",
+                              session.duration || student.sessionDuration || 60
+                            ) && (
                               <Button
                                 size="sm"
                                 variant="ghost"
