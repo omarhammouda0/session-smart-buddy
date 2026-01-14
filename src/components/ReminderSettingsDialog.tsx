@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Bell, Clock, Banknote, MessageCircle, Loader2, CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
 import { useReminderSettings } from '@/hooks/useReminderSettings';
+import { DEFAULT_SESSION_TEMPLATE_1, DEFAULT_SESSION_TEMPLATE_2, DEFAULT_PAYMENT_TEMPLATE, DEFAULT_CANCELLATION_TEMPLATE } from '@/types/reminder';
 import { REMINDER_HOURS_OPTIONS, PAYMENT_DAYS_OPTIONS, SEND_TIME_OPTIONS } from '@/types/reminder';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -40,13 +41,13 @@ export const ReminderSettingsDialog = () => {
       setSessionHours2(settings.session_reminder_hours_2 || 1);
       setSessionSendTime(settings.session_reminder_send_time);
       setSessionTemplate(settings.session_reminder_template);
-      setSessionTemplate1(settings.session_reminder_template_1 || settings.session_reminder_template || '');
-      setSessionTemplate2(settings.session_reminder_template_2 || '');
+      setSessionTemplate1(settings.session_reminder_template_1 || settings.session_reminder_template || DEFAULT_SESSION_TEMPLATE_1);
+      setSessionTemplate2(settings.session_reminder_template_2 || DEFAULT_SESSION_TEMPLATE_2);
       setPaymentEnabled(settings.payment_reminders_enabled);
       setPaymentDays(settings.payment_reminder_days_before);
-      setPaymentTemplate(settings.payment_reminder_template);
+      setPaymentTemplate(settings.payment_reminder_template || DEFAULT_PAYMENT_TEMPLATE);
       setCancellationEnabled(settings.cancellation_reminders_enabled);
-      setCancellationTemplate(settings.cancellation_reminder_template);
+      setCancellationTemplate(settings.cancellation_reminder_template || DEFAULT_CANCELLATION_TEMPLATE);
     }
   }, [settings]);
 
@@ -57,13 +58,13 @@ export const ReminderSettingsDialog = () => {
       setSessionHours2(settings.session_reminder_hours_2 || 1);
       setSessionSendTime(settings.session_reminder_send_time);
       setSessionTemplate(settings.session_reminder_template);
-      setSessionTemplate1(settings.session_reminder_template_1 || settings.session_reminder_template || '');
-      setSessionTemplate2(settings.session_reminder_template_2 || '');
+      setSessionTemplate1(settings.session_reminder_template_1 || settings.session_reminder_template || DEFAULT_SESSION_TEMPLATE_1);
+      setSessionTemplate2(settings.session_reminder_template_2 || DEFAULT_SESSION_TEMPLATE_2);
       setPaymentEnabled(settings.payment_reminders_enabled);
       setPaymentDays(settings.payment_reminder_days_before);
-      setPaymentTemplate(settings.payment_reminder_template);
+      setPaymentTemplate(settings.payment_reminder_template || DEFAULT_PAYMENT_TEMPLATE);
       setCancellationEnabled(settings.cancellation_reminders_enabled);
-      setCancellationTemplate(settings.cancellation_reminder_template);
+      setCancellationTemplate(settings.cancellation_reminder_template || DEFAULT_CANCELLATION_TEMPLATE);
     }
     setOpen(isOpen);
   };

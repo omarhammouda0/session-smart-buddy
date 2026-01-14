@@ -84,15 +84,22 @@ serve(async (req) => {
     const reminderHours1 = settings.session_reminder_hours || 24;
     const reminderHours2 = settings.session_reminder_hours_2 || 1;
 
-    // Separate templates for each reminder interval
-    const reminderTemplate1 = settings.session_reminder_template_1 ||
-      settings.session_reminder_template ||
-      'مرحباً {student_name}،\nتذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.\nنراك قريباً!';
+    // Default templates
+    const defaultTemplate1 = 'مرحباً {student_name}،\nتذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.\nنراك قريباً!';
+    const defaultTemplate2 = 'مرحباً {student_name}،\nجلستك تبدأ خلال ساعة واحدة الساعة {time}!\nالرجاء الاستعداد.';
 
-    const reminderTemplate2 = settings.session_reminder_template_2 ||
-      'مرحباً {student_name}،\nجلستك تبدأ خلال ساعة واحدة الساعة {time}!\nالرجاء الاستعداد.';
+    // Separate templates for each reminder interval
+    // Use trim() to handle empty strings with whitespace
+    const reminderTemplate1 = (settings.session_reminder_template_1 && settings.session_reminder_template_1.trim()) ||
+      (settings.session_reminder_template && settings.session_reminder_template.trim()) ||
+      defaultTemplate1;
+
+    const reminderTemplate2 = (settings.session_reminder_template_2 && settings.session_reminder_template_2.trim()) ||
+      defaultTemplate2;
 
     console.log(`Reminder intervals: ${reminderHours1}h and ${reminderHours2}h`);
+    console.log(`Template 1 (${reminderHours1}h): ${reminderTemplate1.substring(0, 50)}...`);
+    console.log(`Template 2 (${reminderHours2}h): ${reminderTemplate2.substring(0, 50)}...`);
 
     // Array of reminder intervals to check (with their specific templates)
     const reminderIntervals = [

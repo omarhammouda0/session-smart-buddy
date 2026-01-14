@@ -13,113 +13,115 @@
    ===================================================== */
 @layer base {
   :root {
-    /* Colors - Light Mode (Warm & Friendly) */
-    --background: 30 25% 97%;
-    --foreground: 240 10% 15%;
+    /* Colors - Light Mode (Navy Blue & Ivory) */
+    --background: 45 30% 96%;
+    --foreground: 220 50% 15%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 15%;
+    --card: 45 25% 99%;
+    --card-foreground: 220 50% 15%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 15%;
+    --popover: 45 25% 99%;
+    --popover-foreground: 220 50% 15%;
 
-    --primary: 333 71% 50%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 220 60% 30%;
+    --primary-foreground: 45 30% 96%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 5% 35%;
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 40% 30%;
 
-    --muted: 240 5% 92%;
-    --muted-foreground: 240 5% 45%;
+    --muted: 45 15% 90%;
+    --muted-foreground: 220 15% 45%;
 
-    --accent: 333 71% 97%;
-    --accent-foreground: 333 71% 45%;
+    --accent: 220 40% 92%;
+    --accent-foreground: 220 60% 25%;
 
-    --success: 152 60% 42%;
-    --success-foreground: 0 0% 100%;
+    /* Simplified status colors - more muted, less distracting */
+    --success: 220 45% 40%;
+    --success-foreground: 45 30% 96%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 220 30% 45%;
+    --destructive-foreground: 45 30% 96%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 220 35% 50%;
+    --warning-foreground: 45 30% 96%;
 
-    --border: 240 5% 87%;
-    --input: 240 5% 87%;
-    --ring: 333 71% 50%;
+    --border: 220 15% 85%;
+    --input: 220 15% 85%;
+    --ring: 220 60% 30%;
 
     --radius: 1rem;
 
     /* Sidebar */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 10% 15%;
-    --sidebar-primary: 333 71% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 333 71% 97%;
-    --sidebar-accent-foreground: 333 71% 45%;
-    --sidebar-border: 240 5% 90%;
-    --sidebar-ring: 333 71% 50%;
+    --sidebar-background: 220 60% 18%;
+    --sidebar-foreground: 45 30% 96%;
+    --sidebar-primary: 45 30% 96%;
+    --sidebar-primary-foreground: 220 60% 18%;
+    --sidebar-accent: 220 50% 25%;
+    --sidebar-accent-foreground: 45 30% 96%;
+    --sidebar-border: 220 50% 22%;
+    --sidebar-ring: 45 30% 96%;
 
-    /* Charts */
-    --chart-1: 333 71% 50%;
-    --chart-2: 152 60% 42%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 200 80% 50%;
-    --chart-5: 280 60% 50%;
+    /* Charts - Navy blue variations */
+    --chart-1: 220 60% 30%;
+    --chart-2: 220 50% 45%;
+    --chart-3: 220 40% 55%;
+    --chart-4: 220 35% 65%;
+    --chart-5: 220 30% 75%;
   }
 
   .dark {
-    /* Colors - Dark Mode (Rich & Modern) */
-    --background: 240 10% 8%;
-    --foreground: 0 0% 95%;
+    /* Colors - Dark Mode (Navy Blue & Ivory) */
+    --background: 220 50% 8%;
+    --foreground: 45 20% 92%;
 
-    --card: 240 10% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 220 45% 12%;
+    --card-foreground: 45 20% 92%;
 
-    --popover: 240 10% 14%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 220 45% 14%;
+    --popover-foreground: 45 20% 92%;
 
-    --primary: 333 71% 60%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 220 50% 55%;
+    --primary-foreground: 45 30% 96%;
 
-    --secondary: 240 5% 20%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary: 220 35% 18%;
+    --secondary-foreground: 45 15% 85%;
 
-    --muted: 240 5% 25%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 220 35% 16%;
+    --muted-foreground: 220 15% 60%;
 
-    --accent: 333 50% 20%;
-    --accent-foreground: 333 71% 70%;
+    --accent: 220 40% 22%;
+    --accent-foreground: 45 20% 88%;
 
-    --success: 152 60% 45%;
-    --success-foreground: 0 0% 100%;
+    /* Simplified status colors - dark mode */
+    --success: 220 40% 50%;
+    --success-foreground: 45 30% 96%;
 
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 220 25% 55%;
+    --destructive-foreground: 45 30% 96%;
 
-    --warning: 38 92% 55%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 220 30% 58%;
+    --warning-foreground: 45 30% 96%;
 
-    --border: 240 5% 20%;
-    --input: 240 5% 20%;
-    --ring: 333 71% 60%;
+    --border: 220 35% 20%;
+    --input: 220 35% 20%;
+    --ring: 220 50% 55%;
 
     /* Sidebar - Dark */
-    --sidebar-background: 240 10% 10%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 333 71% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 333 50% 20%;
-    --sidebar-accent-foreground: 333 71% 70%;
-    --sidebar-border: 240 5% 18%;
-    --sidebar-ring: 333 71% 60%;
+    --sidebar-background: 220 50% 10%;
+    --sidebar-foreground: 45 20% 92%;
+    --sidebar-primary: 220 50% 55%;
+    --sidebar-primary-foreground: 45 30% 96%;
+    --sidebar-accent: 220 40% 18%;
+    --sidebar-accent-foreground: 45 20% 88%;
+    --sidebar-border: 220 40% 16%;
+    --sidebar-ring: 220 50% 55%;
 
-    /* Charts - Dark */
-    --chart-1: 333 71% 60%;
-    --chart-2: 152 60% 50%;
-    --chart-3: 38 92% 55%;
-    --chart-4: 200 80% 55%;
-    --chart-5: 280 60% 55%;
+    /* Charts - Dark - Navy variations */
+    --chart-1: 220 50% 55%;
+    --chart-2: 220 45% 60%;
+    --chart-3: 220 40% 65%;
+    --chart-4: 220 35% 70%;
+    --chart-5: 220 30% 75%;
   }
 }
 
@@ -407,7 +409,7 @@
   }
 
   .gradient-accent {
-    background: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(32 92% 45%) 100%);
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.9) 0%, hsl(var(--primary) / 0.7) 100%);
   }
 
   .gradient-success {
@@ -424,6 +426,45 @@
       linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
       linear-gradient(135deg, hsl(var(--primary) / 0.5), hsl(var(--primary) / 0.1)) border-box;
     border: 2px solid transparent;
+  }
+
+  /* =====================================================
+     UNIFIED STATUS STYLES - Navy Blue Theme
+     ===================================================== */
+
+  /* Scheduled/Pending - Light Navy */
+  .status-scheduled {
+    @apply bg-primary/10 text-primary border-primary/30;
+  }
+
+  /* Completed/Success - Medium Navy */
+  .status-completed {
+    @apply bg-primary/20 text-primary border-primary/40;
+  }
+
+  /* Cancelled/Error - Muted Navy */
+  .status-cancelled {
+    @apply bg-muted text-muted-foreground border-border;
+  }
+
+  /* Warning - Light Navy with opacity */
+  .status-warning {
+    @apply bg-primary/15 text-primary/90 border-primary/25;
+  }
+
+  /* Info badge */
+  .badge-info {
+    @apply bg-primary/10 text-primary border-primary/20;
+  }
+
+  /* Online indicator */
+  .badge-online {
+    @apply bg-primary/15 text-primary border-primary/30;
+  }
+
+  /* Onsite indicator */
+  .badge-onsite {
+    @apply bg-secondary text-secondary-foreground border-border;
   }
 
   /* Glow effects */

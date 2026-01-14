@@ -599,21 +599,21 @@ const Index = () => {
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-        {/* Dynamic Background */}
+        {/* Dynamic Background - Navy & Ivory */}
         <div className="fixed inset-0 -z-20">
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-violet-50 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
-          <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-to-br from-primary/25 via-purple-500/15 to-pink-500/10 rounded-full blur-3xl animate-blob" />
-          <div className="absolute top-1/3 -left-40 w-[400px] h-[400px] bg-gradient-to-tr from-cyan-500/15 via-blue-500/10 to-indigo-500/15 rounded-full blur-3xl animate-blob animation-delay-2000" />
-          <div className="absolute -bottom-40 right-1/4 w-[450px] h-[450px] bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/15 rounded-full blur-3xl animate-blob animation-delay-4000" />
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 dark:from-background dark:via-background dark:to-primary/10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,hsl(var(--primary)/0.08),rgba(255,255,255,0))]" />
+          <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 rounded-full blur-3xl animate-blob" />
+          <div className="absolute top-1/3 -left-40 w-[400px] h-[400px] bg-gradient-to-tr from-primary/10 via-primary/8 to-primary/5 rounded-full blur-3xl animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-40 right-1/4 w-[450px] h-[450px] bg-gradient-to-r from-primary/10 via-primary/8 to-primary/5 rounded-full blur-3xl animate-blob animation-delay-4000" />
         </div>
 
         {/* Loading content */}
         <div className="relative text-center space-y-6 z-10">
           {/* Animated logo */}
           <div className="relative">
-            <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-primary via-purple-500 to-pink-500 shadow-2xl shadow-primary/40 flex items-center justify-center">
-              <GraduationCap className="h-12 w-12 text-white animate-pulse" />
+            <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-primary via-primary/80 to-primary/60 shadow-2xl shadow-primary/40 flex items-center justify-center">
+              <GraduationCap className="h-12 w-12 text-primary-foreground animate-pulse" />
             </div>
             {/* Glow ring */}
             <div className="absolute inset-0 w-24 h-24 mx-auto rounded-3xl border-4 border-primary/30 animate-ping" />
@@ -650,36 +650,36 @@ const Index = () => {
       dir="rtl"
       className="min-h-screen safe-bottom relative overflow-x-hidden"
     >
-      {/* Dynamic Background */}
+      {/* Dynamic Background - Navy & Ivory Theme */}
       <div className="fixed inset-0 -z-20">
-        {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-violet-50 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950" />
+        {/* Base gradient - Ivory to subtle navy tint */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 dark:from-background dark:via-background dark:to-primary/10" />
 
-        {/* Mesh gradient overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+        {/* Mesh gradient overlay - Navy tint */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,hsl(var(--primary)/0.06),rgba(255,255,255,0))]" />
 
-        {/* Animated gradient orbs */}
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-to-br from-primary/25 via-purple-500/15 to-pink-500/10 rounded-full blur-3xl animate-blob" />
-        <div className="absolute top-1/3 -left-40 w-[400px] h-[400px] bg-gradient-to-tr from-cyan-500/15 via-blue-500/10 to-indigo-500/15 rounded-full blur-3xl animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-40 right-1/4 w-[450px] h-[450px] bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/15 rounded-full blur-3xl animate-blob animation-delay-4000" />
-        <div className="absolute bottom-1/4 left-1/3 w-[300px] h-[300px] bg-gradient-to-tl from-emerald-500/10 via-teal-500/10 to-cyan-500/10 rounded-full blur-3xl animate-blob animation-delay-3000" />
+        {/* Animated gradient orbs - Navy variations */}
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-to-br from-primary/12 via-primary/8 to-primary/4 rounded-full blur-3xl animate-blob" />
+        <div className="absolute top-1/3 -left-40 w-[400px] h-[400px] bg-gradient-to-tr from-primary/10 via-primary/6 to-primary/3 rounded-full blur-3xl animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-40 right-1/4 w-[450px] h-[450px] bg-gradient-to-r from-primary/8 via-primary/5 to-primary/3 rounded-full blur-3xl animate-blob animation-delay-4000" />
+        <div className="absolute bottom-1/4 left-1/3 w-[300px] h-[300px] bg-gradient-to-tl from-primary/10 via-primary/6 to-primary/3 rounded-full blur-3xl animate-blob animation-delay-3000" />
 
         {/* Subtle noise texture */}
         <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.03]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
 
-        {/* Grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1.5px,transparent_1.5px),linear-gradient(90deg,rgba(139,92,246,0.03)_1.5px,transparent_1.5px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_40%,transparent_100%)]" />
+        {/* Grid pattern - Navy lines */}
+        <div className="absolute inset-0 bg-[linear-gradient(hsl(var(--primary)/0.03)_1.5px,transparent_1.5px),linear-gradient(90deg,hsl(var(--primary)/0.03)_1.5px,transparent_1.5px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_40%,transparent_100%)]" />
       </div>
 
-      {/* Floating particles layer */}
+      {/* Floating particles layer - Navy */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        {/* Animated dots */}
+        {/* Animated dots - All navy */}
         <div className="absolute top-20 right-[10%] w-2 h-2 bg-primary/30 rounded-full animate-float" />
-        <div className="absolute top-[30%] left-[5%] w-3 h-3 bg-purple-500/20 rounded-full animate-float animation-delay-1000" />
-        <div className="absolute top-[60%] right-[15%] w-2 h-2 bg-amber-500/25 rounded-full animate-float animation-delay-2000" />
-        <div className="absolute top-[45%] left-[20%] w-1.5 h-1.5 bg-cyan-500/30 rounded-full animate-float animation-delay-3000" />
-        <div className="absolute bottom-[25%] right-[25%] w-2 h-2 bg-pink-500/20 rounded-full animate-float animation-delay-1500" />
-        <div className="absolute bottom-[40%] left-[10%] w-2.5 h-2.5 bg-emerald-500/20 rounded-full animate-float animation-delay-2500" />
+        <div className="absolute top-[30%] left-[5%] w-3 h-3 bg-primary/20 rounded-full animate-float animation-delay-1000" />
+        <div className="absolute top-[60%] right-[15%] w-2 h-2 bg-primary/25 rounded-full animate-float animation-delay-2000" />
+        <div className="absolute top-[45%] left-[20%] w-1.5 h-1.5 bg-primary/30 rounded-full animate-float animation-delay-3000" />
+        <div className="absolute bottom-[25%] right-[25%] w-2 h-2 bg-primary/20 rounded-full animate-float animation-delay-1500" />
+        <div className="absolute bottom-[40%] left-[10%] w-2.5 h-2.5 bg-primary/20 rounded-full animate-float animation-delay-2500" />
 
         {/* Sparkle effects */}
         <div className="absolute top-[15%] right-[30%] animate-pulse">
@@ -688,7 +688,7 @@ const Index = () => {
           </svg>
         </div>
         <div className="absolute top-[50%] left-[15%] animate-pulse animation-delay-2000">
-          <svg className="w-3 h-3 text-amber-500/25" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3 text-primary/25" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
           </svg>
         </div>
@@ -822,7 +822,7 @@ const Index = () => {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-500/10 shrink-0"
+                                className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10 shrink-0"
                                 onClick={() => openWhatsApp(student.phone!)}
                                 title="فتح واتساب"
                               >
@@ -904,18 +904,18 @@ const Index = () => {
                 <span className="font-semibold text-foreground">{getGreeting()} عمر!</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700 border-blue-500/30">
+                <Badge variant="outline" className="gap-1 bg-primary/10 text-primary border-primary/30">
                   <CalendarDays className="h-3 w-3" />
                   {todayStats.total} حصص
                 </Badge>
                 {todayStats.completed > 0 && (
-                  <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                  <Badge variant="outline" className="gap-1 bg-primary/20 text-primary border-primary/40">
                     <CheckCircle2 className="h-3 w-3" />
                     {todayStats.completed} مكتملة
                   </Badge>
                 )}
                 {todayStats.cancelled > 0 && (
-                  <Badge variant="outline" className="gap-1 bg-rose-500/10 text-rose-700 border-rose-500/30">
+                  <Badge variant="outline" className="gap-1 bg-muted text-muted-foreground border-border">
                     <XCircle className="h-3 w-3" />
                     {todayStats.cancelled} ملغاة
                   </Badge>
@@ -926,7 +926,7 @@ const Index = () => {
               <div className="flex items-center gap-2">
                 <div className="hidden sm:block w-24 h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-500"
+                    className="h-full bg-primary transition-all duration-500"
                     style={{ width: `${todayStats.progressPercent}%` }}
                   />
                 </div>
@@ -996,10 +996,10 @@ const Index = () => {
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="relative">
-                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shrink-0 shadow-lg">
-                              <Timer className="h-7 w-7 text-white" />
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 shadow-lg">
+                              <Timer className="h-7 w-7 text-primary-foreground" />
                             </div>
-                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-white animate-pulse" />
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs text-muted-foreground mb-0.5 font-medium">⏰ الحصة القادمة</p>
@@ -1011,7 +1011,7 @@ const Index = () => {
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                                    className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
                                     onClick={() => openWhatsApp(nextSession.student.phone!)}
                                     title="رسالة واتساب"
                                   >
@@ -1020,7 +1020,7 @@ const Index = () => {
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
+                                    className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
                                     onClick={() => window.open(`tel:${nextSession.student.phone}`, "_self")}
                                     title="اتصال هاتفي"
                                   >
@@ -1039,7 +1039,7 @@ const Index = () => {
                                 </>
                               )}
                               <span>•</span>
-                              <span className={nextSession.student.sessionType === "online" ? "text-blue-600" : "text-emerald-600"}>
+                              <span className={nextSession.student.sessionType === "online" ? "text-primary" : "text-primary/80"}>
                                 {nextSession.student.sessionType === "online" ? "أونلاين" : "حضوري"}
                               </span>
                             </div>
@@ -1073,15 +1073,15 @@ const Index = () => {
                                     <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
                                   )}
                                   {lastSession.homework && (
-                                    <div className="flex items-center gap-1 p-1.5 rounded bg-amber-500/10 text-amber-700">
+                                    <div className="flex items-center gap-1 p-1.5 rounded bg-primary/10 text-primary">
                                       <BookOpen className="h-3 w-3" />
                                       <span className="font-medium">واجب:</span>
                                       <span className="line-clamp-1">{lastSession.homework}</span>
                                       {lastSession.homeworkStatus === "completed" && (
-                                        <Badge className="h-4 px-1 text-[10px] bg-emerald-500/20 text-emerald-700">✓</Badge>
+                                        <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary">✓</Badge>
                                       )}
                                       {lastSession.homeworkStatus === "incomplete" && (
-                                        <Badge className="h-4 px-1 text-[10px] bg-rose-500/20 text-rose-700">✗</Badge>
+                                        <Badge className="h-4 px-1 text-[10px] bg-muted text-muted-foreground">✗</Badge>
                                       )}
                                     </div>
                                   )}
@@ -1107,7 +1107,7 @@ const Index = () => {
                               <AlertDialogTrigger asChild>
                                 <Button
                                   size="sm"
-                                  className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
+                                  className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 h-9 px-4"
                                 >
                                   <Check className="h-4 w-4" />
                                   <span className="hidden sm:inline">إكمال</span>
@@ -1124,7 +1124,7 @@ const Index = () => {
                                   <AlertDialogCancel>إلغاء</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => handleToggleComplete(nextSession.student.id, nextSession.session.id)}
-                                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                                   >
                                     تأكيد الإكمال
                                   </AlertDialogAction>
@@ -1136,12 +1136,12 @@ const Index = () => {
                             nextSession.session.time || nextSession.student.sessionTime || "16:00",
                             nextSession.session.duration || nextSession.student.sessionDuration || 60
                           ) ? (
-                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-amber-500/10 text-amber-600 text-sm font-medium">
+                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
                               <Clock className="h-4 w-4 animate-pulse" />
                               <span className="hidden sm:inline">جارية</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-blue-500/10 text-blue-600 text-sm font-medium">
+                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
                               <Clock className="h-4 w-4" />
                               <span className="hidden sm:inline">مجدولة</span>
                             </div>
@@ -1151,7 +1151,7 @@ const Index = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-rose-500/50 text-rose-600 hover:bg-rose-500/10 gap-1.5 h-9 px-4"
+                                className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1.5 h-9 px-4"
                               >
                                 <XCircle className="h-4 w-4" />
                                 <span className="hidden sm:inline">إلغاء</span>
@@ -1218,12 +1218,12 @@ const Index = () => {
                         </Button>
                         <div className="flex items-center gap-1.5 text-xs">
                           {todayStats.scheduled > 0 && (
-                            <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/30 font-semibold">
+                            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 font-semibold">
                               {todayStats.scheduled} مجدولة
                             </Badge>
                           )}
                           {todayStats.completed > 0 && (
-                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30 font-semibold">
+                            <Badge variant="outline" className="bg-primary/20 text-primary border-primary/40 font-semibold">
                               {todayStats.completed} مكتملة
                             </Badge>
                           )}
@@ -1248,9 +1248,9 @@ const Index = () => {
                             key={session.id}
                             className={cn(
                               "flex gap-3 sm:gap-4 p-3 sm:p-4 transition-all group",
-                              isCompleted && "bg-emerald-500/5",
-                              isCancelled && "bg-rose-500/5 opacity-60",
-                              isVacation && "bg-amber-500/5",
+                              isCompleted && "bg-primary/5",
+                              isCancelled && "bg-muted/50 opacity-60",
+                              isVacation && "bg-muted/30",
                               isScheduled && !isNextSession && "hover:bg-muted/50",
                               isNextSession && "bg-gradient-to-r from-primary/10 to-transparent ring-1 ring-primary/20",
                             )}
@@ -1259,10 +1259,10 @@ const Index = () => {
                               <div
                                 className={cn(
                                   "w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-sm border-2 shadow-sm relative overflow-hidden",
-                                  isCompleted && "bg-emerald-500 text-white border-emerald-600",
-                                  isCancelled && "bg-rose-500 text-white border-rose-600",
-                                  isVacation && "bg-amber-500 text-white border-amber-600",
-                                  isScheduled && "bg-blue-500 text-white border-blue-600",
+                                  isCompleted && "bg-primary text-primary-foreground border-primary",
+                                  isCancelled && "bg-muted text-muted-foreground border-border",
+                                  isVacation && "bg-secondary text-secondary-foreground border-border",
+                                  isScheduled && "bg-primary/90 text-primary-foreground border-primary",
                                   isScheduled && "cursor-pointer hover:scale-105 transition-transform",
                                 )}
                                 onClick={() => isScheduled && handleQuickTimeEdit(student, session)}
@@ -1283,10 +1283,10 @@ const Index = () => {
                                 <div
                                   className={cn(
                                     "w-0.5 flex-1 mt-2 min-h-[16px]",
-                                    isCompleted && "bg-emerald-300",
-                                    isCancelled && "bg-rose-300",
-                                    isVacation && "bg-amber-300",
-                                    isScheduled && "bg-blue-300",
+                                    isCompleted && "bg-primary/40",
+                                    isCancelled && "bg-muted-foreground/30",
+                                    isVacation && "bg-muted-foreground/30",
+                                    isScheduled && "bg-primary/30",
                                   )}
                                 />
                               )}
@@ -1296,12 +1296,12 @@ const Index = () => {
                                 <div className="flex items-center gap-2 min-w-0">
                                   <div className={cn(
                                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                                    isOnline ? "bg-blue-500/10" : "bg-emerald-500/10"
+                                    isOnline ? "bg-primary/10" : "bg-primary/15"
                                   )}>
                                     {isOnline ? (
-                                      <Monitor className="h-4 w-4 text-blue-600" />
+                                      <Monitor className="h-4 w-4 text-primary" />
                                     ) : (
-                                      <MapPin className="h-4 w-4 text-emerald-600" />
+                                      <MapPin className="h-4 w-4 text-primary" />
                                     )}
                                   </div>
                                   <div className="min-w-0">
@@ -1316,7 +1316,7 @@ const Index = () => {
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                                        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
                                         onClick={() => openWhatsApp(student.phone!)}
                                         title="رسالة واتساب"
                                       >
@@ -1325,7 +1325,7 @@ const Index = () => {
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
+                                        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
                                         onClick={() => window.open(`tel:${student.phone}`, "_self")}
                                         title="اتصال هاتفي"
                                       >
@@ -1344,10 +1344,10 @@ const Index = () => {
                                   <Badge
                                     className={cn(
                                       "shrink-0 text-xs font-semibold",
-                                      isCompleted && "bg-emerald-500 text-white",
-                                      isCancelled && "bg-rose-500 text-white",
-                                      isVacation && "bg-amber-500 text-white",
-                                      isScheduled && "bg-blue-500 text-white",
+                                      isCompleted && "bg-primary text-primary-foreground",
+                                      isCancelled && "bg-muted text-muted-foreground",
+                                      isVacation && "bg-secondary text-secondary-foreground",
+                                      isScheduled && "bg-primary/80 text-primary-foreground",
                                     )}
                                   >
                                     {isCompleted && "✓ مكتملة"}
@@ -1387,15 +1387,15 @@ const Index = () => {
                                       <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
                                     )}
                                     {lastSession.homework && (
-                                      <div className="flex items-center gap-1 p-1.5 rounded bg-amber-500/10 text-amber-700">
+                                      <div className="flex items-center gap-1 p-1.5 rounded bg-primary/10 text-primary">
                                         <BookOpen className="h-3 w-3" />
                                         <span className="font-medium">واجب:</span>
                                         <span className="line-clamp-1">{lastSession.homework}</span>
                                         {lastSession.homeworkStatus === "completed" && (
-                                          <Badge className="h-4 px-1 text-[10px] bg-emerald-500/20 text-emerald-700">✓</Badge>
+                                          <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary">✓</Badge>
                                         )}
                                         {lastSession.homeworkStatus === "incomplete" && (
-                                          <Badge className="h-4 px-1 text-[10px] bg-rose-500/20 text-rose-700">✗</Badge>
+                                          <Badge className="h-4 px-1 text-[10px] bg-muted text-muted-foreground">✗</Badge>
                                         )}
                                       </div>
                                     )}
@@ -1415,7 +1415,7 @@ const Index = () => {
                                       <AlertDialogTrigger asChild>
                                         <Button
                                           size="sm"
-                                          className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 h-9 px-4"
+                                          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 h-9 px-4"
                                         >
                                           <CheckCircle2 className="h-4 w-4" />
                                           إكمال
@@ -1433,7 +1433,7 @@ const Index = () => {
                                           <AlertDialogCancel>إلغاء</AlertDialogCancel>
                                           <AlertDialogAction
                                             onClick={() => handleToggleComplete(student.id, session.id)}
-                                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                            className="bg-primary text-primary-foreground hover:bg-primary/90"
                                           >
                                             تأكيد الإكمال
                                           </AlertDialogAction>
@@ -1445,12 +1445,12 @@ const Index = () => {
                                     sessionTime,
                                     session.duration || student.sessionDuration || 60
                                   ) ? (
-                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-amber-500/10 text-amber-600 text-sm font-medium">
+                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
                                       <Clock className="h-4 w-4 animate-pulse" />
                                       <span>جارية</span>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-blue-500/10 text-blue-600 text-sm font-medium">
+                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
                                       <Clock className="h-4 w-4" />
                                       <span>مجدولة</span>
                                     </div>
@@ -1460,7 +1460,7 @@ const Index = () => {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="border-rose-500/50 text-rose-600 hover:bg-rose-500/10 gap-1.5 h-9 px-4"
+                                        className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1.5 h-9 px-4"
                                       >
                                         <XCircle className="h-4 w-4" />
                                         إلغاء
@@ -1510,11 +1510,11 @@ const Index = () => {
                               )}
                               {isCompleted && (
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm text-emerald-600 font-medium">✓ تم إكمال الحصة</span>
+                                  <span className="text-sm text-primary font-medium">✓ تم إكمال الحصة</span>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 gap-1.5 h-8 px-3 text-xs"
+                                    className="border-primary/50 text-primary hover:bg-primary/10 gap-1.5 h-8 px-3 text-xs"
                                     onClick={() => handleQuickPayment(student.id, session.id, session.date)}
                                   >
                                     <DollarSign className="h-3.5 w-3.5" />
@@ -1522,8 +1522,8 @@ const Index = () => {
                                   </Button>
                                 </div>
                               )}
-                              {isCancelled && <span className="text-sm text-rose-600">تم إلغاء هذه الحصة</span>}
-                              {isVacation && <span className="text-sm text-amber-600">إجازة</span>}
+                              {isCancelled && <span className="text-sm text-muted-foreground">تم إلغاء هذه الحصة</span>}
+                              {isVacation && <span className="text-sm text-muted-foreground">إجازة</span>}
                             </div>
                           </div>
                         );
@@ -1870,7 +1870,7 @@ const Index = () => {
 
                     return (
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium flex items-center gap-1.5 text-emerald-700">
+                        <Label className="text-sm font-medium flex items-center gap-1.5 text-primary">
                           <Sparkles className="h-4 w-4" />
                           أوقات متاحة
                         </Label>

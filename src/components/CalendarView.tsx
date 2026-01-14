@@ -865,13 +865,13 @@ export const CalendarView = ({
   const getStatusColor = (status: Session["status"]) => {
     switch (status) {
       case "completed":
-        return "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30";
+        return "bg-primary/20 text-primary dark:text-primary border-primary/40 hover:bg-primary/30";
       case "cancelled":
-        return "bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-500/40 hover:bg-rose-500/30";
+        return "bg-muted text-muted-foreground dark:text-muted-foreground border-border hover:bg-muted/80";
       case "vacation":
-        return "bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/40 hover:bg-amber-500/30";
+        return "bg-secondary text-secondary-foreground dark:text-secondary-foreground border-border hover:bg-secondary/80";
       default:
-        return "bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/40 hover:bg-blue-500/30";
+        return "bg-primary/10 text-primary dark:text-primary border-primary/30 hover:bg-primary/20";
     }
   };
 
@@ -891,13 +891,13 @@ export const CalendarView = ({
   const getStatusBadgeColor = (status: Session["status"]) => {
     switch (status) {
       case "completed":
-        return "bg-emerald-500 text-white";
+        return "bg-primary text-primary-foreground";
       case "cancelled":
-        return "bg-rose-500 text-white";
+        return "bg-muted text-muted-foreground";
       case "vacation":
-        return "bg-amber-500 text-white";
+        return "bg-secondary text-secondary-foreground";
       default:
-        return "bg-blue-500 text-white";
+        return "bg-primary/80 text-primary-foreground";
     }
   };
 
@@ -993,24 +993,24 @@ export const CalendarView = ({
           <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-muted/40 to-muted/20 border-2">
             {/* Main Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="text-center p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 hover:scale-105 transition-transform">
-                <CalendarIcon className="h-5 w-5 mx-auto mb-1 text-blue-500" />
-                <p className="text-2xl font-bold text-blue-600 tabular-nums">{periodSummary.totalSessions}</p>
+              <div className="text-center p-3 rounded-xl bg-primary/10 border border-primary/20 hover:scale-105 transition-transform">
+                <CalendarIcon className="h-5 w-5 mx-auto mb-1 text-primary" />
+                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.totalSessions}</p>
                 <p className="text-xs text-muted-foreground font-medium">إجمالي الحصص</p>
               </div>
-              <div className="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:scale-105 transition-transform">
-                <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-                <p className="text-2xl font-bold text-emerald-600 tabular-nums">{periodSummary.completedSessions}</p>
+              <div className="text-center p-3 rounded-xl bg-primary/15 border border-primary/25 hover:scale-105 transition-transform">
+                <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-primary" />
+                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.completedSessions}</p>
                 <p className="text-xs text-muted-foreground font-medium">مكتملة</p>
               </div>
-              <div className="text-center p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:scale-105 transition-transform">
-                <Clock className="h-5 w-5 mx-auto mb-1 text-purple-500" />
-                <p className="text-2xl font-bold text-purple-600 tabular-nums">{periodSummary.totalHours}</p>
+              <div className="text-center p-3 rounded-xl bg-primary/8 border border-primary/15 hover:scale-105 transition-transform">
+                <Clock className="h-5 w-5 mx-auto mb-1 text-primary" />
+                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.totalHours}</p>
                 <p className="text-xs text-muted-foreground font-medium">ساعة</p>
               </div>
-              <div className="text-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:scale-105 transition-transform">
-                <TrendingUp className="h-5 w-5 mx-auto mb-1 text-amber-500" />
-                <p className="text-2xl font-bold text-amber-600 tabular-nums">{periodSummary.completionRate}%</p>
+              <div className="text-center p-3 rounded-xl bg-primary/5 border border-primary/10 hover:scale-105 transition-transform">
+                <TrendingUp className="h-5 w-5 mx-auto mb-1 text-primary" />
+                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.completionRate}%</p>
                 <p className="text-xs text-muted-foreground font-medium">نسبة الإنجاز</p>
               </div>
             </div>
@@ -1044,22 +1044,22 @@ export const CalendarView = ({
 
               {/* Time Distribution */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <Sunset className="h-4 w-4 text-orange-500" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Sunset className="h-4 w-4 text-primary" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">توزيع الأوقات</p>
                   <div className="flex gap-2 text-xs mt-1">
                     <span className="flex items-center gap-1">
-                      <Sunrise className="h-3 w-3 text-amber-500" />
+                      <Sunrise className="h-3 w-3 text-primary/70" />
                       {periodSummary.timeSlotStats.morning}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Sunset className="h-3 w-3 text-orange-500" />
+                      <Sunset className="h-3 w-3 text-primary/80" />
                       {periodSummary.timeSlotStats.afternoon}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Moon className="h-3 w-3 text-indigo-500" />
+                      <Moon className="h-3 w-3 text-primary" />
                       {periodSummary.timeSlotStats.evening}
                     </span>
                   </div>
@@ -1350,10 +1350,10 @@ export const CalendarView = ({
         <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t-2 text-sm bg-gradient-to-r from-muted/30 to-muted/10 p-4 rounded-xl">
           <span className="text-muted-foreground font-bold">الحالة:</span>
           {[
-            { color: "bg-blue-500/40", label: "مجدولة", icon: CalendarIcon },
-            { color: "bg-emerald-500/40", label: "مكتملة", icon: CheckCircle2 },
-            { color: "bg-rose-500/40", label: "ملغاة", icon: XCircle },
-            { color: "bg-amber-500/40", label: "إجازة", icon: Coffee },
+            { color: "bg-primary/30", label: "مجدولة", icon: CalendarIcon },
+            { color: "bg-primary/50", label: "مكتملة", icon: CheckCircle2 },
+            { color: "bg-muted", label: "ملغاة", icon: XCircle },
+            { color: "bg-secondary", label: "إجازة", icon: Coffee },
           ].map(({ color, label, icon: Icon }) => (
             <div key={label} className="flex items-center gap-1.5">
               <div className={cn("w-4 h-4 rounded-md border-2 border-current flex items-center justify-center", color)}>

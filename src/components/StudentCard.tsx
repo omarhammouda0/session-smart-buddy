@@ -252,8 +252,8 @@ export const StudentCard = ({
                 className={cn(
                   "text-xs gap-1.5 font-semibold shadow-sm",
                   (student.sessionType || "onsite") === "online"
-                    ? "border-blue-500/50 text-blue-600 bg-blue-500/10"
-                    : "border-orange-500/50 text-orange-600 bg-orange-500/10",
+                    ? "border-primary/50 text-primary bg-primary/10"
+                    : "border-primary/40 text-primary/90 bg-primary/5",
                 )}
               >
                 {(student.sessionType || "onsite") === "online" ? (
@@ -295,7 +295,7 @@ export const StudentCard = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8 px-3 gap-1.5 border-green-500/50 text-green-600 hover:bg-green-500/10 hover:text-green-700 hover:border-green-500"
+                  className="h-8 px-3 gap-1.5 border-primary/50 text-primary hover:bg-primary/10 hover:text-primary hover:border-primary"
                   onClick={() => openWhatsApp(student.phone!)}
                 >
                   <WhatsAppIcon className="h-4 w-4" />
@@ -531,9 +531,9 @@ export const StudentCard = ({
                       <Badge
                         className={cn(
                           "text-xs",
-                          isCompleted && "bg-emerald-500/20 text-emerald-700 border-emerald-500/30",
-                          isCancelled && "bg-rose-500/20 text-rose-700 border-rose-500/30",
-                          isScheduled && "bg-blue-500/20 text-blue-700 border-blue-500/30",
+                          isCompleted && "bg-primary/20 text-primary border-primary/30",
+                          isCancelled && "bg-muted text-muted-foreground border-border",
+                          isScheduled && "bg-primary/10 text-primary border-primary/20",
                         )}
                       >
                         {isCompleted ? "مكتملة ✓" : isCancelled ? "ملغاة ✗" : "مجدولة"}
@@ -547,7 +547,7 @@ export const StudentCard = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
+                          className="h-8 w-8 text-primary hover:bg-primary/10 hover:text-primary"
                           title="تسجيل دفع"
                           onClick={() => onQuickPayment(student.id, session.id, session.date)}
                         >
