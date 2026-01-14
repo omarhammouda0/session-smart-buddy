@@ -207,11 +207,11 @@ export const StudentCard = ({
   const getHomeworkStatusBadge = (status?: string) => {
     switch (status) {
       case "completed":
-        return <Badge className="bg-emerald-500/20 text-emerald-700 text-xs">✓ تم حله</Badge>;
+        return <Badge className="bg-primary/20 text-primary text-xs">✓ تم حله</Badge>;
       case "incomplete":
-        return <Badge className="bg-rose-500/20 text-rose-700 text-xs">✗ لم يُحل</Badge>;
+        return <Badge className="bg-muted text-muted-foreground text-xs">✗ لم يُحل</Badge>;
       case "assigned":
-        return <Badge className="bg-amber-500/20 text-amber-700 text-xs">⏳ مطلوب</Badge>;
+        return <Badge className="bg-primary/10 text-primary text-xs">⏳ مطلوب</Badge>;
       default:
         return null;
     }
@@ -340,9 +340,9 @@ export const StudentCard = ({
         <CardContent className="p-4 sm:p-5 space-y-3">
           {/* Last Session Notes & Homework */}
           {lastSessionWithNotes && (
-            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/5 to-indigo-500/5 border-2 border-purple-500/20 space-y-2">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 space-y-2">
               <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-sm text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
+                <h4 className="font-semibold text-sm text-primary flex items-center gap-1.5">
                   <FileText className="h-4 w-4" />
                   الحصة السابقة
                 </h4>
@@ -354,7 +354,7 @@ export const StudentCard = ({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-xs gap-1 text-purple-600 hover:bg-purple-500/10"
+                      className="h-7 px-2 text-xs gap-1 text-primary hover:bg-primary/10"
                       onClick={() => setShowHistoryDialog(true)}
                     >
                       <History className="h-3.5 w-3.5" />
@@ -372,7 +372,7 @@ export const StudentCard = ({
               {/* Topic */}
               {lastSessionWithNotes.topic && (
                 <div className="flex items-start gap-2">
-                  <BookOpen className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
+                  <BookOpen className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
                   <p className="text-sm font-medium text-foreground">{lastSessionWithNotes.topic}</p>
                 </div>
               )}
@@ -390,7 +390,7 @@ export const StudentCard = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-purple-600 hover:text-purple-700"
+                      className="h-6 px-2 text-xs text-primary hover:text-primary"
                       onClick={() => setShowNotesExpanded(!showNotesExpanded)}
                     >
                       {showNotesExpanded ? (
@@ -411,14 +411,14 @@ export const StudentCard = ({
 
               {/* Homework */}
               {lastSessionWithNotes.homework && (
-                <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <BookOpen className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+                  <BookOpen className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-semibold text-amber-700">الواجب:</span>
+                      <span className="text-xs font-semibold text-primary">الواجب:</span>
                       {getHomeworkStatusBadge(lastSessionWithNotes.homeworkStatus)}
                     </div>
-                    <p className="text-sm text-amber-800 dark:text-amber-300">{lastSessionWithNotes.homework}</p>
+                    <p className="text-sm text-foreground">{lastSessionWithNotes.homework}</p>
                   </div>
                 </div>
               )}
@@ -430,7 +430,7 @@ export const StudentCard = ({
             <DialogContent dir="rtl" className="sm:max-w-lg max-h-[80vh]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-purple-600" />
+                  <History className="h-5 w-5 text-primary" />
                   سجل حصص {student.name}
                 </DialogTitle>
                 <DialogDescription>
@@ -455,7 +455,7 @@ export const StudentCard = ({
 
                       {session.topic && (
                         <div className="flex items-start gap-2">
-                          <BookOpen className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
+                          <BookOpen className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
                           <p className="text-sm font-medium">{session.topic}</p>
                         </div>
                       )}
@@ -465,14 +465,14 @@ export const StudentCard = ({
                       )}
 
                       {session.homework && (
-                        <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                          <BookOpen className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+                          <BookOpen className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-semibold text-amber-700">الواجب:</span>
+                              <span className="text-xs font-semibold text-primary">الواجب:</span>
                               {getHomeworkStatusBadge(session.homeworkStatus)}
                             </div>
-                            <p className="text-sm text-amber-800 dark:text-amber-300">{session.homework}</p>
+                            <p className="text-sm text-foreground">{session.homework}</p>
                           </div>
                         </div>
                       )}
@@ -503,8 +503,8 @@ export const StudentCard = ({
                   key={session.id || index}
                   className={cn(
                     "flex items-center justify-between p-3 rounded-xl border-2 transition-all",
-                    isCompleted && "bg-emerald-500/10 border-emerald-500/30",
-                    isCancelled && "bg-rose-500/10 border-rose-500/30",
+                    isCompleted && "bg-primary/10 border-primary/30",
+                    isCancelled && "bg-muted/50 border-border",
                     isScheduled && "bg-card border-border",
                   )}
                 >
@@ -512,8 +512,8 @@ export const StudentCard = ({
                     <div
                       className={cn(
                         "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                        isCompleted && "bg-emerald-500/20 text-emerald-600",
-                        isCancelled && "bg-rose-500/20 text-rose-600",
+                        isCompleted && "bg-primary/20 text-primary",
+                        isCancelled && "bg-muted text-muted-foreground",
                         isScheduled && "bg-primary/20 text-primary",
                       )}
                     >
@@ -566,7 +566,7 @@ export const StudentCard = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+                              className="h-8 w-8 text-primary hover:bg-primary/10 hover:text-primary"
                               title="إكمال الحصة"
                             >
                               <Check className="h-4 w-4" />
@@ -583,7 +583,7 @@ export const StudentCard = ({
                               <AlertDialogCancel>إلغاء</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => onToggleComplete(student.id, session.id)}
-                                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                className="bg-primary text-primary-foreground hover:bg-primary/90"
                               >
                                 تأكيد الإكمال
                               </AlertDialogAction>
@@ -599,7 +599,7 @@ export const StudentCard = ({
                         session.duration || student.sessionDuration || 60
                       ) && (
                         <div
-                          className="h-8 w-8 flex items-center justify-center text-amber-500"
+                          className="h-8 w-8 flex items-center justify-center text-primary"
                           title="الحصة جارية الآن"
                         >
                           <Clock className="h-4 w-4 animate-pulse" />
@@ -617,7 +617,7 @@ export const StudentCard = ({
                         session.duration || student.sessionDuration || 60
                       ) && (
                         <div
-                          className="h-8 w-8 flex items-center justify-center text-blue-500"
+                          className="h-8 w-8 flex items-center justify-center text-primary"
                           title="الحصة مجدولة"
                         >
                           <Clock className="h-4 w-4" />
@@ -630,7 +630,7 @@ export const StudentCard = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700"
+                              className="h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
                               title="إلغاء الحصة"
                             >
                               <Ban className="h-4 w-4" />
@@ -650,7 +650,7 @@ export const StudentCard = ({
                                   const reason = prompt("سبب الإلغاء (اختياري):");
                                   onCancelSession(student.id, session.id, reason || undefined);
                                 }}
-                                className="bg-rose-600 text-white hover:bg-rose-700"
+                                className="bg-muted text-foreground hover:bg-muted/80"
                               >
                                 تأكيد الإلغاء
                               </AlertDialogAction>
