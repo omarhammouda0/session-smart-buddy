@@ -83,6 +83,9 @@ import { useStudentMaterials } from "@/hooks/useStudentMaterials";
 import { StudentMaterialsDialog } from "@/components/StudentMaterialsDialog";
 import { TodaySessionsStats } from "@/components/TodaySessionsStats";
 import { EndOfDayChecker } from "@/components/EndOfDayChecker";
+import { useAISuggestions } from "@/hooks/useAISuggestions";
+import { AISuggestionsWidget } from "@/components/AISuggestionsWidget";
+import { ActionHandlers } from "@/lib/suggestionActions";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -270,6 +273,15 @@ const Index = () => {
 
   // Student Materials
   const { getMaterials, addMaterials, addMaterial, removeMaterial } = useStudentMaterials();
+
+  // AI Suggestions
+  const {
+    suggestions: aiSuggestions,
+    hasNewCritical: hasNewAISuggestions,
+    dismissSuggestion: dismissAISuggestion,
+    refreshSuggestions: refreshAISuggestions,
+    markAllAsRead: markAISuggestionsAsRead,
+  } = useAISuggestions(students, payments);
 
   // Handle adding a new student with materials
   const handleAddStudent = async (
@@ -522,6 +534,53 @@ const Index = () => {
     });
   };
 
+  // AI Suggestions Action Handlers
+  const [sessionNotesDialogOpen, setSessionNotesDialogOpen] = useState<{
+    open: boolean;
+    studentId: string;
+    sessionId: string;
+  } | null>(null);
+
+  const aiSuggestionHandlers: ActionHandlers = {
+    openStudent: (studentId: string) => {
+      // Switch to history tab and scroll to student
+      setActiveTab("history");
+      // Could also open edit dialog
+    },
+    openPayment: (studentId: string) => {
+      const student = students.find((s) => s.id === studentId);
+      if (student) {
+        // Find most recent session for context
+        const recentSession = student.sessions
+          .filter((s) => s.status === "completed")
+          .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+        setQuickPaymentDialog({
+          open: true,
+          student,
+          sessionId: recentSession?.id || "",
+          sessionDate: recentSession?.date || format(now, "yyyy-MM-dd"),
+        });
+      }
+    },
+    openSessionNotes: (studentId: string, sessionId: string) => {
+      setSessionNotesDialogOpen({ open: true, studentId, sessionId });
+    },
+    showTodaySessions: () => {
+      setActiveTab("sessions");
+    },
+    showCalendar: () => {
+      setActiveTab("calendar");
+    },
+    markComplete: (studentId: string, sessionId: string) => {
+      toggleSessionComplete(studentId, sessionId);
+      toast({
+        title: "✅ تم تحديث الحصة",
+        description: "تم تسجيل الحصة كمكتملة",
+      });
+    },
+  };
+
   // Computed Values
   const selectedMonth = now.getMonth();
   const selectedYear = now.getFullYear();
@@ -727,6 +786,14 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* AI Suggestions Widget */}
+              <AISuggestionsWidget
+                suggestions={aiSuggestions}
+                hasNewCritical={hasNewAISuggestions}
+                onDismiss={dismissAISuggestion}
+                onMarkAsRead={markAISuggestionsAsRead}
+                actionHandlers={aiSuggestionHandlers}
+              />
               <Sheet>
                 <SheetTrigger asChild>
                   <Button
