@@ -617,18 +617,18 @@ const Index = () => {
             </div>
             {/* Glow ring */}
             <div className="absolute inset-0 w-24 h-24 mx-auto rounded-3xl border-4 border-primary/30 animate-ping" />
-            {/* Orbiting dots */}
+            {/* Orbiting dots - Navy blue theme */}
             <div className="absolute inset-0 w-32 h-32 mx-auto -mt-4 animate-spin-slow" style={{ marginRight: '-1rem' }}>
               <div className="absolute top-0 left-1/2 w-2 h-2 bg-primary rounded-full" />
-              <div className="absolute bottom-0 left-1/2 w-2 h-2 bg-purple-500 rounded-full" />
-              <div className="absolute left-0 top-1/2 w-2 h-2 bg-pink-500 rounded-full" />
-              <div className="absolute right-0 top-1/2 w-2 h-2 bg-cyan-500 rounded-full" />
+              <div className="absolute bottom-0 left-1/2 w-2 h-2 bg-primary/80 rounded-full" />
+              <div className="absolute left-0 top-1/2 w-2 h-2 bg-primary/60 rounded-full" />
+              <div className="absolute right-0 top-1/2 w-2 h-2 bg-primary/70 rounded-full" />
             </div>
           </div>
 
           {/* Loading text */}
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
               متابعة الطلاب
             </h2>
             <p className="text-sm text-muted-foreground">جاري تحميل بياناتك...</p>
@@ -636,8 +636,8 @@ const Index = () => {
 
           {/* Loading bar */}
           <div className="w-48 mx-auto">
-            <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full w-1/3 bg-gradient-to-r from-primary via-purple-500 to-pink-500 rounded-full animate-pulse" />
+            <div className="h-1.5 bg-primary/10 dark:bg-primary/20 rounded-full overflow-hidden">
+              <div className="h-full w-1/3 bg-gradient-to-r from-primary via-primary/80 to-primary/60 rounded-full animate-pulse" />
             </div>
           </div>
         </div>
@@ -693,7 +693,7 @@ const Index = () => {
           </svg>
         </div>
         <div className="absolute bottom-[30%] right-[8%] animate-pulse animation-delay-1000">
-          <svg className="w-3.5 h-3.5 text-purple-500/20" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-primary/20" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
           </svg>
         </div>
@@ -716,7 +716,7 @@ const Index = () => {
         <div className="px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary via-primary to-purple-500 shadow-lg shadow-primary/25 flex items-center justify-center shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/25 flex items-center justify-center shrink-0">
                 <GraduationCap className="h-6 w-6 text-primary-foreground" />
               </div>
               <div className="min-w-0">
@@ -974,7 +974,7 @@ const Index = () => {
             ) : allTodaySessions.length === 0 ? (
               <Card className="border-2 border-dashed bg-gradient-to-br from-muted/30 to-muted/10">
                 <CardContent className="p-10 text-center">
-                  <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/10 to-purple-500/10 flex items-center justify-center">
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
                     <CalendarDays className="h-10 w-10 text-primary/60" />
                   </div>
                   <h3 className="font-display font-bold text-xl mb-2">لا توجد حصص اليوم 🎉</h3>
@@ -991,7 +991,7 @@ const Index = () => {
                 <EndOfDayChecker students={students} onToggleComplete={handleToggleComplete} />
 
                 {nextSession && (
-                  <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-purple-500/5 to-transparent overflow-hidden shadow-lg shadow-primary/5">
+                  <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent overflow-hidden shadow-lg shadow-primary/5">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
@@ -1055,8 +1055,8 @@ const Index = () => {
                               const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
 
                               return (
-                                <div className="mt-2 p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs space-y-1">
-                                  <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 font-medium">
+                                <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/20 text-xs space-y-1">
+                                  <div className="flex items-center gap-1.5 text-primary dark:text-primary font-medium">
                                     <FileText className="h-3 w-3" />
                                     <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
                                   </div>
@@ -1065,7 +1065,7 @@ const Index = () => {
                                   )}
                                   {lastSession.topic && (
                                     <p className="text-muted-foreground flex items-center gap-1">
-                                      <BookOpen className="h-3 w-3 text-indigo-500" />
+                                      <BookOpen className="h-3 w-3 text-primary" />
                                       <span className="font-medium">{lastSession.topic}</span>
                                     </p>
                                   )}
@@ -1175,7 +1175,7 @@ const Index = () => {
                                       reason || undefined,
                                     );
                                   }}
-                                  className="bg-rose-600 text-white hover:bg-rose-700"
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                   تأكيد الإلغاء
                                 </AlertDialogAction>
@@ -1369,8 +1369,8 @@ const Index = () => {
                                 const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
 
                                 return (
-                                  <div className="mt-2 p-2 rounded-lg bg-purple-500/5 border border-purple-500/20 text-xs space-y-1">
-                                    <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 font-medium">
+                                  <div className="mt-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs space-y-1">
+                                    <div className="flex items-center gap-1.5 text-primary dark:text-primary font-medium">
                                       <FileText className="h-3 w-3" />
                                       <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
                                     </div>
@@ -1379,7 +1379,7 @@ const Index = () => {
                                     )}
                                     {lastSession.topic && (
                                       <p className="text-muted-foreground flex items-center gap-1">
-                                        <BookOpen className="h-3 w-3 text-indigo-500" />
+                                        <BookOpen className="h-3 w-3 text-primary" />
                                         <span className="font-medium">{lastSession.topic}</span>
                                       </p>
                                     )}
@@ -1481,7 +1481,7 @@ const Index = () => {
                                             const reason = prompt("سبب الإلغاء (اختياري):");
                                             handleCancelSession(student.id, session.id, reason || undefined);
                                           }}
-                                          className="bg-rose-600 text-white hover:bg-rose-700"
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                         >
                                           تأكيد الإلغاء
                                         </AlertDialogAction>
@@ -1491,7 +1491,7 @@ const Index = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 gap-1.5 h-9 px-4"
+                                    className="border-primary/50 text-primary hover:bg-primary/10 gap-1.5 h-9 px-4"
                                     onClick={() => handleQuickPayment(student.id, session.id, session.date)}
                                   >
                                     <DollarSign className="h-4 w-4" />
@@ -1714,25 +1714,25 @@ const Index = () => {
                     onChange={(e) => setTimeEditDialog({ ...timeEditDialog, newTime: e.target.value })}
                     className={cn(
                       "h-12 text-center text-xl font-bold rounded-xl border-2",
-                      hasError && "border-rose-500 text-rose-600",
-                      hasWarning && "border-amber-500 text-amber-600"
+                      hasError && "border-destructive text-destructive",
+                      hasWarning && "border-warning text-warning"
                     )}
                   />
                 </div>
 
                 {/* Conflict Warning */}
                 {hasError && conflict && conflict.conflicts[0] && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-sm">
-                    <XCircle className="h-4 w-4 text-rose-500 shrink-0" />
-                    <span className="text-rose-700">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm">
+                    <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    <span className="text-foreground">
                       تعارض مع حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span> في الساعة {conflict.conflicts[0].session.time}
                     </span>
                   </div>
                 )}
                 {hasWarning && conflict && conflict.conflicts[0] && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
-                    <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-                    <span className="text-amber-700">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30 text-sm">
+                    <Clock className="h-4 w-4 text-warning shrink-0" />
+                    <span className="text-foreground">
                       قريب من حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span> في الساعة {conflict.conflicts[0].session.time}
                     </span>
                   </div>

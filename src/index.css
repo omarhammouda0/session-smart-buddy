@@ -370,15 +370,15 @@
 
   /* Glassmorphism */
   .glass {
-    @apply bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border border-white/20 dark:border-white/10;
+    @apply bg-card/70 dark:bg-card/70 backdrop-blur-xl border border-border/20 dark:border-border/10;
   }
 
   .glass-card {
-    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/30 dark:border-white/10 shadow-xl;
+    @apply bg-card/80 dark:bg-card/80 backdrop-blur-xl border border-border/30 dark:border-border/10 shadow-xl;
   }
 
   .glass-subtle {
-    @apply bg-white/50 dark:bg-gray-900/50 backdrop-blur-md border border-white/20 dark:border-white/5;
+    @apply bg-card/50 dark:bg-card/50 backdrop-blur-md border border-border/20 dark:border-border/5;
   }
 
   /* Card shadows */
@@ -508,11 +508,11 @@
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-purple-500 to-pink-500;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary/80 to-primary/60;
   }
 
   .text-gradient-gold {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary/90 via-primary to-primary/80;
   }
 
   /* Better number styling */

@@ -348,9 +348,9 @@ export const UpcomingSessionsManager = ({
                                             session?.status === 'completed' && "line-through opacity-70"
                                           )}>{student.name}</span>
                                           {(student.sessionType || 'onsite') === 'online' ? (
-                                            <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
+                                            <Monitor className="h-3 w-3 text-primary shrink-0" />
                                           ) : (
-                                            <MapPin className="h-3 w-3 text-orange-500 shrink-0" />
+                                            <MapPin className="h-3 w-3 text-primary/70 shrink-0" />
                                           )}
                                         </div>
                                         <span className="text-[10px] text-muted-foreground">{session?.time || student.sessionTime}</span>
@@ -363,9 +363,9 @@ export const UpcomingSessionsManager = ({
                                             session?.status === 'completed' && "line-through opacity-70"
                                           )}>{student.name.split(' ')[0]}</span>
                                           {(student.sessionType || 'onsite') === 'online' ? (
-                                            <Monitor className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                                            <Monitor className="h-2.5 w-2.5 text-primary shrink-0" />
                                           ) : (
-                                            <MapPin className="h-2.5 w-2.5 text-orange-500 shrink-0" />
+                                            <MapPin className="h-2.5 w-2.5 text-primary/70 shrink-0" />
                                           )}
                                           {hasConflict && (
                                             <span className={cn(
