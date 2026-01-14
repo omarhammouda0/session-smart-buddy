@@ -26,6 +26,8 @@ export type Database = {
           id: string
           updated_at: string
           user_id: string
+          working_hours_end: string | null
+          working_hours_start: string | null
         }
         Insert: {
           created_at?: string
@@ -38,6 +40,8 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id: string
+          working_hours_end?: string | null
+          working_hours_start?: string | null
         }
         Update: {
           created_at?: string
@@ -50,6 +54,8 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+          working_hours_end?: string | null
+          working_hours_start?: string | null
         }
         Relationships: []
       }

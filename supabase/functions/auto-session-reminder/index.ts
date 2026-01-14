@@ -84,28 +84,34 @@ serve(async (req) => {
     const reminderHours1 = settings.session_reminder_hours || 24;
     const reminderHours2 = settings.session_reminder_hours_2 || 1;
 
-    // Default templates
-    const defaultTemplate1 = 'مرحباً {student_name}،\nتذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.\nنراك قريباً!';
-    const defaultTemplate2 = 'مرحباً {student_name}،\nجلستك تبدأ خلال ساعة واحدة الساعة {time}!\nالرجاء الاستعداد.';
+    // Separate templates for each reminder interval - matched to their hours
+    const reminderTemplate1 = settings.session_reminder_template_1 ||
+      settings.session_reminder_template ||
+      'مرحباً {student_name}،\nتذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.\nنراك قريباً!';
 
-    // Separate templates for each reminder interval
-    // Use trim() to handle empty strings with whitespace
-    const reminderTemplate1 = (settings.session_reminder_template_1 && settings.session_reminder_template_1.trim()) ||
-      (settings.session_reminder_template && settings.session_reminder_template.trim()) ||
-      defaultTemplate1;
+    const reminderTemplate2 = settings.session_reminder_template_2 ||
+      'مرحباً {student_name}،\nجلستك تبدأ خلال ساعة واحدة الساعة {time}!\nالرجاء الاستعداد.';
 
-    const reminderTemplate2 = (settings.session_reminder_template_2 && settings.session_reminder_template_2.trim()) ||
-      defaultTemplate2;
+    console.log(`Reminder intervals: ${reminderHours1}h (template 1) and ${reminderHours2}h (template 2)`);
 
-    console.log(`Reminder intervals: ${reminderHours1}h and ${reminderHours2}h`);
-    console.log(`Template 1 (${reminderHours1}h): ${reminderTemplate1.substring(0, 50)}...`);
-    console.log(`Template 2 (${reminderHours2}h): ${reminderTemplate2.substring(0, 50)}...`);
-
-    // Array of reminder intervals to check (with their specific templates)
-    const reminderIntervals = [
-      { hours: reminderHours1, interval: 1, template: reminderTemplate1 },
-      { hours: reminderHours2, interval: 2, template: reminderTemplate2 }
+    // Build intervals with hours and their corresponding templates
+    // Then SORT by hours descending so the longer interval is processed first
+    const unsortedIntervals = [
+      { hours: reminderHours1, template: reminderTemplate1 },
+      { hours: reminderHours2, template: reminderTemplate2 }
     ];
+
+    // Sort by hours descending (larger interval first: 24h before 1h)
+    unsortedIntervals.sort((a, b) => b.hours - a.hours);
+
+    // Assign interval numbers after sorting (interval 1 = longer, interval 2 = shorter)
+    const reminderIntervals = unsortedIntervals.map((item, index) => ({
+      ...item,
+      interval: index + 1
+    }));
+
+    const longerIntervalHours = reminderIntervals[0].hours;
+    const shorterIntervalHours = reminderIntervals[1].hours;
 
     let totalSent = 0;
     let totalSkipped = 0;
@@ -199,10 +205,10 @@ serve(async (req) => {
         const minutesUntilSession = (sessionLocalTime.getTime() - localNow.getTime()) / (1000 * 60);
         const hoursUntilSession = minutesUntilSession / 60;
 
-        // For interval 1 (24h): session should be within 24h but more than interval 2 hours away
-        // For interval 2 (1h): session should be within 1h and more than 0 (not in the past)
+        // For interval 1 (longer, e.g. 24h): session should be within 24h but more than shorter interval hours away
+        // For interval 2 (shorter, e.g. 1h): session should be within 1h and more than 0 (not in the past)
         const maxHoursForThisInterval = hours;
-        const minHoursForThisInterval = interval === 1 ? reminderHours2 : 0;
+        const minHoursForThisInterval = interval === 1 ? shorterIntervalHours : 0;
 
         if (hoursUntilSession > maxHoursForThisInterval || hoursUntilSession <= minHoursForThisInterval) {
           console.log(`Skipping session ${session.id} - ${hoursUntilSession.toFixed(2)}h until session, outside window [${minHoursForThisInterval}, ${maxHoursForThisInterval}]`);
