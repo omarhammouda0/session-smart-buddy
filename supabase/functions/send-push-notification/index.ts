@@ -221,9 +221,10 @@ serve(async (req) => {
         } else {
           results.push({ token: sub.fcm_token.substring(0, 20), success: true, messageId: result.name });
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Failed to send to token:", error);
-        results.push({ token: sub.fcm_token.substring(0, 20), success: false, error: error.message });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        results.push({ token: sub.fcm_token.substring(0, 20), success: false, error: errorMessage });
       }
     }
 
@@ -255,10 +256,11 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error sending push notification:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
