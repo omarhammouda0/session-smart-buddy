@@ -836,7 +836,7 @@ export const PaymentsDashboard = ({
               disabled={getWhatsAppTargetStudents(whatsappTarget).length === 0}
             >
               <Send className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">تذكير</span>
+              <span className="hidden sm:inline">تذكير</span>
             </Button>
           </>
         )}

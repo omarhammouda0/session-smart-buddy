@@ -836,9 +836,9 @@ const Index = () => {
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary via-primary to-primary/80 shadow-md shadow-primary/25 flex items-center justify-center shrink-0">
                 <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
               </div>
-              <div className="min-w-0 hidden xs:block">
+              <div className="min-w-0">
                 <h1 className="font-display font-bold text-sm sm:text-lg leading-tight truncate">متابعة الطلاب</h1>
-                <p className="text-[0.6rem] sm:text-xs text-muted-foreground font-medium">
+                <p className="text-[0.6rem] sm:text-xs text-muted-foreground font-medium hidden sm:block">
                   {format(now, "EEEE، d MMM", { locale: ar })}
                 </p>
               </div>
@@ -987,15 +987,15 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="px-1.5 py-2 sm:px-4 sm:py-4 space-y-2 sm:space-y-4 max-w-5xl mx-auto">
-        {/* Compact greeting bar - hidden on very small screens */}
+      <main className="px-2 py-2 sm:px-4 sm:py-4 space-y-2 sm:space-y-4 max-w-5xl mx-auto">
+        {/* Compact greeting bar */}
         {students.length > 0 && activeTab === "sessions" && (
-          <div className="hidden xs:flex items-center justify-between gap-2 p-2 sm:p-3 bg-card rounded-lg border shadow-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              <Sparkles className="h-4 w-4 text-primary shrink-0" />
-              <span className="font-semibold text-foreground text-sm">{getGreeting()} عمر!</span>
-              <div className="flex items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="gap-1 bg-primary/10 text-primary border-primary/30 text-xs px-1.5 py-0">
+          <div className="flex items-center justify-between gap-2 p-2 sm:p-3 bg-card rounded-lg border shadow-sm">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <Sparkles className="h-4 w-4 text-primary shrink-0 hidden sm:block" />
+              <span className="font-semibold text-foreground text-xs sm:text-sm">{getGreeting()} عمر!</span>
+              <div className="flex items-center gap-1 text-xs">
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[0.65rem] sm:text-xs px-1.5 py-0">
                   {todayStats.total} حصص
                 </Badge>
                 {todayStats.completed > 0 && (
@@ -1040,16 +1040,14 @@ const Index = () => {
               className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
             >
               <History className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
-              <span className="leading-tight hidden xs:inline sm:inline">الطلبة</span>
-              <span className="leading-tight xs:hidden">طلبة</span>
+              <span className="leading-tight">الطلبة</span>
             </TabsTrigger>
             <TabsTrigger
               value="payments"
               className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
             >
               <CreditCard className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
-              <span className="leading-tight hidden xs:inline sm:inline">المدفوعات</span>
-              <span className="leading-tight xs:hidden">دفع</span>
+              <span className="leading-tight">الدفع</span>
             </TabsTrigger>
           </TabsList>
 

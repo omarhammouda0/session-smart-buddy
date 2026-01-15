@@ -72,9 +72,9 @@ export const StudentSearchCombobox = ({
   };
 
   return (
-    <div ref={containerRef} className={cn("relative w-full", className)} dir="rtl">
+    <div ref={containerRef} className={cn("relative", className)} dir="rtl">
       <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-4 sm:w-4 text-muted-foreground pointer-events-none" />
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           ref={inputRef}
           type="text"
@@ -82,14 +82,14 @@ export const StudentSearchCombobox = ({
           value={inputValue}
           onChange={handleInputChange}
           onFocus={handleFocus}
-          className="pr-10 pl-10 bg-background h-11 sm:h-10 text-base sm:text-sm w-full"
+          className="pr-9 pl-8 bg-background"
         />
         {inputValue && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="absolute left-1 top-1/2 -translate-y-1/2 h-9 w-9 sm:h-7 sm:w-7 text-muted-foreground hover:text-foreground"
+            className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={handleClear}
           >
             <X className="h-4 w-4" />
@@ -106,15 +106,15 @@ export const StudentSearchCombobox = ({
               type="button"
               onClick={() => handleSelectStudent(student)}
               className={cn(
-                "w-full flex items-center gap-2 sm:gap-3 p-3 sm:p-3 text-right hover:bg-accent transition-colors min-h-[3rem]",
+                "w-full flex items-center gap-3 p-3 text-right hover:bg-accent transition-colors",
                 inputValue === student.name && "bg-accent/50"
               )}
             >
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate text-sm sm:text-base">{student.name}</p>
-                <div className="flex items-center gap-1.5 sm:gap-2 text-[0.65rem] sm:text-xs text-muted-foreground mt-0.5">
-                  <span className="flex items-center gap-0.5">
-                    <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                <p className="font-medium truncate">{student.name}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
                     {student.sessionTime || '16:00'}
                   </span>
                   <span>•</span>
@@ -133,7 +133,7 @@ export const StudentSearchCombobox = ({
 
       {/* No results message */}
       {isOpen && inputValue.trim() !== '' && filteredStudents.length === 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg p-3 sm:p-4 text-center text-muted-foreground text-xs sm:text-sm">
+        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg p-4 text-center text-muted-foreground text-sm">
           لا يوجد نتائج
         </div>
       )}

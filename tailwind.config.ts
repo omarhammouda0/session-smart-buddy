@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const tailwindcssAnimate = require("tailwindcss-animate");
 
 export default {
   darkMode: ["class"],
@@ -11,6 +13,14 @@ export default {
       screens: {
         "2xl": "1400px",
       },
+    },
+    screens: {
+      'xs': '375px',
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
     },
     extend: {
       fontFamily: {
@@ -174,5 +184,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;
