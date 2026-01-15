@@ -914,221 +914,93 @@ export const CalendarView = ({
   };
 
   return (
-    <Card className="w-full border-2 shadow-xl overflow-hidden">
-      <CardHeader className="space-y-4 pb-4 bg-gradient-to-br from-primary/5 via-background to-background border-b">
-        {/* Header Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-purple-500 text-white shadow-lg shadow-primary/25">
-              <CalendarIcon className="h-6 w-6" />
+    <Card className="w-full border shadow-lg overflow-hidden">
+      <CardHeader className="space-y-2 sm:space-y-4 p-2 sm:p-4 bg-gradient-to-br from-primary/5 via-background to-background border-b">
+        {/* Header Row - Compact on mobile */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-primary to-purple-500 text-white shadow-md">
+              <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">عرض التقويم</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 font-medium">
-                {selectedStudentFilter === "all"
-                  ? `${students.length} طالب • ${periodSummary.totalSessions} حصة`
-                  : `${periodSummary.totalSessions} حصة`}
+              <h2 className="text-sm sm:text-xl font-display font-bold text-foreground">التقويم</h2>
+              <p className="text-[0.6rem] sm:text-xs text-muted-foreground font-medium">
+                {periodSummary.totalSessions} حصة
               </p>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Student Filter */}
+          {/* Action Buttons - Minimal on mobile */}
+          <div className="flex items-center gap-1">
+            {/* Student Filter - Compact */}
             <Select value={selectedStudentFilter} onValueChange={setSelectedStudentFilter}>
-              <SelectTrigger className="w-[160px] h-9 rounded-lg border-2 text-sm">
-                <Filter className="h-3.5 w-3.5 ml-2 text-muted-foreground" />
-                <SelectValue placeholder="كل الطلاب" />
+              <SelectTrigger className="w-auto min-w-[80px] sm:w-[140px] h-7 sm:h-9 rounded-lg border text-xs sm:text-sm px-2">
+                <Filter className="h-3 w-3 ml-1 text-muted-foreground hidden sm:block" />
+                <SelectValue placeholder="الكل" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">
-                  <span className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5" />
-                    كل الطلاب
-                  </span>
-                </SelectItem>
+                <SelectItem value="all">الكل</SelectItem>
                 {students.map((student) => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.name}
-                  </SelectItem>
+                  <SelectItem key={student.id} value={student.id}>{student.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            {/* Summary Toggle */}
+            {/* Summary Toggle - Icon only on mobile */}
             <Button
               variant={showWeeklySummary ? "default" : "outline"}
               size="sm"
               onClick={() => setShowWeeklySummary(!showWeeklySummary)}
-              className="h-9 gap-1.5 rounded-lg"
+              className="h-7 sm:h-9 w-7 sm:w-auto sm:px-3 rounded-lg"
             >
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">ملخص</span>
+              <BarChart3 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline mr-1">ملخص</span>
             </Button>
-
-            {/* Export Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg">
-                  <Download className="h-4 w-4" />
-                  <span className="hidden sm:inline">تصدير</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleExport("copy")}>
-                  <Download className="h-4 w-4 ml-2" />
-                  نسخ للحافظة
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("print")}>
-                  <Printer className="h-4 w-4 ml-2" />
-                  طباعة
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
-        {/* Weekly Summary Panel - Enhanced */}
+        {/* Weekly Summary Panel - Simplified on mobile */}
         {showWeeklySummary && (
-          <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-muted/40 to-muted/20 border-2">
-            {/* Main Stats Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="text-center p-3 rounded-xl bg-primary/10 border border-primary/20 hover:scale-105 transition-transform">
-                <CalendarIcon className="h-5 w-5 mx-auto mb-1 text-primary" />
-                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.totalSessions}</p>
-                <p className="text-xs text-muted-foreground font-medium">إجمالي الحصص</p>
+          <div className="space-y-2 p-2 sm:p-4 rounded-lg bg-muted/30 border">
+            {/* Main Stats Row - 2 cols on mobile */}
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
+              <div className="text-center p-1.5 sm:p-3 rounded-lg bg-primary/10">
+                <p className="text-base sm:text-2xl font-bold text-primary tabular-nums">{periodSummary.totalSessions}</p>
+                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">حصص</p>
               </div>
-              <div className="text-center p-3 rounded-xl bg-primary/15 border border-primary/25 hover:scale-105 transition-transform">
-                <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-primary" />
-                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.completedSessions}</p>
-                <p className="text-xs text-muted-foreground font-medium">مكتملة</p>
+              <div className="text-center p-1.5 sm:p-3 rounded-lg bg-primary/15">
+                <p className="text-base sm:text-2xl font-bold text-primary tabular-nums">{periodSummary.completedSessions}</p>
+                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">مكتملة</p>
               </div>
-              <div className="text-center p-3 rounded-xl bg-primary/8 border border-primary/15 hover:scale-105 transition-transform">
-                <Clock className="h-5 w-5 mx-auto mb-1 text-primary" />
-                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.totalHours}</p>
-                <p className="text-xs text-muted-foreground font-medium">ساعة</p>
+              <div className="text-center p-1.5 sm:p-3 rounded-lg bg-primary/8">
+                <p className="text-base sm:text-2xl font-bold text-primary tabular-nums">{periodSummary.totalHours}</p>
+                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">ساعة</p>
               </div>
-              <div className="text-center p-3 rounded-xl bg-primary/5 border border-primary/10 hover:scale-105 transition-transform">
-                <TrendingUp className="h-5 w-5 mx-auto mb-1 text-primary" />
-                <p className="text-2xl font-bold text-primary tabular-nums">{periodSummary.completionRate}%</p>
-                <p className="text-xs text-muted-foreground font-medium">نسبة الإنجاز</p>
+              <div className="text-center p-1.5 sm:p-3 rounded-lg bg-primary/5">
+                <p className="text-base sm:text-2xl font-bold text-primary tabular-nums">{periodSummary.completionRate}%</p>
+                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">إنجاز</p>
               </div>
             </div>
 
-            {/* Completion Progress Bar */}
+            {/* Progress Bar */}
             {periodSummary.totalSessions > 0 && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>تقدم الإنجاز</span>
-                  <span>
-                    {periodSummary.completedSessions} من {periodSummary.totalSessions}
-                  </span>
-                </div>
-                <Progress value={periodSummary.completionRate} className="h-2" />
-              </div>
-            )}
-
-            {/* Insights Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t">
-              {/* Busiest Day of Week */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Star className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">أكثر يوم ازدحاماً</p>
-                  <p className="text-sm font-bold">{periodSummary.busiestDayOfWeek}</p>
-                  <p className="text-xs text-muted-foreground">{periodSummary.busiestDayOfWeekCount} حصة</p>
-                </div>
-              </div>
-
-              {/* Time Distribution */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Sunset className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">توزيع الأوقات</p>
-                  <div className="flex gap-2 text-xs mt-1">
-                    <span className="flex items-center gap-1">
-                      <Sunrise className="h-3 w-3 text-primary/70" />
-                      {periodSummary.timeSlotStats.morning}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Sunset className="h-3 w-3 text-primary/80" />
-                      {periodSummary.timeSlotStats.afternoon}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Moon className="h-3 w-3 text-primary" />
-                      {periodSummary.timeSlotStats.evening}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Average Per Day */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                <div className="p-2 rounded-lg bg-cyan-500/10">
-                  <Zap className="h-4 w-4 text-cyan-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">متوسط يومي</p>
-                  <p className="text-sm font-bold">{periodSummary.averageSessionsPerDay} حصة/يوم</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Top Students */}
-            {periodSummary.studentStats.length > 0 && (
-              <div className="pt-3 border-t">
-                <p className="text-xs text-muted-foreground font-semibold mb-2 flex items-center gap-1">
-                  <Users className="h-3.5 w-3.5" />
-                  أكثر الطلاب حصصاً:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {periodSummary.studentStats.slice(0, 5).map((stat, i) => (
-                    <Badge
-                      key={i}
-                      variant="secondary"
-                      className={cn(
-                        "text-xs transition-all hover:scale-105",
-                        i === 0 && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-                      )}
-                    >
-                      {i === 0 && <Star className="h-3 w-3 ml-1 fill-current" />}
-                      {stat.name}: {stat.sessions} حصة
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Quick Tip */}
-            {periodSummary.cancelledSessions > 0 && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/5 border border-rose-500/20 text-sm">
-                <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" />
-                <p className="text-rose-700 dark:text-rose-400">
-                  لديك <strong>{periodSummary.cancelledSessions}</strong> حصة ملغاة هذا الأسبوع
-                </p>
-              </div>
+              <Progress value={periodSummary.completionRate} className="h-1.5 sm:h-2" />
             )}
           </div>
         )}
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-1.5 bg-muted/50 p-1.5 rounded-xl shadow-inner w-fit">
+        {/* View Mode Toggle - Compact */}
+        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-fit">
           {[
-            { value: "week", label: "أسبوعي" },
-            { value: "month", label: "شهري" },
+            { value: "week", label: "أسبوع" },
+            { value: "month", label: "شهر" },
           ].map(({ value, label }) => (
             <button
               key={value}
               onClick={() => setViewMode(value as "week" | "month")}
               className={cn(
-                "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200",
-                viewMode === value
-                  ? "bg-background text-primary shadow-md scale-105"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/50",
+                "px-2 sm:px-4 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-all",
+                viewMode === value ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:bg-background/50"
               )}
             >
               {label}
@@ -1136,74 +1008,44 @@ export const CalendarView = ({
           ))}
         </div>
 
-        {/* Navigation Bar */}
-        <div className="flex items-center justify-between bg-background/80 backdrop-blur-sm p-3 rounded-xl border-2 border-border/50 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToNext}
-              className="h-10 w-10 p-0 rounded-xl border-2 hover:border-primary hover:bg-primary/5 hover:scale-110 transition-all shadow-sm"
-            >
-              <ChevronRight className="h-5 w-5" />
+        {/* Navigation Bar - Compact */}
+        <div className="flex items-center justify-between bg-background/80 p-1.5 sm:p-3 rounded-lg border">
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={goToNext} className="h-7 w-7 sm:h-9 sm:w-9 p-0 rounded-lg">
+              <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToPrev}
-              className="h-10 w-10 p-0 rounded-xl border-2 hover:border-primary hover:bg-primary/5 hover:scale-110 transition-all shadow-sm"
-            >
-              <ChevronLeft className="h-5 w-5" />
+            <Button variant="outline" size="sm" onClick={goToPrev} className="h-7 w-7 sm:h-9 sm:w-9 p-0 rounded-lg">
+              <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
-          <h3 className="font-display font-bold text-base sm:text-lg text-center px-4 py-2 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-xl">
+          <h3 className="font-display font-bold text-xs sm:text-base text-center px-2 py-1 bg-primary/5 rounded-lg">
             {viewMode === "week"
-              ? `${format(days[0], "dd MMM", { locale: ar })} - ${format(days[days.length - 1], "dd MMM yyyy", { locale: ar })}`
-              : format(currentDate, "MMMM yyyy", { locale: ar })}
+              ? `${format(days[0], "dd/MM", { locale: ar })} - ${format(days[days.length - 1], "dd/MM", { locale: ar })}`
+              : format(currentDate, "MMM yyyy", { locale: ar })}
           </h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToToday}
-            className="h-10 px-4 rounded-xl border-2 hover:border-primary hover:bg-primary/5 hover:scale-105 transition-all shadow-sm font-semibold"
-          >
+          <Button variant="outline" size="sm" onClick={goToToday} className="h-7 sm:h-9 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-medium">
             اليوم
           </Button>
         </div>
       </CardHeader>
 
-      <CardContent className="p-3 sm:p-6">
-        {/* Filter indicator */}
+      <CardContent className="p-1.5 sm:p-4">
+        {/* Filter indicator - compact */}
         {selectedStudentFilter !== "all" && (
-          <div className="mb-4 p-3 rounded-xl bg-primary/5 border-2 border-primary/20 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">
-                عرض حصص:{" "}
-                <span className="font-bold text-primary">
-                  {students.find((s) => s.id === selectedStudentFilter)?.name}
-                </span>
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedStudentFilter("all")}
-              className="h-7 px-2 text-xs"
-            >
-              <X className="h-3.5 w-3.5 ml-1" />
-              إزالة الفلتر
+          <div className="mb-2 p-1.5 sm:p-2 rounded-lg bg-primary/5 border border-primary/20 flex items-center justify-between text-xs">
+            <span className="font-medium truncate">
+              {students.find((s) => s.id === selectedStudentFilter)?.name}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedStudentFilter("all")} className="h-5 px-1.5 text-[0.6rem]">
+              <X className="h-3 w-3" />
             </Button>
           </div>
         )}
 
-        <div className="grid gap-3 grid-cols-7">
+        <div className="grid gap-0.5 sm:gap-2 grid-cols-7">
           {DAY_NAMES_SHORT_AR.map((day, i) => (
-            <div
-              key={i}
-              className="text-center text-sm font-bold text-muted-foreground py-3 bg-muted/30 rounded-xl border-b-2 border-primary/10"
-            >
-              {day}
+            <div key={i} className="text-center text-[0.55rem] sm:text-xs font-bold text-muted-foreground py-1 sm:py-2 bg-muted/30 rounded-md">
+              {day.slice(0, 1)}
             </div>
           ))}
           {days.map((day, index) => {

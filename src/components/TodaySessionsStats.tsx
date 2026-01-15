@@ -181,44 +181,26 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
   const greeting = getGreeting();
 
   return (
-    <div className="space-y-3 relative">
-      {/* Animated Background Effects */}
-      <div className="absolute -inset-4 -z-10 overflow-hidden pointer-events-none">
+    <div className="space-y-2 sm:space-y-3 relative">
+      {/* Animated Background Effects - Hidden on mobile */}
+      <div className="hidden sm:block absolute -inset-4 -z-10 overflow-hidden pointer-events-none">
         {/* Gradient orbs - Navy blue theme */}
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 rounded-full blur-3xl animate-blob" />
         <div className="absolute top-20 -left-10 w-32 h-32 bg-gradient-to-tr from-primary/20 via-primary/15 to-primary/10 rounded-full blur-2xl animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-10 right-1/4 w-36 h-36 bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 rounded-full blur-3xl animate-blob animation-delay-4000" />
-
-        {/* Floating particles - Navy blue */}
-        <div className="absolute top-10 right-1/3 w-2 h-2 bg-primary/40 rounded-full animate-float" />
-        <div className="absolute top-1/2 left-10 w-1.5 h-1.5 bg-primary/30 rounded-full animate-float animation-delay-1000" />
-        <div className="absolute bottom-20 right-20 w-2 h-2 bg-primary/40 rounded-full animate-float animation-delay-2000" />
-        <div className="absolute top-1/3 right-10 w-1 h-1 bg-primary/50 rounded-full animate-float animation-delay-3000" />
-
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(hsl(var(--primary)/0.03)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--primary)/0.03)_1px,transparent_1px)] bg-[size:32px_32px]" />
       </div>
 
-      {/* Compact Header: Greeting + Stats in one row */}
-      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-        {/* Compact Greeting */}
-        <Card className="relative overflow-hidden border-0 shadow-lg flex-1 sm:max-w-[280px]">
-          <div className={cn(
-            "absolute inset-0 bg-gradient-to-r",
-            greeting.gradient
-          )} />
-          {/* Decorative circles */}
-          <div className="absolute -top-6 -right-6 w-20 h-20 bg-white/10 rounded-full" />
-          <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/5 rounded-full" />
-          {/* Shimmer effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" />
-          <CardContent className="relative p-2.5 sm:p-3.5 text-white">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <span className="text-2xl sm:text-3xl drop-shadow-lg">{greeting.emoji}</span>
+      {/* Compact Header: Greeting + Stats - Very compact on mobile */}
+      <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-3">
+        {/* Compact Greeting - Single row on mobile */}
+        <Card className="relative overflow-hidden border-0 shadow-md sm:shadow-lg flex-1 sm:max-w-[280px]">
+          <div className={cn("absolute inset-0 bg-gradient-to-r", greeting.gradient)} />
+          <CardContent className="relative p-2 sm:p-3.5 text-white">
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1.5 sm:gap-2.5">
+                <span className="text-lg sm:text-3xl drop-shadow-lg">{greeting.emoji}</span>
                 <div>
-                  <p className="text-base sm:text-lg font-bold drop-shadow font-display">{greeting.text}!</p>
-                  <p className="text-[10px] sm:text-[11px] text-white/80 font-medium">
+                  <p className="text-sm sm:text-lg font-bold drop-shadow font-display">{greeting.text}!</p>
+                  <p className="text-[0.55rem] sm:text-[11px] text-white/80 font-medium">
                     {format(currentTime, "EEEE، d MMMM", { locale: ar })}
                   </p>
                 </div>

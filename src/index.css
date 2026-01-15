@@ -770,219 +770,200 @@
 
 /* Mobile base styles (< 640px) */
 @media (max-width: 639px) {
-  /* Root adjustments */
+  /* Root adjustments - smaller base font */
   html {
-    font-size: 14px;
+    font-size: 13px;
   }
 
-  /* Container padding */
+  /* Remove all heavy animations/decorations */
+  .bg-blob, .bg-blob-2, .bg-blob-3,
+  .bg-float, .bg-float-1, .bg-float-2,
+  .bg-float-3, .bg-float-4, .bg-float-5,
+  .animate-blob, .animate-float, .animate-pulse-soft {
+    display: none !important;
+  }
+
+  .fixed.inset-0.-z-10 svg,
+  .fixed.inset-0.-z-10 .rounded-full {
+    display: none !important;
+  }
+
+  /* Global spacing reductions */
   .container {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
   }
 
-  /* Main content padding */
-  main, .main-content {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
+  /* =====================================================
+     HEADER - Compact mobile header
+     ===================================================== */
+  header {
+    padding: 0.375rem 0.5rem !important;
   }
 
-  /* Cards - more compact on mobile */
-  [data-slot="card"],
-  .card,
-  [class*="Card"] {
-    border-radius: 1rem !important;
+  header .flex.items-center.gap-2,
+  header .flex.items-center.gap-3 {
+    gap: 0.375rem !important;
   }
 
-  [data-slot="card-content"] {
-    padding: 0.875rem !important;
+  /* Logo smaller */
+  header .w-9, header .w-11 {
+    width: 2rem !important;
+    height: 2rem !important;
   }
 
-  /* Tabs - compact for mobile */
+  header .w-9 svg, header .w-11 svg {
+    width: 1.125rem !important;
+    height: 1.125rem !important;
+  }
+
+  /* Header title */
+  header h1 {
+    font-size: 0.875rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Header buttons - icon only */
+  header button {
+    width: 2rem !important;
+    height: 2rem !important;
+    min-height: 2rem !important;
+    padding: 0 !important;
+  }
+
+  header button svg {
+    width: 1rem !important;
+    height: 1rem !important;
+  }
+
+  header button span {
+    display: none !important;
+  }
+
+  header .badge, header [class*="Badge"] {
+    display: none !important;
+  }
+
+  /* =====================================================
+     TABS - Compact mobile tabs
+     ===================================================== */
   [role="tablist"] {
-    gap: 0.25rem !important;
+    gap: 0.125rem !important;
+    padding: 0.125rem !important;
+    margin-bottom: 0.5rem !important;
+    min-height: auto !important;
+    height: auto !important;
   }
 
   [role="tab"] {
-    padding: 0.5rem 0.5rem !important;
-    font-size: 0.7rem !important;
+    flex-direction: column !important;
+    gap: 0.125rem !important;
+    padding: 0.375rem 0.25rem !important;
+    font-size: 0.6rem !important;
     min-height: 2.5rem !important;
-    gap: 0.25rem !important;
+    border-radius: 0.5rem !important;
   }
 
   [role="tab"] svg {
-    width: 1rem !important;
-    height: 1rem !important;
+    width: 0.875rem !important;
+    height: 0.875rem !important;
   }
 
-  /* Buttons - larger touch targets */
-  button,
-  [role="button"] {
-    min-height: 2.5rem;
+  /* Show short labels on mobile tabs */
+  [role="tab"] span {
+    display: block !important;
+    font-size: 0.55rem !important;
+    line-height: 1 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 3.5rem;
   }
 
-  /* Dialog/Sheet improvements */
-  [role="dialog"] {
-    max-height: 90vh !important;
-    max-height: 90dvh !important;
-    margin: 0.5rem !important;
-    border-radius: 1.25rem !important;
+  /* =====================================================
+     CARDS - Compact cards
+     ===================================================== */
+  [data-slot="card"], .card, [class*="Card"] {
+    border-radius: 0.75rem !important;
   }
 
-  /* Form inputs - prevent iOS zoom */
-  input,
-  select,
-  textarea {
-    font-size: 16px !important;
-    min-height: 2.5rem;
+  [data-slot="card-content"],
+  .card > div,
+  [class*="CardContent"] {
+    padding: 0.5rem !important;
   }
 
-  /* Badge sizes */
-  .badge,
-  [data-slot="badge"] {
-    font-size: 0.6rem !important;
-    padding: 0.125rem 0.375rem !important;
+  [class*="CardHeader"] {
+    padding: 0.5rem 0.5rem 0.25rem !important;
   }
 
-  /* Hide decorative background elements for performance */
-  .bg-blob,
-  .bg-blob-2,
-  .bg-blob-3,
-  .bg-float,
-  .bg-float-1,
-  .bg-float-2,
-  .bg-float-3,
-  .bg-float-4,
-  .bg-float-5 {
-    display: none !important;
+  [class*="CardTitle"] {
+    font-size: 0.8rem !important;
   }
 
-  /* Hide animated SVG icons on mobile */
-  .fixed.inset-0.-z-10 svg {
-    display: none !important;
+  /* =====================================================
+     BUTTONS - Touch friendly
+     ===================================================== */
+  button, [role="button"] {
+    min-height: 2.25rem;
+    touch-action: manipulation;
   }
 
-  /* Compact text sizes */
-  h1 {
-    font-size: 1.375rem !important;
-    line-height: 1.3 !important;
-  }
-
-  h2 {
-    font-size: 1.125rem !important;
-    line-height: 1.3 !important;
-  }
-
-  h3 {
-    font-size: 1rem !important;
-    line-height: 1.4 !important;
-  }
-
-  /* Icon sizes in buttons */
-  button svg,
-  [role="button"] svg {
-    width: 1rem !important;
-    height: 1rem !important;
+  button svg, [role="button"] svg {
+    width: 0.875rem !important;
+    height: 0.875rem !important;
     flex-shrink: 0;
   }
 
-  /* Reduce gaps */
-  .gap-4 {
-    gap: 0.625rem !important;
+  /* Button text smaller */
+  button span, [role="button"] span {
+    font-size: 0.7rem !important;
   }
 
-  .gap-6 {
-    gap: 0.875rem !important;
+  /* =====================================================
+     FORM INPUTS
+     ===================================================== */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevent iOS zoom */
+    min-height: 2.25rem !important;
+    padding: 0.375rem 0.5rem !important;
   }
 
-  .space-y-4 > * + * {
-    margin-top: 0.625rem !important;
+  label {
+    font-size: 0.7rem !important;
   }
 
-  .space-y-6 > * + * {
-    margin-top: 0.875rem !important;
+  /* =====================================================
+     BADGES - Smaller badges
+     ===================================================== */
+  .badge, [data-slot="badge"], [class*="Badge"] {
+    font-size: 0.55rem !important;
+    padding: 0.0625rem 0.25rem !important;
+    border-radius: 0.25rem !important;
   }
 
-  /* Padding reductions */
-  .p-4 {
+  /* =====================================================
+     DIALOGS/SHEETS - Full width on mobile
+     ===================================================== */
+  [role="dialog"] {
+    width: calc(100vw - 1rem) !important;
+    max-width: none !important;
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    margin: 0.5rem !important;
+    border-radius: 1rem !important;
     padding: 0.75rem !important;
   }
 
-  .p-6 {
-    padding: 1rem !important;
+  [role="dialog"] h2, [class*="DialogTitle"] {
+    font-size: 0.9rem !important;
   }
 
-  .px-4 {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
+  [role="dialog"] p, [class*="DialogDescription"] {
+    font-size: 0.7rem !important;
   }
 
-  .py-4 {
-    padding-top: 0.625rem !important;
-    padding-bottom: 0.625rem !important;
-  }
-
-  /* Avatar sizes */
-  .w-14.h-14,
-  .w-14 {
-    width: 2.5rem !important;
-    height: 2.5rem !important;
-  }
-
-  .w-16.h-16,
-  .w-16 {
-    width: 2.75rem !important;
-    height: 2.75rem !important;
-  }
-
-  .w-20.h-20,
-  .w-20 {
-    width: 3rem !important;
-    height: 3rem !important;
-  }
-
-  /* Session cards compact */
-  .session-card,
-  [class*="session-card"] {
-    padding: 0.625rem !important;
-  }
-
-  /* Stats cards compact */
-  .stat-card {
-    padding: 0.75rem !important;
-  }
-
-  /* Text sizes */
-  .text-sm {
-    font-size: 0.75rem !important;
-  }
-
-  .text-xs {
-    font-size: 0.65rem !important;
-  }
-
-  .text-lg {
-    font-size: 0.9375rem !important;
-  }
-
-  .text-xl {
-    font-size: 1.0625rem !important;
-  }
-
-  .text-2xl {
-    font-size: 1.25rem !important;
-  }
-
-  /* Flex adjustments */
-  .flex.items-center.gap-3 {
-    gap: 0.5rem !important;
-  }
-
-  .flex.items-center.gap-4 {
-    gap: 0.625rem !important;
-  }
-
-  /* Sheet as bottom sheet on mobile */
+  /* Side sheets become bottom sheets */
   [data-state="open"][data-side="right"],
   [data-state="open"][data-side="left"] {
     position: fixed !important;
@@ -991,175 +972,381 @@
     max-height: 85vh !important;
     max-height: 85dvh !important;
     width: 100% !important;
-    border-radius: 1.5rem 1.5rem 0 0 !important;
-    animation: mobile-sheet-up 0.3s ease-out !important;
+    max-width: 100% !important;
+    border-radius: 1rem 1rem 0 0 !important;
+    transform: none !important;
   }
 
-  /* Hide desktop-only elements */
-  .hidden-mobile,
-  .desktop-only {
-    display: none !important;
-  }
-}
+  /* =====================================================
+     TYPOGRAPHY - Smaller text
+     ===================================================== */
+  h1 { font-size: 1.125rem !important; }
+  h2 { font-size: 0.95rem !important; }
+  h3 { font-size: 0.85rem !important; }
+  h4, h5, h6 { font-size: 0.8rem !important; }
 
-/* Very small mobile (< 375px) */
-@media (max-width: 374px) {
-  html {
-    font-size: 12px !important;
+  p { font-size: 0.75rem !important; }
+
+  .text-xs { font-size: 0.6rem !important; }
+  .text-sm { font-size: 0.7rem !important; }
+  .text-base { font-size: 0.75rem !important; }
+  .text-lg { font-size: 0.85rem !important; }
+  .text-xl { font-size: 0.95rem !important; }
+  .text-2xl { font-size: 1.05rem !important; }
+  .text-3xl { font-size: 1.15rem !important; }
+
+  /* =====================================================
+     SPACING - Reduced gaps and padding
+     ===================================================== */
+  .gap-1 { gap: 0.125rem !important; }
+  .gap-2 { gap: 0.25rem !important; }
+  .gap-3 { gap: 0.375rem !important; }
+  .gap-4 { gap: 0.5rem !important; }
+  .gap-5 { gap: 0.625rem !important; }
+  .gap-6 { gap: 0.75rem !important; }
+
+  .space-y-2 > * + * { margin-top: 0.25rem !important; }
+  .space-y-3 > * + * { margin-top: 0.375rem !important; }
+  .space-y-4 > * + * { margin-top: 0.5rem !important; }
+  .space-y-6 > * + * { margin-top: 0.75rem !important; }
+
+  .p-2 { padding: 0.25rem !important; }
+  .p-3 { padding: 0.375rem !important; }
+  .p-4 { padding: 0.5rem !important; }
+  .p-5 { padding: 0.625rem !important; }
+  .p-6 { padding: 0.75rem !important; }
+
+  .px-2 { padding-left: 0.25rem !important; padding-right: 0.25rem !important; }
+  .px-3 { padding-left: 0.375rem !important; padding-right: 0.375rem !important; }
+  .px-4 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+
+  .py-2 { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; }
+  .py-3 { padding-top: 0.375rem !important; padding-bottom: 0.375rem !important; }
+  .py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+
+  .m-4 { margin: 0.5rem !important; }
+  .mb-4 { margin-bottom: 0.5rem !important; }
+  .mt-4 { margin-top: 0.5rem !important; }
+
+  /* =====================================================
+     AVATARS/ICONS - Smaller sizes
+     ===================================================== */
+  .w-10, .h-10 { width: 2rem !important; height: 2rem !important; }
+  .w-12, .h-12 { width: 2.25rem !important; height: 2.25rem !important; }
+  .w-14, .h-14 { width: 2.5rem !important; height: 2.5rem !important; }
+  .w-16, .h-16 { width: 2.75rem !important; height: 2.75rem !important; }
+  .w-20, .h-20 { width: 3rem !important; height: 3rem !important; }
+
+  /* =====================================================
+     TODAY SESSIONS STATS - Compact dashboard
+     ===================================================== */
+  .stat-card {
+    padding: 0.375rem !important;
   }
 
-  .container {
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-  }
-
-  /* Even more compact tabs */
-  [role="tablist"] {
-    gap: 0.125rem !important;
-  }
-
-  [role="tab"] {
-    padding: 0.375rem 0.375rem !important;
+  .stat-card p {
     font-size: 0.6rem !important;
   }
 
-  /* Hide tab text on very small screens */
-  [role="tab"] span.hidden.xs\\:inline {
+  .stat-card .text-2xl,
+  .stat-card .text-3xl {
+    font-size: 1rem !important;
+  }
+
+  /* Hide animated background effects in stats */
+  .stat-card .absolute,
+  .stat-card::before {
     display: none !important;
   }
 
-  /* Smaller touch targets but still accessible */
-  button,
-  [role="button"] {
-    min-height: 2.25rem;
+  /* =====================================================
+     CALENDAR VIEW - Mobile optimized
+     ===================================================== */
+  /* Calendar header */
+  [class*="CalendarView"] button {
+    min-width: 1.75rem !important;
+    width: auto !important;
+    padding: 0.25rem 0.375rem !important;
   }
 
-  /* Even smaller badges */
-  .badge,
-  [data-slot="badge"] {
+  /* Day cells in calendar */
+  [data-date] {
+    min-height: 3rem !important;
+    padding: 0.125rem !important;
+  }
+
+  /* Session cards in calendar */
+  [data-date] > div {
+    padding: 0.125rem !important;
     font-size: 0.55rem !important;
-    padding: 0.0625rem 0.25rem !important;
+    border-radius: 0.25rem !important;
+    margin-bottom: 0.0625rem !important;
+  }
+
+  /* Calendar grid */
+  .grid-cols-7 {
+    gap: 0.0625rem !important;
+  }
+
+  /* Day names header */
+  .grid-cols-7 > div:first-child {
+    font-size: 0.55rem !important;
+    padding: 0.125rem !important;
+  }
+
+  /* =====================================================
+     PAYMENTS DASHBOARD - Compact view
+     ===================================================== */
+  /* Payment cards */
+  [class*="PaymentsDashboard"] .card,
+  [class*="PaymentsDashboard"] [class*="Card"] {
+    padding: 0.375rem !important;
+  }
+
+  /* Summary stats row */
+  [class*="PaymentsDashboard"] .grid {
+    gap: 0.25rem !important;
+  }
+
+  /* Student payment rows */
+  [class*="PaymentsDashboard"] .flex.items-center {
+    gap: 0.25rem !important;
+    padding: 0.375rem !important;
+  }
+
+  /* Payment amount text */
+  [class*="PaymentsDashboard"] .font-bold {
+    font-size: 0.75rem !important;
+  }
+
+  /* Progress bars */
+  [class*="Progress"] {
+    height: 0.375rem !important;
+  }
+
+  /* =====================================================
+     STUDENT MANAGEMENT - Compact list
+     ===================================================== */
+  /* Student cards */
+  .student-card, [class*="StudentCard"] {
+    padding: 0.375rem !important;
+  }
+
+  /* Student list items */
+  [class*="Sheet"] .flex.items-center {
+    gap: 0.25rem !important;
+    padding: 0.375rem !important;
+  }
+
+  /* Student name */
+  [class*="Sheet"] .font-medium {
+    font-size: 0.75rem !important;
+  }
+
+  /* Student details text */
+  [class*="Sheet"] .text-muted-foreground {
+    font-size: 0.6rem !important;
+  }
+
+  /* =====================================================
+     SESSION CARDS - Compact sessions
+     ===================================================== */
+  .session-card {
+    padding: 0.375rem !important;
+    border-radius: 0.5rem !important;
+  }
+
+  .session-card .font-semibold,
+  .session-card .font-medium {
+    font-size: 0.7rem !important;
+  }
+
+  .session-card .text-sm {
+    font-size: 0.6rem !important;
+  }
+
+  /* Session action buttons */
+  .session-card button {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
+  }
+
+  /* =====================================================
+     SCROLL AREAS - Better mobile scrolling
+     ===================================================== */
+  [data-radix-scroll-area-viewport] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* =====================================================
+     HIDE DESKTOP-ONLY ELEMENTS
+     ===================================================== */
+  .hidden-mobile, .desktop-only, .sm\\:flex, .sm\\:block, .sm\\:inline {
+    /* Don't hide these, they're responsive classes */
+  }
+
+  /* Actually hide specific desktop decorations */
+  .hidden.sm\\:flex, .hidden.sm\\:block, .hidden.sm\\:inline {
+    display: none !important;
+  }
+
+  /* =====================================================
+     MAIN CONTENT AREA
+     ===================================================== */
+  main {
+    padding: 0.375rem 0.5rem !important;
+  }
+
+  main > .space-y-4 {
+    gap: 0.375rem !important;
+  }
+
+  /* Today's greeting bar */
+  main > div:first-child {
+    padding: 0.375rem !important;
   }
 }
 
-/* Touch device optimizations */
+/* =====================================================
+   VERY SMALL MOBILE (< 375px)
+   ===================================================== */
+@media (max-width: 374px) {
+  html {
+    font-size: 11px !important;
+  }
+
+  /* Even smaller tabs */
+  [role="tab"] {
+    padding: 0.25rem 0.125rem !important;
+    min-height: 2.25rem !important;
+  }
+
+  [role="tab"] span {
+    font-size: 0.5rem !important;
+    max-width: 2.5rem;
+  }
+
+  /* Header even more compact */
+  header {
+    padding: 0.25rem !important;
+  }
+
+  header h1 {
+    font-size: 0.75rem !important;
+  }
+
+  /* Buttons smaller */
+  button, [role="button"] {
+    min-height: 2rem !important;
+  }
+
+  header button {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+}
+
+/* =====================================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ===================================================== */
 @media (hover: none) and (pointer: coarse) {
-  /* Larger interactive elements */
-  button,
-  [role="button"],
-  a,
-  input,
-  select,
-  textarea {
+  /* Larger touch targets */
+  button, [role="button"], a, input, select, textarea {
     min-height: 44px;
   }
 
   /* Active states instead of hover */
-  button:active,
-  [role="button"]:active {
+  button:active, [role="button"]:active, a:active {
     transform: scale(0.97);
     opacity: 0.9;
   }
 
-  /* Disable hover effects on touch */
+  /* Disable hover scale effects */
   .hover\\:scale-105:hover,
-  .hover\\:scale-\\[1\\.02\\]:hover {
+  .hover\\:scale-\\[1\\.02\\]:hover,
+  .hover\\:scale-\\[1\\.01\\]:hover {
     transform: none !important;
   }
 
+  /* Disable hover shadows */
   .hover\\:shadow-lg:hover,
   .hover\\:shadow-xl:hover {
     box-shadow: inherit !important;
   }
-
-  /* Sticky header adjustments */
-  .sticky {
-    position: -webkit-sticky;
-    position: sticky;
-  }
 }
 
-/* Landscape mobile */
+/* =====================================================
+   LANDSCAPE MOBILE
+   ===================================================== */
 @media (max-width: 896px) and (orientation: landscape) {
-  /* Reduce vertical spacing in landscape */
-  .py-4 {
-    padding-top: 0.375rem !important;
-    padding-bottom: 0.375rem !important;
-  }
+  /* Reduce vertical spacing */
+  header { padding: 0.25rem 0.5rem !important; }
 
-  .py-6 {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-  }
+  [role="tablist"] { margin-bottom: 0.25rem !important; }
 
-  /* Smaller dialogs in landscape */
   [role="dialog"] {
     max-height: 80vh !important;
     max-height: 80dvh !important;
   }
+
+  /* Horizontal scroll for calendar in landscape */
+  .grid-cols-7 {
+    min-width: 100%;
+  }
 }
 
-/* Safe area utilities for notched phones */
+/* =====================================================
+   SAFE AREAS (Notched phones)
+   ===================================================== */
 @supports (padding: env(safe-area-inset-bottom)) {
-  .pb-safe {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-
-  .pt-safe {
-    padding-top: max(1rem, env(safe-area-inset-top));
-  }
-
-  /* Fixed bottom elements */
   .fixed.bottom-0 {
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-  /* Fixed headers */
-  .fixed.top-0 {
+  .fixed.top-0, header {
     padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 }
 
-/* Mobile keyboard visible adjustments */
+/* =====================================================
+   KEYBOARD VISIBLE
+   ===================================================== */
 @media (max-height: 500px) {
   [role="dialog"] {
     max-height: 95vh !important;
     max-height: 95dvh !important;
   }
 
+  /* Hide non-essential elements */
   .hide-on-keyboard {
     display: none !important;
   }
 }
 
-/* Slide up animation for mobile sheets */
-@keyframes mobile-sheet-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* Dark mode mobile optimizations */
+/* =====================================================
+   DARK MODE MOBILE
+   ===================================================== */
 @media (max-width: 639px) {
   .dark {
     --card: 220 45% 14%;
   }
 }
 
-/* Tablet styles (640px - 1023px) */
+/* =====================================================
+   TABLET (640px - 1023px)
+   ===================================================== */
 @media (min-width: 640px) and (max-width: 1023px) {
-  .container {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+  html {
+    font-size: 15px;
   }
 
-  /* Better grid for tablets */
-  .grid.grid-cols-4 {
-    grid-template-columns: repeat(4, 1fr);
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }

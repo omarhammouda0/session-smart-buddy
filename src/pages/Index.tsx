@@ -829,21 +829,23 @@ const Index = () => {
       )}
 
       <header className="bg-card/70 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
-        <div className="px-2 py-2 sm:px-5 sm:py-4">
-          <div className="flex items-center justify-between gap-2 sm:gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/25 flex items-center justify-center shrink-0">
-                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+        <div className="px-2 py-1.5 sm:px-5 sm:py-3">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3">
+            {/* Logo and Title */}
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary via-primary to-primary/80 shadow-md shadow-primary/25 flex items-center justify-center shrink-0">
+                <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
               </div>
-              <div className="min-w-0">
-                <h1 className="font-display font-bold text-base sm:text-xl leading-tight truncate">متابعة الطلاب</h1>
-                <p className="text-[0.65rem] sm:text-sm text-muted-foreground hidden xs:block font-medium">
-                  {format(now, "EEEE، d MMMM", { locale: ar })}
+              <div className="min-w-0 hidden xs:block">
+                <h1 className="font-display font-bold text-sm sm:text-lg leading-tight truncate">متابعة الطلاب</h1>
+                <p className="text-[0.6rem] sm:text-xs text-muted-foreground font-medium">
+                  {format(now, "EEEE، d MMM", { locale: ar })}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* AI Suggestions Widget */}
+
+            {/* Action buttons - Desktop */}
+            <div className="hidden sm:flex items-center gap-1.5">
               <AISuggestionsWidget
                 currentSuggestion={aiCurrentSuggestion}
                 pendingCount={aiPendingCount}
@@ -857,16 +859,10 @@ const Index = () => {
               />
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 w-9 sm:h-10 sm:w-auto sm:px-4 gap-2 rounded-lg sm:rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all font-medium"
-                  >
+                  <Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-2">
                     <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline text-sm font-semibold">الطلاب</span>
-                    <Badge variant="secondary" className="hidden sm:flex h-5 px-2 text-xs font-bold">
-                      {students.length}
-                    </Badge>
+                    <span className="text-sm font-semibold">الطلاب</span>
+                    <Badge variant="secondary" className="h-5 px-2 text-xs font-bold">{students.length}</Badge>
                   </Button>
                 </SheetTrigger>
                 <SheetContent className="w-full sm:max-w-md" side="left">
@@ -874,116 +870,32 @@ const Index = () => {
                     <SheetTitle className="font-heading text-right">جميع الطلاب ({students.length})</SheetTitle>
                   </SheetHeader>
                   <div className="mt-4">
-                    <StudentSearchCombobox
-                      students={students}
-                      value={allStudentsSearch}
-                      onChange={setAllStudentsSearch}
-                      placeholder="ابحث عن طالب..."
-                    />
+                    <StudentSearchCombobox students={students} value={allStudentsSearch} onChange={setAllStudentsSearch} placeholder="ابحث عن طالب..." />
                   </div>
                   <div className="mt-3 space-y-2 max-h-[calc(100vh-180px)] overflow-y-auto" dir="rtl">
                     {allStudentsSortedByTime.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">
-                        {allStudentsSearch.trim() ? "لا يوجد نتائج" : "لا يوجد طلاب حتى الآن"}
-                      </p>
+                      <p className="text-center text-muted-foreground py-8">{allStudentsSearch.trim() ? "لا يوجد نتائج" : "لا يوجد طلاب حتى الآن"}</p>
                     ) : (
                       allStudentsSortedByTime.map((student) => (
-                        <div
-                          key={student.id}
-                          className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                        >
+                        <div key={student.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate">{student.name}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {student.sessionTime}
-                              </span>
+                            <p className="font-medium truncate text-sm">{student.name}</p>
+                            <div className="flex items-center gap-1.5 text-[0.65rem] text-muted-foreground mt-0.5">
+                              <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{student.sessionTime}</span>
                               <span>•</span>
-                              <span className="flex items-center gap-1">
-                                {(student.sessionType || "onsite") === "online" ? (
-                                  <>
-                                    <Monitor className="h-3 w-3" /> أونلاين
-                                  </>
-                                ) : (
-                                  <>
-                                    <MapPin className="h-3 w-3" /> حضوري
-                                  </>
-                                )}
-                              </span>
-                              <span>•</span>
-                              <span>{student.scheduleDays.map((d) => DAY_NAMES_SHORT_AR[d.dayOfWeek]).join("، ")}</span>
+                              <span>{(student.sessionType || "onsite") === "online" ? "أونلاين" : "حضوري"}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <EditStudentDialog
-                              student={student}
-                              students={students}
-                              appSettings={settings}
-                              currentCancellationCount={getCancellationCount(student.id)}
-                              allCancellations={getAllStudentCancellations(student.id)}
-                              onRestoreSession={handleRestoreSession}
-                              onClearMonthCancellations={clearMonthCancellations}
-                              onUpdateName={(name) => updateStudentName(student.id, name)}
-                              onUpdateTime={(time) => updateStudentTime(student.id, time)}
-                              onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)}
-                              onUpdateParentPhone={(parentPhone) => updateStudentParentPhone(student.id, parentPhone)}
-                              onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)}
-                              onUpdateSchedule={(days, start, end) =>
-                                updateStudentSchedule(student.id, days, start, end)
-                              }
-                              onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)}
-                              onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)}
-                              onUpdateCancellationPolicy={(policy) =>
-                                updateStudentCancellationPolicy(student.id, policy)
-                              }
-                            />
-                            <StudentMaterialsDialog
-                              studentName={student.name}
-                              studentId={student.id}
-                              materials={getMaterials(student.id)}
-                              onAddMaterial={(material) => addMaterial(student.id, material)}
-                              onRemoveMaterial={(materialId) => removeMaterial(student.id, materialId)}
-                            />
-
+                          <div className="flex items-center gap-0.5">
+                            <EditStudentDialog student={student} students={students} appSettings={settings} currentCancellationCount={getCancellationCount(student.id)} allCancellations={getAllStudentCancellations(student.id)} onRestoreSession={handleRestoreSession} onClearMonthCancellations={clearMonthCancellations} onUpdateName={(name) => updateStudentName(student.id, name)} onUpdateTime={(time) => updateStudentTime(student.id, time)} onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)} onUpdateParentPhone={(parentPhone) => updateStudentParentPhone(student.id, parentPhone)} onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)} onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)} onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)} onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)} onUpdateCancellationPolicy={(policy) => updateStudentCancellationPolicy(student.id, policy)} />
                             {student.phone && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10 shrink-0"
-                                onClick={() => openWhatsApp(student.phone!)}
-                                title="فتح واتساب"
-                              >
-                                <WhatsAppIcon className="h-4 w-4" />
-                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => openWhatsApp(student.phone!)}><WhatsAppIcon className="h-3.5 w-3.5" /></Button>
                             )}
-
                             <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
+                              <AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button></AlertDialogTrigger>
                               <AlertDialogContent dir="rtl">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>حذف الطالب</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    هل أنت متأكد من حذف {student.name}؟ سيتم حذف جميع سجلات الحصص والمدفوعات.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter className="flex-row-reverse gap-2">
-                                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => removeStudent(student.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    حذف
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
+                                <AlertDialogHeader><AlertDialogTitle>حذف الطالب</AlertDialogTitle><AlertDialogDescription>هل أنت متأكد من حذف {student.name}؟</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter className="flex-row-reverse gap-2"><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={() => removeStudent(student.id)} className="bg-destructive text-destructive-foreground">حذف</AlertDialogAction></AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
                           </div>
@@ -994,41 +906,93 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
               <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
-              <BulkEditSessionsDialog
-                students={students}
-                onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }}
-                onUpdateSessionDate={updateSessionDateTime}
-                onBulkMarkAsVacation={bulkMarkAsVacation}
-              />
+              <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <MonthlyReportDialog students={students} payments={payments} settings={settings} />
               <ReminderHistoryDialog />
               <ReminderSettingsDialog />
-              <NotificationSettingsDialog
-                settings={notificationSettings}
-                onSave={updateNotificationSettings}
-              />
+              <NotificationSettingsDialog settings={notificationSettings} onSave={updateNotificationSettings} />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
-              <AddStudentDialog
-                onAdd={handleAddStudent}
-                defaultStart={settings.defaultSemesterStart}
-                defaultEnd={settings.defaultSemesterEnd}
-                students={students}
-                settings={settings}
-                defaultDuration={settings.defaultSessionDuration}
-                defaultPriceOnsite={settings.defaultPriceOnsite}
-                defaultPriceOnline={settings.defaultPriceOnline}
+              <AddStudentDialog onAdd={handleAddStudent} defaultStart={settings.defaultSemesterStart} defaultEnd={settings.defaultSemesterEnd} students={students} settings={settings} defaultDuration={settings.defaultSessionDuration} defaultPriceOnsite={settings.defaultPriceOnsite} defaultPriceOnline={settings.defaultPriceOnline} />
+            </div>
+
+            {/* Mobile action buttons - simplified */}
+            <div className="flex sm:hidden items-center gap-0.5">
+              <AISuggestionsWidget
+                currentSuggestion={aiCurrentSuggestion}
+                pendingCount={aiPendingCount}
+                allPendingSuggestions={aiAllPending}
+                hasCriticalInterrupt={aiHasCriticalInterrupt}
+                dismissedHistory={aiDismissedHistory}
+                onDismiss={dismissAISuggestion}
+                onAction={actionAISuggestion}
+                onDismissCriticalOverlay={dismissAICriticalOverlay}
+                actionHandlers={aiSuggestionHandlers}
               />
+              {/* Students Sheet - Mobile */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                    <Users className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full p-3" side="left">
+                  <SheetHeader className="pb-2">
+                    <SheetTitle className="text-sm text-right">الطلاب ({students.length})</SheetTitle>
+                  </SheetHeader>
+                  <StudentSearchCombobox students={students} value={allStudentsSearch} onChange={setAllStudentsSearch} placeholder="بحث..." />
+                  <div className="mt-2 space-y-1.5 max-h-[calc(100vh-140px)] overflow-y-auto" dir="rtl">
+                    {allStudentsSortedByTime.map((student) => (
+                      <div key={student.id} className="flex items-center justify-between p-2 rounded-lg border bg-card">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate text-xs">{student.name}</p>
+                          <p className="text-[0.6rem] text-muted-foreground">{student.sessionTime} • {(student.sessionType || "onsite") === "online" ? "أونلاين" : "حضوري"}</p>
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          <EditStudentDialog student={student} students={students} appSettings={settings} currentCancellationCount={getCancellationCount(student.id)} allCancellations={getAllStudentCancellations(student.id)} onRestoreSession={handleRestoreSession} onClearMonthCancellations={clearMonthCancellations} onUpdateName={(name) => updateStudentName(student.id, name)} onUpdateTime={(time) => updateStudentTime(student.id, time)} onUpdatePhone={(phone) => updateStudentPhone(student.id, phone)} onUpdateParentPhone={(parentPhone) => updateStudentParentPhone(student.id, parentPhone)} onUpdateSessionType={(type) => updateStudentSessionType(student.id, type)} onUpdateSchedule={(days, start, end) => updateStudentSchedule(student.id, days, start, end)} onUpdateDuration={(duration) => updateStudentDuration(student.id, duration)} onUpdateCustomSettings={(settings) => updateStudentCustomSettings(student.id, settings)} onUpdateCancellationPolicy={(policy) => updateStudentCancellationPolicy(student.id, policy)} />
+                          {student.phone && <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openWhatsApp(student.phone!)}><WhatsAppIcon className="h-3 w-3" /></Button>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </SheetContent>
+              </Sheet>
+              {/* Add Student - Mobile */}
+              <AddStudentDialog onAdd={handleAddStudent} defaultStart={settings.defaultSemesterStart} defaultEnd={settings.defaultSemesterEnd} students={students} settings={settings} defaultDuration={settings.defaultSessionDuration} defaultPriceOnsite={settings.defaultPriceOnsite} defaultPriceOnline={settings.defaultPriceOnline} />
+              {/* More Menu - Mobile */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full p-3" side="left">
+                  <SheetHeader className="pb-2">
+                    <SheetTitle className="text-sm text-right">المزيد</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-1 mt-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
+                      <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
+                      <MonthlyReportDialog students={students} payments={payments} settings={settings} />
+                      <ReminderHistoryDialog />
+                      <ReminderSettingsDialog />
+                      <NotificationSettingsDialog settings={notificationSettings} onSave={updateNotificationSettings} />
+                      <SemesterSettings settings={settings} onUpdate={updateSettings} />
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="px-2 py-3 sm:px-4 sm:py-6 space-y-3 sm:space-y-4 max-w-5xl mx-auto">
+      <main className="px-1.5 py-2 sm:px-4 sm:py-4 space-y-2 sm:space-y-4 max-w-5xl mx-auto">
+        {/* Compact greeting bar - hidden on very small screens */}
         {students.length > 0 && activeTab === "sessions" && (
-          <div className="flex items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-4 bg-card rounded-lg sm:rounded-xl border shadow-sm">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="hidden sm:flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
+          <div className="hidden xs:flex items-center justify-between gap-2 p-2 sm:p-3 bg-card rounded-lg border shadow-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="h-4 w-4 text-primary shrink-0" />
                 <span className="font-semibold text-foreground">{getGreeting()} عمر!</span>
               </div>
               <div className="flex items-center gap-2 text-sm">

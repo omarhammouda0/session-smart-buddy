@@ -695,210 +695,172 @@ export const PaymentsDashboard = ({
   // ============================================
 
   return (
-    <div className="space-y-4" dir="rtl">
-      {/* Month Navigation */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-8 w-8">
+    <div className="space-y-2 sm:space-y-4" dir="rtl">
+      {/* Month Navigation - Compact */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-center gap-1.5">
+          <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-7 w-7 sm:h-8 sm:w-8">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <div className="text-center min-w-[140px]">
-            <p className="font-heading font-semibold text-lg">{formatMonthYearAr(selectedMonth, selectedYear)}</p>
+          <div className="text-center min-w-[100px] sm:min-w-[140px]">
+            <p className="font-heading font-semibold text-sm sm:text-lg">{formatMonthYearAr(selectedMonth, selectedYear)}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={goToPrevMonth} className="h-7 w-7 sm:h-8 sm:w-8">
             <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="flex justify-center gap-1.5 overflow-x-auto pb-1">
+        {/* Quick month buttons - scrollable */}
+        <div className="flex justify-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
           {recentMonths.map((m) => (
             <button
               key={`${m.year}-${m.month}`}
-              onClick={() => {
-                setSelectedMonth(m.month);
-                setSelectedYear(m.year);
-              }}
+              onClick={() => { setSelectedMonth(m.month); setSelectedYear(m.year); }}
               className={cn(
-                "flex flex-col items-center px-3 py-2 rounded-lg transition-all min-w-[56px]",
+                "flex flex-col items-center px-2 py-1 sm:px-3 sm:py-2 rounded-lg transition-all min-w-[44px] sm:min-w-[56px]",
                 selectedMonth === m.month && selectedYear === m.year
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : m.isCurrent
-                    ? "bg-primary/10 border-2 border-primary/30"
-                    : "bg-card border border-border",
+                  : m.isCurrent ? "bg-primary/10 border-2 border-primary/30" : "bg-card border border-border"
               )}
             >
-              <span className="text-xs font-medium">{m.label}</span>
-              <span className="text-[10px] opacity-70">{m.year}</span>
+              <span className="text-[0.6rem] sm:text-xs font-medium">{m.label}</span>
+              <span className="text-[0.5rem] sm:text-[10px] opacity-70">{m.year}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Payment Summary Card */}
+      {/* Payment Summary Card - Compact */}
       <Card className="card-shadow bg-gradient-to-br from-primary/5 to-primary/10">
-        <CardContent className="py-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Coins className="h-5 w-5 text-primary" />
-            <span className="font-heading font-semibold">ملخص المدفوعات</span>
+        <CardContent className="py-2 sm:py-4 px-2 sm:px-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Coins className="h-4 w-4 text-primary" />
+            <span className="font-heading font-semibold text-xs sm:text-sm">ملخص المدفوعات</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-card rounded-lg p-2">
-              <p className="text-lg font-heading font-bold">{totalExpected.toLocaleString()}</p>
-              <p className="text-[10px] text-muted-foreground">{CURRENCY} متوقع</p>
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
+            <div className="bg-card rounded-lg p-1.5 sm:p-2">
+              <p className="text-sm sm:text-lg font-heading font-bold">{totalExpected.toLocaleString()}</p>
+              <p className="text-[0.5rem] sm:text-[10px] text-muted-foreground">متوقع</p>
             </div>
-            <div className="bg-success/10 rounded-lg p-2">
-              <p className="text-lg font-heading font-bold text-success">{totalCollected.toLocaleString()}</p>
-              <p className="text-[10px] text-success/80">{CURRENCY} محصّل</p>
+            <div className="bg-success/10 rounded-lg p-1.5 sm:p-2">
+              <p className="text-sm sm:text-lg font-heading font-bold text-success">{totalCollected.toLocaleString()}</p>
+              <p className="text-[0.5rem] sm:text-[10px] text-success/80">محصّل</p>
             </div>
-            <div className="bg-warning/10 rounded-lg p-2">
-              <p className="text-lg font-heading font-bold text-warning">{totalPending.toLocaleString()}</p>
-              <p className="text-[10px] text-warning/80">{CURRENCY} متبقي</p>
+            <div className="bg-warning/10 rounded-lg p-1.5 sm:p-2">
+              <p className="text-sm sm:text-lg font-heading font-bold text-warning">{totalPending.toLocaleString()}</p>
+              <p className="text-[0.5rem] sm:text-[10px] text-warning/80">متبقي</p>
             </div>
           </div>
 
           {/* Collection Progress Bar */}
           {totalExpected > 0 && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs mb-1">
-                <span>نسبة التحصيل</span>
+            <div className="mt-2">
+              <div className="flex justify-between text-[0.6rem] sm:text-xs mb-0.5">
+                <span>التحصيل</span>
                 <span className="font-medium">{collectionPercentage}%</span>
               </div>
-              <Progress value={collectionPercentage} className="h-2" />
+              <Progress value={collectionPercentage} className="h-1.5 sm:h-2" />
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Status Filter Cards */}
-      <div className="grid grid-cols-4 gap-2">
+      {/* Status Filter Cards - Compact */}
+      <div className="grid grid-cols-4 gap-1 sm:gap-2">
         <button
           onClick={() => setPaymentFilter("all")}
-          className={cn(
-            "rounded-lg p-3 card-shadow transition-all text-center",
-            paymentFilter === "all" ? "ring-2 ring-primary bg-card" : "bg-card",
-          )}
+          className={cn("rounded-lg p-1.5 sm:p-3 card-shadow transition-all text-center", paymentFilter === "all" ? "ring-2 ring-primary bg-card" : "bg-card")}
         >
-          <Users className="h-4 w-4 mx-auto mb-1" />
-          <p className="text-xl font-heading font-bold">{students.length}</p>
-          <p className="text-[10px] text-muted-foreground">إجمالي</p>
+          <Users className="h-3 w-3 sm:h-4 sm:w-4 mx-auto mb-0.5" />
+          <p className="text-base sm:text-xl font-heading font-bold">{students.length}</p>
+          <p className="text-[0.5rem] sm:text-[10px] text-muted-foreground">الكل</p>
         </button>
 
         <button
           onClick={() => setPaymentFilter("paid")}
-          className={cn(
-            "rounded-lg p-3 card-shadow transition-all text-center",
-            paymentFilter === "paid" ? "ring-2 ring-success bg-success/10" : "bg-success/10",
-          )}
+          className={cn("rounded-lg p-1.5 sm:p-3 card-shadow transition-all text-center", paymentFilter === "paid" ? "ring-2 ring-success bg-success/10" : "bg-success/10")}
         >
-          <Check className="h-4 w-4 mx-auto mb-1 text-success" />
-          <p className="text-xl font-heading font-bold text-success">{paidCount}</p>
-          <p className="text-[10px] text-success/80">مدفوع</p>
+          <Check className="h-3 w-3 sm:h-4 sm:w-4 mx-auto mb-0.5 text-success" />
+          <p className="text-base sm:text-xl font-heading font-bold text-success">{paidCount}</p>
+          <p className="text-[0.5rem] sm:text-[10px] text-success/80">دفع</p>
         </button>
 
         <button
           onClick={() => setPaymentFilter("partial")}
-          className={cn(
-            "rounded-lg p-3 card-shadow transition-all text-center",
-            paymentFilter === "partial" ? "ring-2 ring-amber-500 bg-amber-500/10" : "bg-amber-500/10",
-          )}
+          className={cn("rounded-lg p-1.5 sm:p-3 card-shadow transition-all text-center", paymentFilter === "partial" ? "ring-2 ring-amber-500 bg-amber-500/10" : "bg-amber-500/10")}
         >
-          <Clock className="h-4 w-4 mx-auto mb-1 text-amber-500" />
-          <p className="text-xl font-heading font-bold text-amber-500">{partialCount}</p>
-          <p className="text-[10px] text-amber-500/80">جزئي</p>
+          <Clock className="h-3 w-3 sm:h-4 sm:w-4 mx-auto mb-0.5 text-amber-500" />
+          <p className="text-base sm:text-xl font-heading font-bold text-amber-500">{partialCount}</p>
+          <p className="text-[0.5rem] sm:text-[10px] text-amber-500/80">جزئي</p>
         </button>
 
         <button
           onClick={() => setPaymentFilter("unpaid")}
-          className={cn(
-            "rounded-lg p-3 card-shadow transition-all text-center",
-            paymentFilter === "unpaid" ? "ring-2 ring-rose-500 bg-rose-500/10" : "bg-rose-500/10",
-          )}
+          className={cn("rounded-lg p-1.5 sm:p-3 card-shadow transition-all text-center", paymentFilter === "unpaid" ? "ring-2 ring-rose-500 bg-rose-500/10" : "bg-rose-500/10")}
         >
-          <X className="h-4 w-4 mx-auto mb-1 text-rose-500" />
-          <p className="text-xl font-heading font-bold text-rose-500">{unpaidCount}</p>
-          <p className="text-[10px] text-rose-500/80">غير مدفوع</p>
+          <X className="h-3 w-3 sm:h-4 sm:w-4 mx-auto mb-0.5 text-rose-500" />
+          <p className="text-base sm:text-xl font-heading font-bold text-rose-500">{unpaidCount}</p>
+          <p className="text-[0.5rem] sm:text-[10px] text-rose-500/80">لا</p>
         </button>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex gap-2">
+      {/* Action Buttons - Compact */}
+      <div className="flex gap-1 sm:gap-2 flex-wrap">
         {bulkSendingReminders ? (
-          <div className="flex-1 p-4 rounded-lg border bg-card space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                جاري إرسال التذكيرات...
-              </span>
-              <span className="text-muted-foreground">
-                {bulkSendProgress.current} / {bulkSendProgress.total}
-              </span>
+          <div className="flex-1 p-2 sm:p-4 rounded-lg border bg-card space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin text-primary" />إرسال...</span>
+              <span className="text-muted-foreground">{bulkSendProgress.current}/{bulkSendProgress.total}</span>
             </div>
-            <Progress value={(bulkSendProgress.current / bulkSendProgress.total) * 100} className="h-2" />
-            <div className="flex gap-4 text-xs">
-              <span className="text-success">✓ نجح: {bulkSendProgress.success}</span>
-              {bulkSendProgress.failed > 0 && (
-                <span className="text-destructive">✗ فشل: {bulkSendProgress.failed}</span>
-              )}
-            </div>
+            <Progress value={(bulkSendProgress.current / bulkSendProgress.total) * 100} className="h-1.5" />
           </div>
         ) : (
           <>
             <Select value={whatsappTarget} onValueChange={(v) => setWhatsappTarget(v as WhatsAppTarget)}>
-              <SelectTrigger className="w-[180px] border-green-500/50 text-green-600">
-                <MessageCircle className="h-4 w-4 ml-1" />
+              <SelectTrigger className="flex-1 min-w-0 h-8 sm:h-9 text-xs sm:text-sm border-green-500/50 text-green-600">
+                <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 ml-1 shrink-0" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="overdue">⚡ للمتأخرين ({unpaidStudents.filter((s) => s.phone).length})</SelectItem>
-                <SelectItem value="upcoming">📅 للمستحقين ({unpaidStudents.filter((s) => s.phone).length})</SelectItem>
-                <SelectItem value="all">👥 للجميع ({students.filter((s) => s.phone).length})</SelectItem>
-                <SelectItem value="custom">✏️ رسالة مخصصة...</SelectItem>
+                <SelectItem value="overdue">متأخرين ({unpaidStudents.filter((s) => s.phone).length})</SelectItem>
+                <SelectItem value="upcoming">مستحقين ({unpaidStudents.filter((s) => s.phone).length})</SelectItem>
+                <SelectItem value="all">الجميع ({students.filter((s) => s.phone).length})</SelectItem>
               </SelectContent>
             </Select>
 
             <Button
               variant="outline"
-              className="flex-1 gap-2 border-green-500/50 text-green-600 hover:bg-green-500/10"
+              className="h-8 sm:h-9 px-2 sm:px-3 gap-1 text-xs sm:text-sm border-green-500/50 text-green-600 hover:bg-green-500/10"
               onClick={sendPaymentReminder}
               disabled={getWhatsAppTargetStudents(whatsappTarget).length === 0}
             >
-              <Send className="h-4 w-4" />
-              إرسال تذكير واتساب
+              <Send className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">تذكير</span>
             </Button>
           </>
         )}
 
-        <Button variant="outline" size="icon" onClick={exportToPDF} title="تصدير التقرير">
-          <Download className="h-4 w-4" />
+        <Button variant="outline" size="icon" onClick={exportToPDF} className="h-8 w-8 sm:h-9 sm:w-9">
+          <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </Button>
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setHistoryDialog({ open: true, view: "monthly" })}
-          title="السجل"
-        >
-          <History className="h-4 w-4" />
+        <Button variant="outline" size="icon" onClick={() => setHistoryDialog({ open: true, view: "monthly" })} className="h-8 w-8 sm:h-9 sm:w-9">
+          <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </Button>
       </div>
 
-      {/* Students List */}
+      {/* Students List - Compact */}
       <Card className="card-shadow">
-        <CardHeader className="pb-3 space-y-3">
-          <CardTitle className="font-heading text-lg flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+        <CardHeader className="pb-2 sm:pb-3 space-y-2 p-2 sm:p-4">
+          <CardTitle className="font-heading text-sm sm:text-lg flex items-center gap-1.5">
+            <Calendar className="h-4 w-4 text-primary" />
             {formatMonthYearAr(selectedMonth, selectedYear)}
           </CardTitle>
-          <StudentSearchCombobox
-            students={students}
-            value={studentSearch}
-            onChange={setStudentSearch}
-            placeholder="ابحث عن طالب..."
-          />
+          <StudentSearchCombobox students={students} value={studentSearch} onChange={setStudentSearch} placeholder="بحث..." />
         </CardHeader>
 
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-1.5 sm:space-y-2 p-2 sm:p-4 pt-0">
           {filteredStudents.length === 0 ? (
             <p className="text-center text-muted-foreground py-4 text-sm">
               {studentSearch.trim() ? "لا يوجد نتائج" : "لا يوجد طلاب تطابق الفلتر"}
