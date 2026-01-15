@@ -22,5 +22,5 @@ export const isFirebaseConfigured = (): boolean => {
 };
 
 // VAPID key for Web Push (from Firebase Console → Cloud Messaging → Web Push certificates)
-export const vapidKey = "BACX5Hkka-kcuWgxKVZIMuGiNkgC4SBROEJrZi3HoZ4cGCsA6lQ6eKOw3DUp0Uaq3D63KZGe1lzpgUGEhasK-Ks";
+export const vapidKey = "BDIJ4_cX54SDstW1QluPuyAKvgz2AmlvBbpOOVZsNkPWygQgcL0ElLq5vt7WjFD-OpAwHPPA28iIv6-qptm5aTg";
 
