@@ -829,20 +829,20 @@ const Index = () => {
       )}
 
       <header className="bg-card/70 backdrop-blur-xl border-b border-border/50 sticky top-0 z-10 safe-top shadow-sm">
-        <div className="px-4 py-3 sm:px-5 sm:py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/25 flex items-center justify-center shrink-0">
-                <GraduationCap className="h-6 w-6 text-primary-foreground" />
+        <div className="px-2 py-2 sm:px-5 sm:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/25 flex items-center justify-center shrink-0">
+                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-display font-bold text-lg sm:text-xl leading-tight truncate">متابعة الطلاب</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground hidden xs:block font-medium">
+                <h1 className="font-display font-bold text-base sm:text-xl leading-tight truncate">متابعة الطلاب</h1>
+                <p className="text-[0.65rem] sm:text-sm text-muted-foreground hidden xs:block font-medium">
                   {format(now, "EEEE، d MMMM", { locale: ar })}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* AI Suggestions Widget */}
               <AISuggestionsWidget
                 currentSuggestion={aiCurrentSuggestion}
@@ -860,7 +860,7 @@ const Index = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-10 w-10 sm:w-auto sm:px-4 gap-2 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all font-medium"
+                    className="h-9 w-9 sm:h-10 sm:w-auto sm:px-4 gap-2 rounded-lg sm:rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all font-medium"
                   >
                     <Users className="h-4 w-4" />
                     <span className="hidden sm:inline text-sm font-semibold">الطلاب</span>
@@ -1023,10 +1023,10 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="px-3 py-4 sm:px-4 sm:py-6 space-y-4 max-w-5xl mx-auto">
+      <main className="px-2 py-3 sm:px-4 sm:py-6 space-y-3 sm:space-y-4 max-w-5xl mx-auto">
         {students.length > 0 && activeTab === "sessions" && (
-          <div className="flex items-center justify-between gap-3 p-3 sm:p-4 bg-card rounded-xl border shadow-sm">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-4 bg-card rounded-lg sm:rounded-xl border shadow-sm">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="hidden sm:flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
                 <span className="font-semibold text-foreground">{getGreeting()} عمر!</span>
@@ -1065,34 +1065,36 @@ const Index = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-4 mb-4 h-12 bg-muted/50 p-1 rounded-xl">
+          <TabsList className="w-full grid grid-cols-4 mb-3 sm:mb-4 h-auto min-h-[2.75rem] sm:h-12 bg-muted/50 p-0.5 sm:p-1 rounded-lg sm:rounded-xl gap-0.5 sm:gap-1">
             <TabsTrigger
               value="sessions"
-              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
+              className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
             >
-              <BookOpen className="h-4 w-4" />
-              <span className="hidden xs:inline">الحصص</span>
+              <BookOpen className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
+              <span className="leading-tight">الحصص</span>
             </TabsTrigger>
             <TabsTrigger
               value="calendar"
-              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
+              className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
             >
-              <CalendarDays className="h-4 w-4" />
-              <span className="hidden xs:inline">التقويم</span>
+              <CalendarDays className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
+              <span className="leading-tight">التقويم</span>
             </TabsTrigger>
             <TabsTrigger
               value="history"
-              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
+              className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
             >
-              <History className="h-4 w-4" />
-              <span className="hidden xs:inline">إدارة الطلبة</span>
+              <History className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
+              <span className="leading-tight hidden xs:inline sm:inline">الطلبة</span>
+              <span className="leading-tight xs:hidden">طلبة</span>
             </TabsTrigger>
             <TabsTrigger
               value="payments"
-              className="gap-1.5 text-xs sm:text-sm rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium"
+              className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
             >
-              <CreditCard className="h-4 w-4" />
-              <span className="hidden xs:inline">المدفوعات</span>
+              <CreditCard className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
+              <span className="leading-tight hidden xs:inline sm:inline">المدفوعات</span>
+              <span className="leading-tight xs:hidden">دفع</span>
             </TabsTrigger>
           </TabsList>
 

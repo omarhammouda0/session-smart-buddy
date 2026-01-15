@@ -763,3 +763,403 @@
     backdrop-filter: none !important;
   }
 }
+
+/* =====================================================
+   MOBILE-FIRST RESPONSIVE IMPROVEMENTS
+   ===================================================== */
+
+/* Mobile base styles (< 640px) */
+@media (max-width: 639px) {
+  /* Root adjustments */
+  html {
+    font-size: 14px;
+  }
+
+  /* Container padding */
+  .container {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  /* Main content padding */
+  main, .main-content {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  /* Cards - more compact on mobile */
+  [data-slot="card"],
+  .card,
+  [class*="Card"] {
+    border-radius: 1rem !important;
+  }
+
+  [data-slot="card-content"] {
+    padding: 0.875rem !important;
+  }
+
+  /* Tabs - compact for mobile */
+  [role="tablist"] {
+    gap: 0.25rem !important;
+  }
+
+  [role="tab"] {
+    padding: 0.5rem 0.5rem !important;
+    font-size: 0.7rem !important;
+    min-height: 2.5rem !important;
+    gap: 0.25rem !important;
+  }
+
+  [role="tab"] svg {
+    width: 1rem !important;
+    height: 1rem !important;
+  }
+
+  /* Buttons - larger touch targets */
+  button,
+  [role="button"] {
+    min-height: 2.5rem;
+  }
+
+  /* Dialog/Sheet improvements */
+  [role="dialog"] {
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    margin: 0.5rem !important;
+    border-radius: 1.25rem !important;
+  }
+
+  /* Form inputs - prevent iOS zoom */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 2.5rem;
+  }
+
+  /* Badge sizes */
+  .badge,
+  [data-slot="badge"] {
+    font-size: 0.6rem !important;
+    padding: 0.125rem 0.375rem !important;
+  }
+
+  /* Hide decorative background elements for performance */
+  .bg-blob,
+  .bg-blob-2,
+  .bg-blob-3,
+  .bg-float,
+  .bg-float-1,
+  .bg-float-2,
+  .bg-float-3,
+  .bg-float-4,
+  .bg-float-5 {
+    display: none !important;
+  }
+
+  /* Hide animated SVG icons on mobile */
+  .fixed.inset-0.-z-10 svg {
+    display: none !important;
+  }
+
+  /* Compact text sizes */
+  h1 {
+    font-size: 1.375rem !important;
+    line-height: 1.3 !important;
+  }
+
+  h2 {
+    font-size: 1.125rem !important;
+    line-height: 1.3 !important;
+  }
+
+  h3 {
+    font-size: 1rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Icon sizes in buttons */
+  button svg,
+  [role="button"] svg {
+    width: 1rem !important;
+    height: 1rem !important;
+    flex-shrink: 0;
+  }
+
+  /* Reduce gaps */
+  .gap-4 {
+    gap: 0.625rem !important;
+  }
+
+  .gap-6 {
+    gap: 0.875rem !important;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 0.625rem !important;
+  }
+
+  .space-y-6 > * + * {
+    margin-top: 0.875rem !important;
+  }
+
+  /* Padding reductions */
+  .p-4 {
+    padding: 0.75rem !important;
+  }
+
+  .p-6 {
+    padding: 1rem !important;
+  }
+
+  .px-4 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .py-4 {
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+  }
+
+  /* Avatar sizes */
+  .w-14.h-14,
+  .w-14 {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+  }
+
+  .w-16.h-16,
+  .w-16 {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+  }
+
+  .w-20.h-20,
+  .w-20 {
+    width: 3rem !important;
+    height: 3rem !important;
+  }
+
+  /* Session cards compact */
+  .session-card,
+  [class*="session-card"] {
+    padding: 0.625rem !important;
+  }
+
+  /* Stats cards compact */
+  .stat-card {
+    padding: 0.75rem !important;
+  }
+
+  /* Text sizes */
+  .text-sm {
+    font-size: 0.75rem !important;
+  }
+
+  .text-xs {
+    font-size: 0.65rem !important;
+  }
+
+  .text-lg {
+    font-size: 0.9375rem !important;
+  }
+
+  .text-xl {
+    font-size: 1.0625rem !important;
+  }
+
+  .text-2xl {
+    font-size: 1.25rem !important;
+  }
+
+  /* Flex adjustments */
+  .flex.items-center.gap-3 {
+    gap: 0.5rem !important;
+  }
+
+  .flex.items-center.gap-4 {
+    gap: 0.625rem !important;
+  }
+
+  /* Sheet as bottom sheet on mobile */
+  [data-state="open"][data-side="right"],
+  [data-state="open"][data-side="left"] {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    height: auto !important;
+    max-height: 85vh !important;
+    max-height: 85dvh !important;
+    width: 100% !important;
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    animation: mobile-sheet-up 0.3s ease-out !important;
+  }
+
+  /* Hide desktop-only elements */
+  .hidden-mobile,
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* Very small mobile (< 375px) */
+@media (max-width: 374px) {
+  html {
+    font-size: 12px !important;
+  }
+
+  .container {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  /* Even more compact tabs */
+  [role="tablist"] {
+    gap: 0.125rem !important;
+  }
+
+  [role="tab"] {
+    padding: 0.375rem 0.375rem !important;
+    font-size: 0.6rem !important;
+  }
+
+  /* Hide tab text on very small screens */
+  [role="tab"] span.hidden.xs\\:inline {
+    display: none !important;
+  }
+
+  /* Smaller touch targets but still accessible */
+  button,
+  [role="button"] {
+    min-height: 2.25rem;
+  }
+
+  /* Even smaller badges */
+  .badge,
+  [data-slot="badge"] {
+    font-size: 0.55rem !important;
+    padding: 0.0625rem 0.25rem !important;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger interactive elements */
+  button,
+  [role="button"],
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Active states instead of hover */
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+
+  /* Disable hover effects on touch */
+  .hover\\:scale-105:hover,
+  .hover\\:scale-\\[1\\.02\\]:hover {
+    transform: none !important;
+  }
+
+  .hover\\:shadow-lg:hover,
+  .hover\\:shadow-xl:hover {
+    box-shadow: inherit !important;
+  }
+
+  /* Sticky header adjustments */
+  .sticky {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+}
+
+/* Landscape mobile */
+@media (max-width: 896px) and (orientation: landscape) {
+  /* Reduce vertical spacing in landscape */
+  .py-4 {
+    padding-top: 0.375rem !important;
+    padding-bottom: 0.375rem !important;
+  }
+
+  .py-6 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  /* Smaller dialogs in landscape */
+  [role="dialog"] {
+    max-height: 80vh !important;
+    max-height: 80dvh !important;
+  }
+}
+
+/* Safe area utilities for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .pt-safe {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  /* Fixed bottom elements */
+  .fixed.bottom-0 {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Fixed headers */
+  .fixed.top-0 {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Mobile keyboard visible adjustments */
+@media (max-height: 500px) {
+  [role="dialog"] {
+    max-height: 95vh !important;
+    max-height: 95dvh !important;
+  }
+
+  .hide-on-keyboard {
+    display: none !important;
+  }
+}
+
+/* Slide up animation for mobile sheets */
+@keyframes mobile-sheet-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Dark mode mobile optimizations */
+@media (max-width: 639px) {
+  .dark {
+    --card: 220 45% 14%;
+  }
+}
+
+/* Tablet styles (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  /* Better grid for tablets */
+  .grid.grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

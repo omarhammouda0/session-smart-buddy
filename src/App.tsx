@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -16,9 +17,25 @@ const queryClient = new QueryClient();
 // ANIMATED BACKGROUND COMPONENT
 // =====================================================
 const AnimatedBackground = memo(() => {
+  const isMobile = useIsMobile();
+
+  // Simplified background for mobile - better performance
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(180deg, hsl(30 25% 98%) 0%, hsl(30 20% 96%) 100%)`,
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Inline styles for animations */}
+      {/* Inline styles for animations - desktop only */}
       <style>{`
         @keyframes blob {
           0%, 100% { transform: translate(0, 0) scale(1); }

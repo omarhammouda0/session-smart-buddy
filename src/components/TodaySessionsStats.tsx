@@ -200,7 +200,7 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
       </div>
 
       {/* Compact Header: Greeting + Stats in one row */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         {/* Compact Greeting */}
         <Card className="relative overflow-hidden border-0 shadow-lg flex-1 sm:max-w-[280px]">
           <div className={cn(
@@ -212,19 +212,19 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
           <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/5 rounded-full" />
           {/* Shimmer effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" />
-          <CardContent className="relative p-3.5 text-white">
+          <CardContent className="relative p-2.5 sm:p-3.5 text-white">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="text-3xl drop-shadow-lg">{greeting.emoji}</span>
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <span className="text-2xl sm:text-3xl drop-shadow-lg">{greeting.emoji}</span>
                 <div>
-                  <p className="text-lg font-bold drop-shadow font-display">{greeting.text}!</p>
-                  <p className="text-[11px] text-white/80 font-medium">
+                  <p className="text-base sm:text-lg font-bold drop-shadow font-display">{greeting.text}!</p>
+                  <p className="text-[10px] sm:text-[11px] text-white/80 font-medium">
                     {format(currentTime, "EEEE، d MMMM", { locale: ar })}
                   </p>
                 </div>
               </div>
-              <div className="text-left bg-white/20 backdrop-blur-sm rounded-xl px-3 py-1.5 shadow-inner">
-                <p className="text-2xl font-mono font-bold drop-shadow tabular-nums">
+              <div className="text-left bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 sm:py-1.5 shadow-inner">
+                <p className="text-xl sm:text-2xl font-mono font-bold drop-shadow tabular-nums">
                   {format(currentTime, "HH:mm")}
                 </p>
               </div>
@@ -233,49 +233,49 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
         </Card>
 
         {/* Compact Stats Row */}
-        <div className="flex-1 grid grid-cols-4 gap-2">
+        <div className="flex-1 grid grid-cols-4 gap-1.5 sm:gap-2">
           {/* Total Sessions */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,60%,30%)] to-[hsl(220,55%,40%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,60%,30%)] to-[hsl(220,55%,40%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-2.5 text-center text-white relative">
-              <Calendar className="h-4 w-4 mx-auto mb-1 opacity-90" />
-              <p className="text-2xl font-bold leading-none tabular-nums">{stats.total}</p>
-              <p className="text-[10px] text-white/90 font-medium mt-0.5">حصص</p>
+            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
+              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
+              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.total}</p>
+              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">حصص</p>
             </CardContent>
           </Card>
 
           {/* Completed */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,50%,35%)] to-[hsl(220,45%,45%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,50%,35%)] to-[hsl(220,45%,45%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-2.5 text-center text-white relative">
-              <CheckCircle2 className="h-4 w-4 mx-auto mb-1 opacity-90" />
-              <p className="text-2xl font-bold leading-none tabular-nums">{stats.completed}</p>
-              <p className="text-[10px] text-white/90 font-medium mt-0.5">مكتملة</p>
+            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
+              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
+              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.completed}</p>
+              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">مكتملة</p>
             </CardContent>
           </Card>
 
           {/* Completion Rate */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,55%,38%)] to-[hsl(220,50%,48%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,55%,38%)] to-[hsl(220,50%,48%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-2.5 text-center text-white relative">
-              <Target className="h-4 w-4 mx-auto mb-1 opacity-90" />
-              <p className="text-2xl font-bold leading-none tabular-nums">{stats.completionRate}%</p>
-              <p className="text-[10px] text-white/90 font-medium mt-0.5">إنجاز</p>
+            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
+              <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
+              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.completionRate}%</p>
+              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">إنجاز</p>
             </CardContent>
           </Card>
 
           {/* Today's Earnings - Shows paid / expected */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,45%,40%)] to-[hsl(220,40%,50%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,45%,40%)] to-[hsl(220,40%,50%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-2.5 text-center text-white relative">
-              <DollarSign className="h-4 w-4 mx-auto mb-1 opacity-90" />
-              <p className="text-2xl font-bold leading-none tabular-nums">{stats.paidAmount}</p>
-              <p className="text-[10px] text-white/90 font-medium mt-0.5">
-                {stats.expectedValue > 0 ? `من ${stats.expectedValue} ج.م` : "ج.م"}
+            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
+              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
+              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.paidAmount}</p>
+              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">
+                {stats.expectedValue > 0 ? `من ${stats.expectedValue}` : "ج.م"}
               </p>
             </CardContent>
           </Card>
