@@ -993,23 +993,14 @@ const Index = () => {
           <div className="hidden xs:flex items-center justify-between gap-2 p-2 sm:p-3 bg-card rounded-lg border shadow-sm">
             <div className="flex items-center gap-2 min-w-0">
               <Sparkles className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-semibold text-foreground">{getGreeting()} عمر!</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Badge variant="outline" className="gap-1 bg-primary/10 text-primary border-primary/30">
-                  <CalendarDays className="h-3 w-3" />
+              <span className="font-semibold text-foreground text-sm">{getGreeting()} عمر!</span>
+              <div className="flex items-center gap-1.5 text-xs">
+                <Badge variant="outline" className="gap-1 bg-primary/10 text-primary border-primary/30 text-xs px-1.5 py-0">
                   {todayStats.total} حصص
                 </Badge>
                 {todayStats.completed > 0 && (
-                  <Badge variant="outline" className="gap-1 bg-primary/20 text-primary border-primary/40">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {todayStats.completed} مكتملة
-                  </Badge>
-                )}
-                {todayStats.cancelled > 0 && (
-                  <Badge variant="outline" className="gap-1 bg-muted text-muted-foreground border-border">
-                    <XCircle className="h-3 w-3" />
-                    {todayStats.cancelled} ملغاة
+                  <Badge variant="outline" className="gap-1 bg-primary/20 text-primary border-primary/40 text-xs px-1.5 py-0">
+                    {todayStats.completed} ✓
                   </Badge>
                 )}
               </div>
