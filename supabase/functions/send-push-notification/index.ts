@@ -26,12 +26,18 @@ interface PushNotificationRequest {
 
 // Generate JWT for Firebase Auth
 async function generateFirebaseAccessToken(): Promise<string> {
-  const privateKey = Deno.env.get("FIREBASE_PRIVATE_KEY")?.replace(/\\n/g, '\n');
+  let privateKey = Deno.env.get("FIREBASE_PRIVATE_KEY");
   const clientEmail = Deno.env.get("FIREBASE_CLIENT_EMAIL");
 
   if (!privateKey || !clientEmail) {
     throw new Error("Firebase credentials not configured");
   }
+
+  // Handle escaped newlines from environment variables
+  privateKey = privateKey.replace(/\\n/g, '\n');
+  
+  console.log("Private key starts with:", privateKey.substring(0, 50));
+  console.log("Client email:", clientEmail);
 
   const now = Math.floor(Date.now() / 1000);
   const expiry = now + 3600; // 1 hour
@@ -61,16 +67,53 @@ async function generateFirebaseAccessToken(): Promise<string> {
   // Import private key and sign
   const pemHeader = "-----BEGIN PRIVATE KEY-----";
   const pemFooter = "-----END PRIVATE KEY-----";
-  const pemContents = privateKey.replace(pemHeader, '').replace(pemFooter, '').replace(/\s/g, '');
-  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+  
+  // Extract and clean the base64 content
+  let pemContents = privateKey;
+  if (pemContents.includes(pemHeader)) {
+    pemContents = pemContents.replace(pemHeader, '').replace(pemFooter, '');
+  }
+  // Remove all whitespace, newlines, carriage returns
+  pemContents = pemContents.replace(/[\r\n\s]/g, '');
+  
+  console.log("PEM contents length:", pemContents.length);
+  console.log("PEM sample (first 50 chars):", pemContents.substring(0, 50));
+  
+  // Find invalid base64 characters
+  const validBase64 = /^[A-Za-z0-9+/=]*$/;
+  if (!validBase64.test(pemContents)) {
+    const invalidChars = pemContents.split('').filter(c => !/[A-Za-z0-9+/=]/.test(c));
+    console.error("Invalid base64 characters found:", [...new Set(invalidChars)]);
+    console.error("First 100 chars:", pemContents.substring(0, 100));
+  }
+  
+  let binaryKey: Uint8Array;
+  try {
+    // Standard base64 decode
+    const binaryString = atob(pemContents);
+    binaryKey = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      binaryKey[i] = binaryString.charCodeAt(i);
+    }
+  } catch (decodeError) {
+    console.error("Base64 decode error:", decodeError);
+    console.error("PEM contents sample:", pemContents.substring(0, 200));
+    throw new Error(`Failed to decode base64: ${decodeError}`);
+  }
 
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    binaryKey,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
+  let cryptoKey;
+  try {
+    cryptoKey = await crypto.subtle.importKey(
+      "pkcs8",
+      binaryKey.buffer as ArrayBuffer,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+  } catch (importError) {
+    console.error("Key import error:", importError);
+    throw new Error(`Failed to import private key: ${importError}`);
+  }
 
   const signature = await crypto.subtle.sign(
     "RSASSA-PKCS1-v1_5",
