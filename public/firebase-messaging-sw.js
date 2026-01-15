@@ -4,14 +4,14 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
 
-// Firebase configuration - will be replaced with actual values during build
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDummy-key-replace-with-actual",
+  apiKey: "AIzaSyCDrdQpGBAj4fdk30sWBdCTieE0qOuLKsA",
   authDomain: "session-smart-buddy.firebaseapp.com",
   projectId: "session-smart-buddy",
   storageBucket: "session-smart-buddy.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  messagingSenderId: "224453116331",
+  appId: "1:224453116331:web:2d62420830bd0c538852ee"
 };
 
 // Initialize Firebase

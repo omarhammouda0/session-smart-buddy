@@ -1,18 +1,14 @@
 // Firebase Configuration
-// These values come from Firebase Console → Project Settings → General → Your apps
-
-// For Lovable deployment, set these in the Lovable Secrets panel:
-// - VITE_FIREBASE_API_KEY
-// - VITE_FIREBASE_MESSAGING_SENDER_ID
-// - VITE_FIREBASE_APP_ID
+// Values from Firebase Console → Project Settings → Your apps
 
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  apiKey: "AIzaSyCDrdQpGBAj4fdk30sWBdCTieE0qOuLKsA",
   authDomain: "session-smart-buddy.firebaseapp.com",
   projectId: "session-smart-buddy",
   storageBucket: "session-smart-buddy.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+  messagingSenderId: "224453116331",
+  appId: "1:224453116331:web:2d62420830bd0c538852ee",
+  measurementId: "G-92DXX5CP3Q"
 };
 
 // Check if Firebase is properly configured
@@ -21,7 +17,7 @@ export const isFirebaseConfigured = (): boolean => {
     firebaseConfig.apiKey &&
     firebaseConfig.messagingSenderId &&
     firebaseConfig.appId &&
-    firebaseConfig.apiKey !== "AIzaSyDummy-key-replace-with-actual"
+    firebaseConfig.apiKey.startsWith("AIza")
   );
 };
 
