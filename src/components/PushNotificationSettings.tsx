@@ -1,7 +1,7 @@
 // Push Notification Settings Component
 // Allows users to enable/disable background push notifications
 
-import { Bell, BellOff, Smartphone } from "lucide-react";
+import { Bell, BellOff, Smartphone, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +13,7 @@ export function PushNotificationSettings() {
   const {
     isSupported,
     isEnabled,
+    isConfigured,
     permission,
     enableNotifications,
     disableNotifications
@@ -30,6 +31,33 @@ export function PushNotificationSettings() {
             غير مدعوم في هذا المتصفح
           </CardDescription>
         </CardHeader>
+      </Card>
+    );
+  }
+
+  if (!isConfigured) {
+    return (
+      <Card className="border-dashed border-yellow-300">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            إشعارات الخلفية
+          </CardTitle>
+          <CardDescription>
+            يتطلب إعداد Firebase
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg bg-yellow-50 p-3 text-xs text-yellow-800 space-y-2">
+            <p className="font-medium">إعدادات Firebase مفقودة</p>
+            <p>يرجى إضافة المتغيرات التالية في Lovable Secrets:</p>
+            <ul className="list-disc list-inside mr-2 space-y-1 font-mono text-[10px]">
+              <li>VITE_FIREBASE_API_KEY</li>
+              <li>VITE_FIREBASE_MESSAGING_SENDER_ID</li>
+              <li>VITE_FIREBASE_APP_ID</li>
+            </ul>
+          </div>
+        </CardContent>
       </Card>
     );
   }

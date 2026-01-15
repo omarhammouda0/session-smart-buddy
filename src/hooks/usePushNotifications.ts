@@ -1,10 +1,9 @@
 // Push Notifications Hook
 // Manages FCM token registration and foreground message handling
+// Uses dynamic imports to handle cases where Firebase is not configured
 
 import { useState, useEffect, useCallback } from "react";
-import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getMessaging, getToken, onMessage, type Messaging } from "firebase/messaging";
-import { firebaseConfig, vapidKey } from "@/lib/firebaseConfig";
+import { firebaseConfig, vapidKey, isFirebaseConfigured } from "@/lib/firebaseConfig";
 import { toast } from "@/hooks/use-toast";
 
 // Get Supabase URL and key from environment
@@ -16,19 +15,7 @@ interface PushNotificationState {
   isEnabled: boolean;
   token: string | null;
   permission: NotificationPermission;
-}
-
-interface NotificationPayload {
-  title?: string;
-  body?: string;
-  data?: {
-    action?: string;
-    studentId?: string;
-    sessionId?: string;
-    actionType?: string;
-    targetUrl?: string;
-    priority?: string;
-  };
+  isConfigured: boolean;
 }
 
 // Helper to save FCM token to database via REST API
@@ -79,35 +66,85 @@ async function deactivateFcmToken(token: string): Promise<boolean> {
   }
 }
 
+// Helper function to play notification sound
+function playNotificationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.value = 800;
+    oscillator.type = "sine";
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (e) {
+    console.warn("Could not play notification sound:", e);
+  }
+}
+
 export function usePushNotifications() {
   const [state, setState] = useState<PushNotificationState>({
     isSupported: false,
     isEnabled: false,
     token: null,
-    permission: "default"
+    permission: "default",
+    isConfigured: false
   });
-  const [messaging, setMessaging] = useState<Messaging | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [messaging, setMessaging] = useState<any>(null);
 
-  // Check if push notifications are supported
+  // Check if push notifications are supported and Firebase is configured
   useEffect(() => {
     const checkSupport = async () => {
-      const isSupported =
+      const browserSupported =
         "Notification" in window &&
         "serviceWorker" in navigator &&
         "PushManager" in window;
 
+      const firebaseReady = isFirebaseConfigured();
+
       setState(prev => ({
         ...prev,
-        isSupported,
-        permission: isSupported ? Notification.permission : "denied"
+        isSupported: browserSupported,
+        isConfigured: firebaseReady,
+        permission: browserSupported ? Notification.permission : "denied"
       }));
 
-      if (isSupported) {
+      if (browserSupported && firebaseReady) {
         try {
+          // Dynamic import Firebase to avoid errors when not configured
+          const { initializeApp, getApps, getApp } = await import("firebase/app");
+          const { getMessaging, onMessage } = await import("firebase/messaging");
+          
           // Initialize Firebase
-          const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+          const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
           const messagingInstance = getMessaging(app);
           setMessaging(messagingInstance);
+
+          // Set up foreground message handler
+          onMessage(messagingInstance, (payload) => {
+            console.log("Foreground message received:", payload);
+            
+            // Show toast for foreground messages
+            toast({
+              title: payload.notification?.title || "تنبيه جديد",
+              description: payload.notification?.body || "",
+              duration: payload.data?.priority === "100" ? 10000 : 5000,
+            });
+
+            // Play sound for priority 100
+            if (payload.data?.priority === "100") {
+              playNotificationSound();
+            }
+          });
 
           // Check if already has permission and token
           if (Notification.permission === "granted") {
@@ -123,6 +160,7 @@ export function usePushNotifications() {
           }
         } catch (error) {
           console.error("Failed to initialize Firebase:", error);
+          setState(prev => ({ ...prev, isConfigured: false }));
         }
       }
     };
@@ -130,41 +168,12 @@ export function usePushNotifications() {
     checkSupport();
   }, []);
 
-  // Handle foreground messages
-  useEffect(() => {
-    if (!messaging) return;
-
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground message received:", payload);
-
-      const notification = payload.notification as NotificationPayload | undefined;
-      const data = payload.data as NotificationPayload["data"];
-
-      // Show toast for foreground messages
-      toast({
-        title: notification?.title || "تنبيه جديد",
-        description: notification?.body || "",
-        duration: data?.priority === "100" ? 10000 : 5000,
-      });
-
-      // Play sound for priority 100
-      if (data?.priority === "100") {
-        playNotificationSound();
-      }
-    });
-
-    return () => unsubscribe();
-  }, [messaging]);
-
   // Handle messages from service worker (notification clicks)
   useEffect(() => {
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data?.type === "NOTIFICATION_CLICK") {
         console.log("Notification clicked:", event.data);
-
-        // Handle navigation based on action
         const { targetUrl } = event.data;
-
         if (targetUrl && targetUrl !== "/") {
           window.location.href = targetUrl;
         }
@@ -179,10 +188,31 @@ export function usePushNotifications() {
 
   // Request permission and get token
   const enableNotifications = useCallback(async (): Promise<boolean> => {
-    if (!state.isSupported || !messaging) {
+    // Check if Firebase is configured
+    if (!state.isConfigured) {
+      toast({
+        title: "غير مُهيأ",
+        description: "إعدادات Firebase غير مكتملة. يرجى إضافة VITE_FIREBASE_API_KEY و VITE_FIREBASE_MESSAGING_SENDER_ID و VITE_FIREBASE_APP_ID",
+        variant: "destructive",
+        duration: 10000
+      });
+      console.error("Firebase not configured. Required env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID");
+      return false;
+    }
+
+    if (!state.isSupported) {
       toast({
         title: "غير مدعوم",
         description: "الإشعارات غير مدعومة في هذا المتصفح",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (!messaging) {
+      toast({
+        title: "خطأ",
+        description: "Firebase لم يتم تهيئته بشكل صحيح",
         variant: "destructive"
       });
       return false;
@@ -206,6 +236,9 @@ export function usePushNotifications() {
       const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
       console.log("Service Worker registered:", registration);
 
+      // Dynamic import getToken
+      const { getToken } = await import("firebase/messaging");
+      
       // Get FCM token
       const token = await getToken(messaging, {
         vapidKey,
@@ -253,12 +286,12 @@ export function usePushNotifications() {
       console.error("Failed to enable notifications:", error);
       toast({
         title: "خطأ",
-        description: "فشل في تفعيل الإشعارات",
+        description: `فشل في تفعيل الإشعارات: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`,
         variant: "destructive"
       });
       return false;
     }
-  }, [state.isSupported, messaging]);
+  }, [state.isSupported, state.isConfigured, messaging]);
 
   // Disable notifications
   const disableNotifications = useCallback(async () => {
@@ -286,29 +319,5 @@ export function usePushNotifications() {
     enableNotifications,
     disableNotifications
   };
-}
-
-// Helper function to play notification sound
-function playNotificationSound() {
-  try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const audioContext = new AudioContextClass();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.frequency.value = 800;
-    oscillator.type = "sine";
-
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3);
-  } catch (e) {
-    console.warn("Could not play notification sound:", e);
-  }
 }
 
