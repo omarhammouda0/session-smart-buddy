@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ar } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 import { useStudents } from "@/hooks/useStudents";
 import { useCancellationTracking } from "@/hooks/useCancellationTracking";
 import { useConflictDetection, ConflictResult } from "@/hooks/useConflictDetection";
@@ -274,13 +275,18 @@ const Index = () => {
   // Student Materials
   const { getMaterials, addMaterials, addMaterial, removeMaterial } = useStudentMaterials();
 
-  // AI Suggestions
+  // AI Suggestions (Queue-based)
   const {
-    suggestions: aiSuggestions,
-    hasNewCritical: hasNewAISuggestions,
+    currentSuggestion: aiCurrentSuggestion,
+    pendingCount: aiPendingCount,
+    allPendingSuggestions: aiAllPending,
+    hasCriticalInterrupt: aiHasCriticalInterrupt,
+    dismissedHistory: aiDismissedHistory,
     dismissSuggestion: dismissAISuggestion,
+    actionSuggestion: actionAISuggestion,
     refreshSuggestions: refreshAISuggestions,
-    markAllAsRead: markAISuggestionsAsRead,
+    resolveByEntity: resolveAIByEntity,
+    dismissCriticalOverlay: dismissAICriticalOverlay,
   } = useAISuggestions(students, payments);
 
   // Handle adding a new student with materials
@@ -482,6 +488,10 @@ const Index = () => {
     const session = student?.sessions.find((s) => s.id === sessionId);
     const wasCompleted = session?.status === "completed";
     toggleSessionComplete(studentId, sessionId);
+    // Auto-resolve AI suggestions when session is completed
+    if (!wasCompleted) {
+      resolveAIByEntity("session", sessionId);
+    }
     toast({
       title: wasCompleted ? "تم إلغاء الإكمال" : "تم إكمال الحصة",
       description: wasCompleted ? "تم إرجاع الحصة إلى مجدولة" : "أحسنت! تم تسجيل الحصة كمكتملة",
@@ -511,6 +521,8 @@ const Index = () => {
       paidAt: new Date().toISOString(),
       notes: `session:${quickPaymentDialog.sessionId}|date:${quickPaymentDialog.sessionDate}`,
     });
+    // Auto-resolve payment-related AI suggestions
+    resolveAIByEntity("payment", `${quickPaymentDialog.student.id}-${sessionDate.getFullYear()}-${sessionDate.getMonth()}`);
     const methodLabel = method === "cash" ? "كاش" : method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
     toast({
       title: "✅ تم تسجيل الدفعة",
@@ -526,6 +538,8 @@ const Index = () => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
     recordPayment(studentId, paymentData);
+    // Auto-resolve payment-related AI suggestions
+    resolveAIByEntity("payment", `${studentId}-${paymentData.year}-${paymentData.month}`);
     const methodLabel =
       paymentData.method === "cash" ? "كاش" : paymentData.method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
     toast({
@@ -574,10 +588,53 @@ const Index = () => {
     },
     markComplete: (studentId: string, sessionId: string) => {
       toggleSessionComplete(studentId, sessionId);
+      // Auto-resolve AI suggestions related to this session
+      resolveAIByEntity("session", sessionId);
       toast({
         title: "✅ تم تحديث الحصة",
         description: "تم تسجيل الحصة كمكتملة",
       });
+    },
+    sendWhatsAppReminder: async (studentId: string) => {
+      const student = students.find((s) => s.id === studentId);
+      if (!student || !student.phone) {
+        toast({
+          title: "خطأ",
+          description: "لا يوجد رقم هاتف مسجل لهذا الطالب",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        // Build payment reminder message
+        const customMessage = `عزيزي ولي الأمر،\nتذكير بدفع المستحقات المتأخرة لـ ${student.name}\nبرجاء التواصل معنا لتسوية المبلغ المستحق.\nشكراً لتعاونكم`;
+
+        const { error } = await supabase.functions.invoke("send-whatsapp-reminder", {
+          body: {
+            phone: student.phone,
+            message: customMessage,
+            studentName: student.name,
+            phoneNumber: student.phone,
+            customMessage: customMessage,
+          },
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "✅ تم الإرسال",
+          description: `تم إرسال تذكير WhatsApp إلى ${student.name}`,
+        });
+      } catch (error: unknown) {
+        console.error("WhatsApp error:", error);
+        const errorMessage = error instanceof Error ? error.message : "فشل إرسال الرسالة";
+        toast({
+          title: "خطأ",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   };
 
@@ -788,10 +845,14 @@ const Index = () => {
             <div className="flex items-center gap-2">
               {/* AI Suggestions Widget */}
               <AISuggestionsWidget
-                suggestions={aiSuggestions}
-                hasNewCritical={hasNewAISuggestions}
+                currentSuggestion={aiCurrentSuggestion}
+                pendingCount={aiPendingCount}
+                allPendingSuggestions={aiAllPending}
+                hasCriticalInterrupt={aiHasCriticalInterrupt}
+                dismissedHistory={aiDismissedHistory}
                 onDismiss={dismissAISuggestion}
-                onMarkAsRead={markAISuggestionsAsRead}
+                onAction={actionAISuggestion}
+                onDismissCriticalOverlay={dismissAICriticalOverlay}
                 actionHandlers={aiSuggestionHandlers}
               />
               <Sheet>

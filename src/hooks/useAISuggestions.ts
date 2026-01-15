@@ -1,15 +1,14 @@
 // AI Suggestions Hook
-// Manages suggestion generation, dismissal, and notifications
+// Queue-based management with auto-removal, history tracking, and critical interrupts
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Student, StudentPayments } from "@/types/student";
-import { AISuggestion, PRIORITY_ORDER } from "@/types/suggestions";
-import { generateSuggestions } from "@/lib/suggestionEngine";
-import { format } from "date-fns";
+import { AISuggestion, DismissedSuggestion } from "@/types/suggestions";
+import { generateSuggestions, isConditionStillValid } from "@/lib/suggestionEngine";
+import { getSuggestionQueueManager, SuggestionQueueManager } from "@/lib/suggestionQueue";
 
-const STORAGE_KEY = "ai-suggestions-dismissed";
-const LAST_RUN_KEY = "ai-suggestions-last-run";
 const REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds
+const CONDITION_CHECK_INTERVAL = 10 * 1000; // 10 seconds for condition checks
 
 // Web Audio API beep for notifications
 const playNotificationSound = () => {
@@ -46,99 +45,164 @@ const triggerVibration = () => {
   }
 };
 
-interface UseAISuggestionsReturn {
-  suggestions: AISuggestion[];
-  hasNewCritical: boolean;
+export interface UseAISuggestionsReturn {
+  // Current suggestion to display (highest priority pending)
+  currentSuggestion: AISuggestion | null;
+  // All pending suggestions count
+  pendingCount: number;
+  // All pending suggestions (for dropdown list)
+  allPendingSuggestions: AISuggestion[];
+  // Whether there's a critical suggestion that should interrupt
+  hasCriticalInterrupt: boolean;
+  // Dismissed suggestions history (read-only)
+  dismissedHistory: DismissedSuggestion[];
+  // Dismiss current suggestion manually
   dismissSuggestion: (id: string) => void;
+  // Mark suggestion as actioned (auto-removes)
+  actionSuggestion: (id: string) => void;
+  // Force refresh suggestions from engine
   refreshSuggestions: () => void;
-  markAllAsRead: () => void;
+  // Resolve suggestions by entity (called when session confirmed, payment made, etc.)
+  resolveByEntity: (entityType: "session" | "student" | "payment", entityId: string) => void;
+  // Mark critical interrupt as seen (hides the overlay)
+  dismissCriticalOverlay: () => void;
 }
 
 export function useAISuggestions(
   students: Student[],
   payments: StudentPayments[]
 ): UseAISuggestionsReturn {
-  const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: { date: string; ids: string[] } = JSON.parse(stored);
-        const today = format(new Date(), "yyyy-MM-dd");
-        // Clear dismissed list if it's a new day
-        if (parsed.date === today) {
-          return new Set(parsed.ids);
-        }
-      }
-      return new Set();
-    } catch {
-      return new Set();
-    }
-  });
+  const queueManagerRef = useRef<SuggestionQueueManager>(getSuggestionQueueManager());
 
-  const [hasNewCritical, setHasNewCritical] = useState(false);
-  const previousSuggestionsRef = useRef<string[]>([]);
+  const [currentSuggestion, setCurrentSuggestion] = useState<AISuggestion | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [allPendingSuggestions, setAllPendingSuggestions] = useState<AISuggestion[]>([]);
+  const [dismissedHistory, setDismissedHistory] = useState<DismissedSuggestion[]>([]);
+  const [hasCriticalInterrupt, setHasCriticalInterrupt] = useState(false);
+
   const isInitialLoadRef = useRef(true);
+  const studentsRef = useRef(students);
+  const paymentsRef = useRef(payments);
 
-  // Save dismissed IDs to localStorage
-  const saveDismissed = useCallback((ids: Set<string>) => {
-    const today = format(new Date(), "yyyy-MM-dd");
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: today, ids: Array.from(ids) }));
+  // Keep refs updated
+  useEffect(() => {
+    studentsRef.current = students;
+    paymentsRef.current = payments;
+  }, [students, payments]);
+
+  // Sync state from queue manager
+  const syncFromQueue = useCallback(() => {
+    const manager = queueManagerRef.current;
+    const current = manager.getCurrentSuggestion();
+    const state = manager.getState();
+
+    setCurrentSuggestion(current);
+    setPendingCount(manager.getPendingCount());
+    setAllPendingSuggestions(
+      state.suggestions
+        .filter((s) => s.status === "pending")
+        .sort((a, b) => b.priorityScore - a.priorityScore)
+    );
+    setDismissedHistory(manager.getDismissedHistory());
+
+    // Check for critical interrupt
+    if (current?.isCritical && !isInitialLoadRef.current) {
+      setHasCriticalInterrupt(true);
+    }
   }, []);
 
-  // Dismiss a suggestion
-  const dismissSuggestion = useCallback((id: string) => {
-    setDismissedIds((prev) => {
-      const updated = new Set(prev);
-      updated.add(id);
-      saveDismissed(updated);
-      return updated;
-    });
-  }, [saveDismissed]);
-
-  // Generate and filter suggestions
+  // Generate and sync suggestions from engine
   const refreshSuggestions = useCallback(() => {
-    if (students.length === 0) {
-      setSuggestions([]);
+    if (studentsRef.current.length === 0) {
+      setCurrentSuggestion(null);
+      setPendingCount(0);
+      setAllPendingSuggestions([]);
       return;
     }
 
-    const currentTime = new Date();
-    const rawSuggestions = generateSuggestions(students, payments, currentTime);
+    const rawSuggestions = generateSuggestions(
+      studentsRef.current,
+      paymentsRef.current,
+      new Date()
+    );
 
-    // Filter out dismissed suggestions
-    const filtered = rawSuggestions.filter((s) => !dismissedIds.has(s.id));
+    const hasNewCritical = queueManagerRef.current.syncFromEngine(rawSuggestions);
 
-    // Check for new critical/high priority suggestions
-    const newIds = filtered.map((s) => s.id);
-    const previousIds = previousSuggestionsRef.current;
-
-    if (!isInitialLoadRef.current) {
-      const newCriticalSuggestions = filtered.filter(
-        (s) =>
-          (s.priority === "critical" || s.priority === "high") &&
-          !previousIds.includes(s.id)
-      );
-
-      if (newCriticalSuggestions.length > 0) {
-        setHasNewCritical(true);
-        playNotificationSound();
-        triggerVibration();
-      }
+    // Notify for new critical suggestions
+    if (hasNewCritical && !isInitialLoadRef.current) {
+      playNotificationSound();
+      triggerVibration();
+      setHasCriticalInterrupt(true);
     }
 
     isInitialLoadRef.current = false;
-    previousSuggestionsRef.current = newIds;
-    setSuggestions(filtered);
+    syncFromQueue();
+  }, [syncFromQueue]);
 
-    // Save last run time
-    localStorage.setItem(LAST_RUN_KEY, currentTime.toISOString());
-  }, [students, payments, dismissedIds]);
+  // Check conditions and auto-remove resolved suggestions
+  const checkConditions = useCallback(() => {
+    const manager = queueManagerRef.current;
+    const state = manager.getState();
 
-  // Mark all as read (clears the "new" indicator)
-  const markAllAsRead = useCallback(() => {
-    setHasNewCritical(false);
+    state.suggestions.forEach((suggestion) => {
+      if (suggestion.relatedEntity && suggestion.status === "pending") {
+        const isValid = isConditionStillValid(
+          suggestion.relatedEntity.conditionKey,
+          studentsRef.current,
+          paymentsRef.current
+        );
+
+        if (!isValid) {
+          manager.resolveByCondition(suggestion.relatedEntity.conditionKey);
+        }
+      }
+    });
+
+    syncFromQueue();
+  }, [syncFromQueue]);
+
+  // Dismiss suggestion manually
+  const dismissSuggestion = useCallback((id: string) => {
+    queueManagerRef.current.markDismissed(id);
+    syncFromQueue();
+
+    // Hide critical overlay if we dismissed the critical suggestion
+    const current = queueManagerRef.current.getCurrentSuggestion();
+    if (!current?.isCritical) {
+      setHasCriticalInterrupt(false);
+    }
+  }, [syncFromQueue]);
+
+  // Mark suggestion as actioned
+  const actionSuggestion = useCallback((id: string) => {
+    queueManagerRef.current.markActioned(id);
+    syncFromQueue();
+
+    // Hide critical overlay
+    const current = queueManagerRef.current.getCurrentSuggestion();
+    if (!current?.isCritical) {
+      setHasCriticalInterrupt(false);
+    }
+  }, [syncFromQueue]);
+
+  // Resolve by entity type
+  const resolveByEntity = useCallback((
+    entityType: "session" | "student" | "payment",
+    entityId: string
+  ) => {
+    queueManagerRef.current.resolveByEntity(entityType, entityId);
+    syncFromQueue();
+  }, [syncFromQueue]);
+
+  // Dismiss critical overlay without dismissing the suggestion
+  const dismissCriticalOverlay = useCallback(() => {
+    setHasCriticalInterrupt(false);
   }, []);
+
+  // Subscribe to queue changes
+  useEffect(() => {
+    queueManagerRef.current.onChange(syncFromQueue);
+  }, [syncFromQueue]);
 
   // Initial load and data change trigger
   useEffect(() => {
@@ -154,21 +218,26 @@ export function useAISuggestions(
     return () => clearInterval(intervalId);
   }, [refreshSuggestions]);
 
-  // Sort suggestions by priority
-  const sortedSuggestions = useMemo(() => {
-    return [...suggestions].sort((a, b) => {
-      const priorityDiff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-      if (priorityDiff !== 0) return priorityDiff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  }, [suggestions]);
+  // Condition check every 10 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      checkConditions();
+    }, CONDITION_CHECK_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [checkConditions]);
 
   return {
-    suggestions: sortedSuggestions,
-    hasNewCritical,
+    currentSuggestion,
+    pendingCount,
+    allPendingSuggestions,
+    hasCriticalInterrupt,
+    dismissedHistory,
     dismissSuggestion,
+    actionSuggestion,
     refreshSuggestions,
-    markAllAsRead,
+    resolveByEntity,
+    dismissCriticalOverlay,
   };
 }
 

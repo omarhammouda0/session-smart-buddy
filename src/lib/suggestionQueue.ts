@@ -1,9 +1,10 @@
 // Suggestion Queue Manager
 // Handles priority-based queue with single-suggestion display and auto-removal
+// Active suggestions are MEMORY-ONLY (reset on refresh)
+// Dismissed history persists for 30 days
 
-import { AISuggestion, DismissedSuggestion, PRIORITY_ORDER } from "@/types/suggestions";
+import { AISuggestion, DismissedSuggestion, INTERRUPT_THRESHOLD } from "@/types/suggestions";
 
-const ACTIVE_STORAGE_KEY = "ai-suggestions-active";
 const HISTORY_STORAGE_KEY = "ai-suggestions-history";
 const HISTORY_MAX_DAYS = 30;
 
@@ -16,7 +17,7 @@ export interface QueueState {
 /**
  * SuggestionQueueManager
  * Manages a priority-based queue where only one suggestion is shown at a time.
- * Critical suggestions can interrupt lower priority ones.
+ * Priority 100 suggestions always interrupt lower priority ones.
  */
 export class SuggestionQueueManager {
   private suggestions: AISuggestion[] = [];
@@ -29,44 +30,35 @@ export class SuggestionQueueManager {
   }
 
   /**
-   * Load state from localStorage
+   * Load state - MEMORY ONLY for active suggestions (reset on refresh)
+   * Only dismissed history is loaded from localStorage
    */
   private loadFromStorage(): void {
-    try {
-      // Load active suggestions
-      const activeData = localStorage.getItem(ACTIVE_STORAGE_KEY);
-      if (activeData) {
-        const parsed = JSON.parse(activeData);
-        this.suggestions = parsed.suggestions || [];
-      }
+    // Active suggestions are MEMORY-ONLY - start empty on refresh
+    this.suggestions = [];
 
-      // Load dismissed history
+    // Load dismissed history from localStorage (persists 30 days)
+    try {
       const historyData = localStorage.getItem(HISTORY_STORAGE_KEY);
       if (historyData) {
         this.dismissedHistory = JSON.parse(historyData) || [];
       }
     } catch (error) {
-      console.warn("Error loading suggestion queue from storage:", error);
-      this.suggestions = [];
+      console.warn("Error loading suggestion history:", error);
       this.dismissedHistory = [];
     }
   }
 
   /**
-   * Save state to localStorage
+   * Save state - ONLY history to localStorage
+   * Active suggestions are not persisted (memory-only)
    */
   private saveToStorage(): void {
     try {
-      localStorage.setItem(
-        ACTIVE_STORAGE_KEY,
-        JSON.stringify({
-          suggestions: this.suggestions,
-          lastUpdated: new Date().toISOString(),
-        })
-      );
+      // Only save history - active suggestions are memory-only
       localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(this.dismissedHistory));
     } catch (error) {
-      console.warn("Error saving suggestion queue to storage:", error);
+      console.warn("Error saving suggestion history:", error);
     }
   }
 
@@ -118,16 +110,17 @@ export class SuggestionQueueManager {
 
   /**
    * Get the current (highest priority) pending suggestion
+   * Priority 100 always shows first
    */
   public getCurrentSuggestion(): AISuggestion | null {
     const pending = this.suggestions
       .filter((s) => s.status === "pending")
       .sort((a, b) => {
-        // Sort by priority score (higher = more urgent)
+        // Higher priority score first
         if (b.priorityScore !== a.priorityScore) {
           return b.priorityScore - a.priorityScore;
         }
-        // Then by creation time (older first)
+        // Older suggestions first for same priority (FIFO)
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       });
 
@@ -142,20 +135,22 @@ export class SuggestionQueueManager {
   }
 
   /**
-   * Check if there's a critical suggestion that should interrupt
+   * Check if there's a priority 100 suggestion that should interrupt
    */
-  public hasCriticalInterrupt(): boolean {
+  public hasInterruptingSuggestion(): boolean {
     const current = this.getCurrentSuggestion();
-    return current?.isCritical === true;
+    return current !== null && current.priorityScore >= INTERRUPT_THRESHOLD;
   }
 
   /**
-   * Sync suggestions from engine - replaces active suggestions while preserving history
-   * Returns true if a new critical suggestion was added (for notification)
+   * Sync suggestions from engine - replaces active suggestions
+   * Returns true if a new interrupting (priority 100) suggestion was added
    */
   public syncFromEngine(newSuggestions: AISuggestion[]): boolean {
-    const previousCriticalIds = new Set(
-      this.suggestions.filter((s) => s.isCritical && s.status === "pending").map((s) => s.id)
+    const previousInterruptIds = new Set(
+      this.suggestions
+        .filter((s) => s.priorityScore >= INTERRUPT_THRESHOLD && s.status === "pending")
+        .map((s) => s.id)
     );
 
     // Get dismissed IDs to filter out
@@ -164,25 +159,18 @@ export class SuggestionQueueManager {
     // Filter out already dismissed suggestions
     const filteredNew = newSuggestions.filter((s) => !dismissedIds.has(s.id));
 
-    // Merge: keep existing pending status if suggestion still exists
-    const existingMap = new Map(this.suggestions.map((s) => [s.id, s]));
+    // Replace suggestions entirely (memory-only)
+    this.suggestions = filteredNew;
 
-    this.suggestions = filteredNew.map((newSug) => {
-      const existing = existingMap.get(newSug.id);
-      if (existing && existing.status !== "pending") {
-        // Keep actioned/dismissed status
-        return { ...newSug, status: existing.status };
-      }
-      return newSug;
-    });
-
-    // Check for new critical suggestions
-    const hasNewCritical = this.suggestions.some(
-      (s) => s.isCritical && s.status === "pending" && !previousCriticalIds.has(s.id)
+    // Check for new interrupting suggestions (priority 100)
+    const hasNewInterrupt = this.suggestions.some(
+      (s) => s.priorityScore >= INTERRUPT_THRESHOLD &&
+             s.status === "pending" &&
+             !previousInterruptIds.has(s.id)
     );
 
     this.notifyChange();
-    return hasNewCritical;
+    return hasNewInterrupt;
   }
 
   /**
@@ -233,7 +221,6 @@ export class SuggestionQueueManager {
 
   /**
    * Auto-remove suggestions when their condition is resolved
-   * Called when underlying data changes (e.g., session confirmed)
    */
   public resolveByCondition(conditionKey: string): void {
     const toResolve = this.suggestions.filter(
@@ -298,7 +285,7 @@ export class SuggestionQueueManager {
   }
 
   /**
-   * Clear all suggestions (for testing/reset)
+   * Clear all active suggestions (for testing/reset)
    */
   public clear(): void {
     this.suggestions = [];
@@ -315,4 +302,3 @@ export function getSuggestionQueueManager(): SuggestionQueueManager {
   }
   return queueManagerInstance;
 }
-

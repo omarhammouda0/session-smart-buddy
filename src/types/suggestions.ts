@@ -1,5 +1,5 @@
 // AI Suggestions Types
-// Enhanced queue-based system with status tracking and history
+// Enhanced queue-based system with strict priority rules
 
 export type SuggestionType =
   | "pre_session"   // Before a specific session
@@ -13,36 +13,81 @@ export type SuggestionPriority = "critical" | "high" | "medium" | "low";
 // Status for queue management
 export type SuggestionStatus = "pending" | "actioned" | "dismissed";
 
+// ============================================
+// STRICT PRIORITY CONSTANTS - DO NOT MODIFY
+// ============================================
+export const PRIORITY_LEVELS = {
+  // PRIORITY 100 - BLOCKING / IMMEDIATE (must interrupt)
+  SESSION_UNCONFIRMED: 100,        // Session ended, not confirmed
+  PAYMENT_OVERDUE_30_DAYS: 100,    // Student hasn't paid for 30+ days
+  PRE_SESSION_30_MIN: 100,         // 30 minutes before session
+
+  // PRIORITY 90
+  END_OF_DAY_UNCONFIRMED: 90,      // End of day with unconfirmed sessions
+
+  // PRIORITY 80
+  PRE_SESSION_HOMEWORK: 80,        // Upcoming session, homework not reviewed
+  PRE_SESSION_IMPORTANT_NOTES: 80, // Upcoming session, important previous notes
+  PRE_SESSION_FREQUENT_CANCEL: 80, // Upcoming session, student cancels frequently
+
+  // PRIORITY 70
+  PATTERN_FREQUENT_CANCEL: 70,     // Student behavior: frequent cancellations
+  PATTERN_IRREGULAR: 70,           // Student behavior: irregular attendance
+
+  // PRIORITY 50
+  SCHEDULE_GAP: 50,                // Large schedule gaps
+
+  // PRIORITY 30
+  GENERAL_AWARENESS: 30,           // Non-critical patterns
+} as const;
+
+// Auto-show threshold: suggestions with priority >= 70 can auto-show
+export const AUTO_SHOW_THRESHOLD = 70;
+
+// Interrupt threshold: priority 100 always interrupts
+export const INTERRUPT_THRESHOLD = 100;
+
 export interface SuggestionAction {
   label: string;
-  target: string; // e.g., "open_student:123", "open_payment:456"
+  target: string;
 }
 
 // Related entity for auto-removal tracking
 export interface RelatedEntity {
   type: "session" | "student" | "payment";
   id: string;
-  // Condition key for auto-removal (e.g., "session_confirmed:abc123")
   conditionKey: string;
+}
+
+// Last note info for pre-session reminders
+export interface LastNoteInfo {
+  content?: string;
+  date?: string;
+}
+
+// Homework status for pre-session reminders
+export interface HomeworkInfo {
+  status: "none" | "assigned" | "completed" | "not_completed";
+  description?: string;
 }
 
 export interface AISuggestion {
   id: string;
   type: SuggestionType;
   priority: SuggestionPriority;
-  // Numeric priority score (1-100, higher = more urgent)
   priorityScore: number;
   message: string;
   action: SuggestionAction;
+  secondaryAction?: SuggestionAction;
   studentId?: string;
   sessionId?: string;
-  // Related entity for condition-based auto-removal
   relatedEntity?: RelatedEntity;
-  // Status for queue management
   status: SuggestionStatus;
   createdAt: string;
-  // Whether this is a critical suggestion that should auto-show
   isCritical: boolean;
+  lastNote?: LastNoteInfo;
+  homeworkInfo?: HomeworkInfo;
+  phone?: string;
 }
 
 // Dismissed suggestion with history tracking
@@ -56,7 +101,7 @@ export interface DismissedSuggestion {
   studentId?: string;
 }
 
-// Priority order for sorting (lower number = higher priority)
+// Priority order for sorting
 export const PRIORITY_ORDER: Record<SuggestionPriority, number> = {
   critical: 0,
   high: 1,
@@ -64,10 +109,10 @@ export const PRIORITY_ORDER: Record<SuggestionPriority, number> = {
   low: 3,
 };
 
-// Priority scores for each level
+// Legacy priority scores
 export const PRIORITY_SCORES: Record<SuggestionPriority, number> = {
-  critical: 90,
-  high: 70,
+  critical: 100,
+  high: 80,
   medium: 50,
   low: 30,
 };
@@ -89,4 +134,3 @@ export const SUGGESTION_TYPE_LABELS: Record<SuggestionType, string> = {
   payment: "مدفوعات",
   schedule: "الجدول",
 };
-
