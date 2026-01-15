@@ -7,3 +7,13 @@ verify_jwt = false
 verify_jwt = false
 # This function is triggered by pg_cron every 5 minutes
 # See migration: 20260113_auto_session_reminder_cron.sql
+
+[functions.send-push-notification]
+verify_jwt = false
+# Sends push notifications via Firebase Cloud Messaging
+
+[functions.check-critical-alerts]
+verify_jwt = false
+# Checks for Priority 100 alerts and sends push notifications
+# Triggered by pg_cron every 5 minutes
+# See migration: 20260115_check_critical_alerts_cron.sql

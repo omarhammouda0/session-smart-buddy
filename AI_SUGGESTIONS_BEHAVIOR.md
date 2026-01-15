@@ -505,3 +505,55 @@ All numbers in messages are displayed in Arabic numerals:
 
 Example: "٣٠ دقيقة" instead of "30 دقيقة"
 
+---
+
+## Push Notifications (Background/Offline)
+
+Priority 100 suggestions can also be delivered as **push notifications** when the browser is closed.
+
+### How It Works
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  pg_cron (every 5 minutes)                                 │
+│    └── check-critical-alerts edge function                 │
+│          ├── Checks for Priority 100 conditions            │
+│          └── Sends push via Firebase Cloud Messaging       │
+└───────────────────────────────────────���────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│  Service Worker (firebase-messaging-sw.js)                 │
+│    └── Shows notification even when browser is closed      │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Priority 100 Alerts Sent via Push
+
+| Alert Type | Condition | Message |
+|------------|-----------|---------|
+| Session Unconfirmed | Session ended, status = scheduled | `حصة {name} خلصت ومحتاجة تأكيد` |
+| Payment Overdue | 30+ days since last payment (active student) | `⚠️ {name} لم يدفع منذ {days} يوم` |
+| Pre-Session 30min | 25-35 minutes before session | `📚 حصة {name} كمان ٣٠ دقيقة` |
+
+### Deduplication
+
+- Same `condition_key` won't trigger a new push within 1 hour
+- Tracked in `push_notification_log` table
+
+### Enabling Push Notifications
+
+1. User must enable in Notification Settings dialog
+2. Browser permission must be granted
+3. FCM token stored in `push_subscriptions` table
+
+### Related Files
+
+- `src/hooks/usePushNotifications.ts` - Frontend hook
+- `src/components/PushNotificationSettings.tsx` - Settings UI
+- `supabase/functions/check-critical-alerts/index.ts` - Server-side checker
+- `supabase/functions/send-push-notification/index.ts` - FCM sender
+- `public/firebase-messaging-sw.js` - Service worker
+
+See `PUSH_NOTIFICATIONS_SETUP.md` for full setup guide.
+

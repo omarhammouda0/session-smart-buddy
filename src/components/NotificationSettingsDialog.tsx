@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
+import { PushNotificationSettings } from '@/components/PushNotificationSettings';
 
 interface NotificationSettingsDialogProps {
   settings: {
@@ -231,6 +232,11 @@ export function NotificationSettingsDialog({ settings, onSave }: NotificationSet
               </Button>
             )}
           </div>
+
+          <Separator />
+
+          {/* Background Push Notifications */}
+          <PushNotificationSettings />
 
           <Separator />
 
