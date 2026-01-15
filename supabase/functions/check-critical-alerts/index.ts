@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Check Critical Alerts Edge Function
+// Check Critical Alerts Edge Function - v2.0
 // Runs via pg_cron to detect Priority 100 conditions and send push notifications
+// FIXED: Now sends push notifications directly via Firebase FCM
 // Handles: unconfirmed sessions, payment overdue 30+ days, 30-min pre-session reminders
 
 const corsHeaders = {
@@ -30,6 +31,196 @@ function getGermanyTime(date: Date): Date {
 function toArabicNumerals(num: number): string {
   const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
   return String(num).split('').map(d => arabicNumerals[parseInt(d)] || d).join('');
+}
+
+// Generate JWT for Firebase Auth
+async function generateFirebaseAccessToken(): Promise<string> {
+  const privateKey = Deno.env.get("FIREBASE_PRIVATE_KEY")?.replace(/\\n/g, '\n');
+  const clientEmail = Deno.env.get("FIREBASE_CLIENT_EMAIL");
+
+  if (!privateKey || !clientEmail) {
+    throw new Error("Firebase credentials not configured");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const expiry = now + 3600;
+
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: clientEmail,
+    sub: clientEmail,
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: expiry,
+    scope: "https://www.googleapis.com/auth/firebase.messaging"
+  };
+
+  const encoder = new TextEncoder();
+  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  const pemHeader = "-----BEGIN PRIVATE KEY-----";
+  const pemFooter = "-----END PRIVATE KEY-----";
+  const pemContents = privateKey.replace(pemHeader, '').replace(pemFooter, '').replace(/\s/g, '');
+  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    binaryKey,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    encoder.encode(unsignedToken)
+  );
+
+  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const jwt = `${unsignedToken}.${signatureB64}`;
+
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+  });
+
+  if (!tokenResponse.ok) {
+    const error = await tokenResponse.text();
+    throw new Error(`Failed to get access token: ${error}`);
+  }
+
+  const tokenData = await tokenResponse.json();
+  return tokenData.access_token;
+}
+
+// Send push notification directly via Firebase FCM
+async function sendPushNotification(
+  supabase: any,
+  alert: {
+    title: string;
+    body: string;
+    priority: number;
+    suggestionType: string;
+    actionType: string;
+    conditionKey: string;
+    studentId?: string;
+    sessionId?: string;
+    studentPhone?: string;
+  }
+): Promise<{ sent: number; skipped: boolean; error?: string }> {
+  try {
+    const projectId = Deno.env.get("FIREBASE_PROJECT_ID") || "session-smart-buddy";
+
+    // Check for duplicate notification
+    if (alert.conditionKey) {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { data: existing } = await supabase
+        .from('push_notification_log')
+        .select('id')
+        .eq('condition_key', alert.conditionKey)
+        .eq('status', 'sent')
+        .gte('sent_at', oneHourAgo)
+        .maybeSingle();
+
+      if (existing) {
+        return { sent: 0, skipped: true };
+      }
+    }
+
+    // Get active FCM tokens
+    const { data: subscriptions, error: subError } = await supabase
+      .from('push_subscriptions')
+      .select('fcm_token')
+      .eq('is_active', true);
+
+    if (subError || !subscriptions || subscriptions.length === 0) {
+      return { sent: 0, skipped: false, error: "No active subscriptions" };
+    }
+
+    // Get Firebase access token
+    const accessToken = await generateFirebaseAccessToken();
+    const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+
+    let successCount = 0;
+    const results: any[] = [];
+
+    for (const sub of subscriptions) {
+      const message = {
+        message: {
+          token: sub.fcm_token,
+          notification: { title: alert.title, body: alert.body },
+          data: {
+            priority: String(alert.priority),
+            suggestionType: alert.suggestionType || '',
+            actionType: alert.actionType || '',
+            studentId: alert.studentId || '',
+            sessionId: alert.sessionId || '',
+            studentPhone: alert.studentPhone || '',
+            conditionKey: alert.conditionKey || '',
+            timestamp: new Date().toISOString()
+          },
+          webpush: {
+            notification: {
+              icon: '/favicon.ico',
+              badge: '/favicon.ico',
+              dir: 'rtl',
+              lang: 'ar',
+              requireInteraction: alert.priority === 100,
+              vibrate: [100, 50, 100]
+            },
+            fcm_options: { link: '/' }
+          }
+        }
+      };
+
+      try {
+        const response = await fetch(fcmUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(message)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          if (result.error?.code === 404 || result.error?.details?.[0]?.errorCode === "UNREGISTERED") {
+            await supabase.from('push_subscriptions').update({ is_active: false }).eq('fcm_token', sub.fcm_token);
+          }
+          results.push({ success: false, error: result.error });
+        } else {
+          successCount++;
+          results.push({ success: true, messageId: result.name });
+        }
+      } catch (error) {
+        results.push({ success: false, error: String(error) });
+      }
+    }
+
+    // Log notification
+    await supabase.from('push_notification_log').insert({
+      user_id: 'default',
+      suggestion_type: alert.suggestionType || 'general',
+      priority: alert.priority,
+      title: alert.title,
+      body: alert.body,
+      condition_key: alert.conditionKey,
+      fcm_response: { results, sent: successCount, total: subscriptions.length },
+      status: successCount > 0 ? 'sent' : 'failed'
+    });
+
+    return { sent: successCount, skipped: false };
+  } catch (error) {
+    return { sent: 0, skipped: false, error: String(error) };
+  }
 }
 
 serve(async (req) => {
@@ -246,28 +437,26 @@ serve(async (req) => {
     console.log(`Found ${alerts.length} critical alerts`);
 
     // ========================================
-    // SEND PUSH NOTIFICATIONS
+    // SEND PUSH NOTIFICATIONS DIRECTLY
     // ========================================
     let sentCount = 0;
     let skippedCount = 0;
 
     for (const alert of alerts) {
       try {
-        const { data, error } = await supabase.functions.invoke('send-push-notification', {
-          body: alert
-        });
+        const result = await sendPushNotification(supabase, alert);
 
-        if (error) {
-          console.error("Failed to send push notification:", error);
-        } else if (data?.skipped) {
+        if (result.skipped) {
           skippedCount++;
           console.log(`Skipped (duplicate): ${alert.conditionKey}`);
-        } else {
+        } else if (result.sent > 0) {
           sentCount++;
           console.log(`Sent: ${alert.title} - ${alert.conditionKey}`);
+        } else if (result.error) {
+          console.error("Failed to send push notification:", result.error);
         }
       } catch (error) {
-        console.error("Error invoking send-push-notification:", error);
+        console.error("Error sending push notification:", error);
       }
     }
 

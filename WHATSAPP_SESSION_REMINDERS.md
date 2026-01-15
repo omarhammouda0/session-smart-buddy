@@ -2,7 +2,9 @@
 
 ## Overview
 
-The system automatically sends WhatsApp reminders to students (or their parents) before their scheduled sessions. This works **even when the app is closed** because it runs server-side via Supabase.
+The system automatically sends WhatsApp reminders to students (or their parents) before their scheduled sessions. This works **even when the app is closed** because it runs server-side via Supabase Edge Functions + pg_cron.
+
+**Version 3.0**: Now calls Twilio directly instead of invoking another edge function, which fixes the issue where reminders weren't being sent when triggered by pg_cron.
 
 ---
 
@@ -15,7 +17,7 @@ The system automatically sends WhatsApp reminders to students (or their parents)
 │          ├── Checks reminder_settings table                 │
 │          ├── Finds sessions within reminder window          │
 │          ├── Checks reminder_log for duplicates             │
-│          └── Sends WhatsApp via send-whatsapp-reminder      │
+│          └── Sends WhatsApp DIRECTLY via Twilio API         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
