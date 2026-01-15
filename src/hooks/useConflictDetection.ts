@@ -62,12 +62,13 @@ export const formatTimeAr = (time: string): string => {
 export const useConflictDetection = (students: Student[]) => {
   /**
    * Check for conflicts when adding/editing a session
+   * Note: We check ALL students including the same student to prevent overlapping sessions
    */
   const checkConflict = useCallback(
     (
       sessionInfo: SessionTimeInfo,
       excludeSessionId?: string,
-      currentStudentId?: string, // ✅ NEW: Add student ID to skip same student's sessions
+      _currentStudentId?: string, // Kept for backward compatibility but not used
     ): ConflictResult => {
       const { date, startTime, duration = DEFAULT_SESSION_DURATION } = sessionInfo;
       const startMinutes = timeToMinutes(startTime);
@@ -79,8 +80,8 @@ export const useConflictDetection = (students: Student[]) => {
 
       // Get all sessions on the same date
       students.forEach((student) => {
-        // ✅ NEW: Skip checking conflicts with the SAME student (allow multiple sessions per day)
-        if (currentStudentId && student.id === currentStudentId) return;
+        // We check ALL students including the same student
+        // A student CAN have multiple sessions per day, but NOT at overlapping times
 
         student.sessions.forEach((session) => {
           // Skip excluded session (when editing)
@@ -162,11 +163,10 @@ export const useConflictDetection = (students: Student[]) => {
       // Generate time suggestions if there are conflicts
       const suggestions: TimeSuggestion[] = [];
       if (highestSeverity !== "none") {
-        // Find all sessions on the same date (excluding current student)
+        // Find all sessions on the same date (including current student)
         const sessionsOnDate: { start: number; end: number }[] = [];
         students.forEach((student) => {
-          // ✅ Skip current student when generating suggestions
-          if (currentStudentId && student.id === currentStudentId) return;
+          // Include ALL students' sessions for proper suggestion generation
 
           student.sessions.forEach((session) => {
             if (session.date !== date) return;
