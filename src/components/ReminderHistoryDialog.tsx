@@ -135,9 +135,9 @@ export const ReminderHistoryDialog = () => {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <History className="h-4 w-4" />
-          <span className="hidden sm:inline">السجل</span>
+        <Button variant="outline" size="sm" className="gap-2 w-full justify-start">
+          <History className="h-4 w-4 shrink-0" />
+          <span>السجل</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">

@@ -136,9 +136,9 @@ export const ReminderSettingsDialog = () => {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Bell className="h-4 w-4" />
-          <span className="hidden sm:inline">التذكيرات</span>
+        <Button variant="outline" size="sm" className="gap-2 w-full justify-start">
+          <Bell className="h-4 w-4 shrink-0" />
+          <span>التذكيرات</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" dir="rtl">

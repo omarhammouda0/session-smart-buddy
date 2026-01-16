@@ -124,8 +124,9 @@ export function NotificationSettingsDialog({ settings, onSave }: NotificationSet
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+        <Button variant="outline" size="sm" className="relative w-full justify-start gap-2">
+          <Bell className="h-4 w-4 shrink-0" />
+          <span>الإشعارات</span>
           {enabled && (
             <span className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full" />
           )}

@@ -82,8 +82,9 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="shrink-0">
-          <Settings className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="shrink-0 w-full justify-start gap-2">
+          <Settings className="h-4 w-4 shrink-0" />
+          <span>الإعدادات</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">

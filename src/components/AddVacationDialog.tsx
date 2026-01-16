@@ -327,10 +327,10 @@ export const AddVacationDialog = ({
         <Button 
           variant="outline" 
           size="sm" 
-          className="gap-1.5 border-warning/50 text-warning hover:bg-warning/10 hover:text-warning"
+          className="gap-1.5 border-warning/50 text-warning hover:bg-warning/10 hover:text-warning w-full justify-start"
         >
-          <Palmtree className="h-4 w-4" />
-          <span className="hidden sm:inline">إضافة إجازة</span>
+          <Palmtree className="h-4 w-4 shrink-0" />
+          <span>إضافة إجازة</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" dir="rtl">

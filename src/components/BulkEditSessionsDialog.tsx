@@ -756,9 +756,9 @@ export const BulkEditSessionsDialog = ({
         }}
       >
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">تعديل جماعي</span>
+          <Button variant="outline" size="sm" className="gap-1.5 w-full justify-start">
+            <Clock className="h-4 w-4 shrink-0" />
+            <span>تعديل جماعي</span>
           </Button>
         </DialogTrigger>
         <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">

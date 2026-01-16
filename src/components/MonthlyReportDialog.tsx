@@ -463,9 +463,9 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">التقارير</span>
+          <Button variant="outline" size="sm" className="gap-1.5 w-full justify-start">
+            <FileText className="h-4 w-4 shrink-0" />
+            <span>التقارير</span>
           </Button>
         )}
       </DialogTrigger>

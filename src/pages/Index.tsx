@@ -965,12 +965,13 @@ const Index = () => {
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent className="w-full p-3" side="left">
-                  <SheetHeader className="pb-2">
-                    <SheetTitle className="text-sm text-right">المزيد</SheetTitle>
+                <SheetContent className="w-[85%] max-w-sm p-4" side="right">
+                  <SheetHeader className="pb-3 border-b">
+                    <SheetTitle className="text-base text-right">المزيد من الخيارات</SheetTitle>
                   </SheetHeader>
-                  <div className="space-y-1 mt-2">
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2 mt-4">
+                    {/* Each menu item as a full-width button with visible label */}
+                    <div className="flex flex-col gap-2">
                       <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
                       <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
                       <MonthlyReportDialog students={students} payments={payments} settings={settings} />

@@ -1350,6 +1350,88 @@
 }
 
 /* =====================================================
+   MOBILE MENU SHEET - Force labels to show
+   ===================================================== */
+@media (max-width: 639px) {
+  /* Inside Sheet content, show hidden labels */
+  [data-state="open"][data-side] .hidden.sm\:inline,
+  [class*="SheetContent"] .hidden.sm\:inline {
+    display: inline !important;
+  }
+
+  /* Make buttons in sheet full width with proper layout */
+  [class*="SheetContent"] button[class*="outline"],
+  [class*="SheetContent"] button[class*="ghost"] {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    gap: 0.75rem !important;
+    padding: 0.75rem 1rem !important;
+    min-height: 3rem !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* Ensure icons and text are properly aligned */
+  [class*="SheetContent"] button svg {
+    flex-shrink: 0 !important;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+
+  /* Calendar improvements for mobile */
+  .calendar-grid,
+  [class*="CalendarView"] .grid-cols-7 {
+    gap: 1px !important;
+  }
+
+  /* Smaller session cards in calendar */
+  [class*="CalendarView"] [data-date] > div {
+    font-size: 0.5rem !important;
+    padding: 0.125rem !important;
+    line-height: 1.1 !important;
+  }
+
+  /* SessionHistoryBar stats - grid-cols-4 */
+  .grid-cols-4 {
+    gap: 0.375rem !important;
+  }
+
+  .grid-cols-4 > div {
+    padding: 0.5rem 0.25rem !important;
+  }
+
+  .grid-cols-4 svg {
+    width: 1rem !important;
+    height: 1rem !important;
+  }
+
+  .grid-cols-4 .text-2xl {
+    font-size: 1.25rem !important;
+  }
+
+  .grid-cols-4 .text-xs {
+    font-size: 0.6rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Chart container - make it smaller on mobile */
+  [class*="recharts-wrapper"],
+  [class*="recharts-surface"] {
+    max-height: 120px !important;
+  }
+
+  /* Empty state in charts */
+  .recharts-wrapper:empty,
+  [class*="Chart"]:empty {
+    display: none !important;
+  }
+
+  /* Session list items - more compact */
+  [class*="SessionHistoryBar"] .space-y-2 > div {
+    padding: 0.5rem !important;
+  }
+}
+
+/* =====================================================
    TABLET (640px - 1023px)
    ===================================================== */
 @media (min-width: 640px) and (max-width: 1023px) {
