@@ -38,7 +38,27 @@ This document describes all the changes made to support multiple authenticated u
 - FCM tokens are now saved with actual user ID
 - Users only receive push notifications for their own alerts
 
-### 4. `supabase/functions/auto-session-reminder/index.ts` (v4.0)
+### 4. `src/hooks/useStudentMaterials.ts` (NEW - Database Synced)
+
+**Before:** Used `localStorage` - data was browser-local and not user-isolated.
+
+**After:**
+- Created new `student_materials` table in database
+- All materials are now stored in Supabase with `user_id`
+- Materials sync across devices
+- Full user isolation with RLS policies
+
+### 5. `src/hooks/useSessionNotifications.ts` (NEW - Database Synced)
+
+**Before:** Used `localStorage` for notification settings - not synced across devices.
+
+**After:**
+- Created new `notification_settings` table in database
+- Settings sync across devices for the same user
+- "Which sessions have been notified today" still uses localStorage (intentional - resets daily)
+- Full user isolation with RLS policies
+
+### 6. `supabase/functions/auto-session-reminder/index.ts` (v4.0)
 
 **Before:** 
 - Only fetched settings for `user_id = 'default'`
@@ -51,7 +71,7 @@ This document describes all the changes made to support multiple authenticated u
 - Filters sessions by `students.user_id`
 - Logs reminders with correct user_id
 
-### 5. `supabase/functions/check-critical-alerts/index.ts` (v3.0)
+### 7. `supabase/functions/check-critical-alerts/index.ts` (v3.0)
 
 **Before:**
 - Sent push notifications to ALL active devices
@@ -62,7 +82,7 @@ This document describes all the changes made to support multiple authenticated u
 - `sendPushNotification()` now filters subscriptions by user_id
 - Logs notifications with correct user_id
 
-### 6. `supabase/functions/send-push-notification/index.ts`
+### 8. `supabase/functions/send-push-notification/index.ts`
 
 **Before:** 
 - Logged with `user_id: 'default'`
@@ -78,7 +98,6 @@ These features already properly used `getUserId()` and filtered by user_id:
 - `src/hooks/useStudents.ts` - Students, sessions, payments, app settings
 - `src/hooks/useCancellationTracking.ts` - Cancellation tracking
 - `src/hooks/useConflictDetection.ts` - Conflict detection
-- `src/hooks/useStudentMaterials.ts` - Student materials
 
 ## Database Tables with user_id
 
@@ -98,6 +117,8 @@ All these tables have `user_id` columns and proper Row Level Security (RLS):
 - `push_notification_log`
 - `cancellation_notifications`
 - `session_cancellations`
+- `student_materials` ← NEW
+- `notification_settings` ← NEW
 
 ## Data Isolation
 
@@ -121,8 +142,26 @@ If you have existing data with `user_id = 'default'`, you may need to:
 
 ## Deployment
 
-After pushing changes, deploy edge functions:
+After pushing changes:
 
+### 1. Run the database migration
+
+In Supabase Dashboard SQL Editor, run the migration:
+```
+supabase/migrations/20260116000000_student_materials_and_notification_settings.sql
+```
+
+Or use CLI:
+```bash
+supabase db push
+```
+
+### 2. Regenerate TypeScript types (optional but recommended)
+```bash
+supabase gen types typescript --local > src/integrations/supabase/types.ts
+```
+
+### 3. Deploy edge functions
 ```bash
 supabase functions deploy auto-session-reminder
 supabase functions deploy check-critical-alerts
