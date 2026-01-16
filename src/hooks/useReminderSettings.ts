@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ReminderSettings, ReminderLog, DEFAULT_SESSION_TEMPLATE, DEFAULT_SESSION_TEMPLATE_1, DEFAULT_SESSION_TEMPLATE_2, DEFAULT_PAYMENT_TEMPLATE, DEFAULT_CANCELLATION_TEMPLATE } from '@/types/reminder';
 import { toast } from '@/hooks/use-toast';
@@ -23,19 +23,24 @@ export const useReminderSettings = () => {
   const [logs, setLogs] = useState<ReminderLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Fetch settings on mount
-  useEffect(() => {
-    fetchSettings();
-    fetchLogs();
+  // Get current user ID
+  const getUserId = useCallback(async (): Promise<string | null> => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Auth error:", error);
+      return null;
+    }
+    return data.user?.id ?? null;
   }, []);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async (uid: string) => {
     try {
       const { data, error } = await supabase
         .from('reminder_settings')
         .select('*')
-        .eq('user_id', 'default')
+        .eq('user_id', uid)
         .maybeSingle();
 
       if (error) throw error;
@@ -48,14 +53,14 @@ export const useReminderSettings = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchLogs = async (limit = 50) => {
+  const fetchLogs = useCallback(async (uid: string, limit = 50) => {
     try {
       const { data, error } = await supabase
         .from('reminder_log')
         .select('*')
-        .eq('user_id', 'default')
+        .eq('user_id', uid)
         .order('sent_at', { ascending: false })
         .limit(limit);
 
@@ -65,9 +70,38 @@ export const useReminderSettings = () => {
     } catch (error) {
       console.error('Error fetching reminder logs:', error);
     }
-  };
+  }, []);
+
+  // Fetch settings on mount
+  useEffect(() => {
+    const init = async () => {
+      const currentUserId = await getUserId();
+      if (currentUserId) {
+        setUserId(currentUserId);
+        await fetchSettings(currentUserId);
+        await fetchLogs(currentUserId);
+      } else {
+        setIsLoading(false);
+      }
+    };
+    init();
+  }, [getUserId, fetchSettings, fetchLogs]);
 
   const saveSettings = async (newSettings: Partial<ReminderSettings>) => {
+    let currentUserId = userId;
+    if (!currentUserId) {
+      currentUserId = await getUserId();
+      if (!currentUserId) {
+        toast({
+          title: "خطأ",
+          description: "يجب تسجيل الدخول أولاً",
+          variant: "destructive",
+        });
+        return false;
+      }
+      setUserId(currentUserId);
+    }
+
     setIsSaving(true);
     try {
       const updatedSettings = { ...settings, ...newSettings };
@@ -75,7 +109,7 @@ export const useReminderSettings = () => {
       const { error } = await supabase
         .from('reminder_settings')
         .upsert({
-          user_id: 'default',
+          user_id: currentUserId,
           ...updatedSettings,
           updated_at: new Date().toISOString(),
         }, {
@@ -104,27 +138,31 @@ export const useReminderSettings = () => {
   };
 
   const logReminder = async (log: Omit<ReminderLog, 'id' | 'created_at' | 'sent_at' | 'user_id'>) => {
+    if (!userId) return;
+
     try {
       const { error } = await supabase
         .from('reminder_log')
         .insert({
           ...log,
-          user_id: 'default',
+          user_id: userId,
         });
 
       if (error) throw error;
-      await fetchLogs();
+      await fetchLogs(userId);
     } catch (error) {
       console.error('Error logging reminder:', error);
     }
   };
 
   const checkReminderSent = async (type: 'session' | 'payment', studentId: string, sessionId?: string, month?: number, year?: number): Promise<boolean> => {
+    if (!userId) return false;
+
     try {
       let query = supabase
         .from('reminder_log')
         .select('id')
-        .eq('user_id', 'default')
+        .eq('user_id', userId)
         .eq('type', type)
         .eq('student_id', studentId)
         .eq('status', 'sent');
@@ -183,7 +221,9 @@ export const useReminderSettings = () => {
       }
     }
 
-    await fetchLogs();
+    if (userId) {
+      await fetchLogs(userId);
+    }
     return { total: failedLogs.length, success: successCount };
   };
 

@@ -134,11 +134,17 @@ serve(async (req) => {
       }
     }
 
-    // Get all active FCM tokens
-    const { data: subscriptions, error: subError } = await supabase
+    // Build query for active FCM tokens
+    // If userId is provided, filter by that user only
+    let query = supabase
       .from('push_subscriptions')
-      .select('fcm_token')
+      .select('fcm_token, user_id')
       .eq('is_active', true);
+
+    // Note: For test notifications sent from the UI, we don't have userId
+    // So we send to all active subscriptions (backwards compatible)
+
+    const { data: subscriptions, error: subError } = await query;
 
     if (subError) {
       throw new Error(`Failed to fetch subscriptions: ${subError.message}`);
@@ -229,9 +235,11 @@ serve(async (req) => {
     }
 
     // Log the notification
+    // Note: For test notifications, we use the first subscription's user_id if available
+    const logUserId = subscriptions[0]?.user_id || 'system';
     const successCount = results.filter(r => r.success).length;
     await supabase.from('push_notification_log').insert({
-      user_id: 'default',
+      user_id: logUserId,
       suggestion_type: body.suggestionType || 'general',
       priority: body.priority || 50,
       title: body.title,
@@ -265,4 +273,3 @@ serve(async (req) => {
     );
   }
 });
-

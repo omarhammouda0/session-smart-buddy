@@ -1,10 +1,12 @@
 // Push Notifications Hook
 // Manages FCM token registration and foreground message handling
 // Uses dynamic imports to handle cases where Firebase is not configured
+// UPDATED: Now properly handles multi-user authentication
 
 import { useState, useEffect, useCallback } from "react";
 import { firebaseConfig, vapidKey, isFirebaseConfigured } from "@/lib/firebaseConfig";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 // Get Supabase URL and key from environment
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -18,8 +20,18 @@ interface PushNotificationState {
   isConfigured: boolean;
 }
 
+// Helper to get current user ID
+async function getCurrentUserId(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    console.error("Auth error:", error);
+    return null;
+  }
+  return data.user?.id ?? null;
+}
+
 // Helper to save FCM token to database via REST API
-async function saveFcmToken(token: string, deviceInfo: object): Promise<boolean> {
+async function saveFcmToken(token: string, deviceInfo: object, userId: string): Promise<boolean> {
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
       method: "POST",
@@ -30,7 +42,7 @@ async function saveFcmToken(token: string, deviceInfo: object): Promise<boolean>
         "Prefer": "resolution=merge-duplicates"
       },
       body: JSON.stringify({
-        user_id: "default",
+        user_id: userId,
         fcm_token: token,
         device_info: deviceInfo,
         is_active: true,
@@ -264,7 +276,18 @@ export function usePushNotifications() {
         timestamp: new Date().toISOString()
       };
 
-      await saveFcmToken(token, deviceInfo);
+      // Get current user ID
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        toast({
+          title: "خطأ",
+          description: "فشل في الحصول على معرف المستخدم",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      await saveFcmToken(token, deviceInfo, userId);
 
       // Save to localStorage for quick access
       localStorage.setItem("fcm_token", token);
@@ -320,4 +343,3 @@ export function usePushNotifications() {
     disableNotifications
   };
 }
-

@@ -277,7 +277,7 @@ serve(async (req) => {
         duration,
         status,
         student_id,
-        students!inner (id, name, phone, parent_phone, session_time, default_duration)
+        students!inner (id, name, phone, parent_phone, session_time, default_duration, user_id)
       `)
       .eq('date', today)
       .eq('status', 'scheduled');
@@ -289,6 +289,7 @@ serve(async (req) => {
         const student = Array.isArray(session.students) ? session.students[0] : session.students;
         const sessionTime = session.time || student?.session_time || '16:00';
         const duration = session.duration || student?.default_duration || 60;
+        const userId = student?.user_id;
 
         const [hour, minute] = sessionTime.split(':').map(Number);
         const sessionEndMinutes = hour * 60 + minute + duration;
@@ -305,6 +306,7 @@ serve(async (req) => {
             suggestionType: 'end_of_day',
             actionType: 'confirm_session',
             conditionKey,
+            userId,
             studentId: student?.id,
             sessionId: session.id
           });

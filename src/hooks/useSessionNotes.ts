@@ -3,21 +3,41 @@ import { supabase } from '@/integrations/supabase/client';
 import { SessionNote, Homework, HomeworkAttachment, NoteCategory, NoteType, HomeworkPriority, HomeworkStatusType } from '@/types/notes';
 import { toast } from 'sonner';
 
-const USER_ID = 'default';
-
 export function useSessionNotes(studentId?: string, sessionId?: string) {
   const [notes, setNotes] = useState<SessionNote[]>([]);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Get current user ID
+  const getUserId = useCallback(async (): Promise<string | null> => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Auth error:", error);
+      return null;
+    }
+    return data.user?.id ?? null;
+  }, []);
+
+  // Initialize user ID
+  useEffect(() => {
+    const init = async () => {
+      const uid = await getUserId();
+      setUserId(uid);
+    };
+    init();
+  }, [getUserId]);
 
   // Fetch notes for a student or session
   const fetchNotes = useCallback(async () => {
+    if (!userId) return;
+
     setIsLoading(true);
     try {
       let query = supabase
         .from('session_notes')
         .select('*')
-        .eq('user_id', USER_ID)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (studentId) {
@@ -44,15 +64,17 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [studentId, sessionId]);
+  }, [studentId, sessionId, userId]);
 
   // Fetch homework for a student or session
   const fetchHomework = useCallback(async () => {
+    if (!userId) return;
+
     try {
       let query = supabase
         .from('homework')
         .select('*')
-        .eq('user_id', USER_ID)
+        .eq('user_id', userId)
         .order('due_date', { ascending: true });
 
       if (studentId) {
@@ -87,13 +109,15 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     } catch (error) {
       console.error('Error fetching homework:', error);
     }
-  }, [studentId, sessionId]);
+  }, [studentId, sessionId, userId]);
 
-  // Load data on mount
+  // Load data when userId is available
   useEffect(() => {
-    fetchNotes();
-    fetchHomework();
-  }, [fetchNotes, fetchHomework]);
+    if (userId) {
+      fetchNotes();
+      fetchHomework();
+    }
+  }, [userId, fetchNotes, fetchHomework]);
 
   // Add text note
   const addTextNote = async (params: {
@@ -105,9 +129,15 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     category: NoteCategory;
     includeInReport?: boolean;
   }) => {
+    const currentUserId = userId || await getUserId();
+    if (!currentUserId) {
+      toast.error('يجب تسجيل الدخول أولاً');
+      return false;
+    }
+
     try {
       const { error } = await supabase.from('session_notes').insert({
-        user_id: USER_ID,
+        user_id: currentUserId,
         student_id: params.studentId,
         session_id: params.sessionId,
         session_date: params.sessionDate,
@@ -138,6 +168,12 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     audioBlob: Blob;
     duration: number;
   }) => {
+    const currentUserId = userId || await getUserId();
+    if (!currentUserId) {
+      toast.error('يجب تسجيل الدخول أولاً');
+      return false;
+    }
+
     try {
       // Upload audio file to storage
       const fileName = `voice-notes/${params.studentId}/${params.sessionId}/${Date.now()}.webm`;
@@ -156,7 +192,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
 
       // Save note to database
       const { error } = await supabase.from('session_notes').insert({
-        user_id: USER_ID,
+        user_id: currentUserId,
         student_id: params.studentId,
         session_id: params.sessionId,
         session_date: params.sessionDate,
@@ -189,6 +225,12 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     file: File;
     description?: string;
   }) => {
+    const currentUserId = userId || await getUserId();
+    if (!currentUserId) {
+      toast.error('يجب تسجيل الدخول أولاً');
+      return false;
+    }
+
     try {
       // Upload file to storage
       const fileName = `files/${params.studentId}/${params.sessionId}/${Date.now()}-${params.file.name}`;
@@ -207,7 +249,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
 
       // Save note to database
       const { error } = await supabase.from('session_notes').insert({
-        user_id: USER_ID,
+        user_id: currentUserId,
         student_id: params.studentId,
         session_id: params.sessionId,
         session_date: params.sessionDate,
@@ -291,6 +333,12 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
     voiceDuration?: number;
     files?: File[];
   }) => {
+    const currentUserId = userId || await getUserId();
+    if (!currentUserId) {
+      toast.error('يجب تسجيل الدخول أولاً');
+      return false;
+    }
+
     try {
       let voiceUrl: string | undefined;
 
@@ -315,7 +363,7 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
       const { data: hwData, error } = await supabase
         .from('homework')
         .insert({
-          user_id: USER_ID,
+          user_id: currentUserId,
           student_id: params.studentId,
           session_id: params.sessionId,
           session_date: params.sessionDate,
