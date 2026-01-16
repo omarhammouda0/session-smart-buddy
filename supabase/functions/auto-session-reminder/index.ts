@@ -204,15 +204,48 @@ serve(async (req) => {
 
     console.log(`Reminder intervals: ${reminderHours1}h and ${reminderHours2}h`);
 
+    // Create reminder intervals with specific time windows
+    // Each reminder fires within a window around its target time, not filling gaps
+    // Window logic:
+    //   - For reminders <= 2 hours: window is (0, hours]
+    //   - For reminders > 2 hours: window is (hours - tolerance, hours] where tolerance = min(2, hours * 0.2)
+    const createReminderWindow = (hours: number, otherHours: number) => {
+      if (hours <= 2) {
+        // Short reminders: fire from 0 to the specified hours
+        // But not below the other reminder if it's shorter
+        const minBound = otherHours < hours ? otherHours : 0;
+        return { min: minBound, max: hours };
+      } else {
+        // Longer reminders: fire within a ±2 hour window or 20% tolerance
+        const tolerance = Math.min(2, hours * 0.2);
+        // Don't overlap with shorter reminder
+        const minBound = Math.max(hours - tolerance, otherHours);
+        return { min: minBound, max: hours + tolerance };
+      }
+    };
+
     // Sort intervals by hours descending (longer first)
     const intervals = [
       { hours: reminderHours1, template: reminderTemplate1 },
       { hours: reminderHours2, template: reminderTemplate2 }
     ].sort((a, b) => b.hours - a.hours);
 
-    const reminderIntervals = intervals.map((item, idx) => ({ ...item, interval: idx + 1 }));
-    const longerHours = reminderIntervals[0].hours;
-    const shorterHours = reminderIntervals[1].hours;
+    const longerHours = intervals[0].hours;
+    const shorterHours = intervals[1].hours;
+
+    // Calculate windows for each interval
+    const reminderIntervals = intervals.map((item, idx) => {
+      const otherHours = idx === 0 ? shorterHours : longerHours;
+      const window = createReminderWindow(item.hours, otherHours);
+      return {
+        ...item,
+        interval: idx + 1,
+        windowMin: window.min,
+        windowMax: window.max
+      };
+    });
+
+    console.log(`Reminder windows: ${reminderIntervals.map(r => `${r.hours}h: (${r.windowMin.toFixed(1)}, ${r.windowMax.toFixed(1)}]`).join(', ')}`);
 
     let totalSent = 0;
     let totalSkipped = 0;
@@ -262,8 +295,8 @@ serve(async (req) => {
     }
 
     // Process each reminder interval
-    for (const { hours, interval, template } of reminderIntervals) {
-      console.log(`\n--- Processing interval ${interval} (${hours}h before) ---`);
+    for (const { hours, interval, template, windowMin, windowMax } of reminderIntervals) {
+      console.log(`\n--- Processing interval ${interval} (${hours}h before, window: ${windowMin.toFixed(1)}-${windowMax.toFixed(1)}h) ---`);
 
       let sentCount = 0;
       let skippedCount = 0;
@@ -280,12 +313,9 @@ serve(async (req) => {
         const minutesUntilSession = calculateMinutesUntilSession(session.date, sessionTime, germanyNow);
         const hoursUntilSession = minutesUntilSession / 60;
 
-        // Determine window bounds for this interval
-        const maxHours = hours;
-        const minHours = interval === 1 ? shorterHours : 0;
-
-        // Session must be within (minHours, maxHours] window
-        if (hoursUntilSession > maxHours || hoursUntilSession <= minHours || hoursUntilSession < 0) {
+        // Session must be within the specific window for this reminder
+        // Window is (windowMin, windowMax] - exclusive min, inclusive max
+        if (hoursUntilSession > windowMax || hoursUntilSession <= windowMin || hoursUntilSession < 0) {
           continue; // Outside window, skip silently
         }
 

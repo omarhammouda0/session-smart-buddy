@@ -4,7 +4,7 @@
 
 The system automatically sends WhatsApp reminders to students (or their parents) before their scheduled sessions. This works **even when the app is closed** because it runs server-side via Supabase Edge Functions + pg_cron.
 
-**Version 3.0**: Now calls Twilio directly instead of invoking another edge function, which fixes the issue where reminders weren't being sent when triggered by pg_cron.
+**Version 3.1**: Fixed template selection bug - now uses specific time windows instead of gap-filling.
 
 ---
 
@@ -31,6 +31,31 @@ The system sends **TWO reminders** per session at configurable intervals:
 |----------|---------|---------|
 | **Reminder 1** (longer) | 24 hours before | "تذكير: لديك جلسة غداً..." |
 | **Reminder 2** (shorter) | 1 hour before | "جلستك تبدأ خلال ساعة واحدة..." |
+
+---
+
+## Time Window Logic (v3.1)
+
+Each reminder fires within a **specific time window** around its target time:
+
+### For short reminders (≤ 2 hours):
+- Window: `(0, hours]`
+- Example: 1-hour reminder fires when session is 0-1 hours away
+
+### For longer reminders (> 2 hours):
+- Window: `(hours - tolerance, hours + tolerance]`
+- Tolerance = min(2 hours, 20% of the interval)
+- Example: 24-hour reminder with 2h tolerance fires when session is 22-26 hours away
+
+### Window Examples:
+
+| Settings | 24h Reminder Window | 1h Reminder Window |
+|----------|--------------------|--------------------|
+| 24h & 1h | (22, 26] hours | (0, 1] hours |
+| 12h & 1h | (10, 14] hours | (0, 1] hours |
+| 2h & 1h | (1, 2] hours | (0, 1] hours |
+
+This prevents the wrong template from being sent (e.g., "tomorrow" message for a session 1.5 hours away).
 
 ---
 
