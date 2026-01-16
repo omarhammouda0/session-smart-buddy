@@ -1,9 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Auto Session Reminder - v3.0
+// Auto Session Reminder - v4.0
 // Runs on schedule (pg_cron) to send dual WhatsApp reminders at configurable intervals
-// FIXED: Now calls Twilio directly instead of invoking another edge function
+// UPDATED: Now supports multiple users - processes each user's settings and sessions separately
 // This ensures reminders work even when the app is closed
 
 // Twilio credentials - must be configured in Supabase secrets
@@ -152,7 +152,7 @@ serve(async (req) => {
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  console.log("=== Auto Session Reminder v3.0 (Direct Twilio) ===");
+  console.log("=== Auto Session Reminder v4.0 (Multi-User Support) ===");
 
   try {
     const now = new Date();
@@ -171,234 +171,234 @@ serve(async (req) => {
     }
     console.log("✓ Twilio credentials configured");
 
-    // Fetch reminder settings
-    const { data: settings, error: settingsError } = await supabase
+    // Fetch ALL users' reminder settings (not just 'default')
+    const { data: allSettings, error: settingsError } = await supabase
       .from('reminder_settings')
       .select('*')
-      .eq('user_id', 'default')
-      .maybeSingle();
+      .eq('session_reminders_enabled', true);
 
     if (settingsError) {
       console.error("Error fetching settings:", settingsError);
       throw settingsError;
     }
 
-    if (!settings?.session_reminders_enabled) {
-      console.log("⏸ Session reminders are DISABLED");
+    if (!allSettings || allSettings.length === 0) {
+      console.log("⏸ No users have session reminders enabled");
       return new Response(
-        JSON.stringify({ success: true, message: "Session reminders are disabled", processed: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    console.log("✓ Session reminders are ENABLED");
-
-    const reminderHours1 = settings.session_reminder_hours || 24;
-    const reminderHours2 = settings.session_reminder_hours_2 || 1;
-
-    const reminderTemplate1 = settings.session_reminder_template_1 ||
-      settings.session_reminder_template ||
-      'مرحباً {student_name}،\nتذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.\nنراك قريباً!';
-
-    const reminderTemplate2 = settings.session_reminder_template_2 ||
-      'مرحباً {student_name}،\nجلستك تبدأ خلال ساعة واحدة الساعة {time}!\nالرجاء الاستعداد.';
-
-    console.log(`Reminder intervals: ${reminderHours1}h and ${reminderHours2}h`);
-
-    // Create reminder intervals with specific time windows
-    // Each reminder fires within a window around its target time, not filling gaps
-    // Window logic:
-    //   - For reminders <= 2 hours: window is (0, hours]
-    //   - For reminders > 2 hours: window is (hours - tolerance, hours] where tolerance = min(2, hours * 0.2)
-    const createReminderWindow = (hours: number, otherHours: number) => {
-      if (hours <= 2) {
-        // Short reminders: fire from 0 to the specified hours
-        // But not below the other reminder if it's shorter
-        const minBound = otherHours < hours ? otherHours : 0;
-        return { min: minBound, max: hours };
-      } else {
-        // Longer reminders: fire within a ±2 hour window or 20% tolerance
-        const tolerance = Math.min(2, hours * 0.2);
-        // Don't overlap with shorter reminder
-        const minBound = Math.max(hours - tolerance, otherHours);
-        return { min: minBound, max: hours + tolerance };
-      }
-    };
-
-    // Sort intervals by hours descending (longer first)
-    const intervals = [
-      { hours: reminderHours1, template: reminderTemplate1 },
-      { hours: reminderHours2, template: reminderTemplate2 }
-    ].sort((a, b) => b.hours - a.hours);
-
-    const longerHours = intervals[0].hours;
-    const shorterHours = intervals[1].hours;
-
-    // Calculate windows for each interval
-    const reminderIntervals = intervals.map((item, idx) => {
-      const otherHours = idx === 0 ? shorterHours : longerHours;
-      const window = createReminderWindow(item.hours, otherHours);
-      return {
-        ...item,
-        interval: idx + 1,
-        windowMin: window.min,
-        windowMax: window.max
-      };
-    });
-
-    console.log(`Reminder windows: ${reminderIntervals.map(r => `${r.hours}h: (${r.windowMin.toFixed(1)}, ${r.windowMax.toFixed(1)}]`).join(', ')}`);
-
-    let totalSent = 0;
-    let totalSkipped = 0;
-    let totalErrors = 0;
-    const allResults: any[] = [];
-
-    // Calculate date range to query (today + next day for longer interval reminders)
-    const today = germanyNow.dateStr;
-    const maxLookaheadMs = Math.max(longerHours, 48) * 60 * 60 * 1000;
-    const futureDate = new Date(now.getTime() + maxLookaheadMs);
-    const endDate = futureDate.toISOString().split('T')[0];
-
-    console.log(`Checking sessions from ${today} to ${endDate}`);
-
-    // Fetch all scheduled sessions
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('sessions')
-      .select(`
-        id,
-        date,
-        time,
-        student_id,
-        students!inner (
-          id,
-          name,
-          phone,
-          parent_phone,
-          session_time
-        )
-      `)
-      .eq('status', 'scheduled')
-      .gte('date', today)
-      .lte('date', endDate);
-
-    if (sessionsError) {
-      console.error("Error fetching sessions:", sessionsError);
-      throw sessionsError;
-    }
-
-    console.log(`Found ${sessions?.length || 0} scheduled sessions`);
-
-    if (!sessions || sessions.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, message: "No scheduled sessions found", sent: 0, skipped: 0, errors: 0 }),
+        JSON.stringify({ success: true, message: "No users have session reminders enabled", processed: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Process each reminder interval
-    for (const { hours, interval, template, windowMin, windowMax } of reminderIntervals) {
-      console.log(`\n--- Processing interval ${interval} (${hours}h before, window: ${windowMin.toFixed(1)}-${windowMax.toFixed(1)}h) ---`);
+    console.log(`✓ Found ${allSettings.length} user(s) with session reminders enabled`);
 
-      let sentCount = 0;
-      let skippedCount = 0;
-      let errorCount = 0;
+    let globalTotalSent = 0;
+    let globalTotalSkipped = 0;
+    let globalTotalErrors = 0;
+    const globalResults: any[] = [];
 
-      for (const session of sessions) {
-        const studentData = Array.isArray(session.students) ? session.students[0] : session.students;
-        const phone = studentData?.phone || studentData?.parent_phone;
-        const sessionTime = session.time || studentData?.session_time || '16:00';
-        const studentName = studentData?.name || 'الطالب';
-        const studentId = studentData?.id;
+    // Process each user separately
+    for (const settings of allSettings) {
+      const userId = settings.user_id;
+      console.log(`\n========== Processing user: ${userId} ==========`);
 
-        // Calculate minutes until session using correct timezone handling
-        const minutesUntilSession = calculateMinutesUntilSession(session.date, sessionTime, germanyNow);
-        const hoursUntilSession = minutesUntilSession / 60;
+      const reminderHours1 = settings.session_reminder_hours || 24;
+      const reminderHours2 = settings.session_reminder_hours_2 || 1;
 
-        // Session must be within the specific window for this reminder
-        // Window is (windowMin, windowMax] - exclusive min, inclusive max
-        if (hoursUntilSession > windowMax || hoursUntilSession <= windowMin || hoursUntilSession < 0) {
-          continue; // Outside window, skip silently
-        }
+      const reminderTemplate1 = settings.session_reminder_template_1 ||
+        settings.session_reminder_template ||
+        'مرحباً {student_name}،\nتذكير: لديك جلسة غداً بتاريخ {date} الساعة {time}.\nنراك قريباً!';
 
-        if (!phone) {
-          console.log(`Skip ${session.id} - no phone`);
-          skippedCount++;
-          continue;
-        }
+      const reminderTemplate2 = settings.session_reminder_template_2 ||
+        'مرحباً {student_name}،\nجلستك تبدأ خلال ساعة واحدة الساعة {time}!\nالرجاء الاستعداد.';
 
-        // Check if reminder already sent for this session+interval
-        const { data: existingReminder, error: reminderCheckError } = await supabase
-          .from('reminder_log')
-          .select('id')
-          .eq('session_id', session.id)
-          .eq('type', 'session')
-          .eq('reminder_interval', interval)
-          .eq('status', 'sent')
-          .maybeSingle();
+      console.log(`Reminder intervals: ${reminderHours1}h and ${reminderHours2}h`);
 
-        if (reminderCheckError) {
-          console.error(`Error checking reminder for ${session.id}:`, reminderCheckError);
-        }
-
-        if (existingReminder) {
-          console.log(`Skip ${session.id} - interval ${interval} already sent`);
-          skippedCount++;
-          continue;
-        }
-
-        // Build message
-        const message = template
-          .replace(/{student_name}/g, studentName)
-          .replace(/{date}/g, session.date)
-          .replace(/{time}/g, sessionTime);
-
-        console.log(`➤ Sending to ${studentName} (${session.date} ${sessionTime}, ${hoursUntilSession.toFixed(1)}h away)`);
-
-        // Send WhatsApp directly via Twilio
-        const result = await sendWhatsAppMessage(phone, message);
-
-        // Log the attempt
-        await supabase.from('reminder_log').insert({
-          user_id: 'default',
-          type: 'session',
-          student_id: studentId,
-          student_name: studentName,
-          phone_number: phone,
-          message_text: message,
-          status: result.success ? 'sent' : 'failed',
-          twilio_message_sid: result.messageSid,
-          error_message: result.error,
-          session_id: session.id,
-          session_date: session.date,
-          reminder_interval: interval,
-        });
-
-        if (result.success) {
-          console.log(`  ✓ Sent (${result.messageSid})`);
-          sentCount++;
-          allResults.push({ sessionId: session.id, interval, status: 'sent', messageSid: result.messageSid });
+      // Create reminder intervals with specific time windows
+      const createReminderWindow = (hours: number, otherHours: number) => {
+        if (hours <= 2) {
+          const minBound = otherHours < hours ? otherHours : 0;
+          return { min: minBound, max: hours };
         } else {
-          console.error(`  ✗ Failed: ${result.error}`);
-          errorCount++;
-          allResults.push({ sessionId: session.id, interval, status: 'failed', error: result.error });
+          const tolerance = Math.min(2, hours * 0.2);
+          const minBound = Math.max(hours - tolerance, otherHours);
+          return { min: minBound, max: hours + tolerance };
         }
+      };
+
+      const intervals = [
+        { hours: reminderHours1, template: reminderTemplate1 },
+        { hours: reminderHours2, template: reminderTemplate2 }
+      ].sort((a, b) => b.hours - a.hours);
+
+      const longerHours = intervals[0].hours;
+      const shorterHours = intervals[1].hours;
+
+      const reminderIntervals = intervals.map((item, idx) => {
+        const otherHours = idx === 0 ? shorterHours : longerHours;
+        const window = createReminderWindow(item.hours, otherHours);
+        return {
+          ...item,
+          interval: idx + 1,
+          windowMin: window.min,
+          windowMax: window.max
+        };
+      });
+
+      console.log(`Reminder windows: ${reminderIntervals.map(r => `${r.hours}h: (${r.windowMin.toFixed(1)}, ${r.windowMax.toFixed(1)}]`).join(', ')}`);
+
+      // Calculate date range
+      const today = germanyNow.dateStr;
+      const maxLookaheadMs = Math.max(longerHours, 48) * 60 * 60 * 1000;
+      const futureDate = new Date(now.getTime() + maxLookaheadMs);
+      const endDate = futureDate.toISOString().split('T')[0];
+
+      console.log(`Checking sessions from ${today} to ${endDate}`);
+
+      // Fetch sessions for THIS USER's students only
+      // Join through students table to filter by user_id
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('sessions')
+        .select(`
+          id,
+          date,
+          time,
+          student_id,
+          students!inner (
+            id,
+            name,
+            phone,
+            parent_phone,
+            session_time,
+            user_id
+          )
+        `)
+        .eq('status', 'scheduled')
+        .eq('students.user_id', userId)
+        .gte('date', today)
+        .lte('date', endDate);
+
+      if (sessionsError) {
+        console.error(`Error fetching sessions for user ${userId}:`, sessionsError);
+        continue; // Skip this user but continue with others
       }
 
-      console.log(`Interval ${interval}: ${sentCount} sent, ${skippedCount} skipped, ${errorCount} errors`);
-      totalSent += sentCount;
-      totalSkipped += skippedCount;
-      totalErrors += errorCount;
+      console.log(`Found ${sessions?.length || 0} scheduled sessions for user ${userId}`);
+
+      if (!sessions || sessions.length === 0) {
+        continue; // No sessions for this user
+      }
+
+      let userTotalSent = 0;
+      let userTotalSkipped = 0;
+      let userTotalErrors = 0;
+
+      // Process each reminder interval
+      for (const { hours, interval, template, windowMin, windowMax } of reminderIntervals) {
+        console.log(`\n--- Processing interval ${interval} (${hours}h before) for user ${userId} ---`);
+
+        let sentCount = 0;
+        let skippedCount = 0;
+        let errorCount = 0;
+
+        for (const session of sessions) {
+          const studentData = Array.isArray(session.students) ? session.students[0] : session.students;
+          const phone = studentData?.phone || studentData?.parent_phone;
+          const sessionTime = session.time || studentData?.session_time || '16:00';
+          const studentName = studentData?.name || 'الطالب';
+          const studentId = studentData?.id;
+
+          const minutesUntilSession = calculateMinutesUntilSession(session.date, sessionTime, germanyNow);
+          const hoursUntilSession = minutesUntilSession / 60;
+
+          if (hoursUntilSession > windowMax || hoursUntilSession <= windowMin || hoursUntilSession < 0) {
+            continue;
+          }
+
+          if (!phone) {
+            console.log(`Skip ${session.id} - no phone`);
+            skippedCount++;
+            continue;
+          }
+
+          // Check if reminder already sent
+          const { data: existingReminder, error: reminderCheckError } = await supabase
+            .from('reminder_log')
+            .select('id')
+            .eq('session_id', session.id)
+            .eq('type', 'session')
+            .eq('reminder_interval', interval)
+            .eq('status', 'sent')
+            .maybeSingle();
+
+          if (reminderCheckError) {
+            console.error(`Error checking reminder for ${session.id}:`, reminderCheckError);
+          }
+
+          if (existingReminder) {
+            console.log(`Skip ${session.id} - interval ${interval} already sent`);
+            skippedCount++;
+            continue;
+          }
+
+          const message = template
+            .replace(/{student_name}/g, studentName)
+            .replace(/{date}/g, session.date)
+            .replace(/{time}/g, sessionTime);
+
+          console.log(`➤ Sending to ${studentName} (${session.date} ${sessionTime}, ${hoursUntilSession.toFixed(1)}h away)`);
+
+          const result = await sendWhatsAppMessage(phone, message);
+
+          // Log with correct user_id
+          await supabase.from('reminder_log').insert({
+            user_id: userId,
+            type: 'session',
+            student_id: studentId,
+            student_name: studentName,
+            phone_number: phone,
+            message_text: message,
+            status: result.success ? 'sent' : 'failed',
+            twilio_message_sid: result.messageSid,
+            error_message: result.error,
+            session_id: session.id,
+            session_date: session.date,
+            reminder_interval: interval,
+          });
+
+          if (result.success) {
+            console.log(`  ✓ Sent (${result.messageSid})`);
+            sentCount++;
+            globalResults.push({ userId, sessionId: session.id, interval, status: 'sent', messageSid: result.messageSid });
+          } else {
+            console.error(`  ✗ Failed: ${result.error}`);
+            errorCount++;
+            globalResults.push({ userId, sessionId: session.id, interval, status: 'failed', error: result.error });
+          }
+        }
+
+        console.log(`Interval ${interval} for user ${userId}: ${sentCount} sent, ${skippedCount} skipped, ${errorCount} errors`);
+        userTotalSent += sentCount;
+        userTotalSkipped += skippedCount;
+        userTotalErrors += errorCount;
+      }
+
+      console.log(`User ${userId} totals: ${userTotalSent} sent, ${userTotalSkipped} skipped, ${userTotalErrors} errors`);
+      globalTotalSent += userTotalSent;
+      globalTotalSkipped += userTotalSkipped;
+      globalTotalErrors += userTotalErrors;
     }
 
-    console.log(`\n=== Complete: ${totalSent} sent, ${totalSkipped} skipped, ${totalErrors} errors ===`);
+    console.log(`\n=== Complete: ${globalTotalSent} sent, ${globalTotalSkipped} skipped, ${globalTotalErrors} errors across ${allSettings.length} users ===`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        sent: totalSent,
-        skipped: totalSkipped,
-        errors: totalErrors,
-        reminders: reminderIntervals.map(r => ({ interval: r.interval, hours: r.hours })),
-        results: allResults,
+        users_processed: allSettings.length,
+        sent: globalTotalSent,
+        skipped: globalTotalSkipped,
+        errors: globalTotalErrors,
+        results: globalResults,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -1,9 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Check Critical Alerts Edge Function - v2.0
+// Check Critical Alerts Edge Function - v3.0
 // Runs via pg_cron to detect Priority 100 conditions and send push notifications
-// FIXED: Now sends push notifications directly via Firebase FCM
+// UPDATED: Now supports multiple users - sends push notifications to the correct user's devices
 // Handles: unconfirmed sessions, payment overdue 30+ days, 30-min pre-session reminders
 
 const corsHeaders = {
@@ -100,6 +100,7 @@ async function generateFirebaseAccessToken(): Promise<string> {
 }
 
 // Send push notification directly via Firebase FCM
+// UPDATED: Now accepts userId to send only to that user's devices
 async function sendPushNotification(
   supabase: any,
   alert: {
@@ -109,6 +110,7 @@ async function sendPushNotification(
     suggestionType: string;
     actionType: string;
     conditionKey: string;
+    userId?: string;
     studentId?: string;
     sessionId?: string;
     studentPhone?: string;
@@ -133,14 +135,20 @@ async function sendPushNotification(
       }
     }
 
-    // Get active FCM tokens
-    const { data: subscriptions, error: subError } = await supabase
+    // Get active FCM tokens for the specific user (or all if no userId provided)
+    let query = supabase
       .from('push_subscriptions')
-      .select('fcm_token')
+      .select('fcm_token, user_id')
       .eq('is_active', true);
 
+    if (alert.userId) {
+      query = query.eq('user_id', alert.userId);
+    }
+
+    const { data: subscriptions, error: subError } = await query;
+
     if (subError || !subscriptions || subscriptions.length === 0) {
-      return { sent: 0, skipped: false, error: "No active subscriptions" };
+      return { sent: 0, skipped: false, error: alert.userId ? `No active subscriptions for user ${alert.userId}` : "No active subscriptions" };
     }
 
     // Get Firebase access token
@@ -159,6 +167,7 @@ async function sendPushNotification(
             priority: String(alert.priority),
             suggestionType: alert.suggestionType || '',
             actionType: alert.actionType || '',
+            userId: alert.userId || '',
             studentId: alert.studentId || '',
             sessionId: alert.sessionId || '',
             studentPhone: alert.studentPhone || '',
@@ -205,9 +214,9 @@ async function sendPushNotification(
       }
     }
 
-    // Log notification
+    // Log notification with correct user_id
     await supabase.from('push_notification_log').insert({
-      user_id: 'default',
+      user_id: alert.userId || 'default',
       suggestion_type: alert.suggestionType || 'general',
       priority: alert.priority,
       title: alert.title,
@@ -250,6 +259,7 @@ serve(async (req) => {
       suggestionType: string;
       actionType: string;
       conditionKey: string;
+      userId?: string;
       studentId?: string;
       sessionId?: string;
       studentPhone?: string;
@@ -341,6 +351,7 @@ serve(async (req) => {
             suggestionType: 'pre_session',
             actionType: 'pre_session',
             conditionKey,
+            userId,
             studentId: student?.id,
             sessionId: session.id
           });
@@ -353,8 +364,7 @@ serve(async (req) => {
     // ========================================
     const { data: students, error: studentsError } = await supabase
       .from('students')
-      .select('id, name, phone, parent_phone')
-      .eq('is_active', true);
+      .select('id, name, phone, parent_phone, user_id');
 
     if (studentsError) {
       console.error("Error fetching students:", studentsError);
@@ -396,6 +406,7 @@ serve(async (req) => {
                 suggestionType: 'payment',
                 actionType: 'record_payment',
                 conditionKey,
+                userId: student.user_id,
                 studentId: student.id,
                 studentPhone: student.phone || student.parent_phone
               });
@@ -425,6 +436,7 @@ serve(async (req) => {
                 suggestionType: 'payment',
                 actionType: 'record_payment',
                 conditionKey,
+                userId: student.user_id,
                 studentId: student.id,
                 studentPhone: student.phone || student.parent_phone
               });
@@ -451,7 +463,7 @@ serve(async (req) => {
           console.log(`Skipped (duplicate): ${alert.conditionKey}`);
         } else if (result.sent > 0) {
           sentCount++;
-          console.log(`Sent: ${alert.title} - ${alert.conditionKey}`);
+          console.log(`Sent to user ${alert.userId || 'all'}: ${alert.title} - ${alert.conditionKey}`);
         } else if (result.error) {
           console.error("Failed to send push notification:", result.error);
         }
