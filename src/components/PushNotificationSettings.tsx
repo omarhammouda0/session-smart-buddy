@@ -132,6 +132,39 @@ export function PushNotificationSettings() {
             تفعيل الإشعارات الآن
           </Button>
         )}
+
+        {isEnabled && (
+          <Button
+            onClick={async () => {
+              try {
+                const response = await fetch(
+                  'https://jguiqcroufwbxamfymnj.supabase.co/functions/v1/send-push-notification',
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpndWlxY3JvdWZ3YnhhbWZ5bW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNDcyMDUsImV4cCI6MjA1MTgyMzIwNX0.SiM9Ebv5R-G9ORZgInf9VpPVz1h5ZmEoOV0IjhKzq-s'
+                    },
+                    body: JSON.stringify({
+                      title: '🔔 اختبار الإشعارات',
+                      body: 'تم تفعيل إشعارات الخلفية بنجاح! ستصلك تنبيهات حتى عند إغلاق التطبيق.',
+                      priority: 100
+                    })
+                  }
+                );
+                const result = await response.json();
+                console.log('Test notification result:', result);
+              } catch (error) {
+                console.error('Error sending test notification:', error);
+              }
+            }}
+            className="w-full"
+            variant="secondary"
+          >
+            <Bell className="h-4 w-4 ml-2" />
+            إرسال إشعار تجريبي
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
