@@ -1,6 +1,7 @@
 // Push Notification Settings Component
 // Allows users to enable/disable background push notifications
 
+import { useState, useEffect } from "react";
 import { Bell, BellOff, Smartphone, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 
-
-export function PushNotificationSettings() {
+// Inner component with the actual push notification logic
+function PushNotificationSettingsInner() {
   const {
     isSupported,
     isEnabled,
@@ -186,5 +187,59 @@ export function PushNotificationSettings() {
       </CardContent>
     </Card>
   );
+}
+
+// Main export - wraps inner component with safe loading
+export function PushNotificationSettings() {
+  const [isReady, setIsReady] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    // Delay initialization to prevent race conditions with auth
+    const timer = setTimeout(() => {
+      try {
+        setIsReady(true);
+      } catch (e) {
+        console.error("PushNotificationSettings init error:", e);
+        setHasError(true);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (hasError) {
+    return (
+      <Card className="border-dashed">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            إشعارات الخلفية
+          </CardTitle>
+          <CardDescription>
+            حدث خطأ أثناء التحميل
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (!isReady) {
+    return (
+      <Card className="border-dashed">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="h-4 w-4 text-muted-foreground animate-pulse" />
+            إشعارات الخلفية
+          </CardTitle>
+          <CardDescription>
+            جاري التحميل...
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return <PushNotificationSettingsInner />;
 }
 

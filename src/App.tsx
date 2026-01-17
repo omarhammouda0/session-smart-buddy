@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -451,32 +452,34 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 // MAIN APP
 // =====================================================
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      {/* Animated Background */}
-      <AnimatedBackground />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        {/* Animated Background */}
+        <AnimatedBackground />
 
-      {/* Toast notifications */}
-      <Toaster />
-      <Sonner />
+        {/* Toast notifications */}
+        <Toaster />
+        <Sonner />
 
-      {/* Main App Routes */}
-      <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route
-            path="/"
-            element={
-              <RequireAuth>
-                <Index />
-              </RequireAuth>
-            }
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+        {/* Main App Routes */}
+        <BrowserRouter>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  <Index />
+                </RequireAuth>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

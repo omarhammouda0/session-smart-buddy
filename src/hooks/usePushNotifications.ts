@@ -115,80 +115,151 @@ export function usePushNotifications() {
 
   // Check if push notifications are supported and Firebase is configured
   useEffect(() => {
+    let mounted = true;
+
     const checkSupport = async () => {
-      const browserSupported =
-        "Notification" in window &&
-        "serviceWorker" in navigator &&
-        "PushManager" in window;
+      try {
+        const browserSupported =
+          "Notification" in window &&
+          "serviceWorker" in navigator &&
+          "PushManager" in window;
 
-      const firebaseReady = isFirebaseConfigured();
+        const firebaseReady = isFirebaseConfigured();
 
-      setState(prev => ({
-        ...prev,
-        isSupported: browserSupported,
-        isConfigured: firebaseReady,
-        permission: browserSupported ? Notification.permission : "denied"
-      }));
+        if (!mounted) return;
 
-      if (browserSupported && firebaseReady) {
-        try {
-          // Dynamic import Firebase to avoid errors when not configured
-          const { initializeApp, getApps, getApp } = await import("firebase/app");
-          const { getMessaging, onMessage } = await import("firebase/messaging");
-          
-          // Initialize Firebase
-          const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-          const messagingInstance = getMessaging(app);
-          setMessaging(messagingInstance);
+        setState(prev => ({
+          ...prev,
+          isSupported: browserSupported,
+          isConfigured: firebaseReady,
+          permission: browserSupported ? Notification.permission : "denied"
+        }));
 
-          // Set up foreground message handler
-          onMessage(messagingInstance, (payload) => {
-            console.log("Foreground message received:", payload);
-            
-            // Show toast for foreground messages
-            toast({
-              title: payload.notification?.title || "تنبيه جديد",
-              description: payload.notification?.body || "",
-              duration: payload.data?.priority === "100" ? 10000 : 5000,
+        if (browserSupported && firebaseReady) {
+          // Delay Firebase initialization on mobile to prevent race conditions with auth
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (isMobile) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+          if (!mounted) return;
+
+          try {
+            // Dynamic import Firebase to avoid errors when not configured
+            const { initializeApp, getApps, getApp } = await import("firebase/app");
+            const { getMessaging, onMessage } = await import("firebase/messaging");
+
+            if (!mounted) return;
+
+            // Initialize Firebase
+            const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+            const messagingInstance = getMessaging(app);
+
+            if (!mounted) return;
+            setMessaging(messagingInstance);
+
+            // Set up foreground message handler with error protection
+            onMessage(messagingInstance, (payload) => {
+              try {
+                console.log("Foreground message received:", payload);
+
+                // Safely extract notification data
+                const title = payload?.notification?.title || payload?.data?.title || "تنبيه جديد";
+                const body = payload?.notification?.body || payload?.data?.body || "";
+                const priority = payload?.data?.priority;
+
+                // Show toast for foreground messages - wrapped in setTimeout to prevent blocking
+                setTimeout(() => {
+                  try {
+                    toast({
+                      title,
+                      description: body,
+                      duration: priority === "100" ? 10000 : 5000,
+                    });
+                  } catch (toastError) {
+                    console.warn("Toast display error:", toastError);
+                  }
+                }, 0);
+
+                // Play sound for priority 100
+                if (priority === "100") {
+                  try {
+                    playNotificationSound();
+                  } catch (soundError) {
+                    console.warn("Notification sound error:", soundError);
+                  }
+                }
+              } catch (error) {
+                console.error("Error handling foreground message:", error);
+              }
             });
 
-            // Play sound for priority 100
-            if (payload.data?.priority === "100") {
-              playNotificationSound();
+            // Check if already has permission and token
+            if (mounted && Notification.permission === "granted") {
+              const existingToken = localStorage.getItem("fcm_token");
+              if (existingToken) {
+                setState(prev => ({
+                  ...prev,
+                  isEnabled: true,
+                  token: existingToken,
+                  permission: "granted"
+                }));
+              }
             }
-          });
-
-          // Check if already has permission and token
-          if (Notification.permission === "granted") {
-            const existingToken = localStorage.getItem("fcm_token");
-            if (existingToken) {
-              setState(prev => ({
-                ...prev,
-                isEnabled: true,
-                token: existingToken,
-                permission: "granted"
-              }));
+          } catch (error) {
+            console.error("Failed to initialize Firebase:", error);
+            if (mounted) {
+              setState(prev => ({ ...prev, isConfigured: false }));
             }
           }
-        } catch (error) {
-          console.error("Failed to initialize Firebase:", error);
-          setState(prev => ({ ...prev, isConfigured: false }));
         }
+      } catch (error) {
+        console.error("Error in push notification setup:", error);
       }
     };
 
     checkSupport();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Handle messages from service worker (notification clicks)
   useEffect(() => {
     const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data?.type === "NOTIFICATION_CLICK") {
-        console.log("Notification clicked:", event.data);
-        const { targetUrl } = event.data;
-        if (targetUrl && targetUrl !== "/") {
-          window.location.href = targetUrl;
+      try {
+        if (event.data?.type === "NOTIFICATION_CLICK") {
+          console.log("Notification clicked:", event.data);
+          const { targetUrl } = event.data;
+
+          // Only navigate if we have a meaningful URL that's not just root
+          if (targetUrl && targetUrl !== "/" && targetUrl.length > 1) {
+            // Use a safe navigation approach - store in sessionStorage for the app to handle
+            // This prevents full page reloads that cause blank screens on mobile
+            try {
+              sessionStorage.setItem("pending_notification_action", JSON.stringify({
+                url: targetUrl,
+                data: event.data.data,
+                action: event.data.action,
+                timestamp: Date.now()
+              }));
+
+              // Dispatch custom event for app to handle
+              window.dispatchEvent(new CustomEvent("notification-action", {
+                detail: {
+                  url: targetUrl,
+                  data: event.data.data,
+                  action: event.data.action
+                }
+              }));
+            } catch (storageError) {
+              console.warn("Failed to store notification action:", storageError);
+            }
+          }
         }
+      } catch (error) {
+        console.error("Error handling service worker message:", error);
       }
     };
 
