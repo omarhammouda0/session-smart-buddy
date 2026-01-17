@@ -399,57 +399,6 @@ export type Database = {
         }
         Relationships: []
       }
-      push_notification_log: {
-        Row: {
-          id: string
-          user_id: string
-          suggestion_type: string
-          priority: number
-          title: string
-          body: string
-          related_entity_type: string | null
-          related_entity_id: string | null
-          condition_key: string | null
-          fcm_response: Json | null
-          status: string
-          error_message: string | null
-          sent_at: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id?: string
-          suggestion_type: string
-          priority: number
-          title: string
-          body: string
-          related_entity_type?: string | null
-          related_entity_id?: string | null
-          condition_key?: string | null
-          fcm_response?: Json | null
-          status?: string
-          error_message?: string | null
-          sent_at?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          suggestion_type?: string
-          priority?: number
-          title?: string
-          body?: string
-          related_entity_type?: string | null
-          related_entity_id?: string | null
-          condition_key?: string | null
-          fcm_response?: Json | null
-          status?: string
-          error_message?: string | null
-          sent_at?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
       reminder_log: {
         Row: {
           created_at: string
