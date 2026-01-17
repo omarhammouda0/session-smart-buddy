@@ -169,11 +169,15 @@ serve(async (req) => {
       const message = {
         message: {
           token: sub.fcm_token,
+          // Notification payload - shown by system when app is in background
           notification: {
             title: body.title,
             body: body.body
           },
+          // Data payload - passed to service worker
           data: {
+            title: body.title,
+            body: body.body,
             priority: String(body.priority || 50),
             suggestionType: body.suggestionType || '',
             actionType: body.actionType || '',
@@ -184,14 +188,34 @@ serve(async (req) => {
             conditionKey: body.conditionKey || '',
             timestamp: new Date().toISOString()
           },
+          // Android specific config for background delivery
+          android: {
+            priority: "high",
+            ttl: "86400s", // 24 hours
+            notification: {
+              channel_id: "critical_alerts",
+              priority: "high",
+              default_sound: true,
+              default_vibrate_timings: true,
+              visibility: "public",
+              notification_count: 1
+            }
+          },
+          // Web push config
           webpush: {
+            headers: {
+              Urgency: "high",
+              TTL: "86400"
+            },
             notification: {
               icon: '/favicon.ico',
               badge: '/favicon.ico',
               dir: 'rtl',
               lang: 'ar',
               requireInteraction: body.priority === 100,
-              vibrate: [100, 50, 100]
+              vibrate: [100, 50, 100],
+              tag: body.conditionKey || `notification-${Date.now()}`,
+              renotify: true
             },
             fcm_options: {
               link: body.actionUrl || '/'

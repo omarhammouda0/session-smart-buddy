@@ -66,31 +66,48 @@ function showNotification(payload) {
 
 // Handle raw push events (more reliable for background on mobile)
 self.addEventListener('push', (event) => {
-  console.log('[firebase-messaging-sw.js] Push event received:', event);
+  console.log('[SW] Push event received at:', new Date().toISOString());
 
   if (!event.data) {
-    console.log('[firebase-messaging-sw.js] No data in push event');
+    console.log('[SW] No data in push event');
+    // Still show a generic notification
+    event.waitUntil(
+      self.registration.showNotification('تنبيه جديد', {
+        body: 'لديك إشعار جديد',
+        icon: '/favicon.ico',
+        dir: 'rtl',
+        lang: 'ar'
+      })
+    );
     return;
   }
 
   let payload;
   try {
     payload = event.data.json();
+    console.log('[SW] Push payload parsed:', JSON.stringify(payload).substring(0, 200));
   } catch (e) {
-    console.log('[firebase-messaging-sw.js] Could not parse push data:', e);
-    payload = { notification: { title: 'تنبيه جديد', body: event.data.text() } };
+    console.log('[SW] Could not parse push data, using text:', e);
+    const text = event.data.text();
+    payload = {
+      notification: { title: 'تنبيه جديد', body: text },
+      data: { body: text }
+    };
   }
 
-  console.log('[firebase-messaging-sw.js] Push payload:', payload);
+  // Ensure we always show a notification
+  // On Android, if the notification payload exists, the system may show it automatically
+  // But we still call showNotification to ensure it works when app is closed
+  const notificationPromise = showNotification(payload);
 
-  // Show the notification
-  event.waitUntil(showNotification(payload));
+  event.waitUntil(notificationPromise);
 });
 
-// Handle background messages (Firebase SDK)
+// Handle background messages (Firebase SDK) - this is a fallback
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message:', payload);
-  // Note: If push event already handled this, this may be skipped
+  console.log('[SW] Background message via Firebase SDK:', new Date().toISOString());
+  // The push event handler above should handle most cases
+  // This is a fallback for when Firebase SDK intercepts the message
   return showNotification(payload);
 });
 
@@ -155,7 +172,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 });
 
 // Cache version - increment to force update
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v1.1.0';
 const CACHE_NAME = `session-smart-buddy-${CACHE_VERSION}`;
 
 // Install event - take control immediately

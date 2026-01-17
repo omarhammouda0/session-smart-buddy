@@ -168,7 +168,7 @@ export function PushNotificationDebug() {
       const { data, error } = await supabase.functions.invoke("send-push-notification", {
         body: {
           title: "🔔 اختبار الإشعارات",
-          body: "إذا ظهر هذا الإشعار، فالنظام يعمل بشكل صحيح!",
+          body: "إذا ظهر هذا الإشعار، فالنظام يعمل بشكل صحيح! " + new Date().toLocaleTimeString('ar-EG'),
           priority: 100,
           suggestionType: "test",
           actionType: "test",
@@ -178,11 +178,33 @@ export function PushNotificationDebug() {
       if (error) {
         alert(`خطأ: ${error.message}`);
       } else {
-        alert(`تم إرسال الإشعار! النتيجة: ${JSON.stringify(data)}`);
+        alert(`تم إرسال الإشعار!\nالنتيجة: أُرسل إلى ${data?.sent || 0} جهاز\n\nأغلق التطبيق الآن وانتظر الإشعار!`);
       }
     } catch (e) {
       alert(`فشل: ${e}`);
     }
+  };
+
+  // Test with delayed notification (gives you time to close the app)
+  const testDelayedNotification = async () => {
+    alert("سيتم إرسال الإشعار بعد 10 ثواني.\n\nأغلق التطبيق الآن وانتظر!");
+
+    // Wait 10 seconds then send
+    setTimeout(async () => {
+      try {
+        await supabase.functions.invoke("send-push-notification", {
+          body: {
+            title: "🔔 إشعار مؤجل",
+            body: "هذا الإشعار أُرسل بعد 10 ثواني - " + new Date().toLocaleTimeString('ar-EG'),
+            priority: 100,
+            suggestionType: "test",
+            actionType: "test",
+          },
+        });
+      } catch (e) {
+        console.error("Failed to send delayed notification:", e);
+      }
+    }, 10000);
   };
 
   // Refresh FCM token
@@ -341,6 +363,14 @@ export function PushNotificationDebug() {
               onClick={testPushNotification}
             >
               إرسال إشعار تجريبي
+            </Button>
+
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={testDelayedNotification}
+            >
+              إشعار بعد 10 ثواني (أغلق التطبيق!)
             </Button>
 
             <Button
