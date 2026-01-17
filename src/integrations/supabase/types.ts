@@ -252,6 +252,39 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          created_at: string | null
+          ended_session_alerts_enabled: boolean | null
+          id: string
+          session_notification_minutes_before: number | null
+          session_notification_sound_enabled: boolean | null
+          session_notifications_enabled: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          ended_session_alerts_enabled?: boolean | null
+          id?: string
+          session_notification_minutes_before?: number | null
+          session_notification_sound_enabled?: boolean | null
+          session_notifications_enabled?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          ended_session_alerts_enabled?: boolean | null
+          id?: string
+          session_notification_minutes_before?: number | null
+          session_notification_sound_enabled?: boolean | null
+          session_notifications_enabled?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_records: {
         Row: {
           amount: number
@@ -682,6 +715,51 @@ export type Database = {
           parent_notified_at?: string | null
           student_id?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      student_materials: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          file_name: string | null
+          file_size: number | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          student_id: string
+          title: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          student_id: string
+          title: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          student_id?: string
+          title?: string
+          type?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
