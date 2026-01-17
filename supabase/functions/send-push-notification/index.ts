@@ -234,6 +234,7 @@ serve(async (req) => {
       }
     }
 
+
     // Log the notification
     // Note: For test notifications, we use the first subscription's user_id if available
     const logUserId = subscriptions[0]?.user_id || 'system';

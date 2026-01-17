@@ -7,6 +7,7 @@ BEGIN
         AND table_name = 'reminder_settings'
         AND column_name = 'session_reminder_hours_2'
     ) THEN
+
         ALTER TABLE public.reminder_settings
         ADD COLUMN session_reminder_hours_2 INTEGER NOT NULL DEFAULT 1;
     END IF;
