@@ -3,17 +3,43 @@
   "short_name": "متابعة الطلاب",
   "description": "تطبيق متابعة جلسات الطلاب والمدفوعات",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#f8f7f2",
   "theme_color": "#1e3a5f",
   "orientation": "portrait-primary",
   "dir": "rtl",
   "lang": "ar",
+  "scope": "/",
   "icons": [
     {
       "src": "/favicon.ico",
       "sizes": "64x64",
       "type": "image/x-icon"
+    },
+    {
+      "src": "/icons/icon-192x192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
   "categories": ["education", "productivity"],
@@ -21,15 +47,18 @@
     {
       "name": "حصص اليوم",
       "short_name": "اليوم",
-      "url": "/?tab=sessions"
+      "url": "/?tab=sessions",
+      "icons": [{ "src": "/favicon.ico", "sizes": "64x64" }]
     },
     {
       "name": "التقويم",
       "short_name": "التقويم",
-      "url": "/?tab=calendar"
+      "url": "/?tab=calendar",
+      "icons": [{ "src": "/favicon.ico", "sizes": "64x64" }]
     }
   ],
   "gcm_sender_id": "224453116331",
-  "permissions": ["notifications"]
+  "prefer_related_applications": false,
+  "related_applications": []
 }
 

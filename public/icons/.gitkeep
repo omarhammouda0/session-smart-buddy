@@ -1,0 +1,17 @@
+# PWA Icons
+#
+# SVG icons are included and work in most modern browsers.
+# For full compatibility (especially iOS), add PNG versions:
+#
+# 1. icon-192x192.png - 192x192 pixels PNG
+# 2. icon-512x512.png - 512x512 pixels PNG
+#
+# You can convert the SVG files to PNG using:
+# - https://cloudconvert.com/svg-to-png
+# - https://www.pwabuilder.com/imageGenerator
+# - Or any image editor like Figma, Canva, etc.
+#
+# The SVG files included have:
+# - Navy blue background (#1e3a5f)
+# - White graduation cap icon
+# - Rounded corners

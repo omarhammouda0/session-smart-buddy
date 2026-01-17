@@ -154,17 +154,45 @@ self.addEventListener('pushsubscriptionchange', (event) => {
   );
 });
 
+// Cache version - increment to force update
+const CACHE_VERSION = 'v1.0.0';
+const CACHE_NAME = `session-smart-buddy-${CACHE_VERSION}`;
+
 // Install event - take control immediately
 self.addEventListener('install', (event) => {
-  console.log('[firebase-messaging-sw.js] Service Worker installing...');
+  console.log('[firebase-messaging-sw.js] Service Worker installing...', CACHE_VERSION);
   // Skip waiting to activate immediately
   self.skipWaiting();
 });
 
-// Activate event - claim all clients
+// Activate event - claim all clients and clean old caches
 self.addEventListener('activate', (event) => {
-  console.log('[firebase-messaging-sw.js] Service Worker activating...');
-  // Take control of all pages immediately
-  event.waitUntil(self.clients.claim());
+  console.log('[firebase-messaging-sw.js] Service Worker activating...', CACHE_VERSION);
+
+  event.waitUntil(
+    Promise.all([
+      // Take control of all pages immediately
+      self.clients.claim(),
+      // Clean old caches
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((name) => name.startsWith('session-smart-buddy-') && name !== CACHE_NAME)
+            .map((name) => {
+              console.log('[firebase-messaging-sw.js] Deleting old cache:', name);
+              return caches.delete(name);
+            })
+        );
+      })
+    ])
+  );
 });
 
+// Periodic sync for keeping the SW alive (if supported)
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'check-notifications') {
+    console.log('[firebase-messaging-sw.js] Periodic sync: check-notifications');
+    // The actual notification check is done by the cron job on the server
+    // This just keeps the SW active
+  }
+});

@@ -87,6 +87,8 @@ import { EndOfDayChecker } from "@/components/EndOfDayChecker";
 import { useAISuggestions } from "@/hooks/useAISuggestions";
 import { AISuggestionsWidget } from "@/components/AISuggestionsWidget";
 import { ActionHandlers } from "@/lib/suggestionActions";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { useNotificationPrompt } from "@/hooks/useNotificationPrompt";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -288,6 +290,9 @@ const Index = () => {
     resolveByEntity: resolveAIByEntity,
     dismissCriticalOverlay: dismissAICriticalOverlay,
   } = useAISuggestions(students, payments);
+
+  // Notification Permission Prompt (for push notifications when browser closed)
+  const { promptForNotifications, NotificationPromptComponent } = useNotificationPrompt();
 
   // Handle adding a new student with materials
   const handleAddStudent = async (
@@ -491,6 +496,8 @@ const Index = () => {
     // Auto-resolve AI suggestions when session is completed
     if (!wasCompleted) {
       resolveAIByEntity("session", sessionId);
+      // Prompt for notification permission after completing a session
+      promptForNotifications("session_completed");
     }
     toast({
       title: wasCompleted ? "تم إلغاء الإكمال" : "تم إكمال الحصة",
@@ -2028,6 +2035,12 @@ const Index = () => {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
+
+      {/* Notification Permission Prompt */}
+      {NotificationPromptComponent}
     </div>
   );
 };
