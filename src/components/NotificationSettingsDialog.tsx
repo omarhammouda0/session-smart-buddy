@@ -86,7 +86,7 @@ export function NotificationSettingsDialog({ settings, onSave }: NotificationSet
     });
   };
 
-  const handleTestNotification = () => {
+  const handleTestNotification = async () => {
     // Play sound
     if (soundEnabled) {
       try {
@@ -107,12 +107,32 @@ export function NotificationSettingsDialog({ settings, onSave }: NotificationSet
       }
     }
 
-    // Browser notification
+    // Browser notification - use service worker for mobile compatibility
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('🔔 إشعار تجريبي', {
-        body: 'هذا إشعار تجريبي - الإشعارات تعمل بشكل صحيح!',
-        icon: '/favicon.ico',
-      });
+      try {
+        // Try service worker first (mobile compatible)
+        if ('serviceWorker' in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification('🔔 إشعار تجريبي', {
+            body: 'هذا إشعار تجريبي - الإشعارات تعمل بشكل صحيح!',
+            icon: '/favicon.ico',
+            dir: 'rtl',
+            lang: 'ar',
+          });
+        } else {
+          // Fallback for desktop - may not work on mobile
+          try {
+            new Notification('🔔 إشعار تجريبي', {
+              body: 'هذا إشعار تجريبي - الإشعارات تعمل بشكل صحيح!',
+              icon: '/favicon.ico',
+            });
+          } catch (e) {
+            console.log('Direct notification not supported');
+          }
+        }
+      } catch (error) {
+        console.warn('Could not show notification:', error);
+      }
     }
 
     toast({

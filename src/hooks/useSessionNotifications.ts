@@ -31,6 +31,41 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   soundEnabled: true,
 };
 
+// Helper function to safely show notifications on both desktop and mobile
+// Mobile browsers don't support `new Notification()`, they require ServiceWorkerRegistration.showNotification()
+async function showSafeNotification(title: string, options: NotificationOptions): Promise<void> {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    // Try using service worker first (works on mobile)
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, {
+        ...options,
+        dir: "rtl",
+        lang: "ar",
+      });
+      return;
+    }
+
+    // Fallback to direct Notification (desktop only)
+    // This may fail on mobile, so we wrap it in try-catch
+    try {
+      const notification = new Notification(title, options);
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+    } catch (e) {
+      console.log("Direct notification not supported, using toast instead");
+    }
+  } catch (error) {
+    console.warn("Could not show notification:", error);
+  }
+}
+
 // Local storage keys for tracking notified sessions (resets daily)
 const NOTIFIED_SESSIONS_KEY = "session-notifications-notified";
 const ENDED_SESSIONS_KEY = "session-ended-notified";
@@ -253,20 +288,13 @@ export function useSessionNotifications(students: Student[]) {
   // Send browser notification
   const sendBrowserNotification = useCallback(
     (student: Student, session: Session, minutesUntil: number) => {
-      if ("Notification" in window && Notification.permission === "granted") {
-        const sessionTime = session.time || student.sessionTime || "16:00";
-        const notification = new Notification("تذكير بالحصة القادمة 📚", {
-          body: `حصة ${student.name} بعد ${minutesUntil < 60 ? `${minutesUntil} دقيقة` : "ساعة"} (${sessionTime})`,
-          icon: "/favicon.ico",
-          tag: `session-${session.id}`,
-          requireInteraction: true,
-        });
-
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-        };
-      }
+      const sessionTime = session.time || student.sessionTime || "16:00";
+      showSafeNotification("تذكير بالحصة القادمة 📚", {
+        body: `حصة ${student.name} بعد ${minutesUntil < 60 ? `${minutesUntil} دقيقة` : "ساعة"} (${sessionTime})`,
+        icon: "/favicon.ico",
+        tag: `session-${session.id}`,
+        requireInteraction: true,
+      });
     },
     []
   );
@@ -375,19 +403,13 @@ export function useSessionNotifications(students: Student[]) {
         setEndedSessionNotification(ended);
         playNotificationSound();
 
-        if ("Notification" in window && Notification.permission === "granted") {
-          const notification = new Notification("⏰ انتهت الحصة", {
-            body: `حصة ${ended.student.name} انتهت. هل تريد تأكيد حالة الحصة؟`,
-            icon: "/favicon.ico",
-            tag: `session-ended-${ended.session.id}`,
-            requireInteraction: true,
-          });
+        showSafeNotification("⏰ انتهت الحصة", {
+          body: `حصة ${ended.student.name} انتهت. هل تريد تأكيد حالة الحصة؟`,
+          icon: "/favicon.ico",
+          tag: `session-ended-${ended.session.id}`,
+          requireInteraction: true,
+        });
 
-          notification.onclick = () => {
-            window.focus();
-            notification.close();
-          };
-        }
 
         toast({
           title: "⏰ انتهت الحصة",
