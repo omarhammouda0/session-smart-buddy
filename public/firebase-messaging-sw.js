@@ -20,21 +20,20 @@ firebase.initializeApp(firebaseConfig);
 // Get messaging instance
 const messaging = firebase.messaging();
 
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message:', payload);
-
+// Helper function to show notification
+function showNotification(payload) {
   const notificationTitle = payload.notification?.title || payload.data?.title || 'تنبيه جديد';
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body || '',
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    tag: payload.data?.tag || 'default',
+    tag: payload.data?.tag || `notification-${Date.now()}`,
     data: payload.data || {},
     requireInteraction: payload.data?.priority === '100',
     dir: 'rtl',
     lang: 'ar',
-    vibrate: [100, 50, 100],
+    vibrate: [200, 100, 200],
+    silent: false,
     actions: []
   };
 
@@ -63,6 +62,36 @@ messaging.onBackgroundMessage((payload) => {
   }
 
   return self.registration.showNotification(notificationTitle, notificationOptions);
+}
+
+// Handle raw push events (more reliable for background on mobile)
+self.addEventListener('push', (event) => {
+  console.log('[firebase-messaging-sw.js] Push event received:', event);
+
+  if (!event.data) {
+    console.log('[firebase-messaging-sw.js] No data in push event');
+    return;
+  }
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    console.log('[firebase-messaging-sw.js] Could not parse push data:', e);
+    payload = { notification: { title: 'تنبيه جديد', body: event.data.text() } };
+  }
+
+  console.log('[firebase-messaging-sw.js] Push payload:', payload);
+
+  // Show the notification
+  event.waitUntil(showNotification(payload));
+});
+
+// Handle background messages (Firebase SDK)
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Received background message:', payload);
+  // Note: If push event already handled this, this may be skipped
+  return showNotification(payload);
 });
 
 // Handle notification click
@@ -123,5 +152,19 @@ self.addEventListener('pushsubscriptionchange', (event) => {
         // The app will handle re-registering when it loads
       })
   );
+});
+
+// Install event - take control immediately
+self.addEventListener('install', (event) => {
+  console.log('[firebase-messaging-sw.js] Service Worker installing...');
+  // Skip waiting to activate immediately
+  self.skipWaiting();
+});
+
+// Activate event - claim all clients
+self.addEventListener('activate', (event) => {
+  console.log('[firebase-messaging-sw.js] Service Worker activating...');
+  // Take control of all pages immediately
+  event.waitUntil(self.clients.claim());
 });
 
