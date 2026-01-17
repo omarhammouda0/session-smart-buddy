@@ -197,9 +197,22 @@ serve(async (req) => {
     let globalTotalErrors = 0;
     const globalResults: any[] = [];
 
+    // Helper function to validate UUID format
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(str);
+    };
+
     // Process each user separately
     for (const settings of allSettings) {
       const userId = settings.user_id;
+
+      // Skip invalid user IDs (like 'default')
+      if (!isValidUUID(userId)) {
+        console.log(`\n⚠️ Skipping invalid user_id: ${userId} (not a valid UUID)`);
+        continue;
+      }
+
       console.log(`\n========== Processing user: ${userId} ==========`);
 
       const reminderHours1 = settings.session_reminder_hours || 24;
@@ -311,12 +324,18 @@ serve(async (req) => {
           const minutesUntilSession = calculateMinutesUntilSession(session.date, sessionTime, germanyNow);
           const hoursUntilSession = minutesUntilSession / 60;
 
+          // Log each session for debugging
+          console.log(`  Session ${session.id}: ${session.date} ${sessionTime}, ${studentName}, ${hoursUntilSession.toFixed(2)}h away (window: ${windowMin.toFixed(1)}-${windowMax.toFixed(1)}h)`);
+
           if (hoursUntilSession > windowMax || hoursUntilSession <= windowMin || hoursUntilSession < 0) {
+            console.log(`    → Outside window, skipping`);
             continue;
           }
 
+          console.log(`    → ✓ In window! Checking phone...`);
+
           if (!phone) {
-            console.log(`Skip ${session.id} - no phone`);
+            console.log(`    → Skip - no phone number`);
             skippedCount++;
             continue;
           }
