@@ -2,7 +2,7 @@
 // Catches JavaScript errors and prevents app crashes
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -14,20 +14,23 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
+    errorInfo: null
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   private handleReload = () => {
@@ -35,7 +38,12 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, errorInfo: null });
+  };
+
+  private copyError = () => {
+    const errorText = `Error: ${this.state.error?.message}\n\nStack: ${this.state.error?.stack}\n\nComponent Stack: ${this.state.errorInfo?.componentStack}`;
+    navigator.clipboard.writeText(errorText).catch(console.error);
   };
 
   public render() {
@@ -44,8 +52,11 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      const errorMessage = this.state.error?.message || "Unknown error";
+      const errorStack = this.state.error?.stack || "";
+
       return (
-        <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-background">
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
@@ -57,11 +68,23 @@ export class ErrorBoundary extends Component<Props, State> {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {process.env.NODE_ENV === "development" && this.state.error && (
-                <div className="rounded-lg bg-red-50 p-3 text-xs text-red-800 font-mono overflow-auto max-h-32">
-                  {this.state.error.message}
-                </div>
-              )}
+              {/* Always show error details for debugging */}
+              <div className="rounded-lg bg-red-50 p-3 text-xs text-red-800 font-mono overflow-auto max-h-40 space-y-2">
+                <p className="font-bold">Error:</p>
+                <p className="break-all">{errorMessage}</p>
+                {errorStack && (
+                  <>
+                    <p className="font-bold mt-2">Location:</p>
+                    <p className="break-all text-[10px]">{errorStack.split('\n').slice(0, 3).join('\n')}</p>
+                  </>
+                )}
+              </div>
+
+              <Button onClick={this.copyError} variant="ghost" size="sm" className="w-full text-xs">
+                <Copy className="h-3 w-3 ml-1" />
+                نسخ تفاصيل الخطأ
+              </Button>
+
               <div className="flex gap-2">
                 <Button onClick={this.handleReset} variant="outline" className="flex-1">
                   محاولة مرة أخرى

@@ -225,41 +225,14 @@ export function usePushNotifications() {
             if (!mounted) return;
             setMessaging(messagingInstance);
 
-            // Set up foreground message handler with error protection
-            onMessage(messagingInstance, (payload) => {
-              try {
-                console.log("Foreground message received:", payload);
+            // TEMPORARILY DISABLED: Foreground message handler was causing crashes on mobile
+            // The browser will still show notifications via the service worker
+            // When the app is in foreground, Firebase will handle it automatically
+            //
+            // TODO: Re-enable once root cause is identified
+            // onMessage(messagingInstance, (payload) => { ... });
 
-                // Safely extract notification data
-                const title = payload?.notification?.title || payload?.data?.title || "تنبيه جديد";
-                const body = payload?.notification?.body || payload?.data?.body || "";
-                const priority = payload?.data?.priority;
-
-                // Show toast for foreground messages - wrapped in setTimeout to prevent blocking
-                setTimeout(() => {
-                  try {
-                    toast({
-                      title,
-                      description: body,
-                      duration: priority === "100" ? 10000 : 5000,
-                    });
-                  } catch (toastError) {
-                    console.warn("Toast display error:", toastError);
-                  }
-                }, 0);
-
-                // Play sound for priority 100
-                if (priority === "100") {
-                  try {
-                    playNotificationSound();
-                  } catch (soundError) {
-                    console.warn("Notification sound error:", soundError);
-                  }
-                }
-              } catch (error) {
-                console.error("Error handling foreground message:", error);
-              }
-            });
+            console.log("Firebase messaging initialized (foreground handler disabled for stability)");
 
             // Check if already has permission and token
             if (mounted && Notification.permission === "granted") {
