@@ -139,10 +139,65 @@ function PushNotificationSettingsInner() {
         )}
 
         {isEnabled && (
-          <Button
-            onClick={async () => {
-              try {
-                // First check if we have subscriptions in the database
+          <>
+            {/* Reactivate button - activates all inactive subscriptions */}
+            <Button
+              onClick={async () => {
+                try {
+                  // Get current user
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (!user) {
+                    toast({
+                      title: "خطأ",
+                      description: "يرجى تسجيل الدخول أولاً",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+
+                  // Reactivate all subscriptions for this user
+                  const { data, error } = await supabase
+                    .from('push_subscriptions')
+                    .update({ is_active: true, updated_at: new Date().toISOString() })
+                    .eq('is_active', false)
+                    .select();
+
+                  if (error) {
+                    console.error("Reactivate error:", error);
+                    toast({
+                      title: "خطأ",
+                      description: "فشل في إعادة تفعيل الاشتراكات",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+
+                  console.log("Reactivated subscriptions:", data?.length || 0);
+                  toast({
+                    title: "تم ✓",
+                    description: `تم إعادة تفعيل ${data?.length || 0} اشتراك`,
+                  });
+                } catch (error) {
+                  console.error("Error reactivating:", error);
+                  toast({
+                    title: "خطأ",
+                    description: "حدث خطأ أثناء إعادة التفعيل",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              className="w-full"
+              variant="outline"
+            >
+              <Bell className="h-4 w-4 ml-2" />
+              إعادة تفعيل الاشتراكات
+            </Button>
+
+            {/* Test notification button */}
+            <Button
+              onClick={async () => {
+                try {
+                  // First check if we have subscriptions in the database
                 const { data: subs, error: subsError } = await supabase
                   .from('push_subscriptions')
                   .select('id, fcm_token, is_active, user_id')
@@ -204,6 +259,7 @@ function PushNotificationSettingsInner() {
             <Bell className="h-4 w-4 ml-2" />
             إرسال إشعار تجريبي
           </Button>
+          </>
         )}
       </CardContent>
     </Card>

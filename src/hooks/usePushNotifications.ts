@@ -30,12 +30,13 @@ async function getCurrentUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
-// Helper to save FCM token to database via REST API
+// Helper to save or reactivate FCM token in database
 async function saveFcmToken(token: string, deviceInfo: object, userId: string): Promise<boolean> {
   try {
     console.log("Saving FCM token for user:", userId);
+    console.log("Token (first 30 chars):", token.substring(0, 30));
 
-    // First, try to update existing token
+    // Always update the token first to reactivate it if it exists
     const updateResponse = await fetch(
       `${SUPABASE_URL}/rest/v1/push_subscriptions?fcm_token=eq.${encodeURIComponent(token)}`,
       {
@@ -44,7 +45,7 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
           "Content-Type": "application/json",
           "apikey": SUPABASE_KEY,
           "Authorization": `Bearer ${SUPABASE_KEY}`,
-          "Prefer": "return=minimal"
+          "Prefer": "return=representation"
         },
         body: JSON.stringify({
           user_id: userId,
@@ -56,17 +57,24 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
       }
     );
 
-    // Check if update affected any rows by trying insert if no rows updated
-    // Note: PATCH returns 200 even if no rows match, so we do upsert logic
+    const updateData = await updateResponse.json();
+    console.log("Update response:", updateResponse.status, updateData);
 
-    // Now try insert (will fail if token exists due to unique constraint, which is fine)
+    // If update returned data, the token was updated successfully
+    if (Array.isArray(updateData) && updateData.length > 0) {
+      console.log("FCM token reactivated successfully");
+      return true;
+    }
+
+    // Token doesn't exist, try to insert
+    console.log("Token not found, inserting new...");
     const insertResponse = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "apikey": SUPABASE_KEY,
         "Authorization": `Bearer ${SUPABASE_KEY}`,
-        "Prefer": "return=minimal"
+        "Prefer": "return=representation"
       },
       body: JSON.stringify({
         user_id: userId,
@@ -77,18 +85,38 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
       })
     });
 
-    // Success if either update worked or insert worked (409 conflict means token already exists, which is OK)
-    const success = updateResponse.ok || insertResponse.ok || insertResponse.status === 409;
+    const insertData = await insertResponse.json();
+    console.log("Insert response:", insertResponse.status, insertData);
 
-    if (success) {
-      console.log("FCM token saved successfully");
-    } else {
-      console.error("Failed to save FCM token. Update:", updateResponse.status, "Insert:", insertResponse.status);
-      const errorText = await insertResponse.text();
-      console.error("Insert error:", errorText);
+    if (insertResponse.ok || insertResponse.status === 201) {
+      console.log("FCM token inserted successfully");
+      return true;
     }
 
-    return success;
+    // 409 conflict means token exists - try update again
+    if (insertResponse.status === 409) {
+      console.log("Token exists (conflict), forcing update...");
+      const forceUpdate = await fetch(
+        `${SUPABASE_URL}/rest/v1/push_subscriptions?fcm_token=eq.${encodeURIComponent(token)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_KEY,
+            "Authorization": `Bearer ${SUPABASE_KEY}`
+          },
+          body: JSON.stringify({
+            is_active: true,
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+      console.log("Force update response:", forceUpdate.status);
+      return forceUpdate.ok;
+    }
+
+    console.error("Failed to save FCM token");
+    return false;
   } catch (error) {
     console.error("Failed to save FCM token:", error);
     return false;
