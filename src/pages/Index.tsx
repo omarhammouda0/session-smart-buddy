@@ -89,6 +89,7 @@ import { AISuggestionsWidget } from "@/components/AISuggestionsWidget";
 import { ActionHandlers } from "@/lib/suggestionActions";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { useNotificationPrompt } from "@/hooks/useNotificationPrompt";
+import { PushNotificationDebug } from "@/components/PushNotificationDebug";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -2041,6 +2042,9 @@ const Index = () => {
 
       {/* Notification Permission Prompt */}
       {NotificationPromptComponent}
+
+      {/* Push Notification Debug Tool */}
+      <PushNotificationDebug />
     </div>
   );
 };
