@@ -2,12 +2,12 @@
 // Helps diagnose issues with background push notifications
 
 import { useState } from "react";
-import { Bell, Check, X, AlertTriangle, RefreshCw, Bug } from "lucide-react";
+import { Bell, Check, X, AlertTriangle, RefreshCw, Bug, Clock, Send, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface DiagnosticResult {
   name: string;
@@ -20,6 +20,7 @@ export function PushNotificationDebug() {
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [cronJobStatus, setCronJobStatus] = useState<string>("unknown");
+  const [isSending, setIsSending] = useState(false);
 
   const {
     isSupported,
@@ -90,11 +91,11 @@ export function PushNotificationDebug() {
     // 5. Check FCM token
     const localToken = token || localStorage.getItem("fcm_token");
     results.push({
-      name: "FCM Token محلي",
+      name: "FCM Token",
       status: localToken ? "pass" : "fail",
       message: localToken
-        ? `Token موجود: ${localToken.substring(0, 20)}...`
-        : "لا يوجد Token - يجب تفعيل الإشعارات",
+        ? `موجود: ${localToken.substring(0, 15)}...`
+        : "غير موجود - فعّل الإشعارات",
     });
 
     // 6. Check if token is in database
@@ -120,14 +121,14 @@ export function PushNotificationDebug() {
               name: "Token في قاعدة البيانات",
               status: tokenMatches ? "pass" : "warning",
               message: tokenMatches
-                ? `Token محفوظ ونشط (${data.length} جهاز)`
-                : `Token مختلف في قاعدة البيانات`,
+                ? `محفوظ ونشط (${data.length} جهاز)`
+                : `Token مختلف`,
             });
           } else {
             results.push({
               name: "Token في قاعدة البيانات",
               status: "fail",
-              message: "Token غير موجود في قاعدة البيانات!",
+              message: "غير موجود!",
             });
           }
         }
@@ -135,7 +136,7 @@ export function PushNotificationDebug() {
         results.push({
           name: "Token في قاعدة البيانات",
           status: "fail",
-          message: "فشل في التحقق من قاعدة البيانات",
+          message: "فشل التحقق",
         });
       }
     }
@@ -147,14 +148,14 @@ export function PushNotificationDebug() {
         name: "المستخدم",
         status: user?.user?.id ? "pass" : "fail",
         message: user?.user?.id
-          ? `مُسجل دخول: ${user.user.id.substring(0, 8)}...`
-          : "غير مسجل دخول",
+          ? `مُسجل: ${user.user.id.substring(0, 8)}...`
+          : "غير مسجل",
       });
     } catch (e) {
       results.push({
         name: "المستخدم",
         status: "fail",
-        message: "فشل في التحقق من المستخدم",
+        message: "فشل التحقق",
       });
     }
 
@@ -164,11 +165,12 @@ export function PushNotificationDebug() {
 
   // Test push notification manually
   const testPushNotification = async () => {
+    setIsSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-push-notification", {
         body: {
           title: "🔔 اختبار الإشعارات",
-          body: "إذا ظهر هذا الإشعار، فالنظام يعمل بشكل صحيح! " + new Date().toLocaleTimeString('ar-EG'),
+          body: "إذا ظهر هذا الإشعار، فالنظام يعمل! " + new Date().toLocaleTimeString('ar-EG'),
           priority: 100,
           suggestionType: "test",
           actionType: "test",
@@ -178,31 +180,32 @@ export function PushNotificationDebug() {
       if (error) {
         alert(`خطأ: ${error.message}`);
       } else {
-        alert(`تم إرسال الإشعار!\nالنتيجة: أُرسل إلى ${data?.sent || 0} جهاز\n\nأغلق التطبيق الآن وانتظر الإشعار!`);
+        alert(`تم الإرسال إلى ${data?.sent || 0} جهاز\n\nأغلق التطبيق وانتظر!`);
       }
     } catch (e) {
       alert(`فشل: ${e}`);
+    } finally {
+      setIsSending(false);
     }
   };
 
   // Test with delayed notification (gives you time to close the app)
   const testDelayedNotification = async () => {
-    alert("سيتم إرسال الإشعار بعد 10 ثواني.\n\nأغلق التطبيق الآن وانتظر!");
+    alert("سيتم إرسال الإشعار بعد 10 ثواني.\n\nأغلق التطبيق الآن!");
 
-    // Wait 10 seconds then send
     setTimeout(async () => {
       try {
         await supabase.functions.invoke("send-push-notification", {
           body: {
             title: "🔔 إشعار مؤجل",
-            body: "هذا الإشعار أُرسل بعد 10 ثواني - " + new Date().toLocaleTimeString('ar-EG'),
+            body: "أُرسل بعد 10 ثواني - " + new Date().toLocaleTimeString('ar-EG'),
             priority: 100,
             suggestionType: "test",
             actionType: "test",
           },
         });
       } catch (e) {
-        console.error("Failed to send delayed notification:", e);
+        console.error("Failed:", e);
       }
     }, 10000);
   };
@@ -210,19 +213,13 @@ export function PushNotificationDebug() {
   // Refresh FCM token
   const refreshToken = async () => {
     try {
-      // Clear existing token
-      const oldToken = localStorage.getItem("fcm_token");
-      if (oldToken) {
-        localStorage.removeItem("fcm_token");
-      }
-
-      // Re-enable notifications (will get fresh token)
+      localStorage.removeItem("fcm_token");
       const success = await enableNotifications();
       if (success) {
-        alert("تم تحديث Token بنجاح! أعد التشخيص للتأكد.");
+        alert("تم تحديث Token!");
         runDiagnostics();
       } else {
-        alert("فشل في تحديث Token");
+        alert("فشل التحديث");
       }
     } catch (e) {
       alert(`فشل: ${e}`);
@@ -231,161 +228,193 @@ export function PushNotificationDebug() {
 
   // Trigger check-critical-alerts manually
   const triggerCronJob = async () => {
+    setCronJobStatus("جاري...");
     try {
-      setCronJobStatus("جاري التشغيل...");
       const { data, error } = await supabase.functions.invoke("check-critical-alerts");
-
       if (error) {
         setCronJobStatus(`خطأ: ${error.message}`);
       } else {
-        setCronJobStatus(`نجح! تم إرسال ${data?.sent || 0} إشعارات من ${data?.alerts || 0} تنبيه`);
+        setCronJobStatus(`✓ ${data?.sent || 0}/${data?.alerts || 0} إشعار`);
       }
     } catch (e) {
-      setCronJobStatus(`فشل: ${e}`);
+      setCronJobStatus(`فشل`);
     }
   };
 
   const getStatusIcon = (status: DiagnosticResult["status"]) => {
     switch (status) {
       case "pass":
-        return <Check className="h-4 w-4 text-green-500" />;
+        return <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />;
       case "fail":
-        return <X className="h-4 w-4 text-red-500" />;
+        return <X className="h-3.5 w-3.5 text-red-500 shrink-0" />;
       case "warning":
-        return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+        return <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
       default:
-        return <RefreshCw className="h-4 w-4 animate-spin" />;
+        return <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" />;
     }
   };
 
-  const getStatusBadge = (status: DiagnosticResult["status"]) => {
+  const getStatusColor = (status: DiagnosticResult["status"]) => {
     switch (status) {
       case "pass":
-        return <Badge className="bg-green-500">نجح</Badge>;
+        return "bg-green-500/10 border-green-500/30";
       case "fail":
-        return <Badge variant="destructive">فشل</Badge>;
+        return "bg-red-500/10 border-red-500/30";
       case "warning":
-        return <Badge className="bg-amber-500">تحذير</Badge>;
+        return "bg-amber-500/10 border-amber-500/30";
       default:
-        return <Badge variant="secondary">جاري...</Badge>;
+        return "bg-muted";
     }
   };
 
+  // Floating button when closed
   if (!isOpen) {
     return (
       <Button
         variant="outline"
         size="sm"
-        className="fixed bottom-20 left-4 z-50 gap-2"
+        className="fixed bottom-20 left-3 z-50 gap-1.5 h-9 px-3 text-xs shadow-lg bg-background/95 backdrop-blur"
         onClick={() => {
           setIsOpen(true);
           runDiagnostics();
         }}
       >
-        <Bug className="h-4 w-4" />
-        تشخيص الإشعارات
+        <Bug className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">تشخيص الإشعارات</span>
+        <span className="sm:hidden">تشخيص</span>
       </Button>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md max-h-[80vh] overflow-hidden" dir="rtl">
-        <CardHeader className="pb-2">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center">
+      <Card
+        className="w-full sm:max-w-md max-h-[85vh] sm:max-h-[80vh] overflow-hidden rounded-t-2xl sm:rounded-2xl sm:m-4 animate-in slide-in-from-bottom duration-300"
+        dir="rtl"
+      >
+        {/* Header */}
+        <CardHeader className="pb-2 pt-3 px-4 border-b bg-muted/30">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Bug className="h-5 w-5" />
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Bug className="h-4 w-4" />
               تشخيص الإشعارات
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 -ml-2"
+              onClick={() => setIsOpen(false)}
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4 overflow-y-auto max-h-[60vh]">
+
+        <CardContent className="p-0 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 60px)' }}>
           {/* Diagnostics List */}
-          <div className="space-y-2">
+          <div className="p-3 space-y-1.5">
             {diagnostics.map((d, i) => (
               <div
                 key={i}
-                className="flex items-start gap-2 p-2 rounded-lg bg-muted/50"
+                className={cn(
+                  "flex items-center gap-2 p-2 rounded-lg border",
+                  getStatusColor(d.status)
+                )}
               >
                 {getStatusIcon(d.status)}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{d.name}</span>
-                    {getStatusBadge(d.status)}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 break-all">
+                <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium truncate">{d.name}</span>
+                  <span className="text-[10px] text-muted-foreground truncate max-w-[45%] text-left">
                     {d.message}
-                  </p>
+                  </span>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Action Buttons */}
-          <div className="space-y-2 pt-2 border-t">
-            <Button
-              className="w-full"
-              onClick={runDiagnostics}
-              disabled={isRunning}
-            >
-              <RefreshCw className={`h-4 w-4 ml-2 ${isRunning ? "animate-spin" : ""}`} />
-              إعادة التشخيص
-            </Button>
-
-            {!isEnabled && permission !== "denied" && (
+          <div className="p-3 pt-0 space-y-2 border-t bg-muted/20">
+            {/* Primary Actions Row */}
+            <div className="grid grid-cols-2 gap-2">
               <Button
-                className="w-full"
-                variant="secondary"
-                onClick={enableNotifications}
+                size="sm"
+                variant="outline"
+                className="h-9 text-xs gap-1.5"
+                onClick={runDiagnostics}
+                disabled={isRunning}
               >
-                <Bell className="h-4 w-4 ml-2" />
-                تفعيل الإشعارات
+                <RefreshCw className={cn("h-3.5 w-3.5", isRunning && "animate-spin")} />
+                إعادة الفحص
               </Button>
-            )}
 
-            {isEnabled && (
+              {!isEnabled && permission !== "denied" ? (
+                <Button
+                  size="sm"
+                  className="h-9 text-xs gap-1.5"
+                  onClick={enableNotifications}
+                >
+                  <Bell className="h-3.5 w-3.5" />
+                  تفعيل
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-9 text-xs gap-1.5"
+                  onClick={refreshToken}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  تحديث Token
+                </Button>
+              )}
+            </div>
+
+            {/* Test Notifications */}
+            <div className="grid grid-cols-2 gap-2">
               <Button
-                className="w-full"
-                variant="secondary"
-                onClick={refreshToken}
+                size="sm"
+                variant="outline"
+                className="h-9 text-xs gap-1.5"
+                onClick={testPushNotification}
+                disabled={isSending}
               >
-                <RefreshCw className="h-4 w-4 ml-2" />
-                تحديث Token
+                <Send className={cn("h-3.5 w-3.5", isSending && "animate-pulse")} />
+                إشعار فوري
               </Button>
-            )}
 
-            <Button
-              className="w-full"
-              variant="outline"
-              onClick={testPushNotification}
-            >
-              إرسال إشعار تجريبي
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 text-xs gap-1.5 text-amber-600 border-amber-300 hover:bg-amber-50"
+                onClick={testDelayedNotification}
+              >
+                <Clock className="h-3.5 w-3.5" />
+                بعد 10 ثواني
+              </Button>
+            </div>
 
+            {/* Cron Job Button */}
             <Button
-              className="w-full"
+              size="sm"
               variant="outline"
-              onClick={testDelayedNotification}
-            >
-              إشعار بعد 10 ثواني (أغلق التطبيق!)
-            </Button>
-
-            <Button
-              className="w-full"
-              variant="outline"
+              className="w-full h-9 text-xs gap-1.5"
               onClick={triggerCronJob}
             >
-              تشغيل فحص التنبيهات يدوياً
+              <Zap className="h-3.5 w-3.5" />
+              فحص التنبيهات يدوياً
             </Button>
 
+            {/* Cron Job Status */}
             {cronJobStatus !== "unknown" && (
-              <p className="text-xs text-muted-foreground bg-muted p-2 rounded break-all">
+              <div className="text-[10px] text-center text-muted-foreground bg-muted/50 rounded-lg py-1.5 px-2">
                 {cronJobStatus}
-              </p>
+              </div>
             )}
+
+            {/* Help Text */}
+            <p className="text-[10px] text-center text-muted-foreground pt-1">
+              اضغط "بعد 10 ثواني" ثم أغلق التطبيق لاختبار الإشعارات في الخلفية
+            </p>
           </div>
         </CardContent>
       </Card>
