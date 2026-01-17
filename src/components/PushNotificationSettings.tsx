@@ -142,6 +142,27 @@ function PushNotificationSettingsInner() {
           <Button
             onClick={async () => {
               try {
+                // First check if we have subscriptions in the database
+                const { data: subs, error: subsError } = await supabase
+                  .from('push_subscriptions')
+                  .select('id, fcm_token, is_active, user_id')
+                  .eq('is_active', true);
+
+                console.log("Active subscriptions:", subs?.length || 0, subs);
+
+                if (subsError) {
+                  console.error("Error checking subscriptions:", subsError);
+                }
+
+                if (!subs || subs.length === 0) {
+                  toast({
+                    title: "لا توجد اشتراكات",
+                    description: "يرجى إعادة تفعيل الإشعارات. لم يتم العثور على اشتراكات نشطة.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
                 const { data, error } = await supabase.functions.invoke(
                   "send-push-notification",
                   {

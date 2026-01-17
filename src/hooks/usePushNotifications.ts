@@ -33,13 +33,40 @@ async function getCurrentUserId(): Promise<string | null> {
 // Helper to save FCM token to database via REST API
 async function saveFcmToken(token: string, deviceInfo: object, userId: string): Promise<boolean> {
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+    console.log("Saving FCM token for user:", userId);
+
+    // First, try to update existing token
+    const updateResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/push_subscriptions?fcm_token=eq.${encodeURIComponent(token)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          device_info: deviceInfo,
+          is_active: true,
+          last_used_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+      }
+    );
+
+    // Check if update affected any rows by trying insert if no rows updated
+    // Note: PATCH returns 200 even if no rows match, so we do upsert logic
+
+    // Now try insert (will fail if token exists due to unique constraint, which is fine)
+    const insertResponse = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "apikey": SUPABASE_KEY,
         "Authorization": `Bearer ${SUPABASE_KEY}`,
-        "Prefer": "resolution=merge-duplicates"
+        "Prefer": "return=minimal"
       },
       body: JSON.stringify({
         user_id: userId,
@@ -49,7 +76,19 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
         last_used_at: new Date().toISOString()
       })
     });
-    return response.ok;
+
+    // Success if either update worked or insert worked (409 conflict means token already exists, which is OK)
+    const success = updateResponse.ok || insertResponse.ok || insertResponse.status === 409;
+
+    if (success) {
+      console.log("FCM token saved successfully");
+    } else {
+      console.error("Failed to save FCM token. Update:", updateResponse.status, "Insert:", insertResponse.status);
+      const errorText = await insertResponse.text();
+      console.error("Insert error:", errorText);
+    }
+
+    return success;
   } catch (error) {
     console.error("Failed to save FCM token:", error);
     return false;
@@ -349,16 +388,19 @@ export function usePushNotifications() {
 
       // Get current user ID
       const userId = await getCurrentUserId();
+      console.log("Current user ID:", userId);
+
       if (!userId) {
         toast({
           title: "خطأ",
-          description: "فشل في الحصول على معرف المستخدم",
+          description: "فشل في الحصول على معرف المستخدم. يرجى تسجيل الدخول مرة أخرى.",
           variant: "destructive"
         });
         return false;
       }
 
-      await saveFcmToken(token, deviceInfo, userId);
+      const saved = await saveFcmToken(token, deviceInfo, userId);
+      console.log("Token save result:", saved);
 
       // Save to localStorage for quick access
       localStorage.setItem("fcm_token", token);
