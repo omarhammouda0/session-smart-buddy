@@ -178,12 +178,31 @@ export function PushNotificationDebug() {
       });
 
       if (error) {
-        alert(`خطأ: ${error.message}`);
+        alert(`❌ خطأ: ${error.message}`);
       } else {
-        alert(`تم الإرسال إلى ${data?.sent || 0} جهاز\n\nأغلق التطبيق وانتظر!`);
+        const sent = data?.sent || 0;
+        const failed = (data?.results || []).filter((r: { success: boolean }) => !r.success).length;
+
+        if (sent > 0) {
+          alert(
+            `✅ تم الإرسال بنجاح!\n\n` +
+            `• أجهزة نجحت: ${sent}\n` +
+            `• أجهزة فشلت: ${failed}\n\n` +
+            `إذا لم تظهر الإشعارات:\n` +
+            `1. تأكد أن إشعارات المتصفح مفعلة\n` +
+            `2. تأكد أن الهاتف ليس في وضع "عدم الإزعاج"\n` +
+            `3. جرب إغلاق التطبيق والانتظار`
+          );
+        } else {
+          alert(
+            `⚠️ لم يتم الإرسال!\n\n` +
+            `لا توجد أجهزة مسجلة.\n` +
+            `جرب الضغط على "تحديث Token" أولاً.`
+          );
+        }
       }
     } catch (e) {
-      alert(`فشل: ${e}`);
+      alert(`❌ فشل: ${e}`);
     } finally {
       setIsSending(false);
     }
@@ -191,23 +210,32 @@ export function PushNotificationDebug() {
 
   // Test with delayed notification (gives you time to close the app)
   const testDelayedNotification = async () => {
-    alert("سيتم إرسال الإشعار بعد 10 ثواني.\n\nأغلق التطبيق الآن!");
+    // First, show countdown alert
+    const confirmed = window.confirm(
+      "سيتم إرسال الإشعار فوراً.\n\n" +
+      "1️⃣ اضغط OK\n" +
+      "2️⃣ أغلق التطبيق فوراً (خلال 3 ثواني)\n" +
+      "3️⃣ انتظر الإشعار\n\n" +
+      "هل أنت جاهز؟"
+    );
 
-    setTimeout(async () => {
-      try {
-        await supabase.functions.invoke("send-push-notification", {
-          body: {
-            title: "🔔 إشعار مؤجل",
-            body: "أُرسل بعد 10 ثواني - " + new Date().toLocaleTimeString('ar-EG'),
-            priority: 100,
-            suggestionType: "test",
-            actionType: "test",
-          },
-        });
-      } catch (e) {
-        console.error("Failed:", e);
-      }
-    }, 10000);
+    if (!confirmed) return;
+
+    // Send immediately - user should close app right after
+    try {
+      await supabase.functions.invoke("send-push-notification", {
+        body: {
+          title: "🔔 اختبار الخلفية",
+          body: "إذا ظهر هذا وأنت خارج التطبيق، فالإشعارات تعمل! ✅ " + new Date().toLocaleTimeString('ar-EG'),
+          priority: 100,
+          suggestionType: "test",
+          actionType: "test",
+        },
+      });
+      console.log("Notification sent - close app NOW!");
+    } catch (e) {
+      console.error("Failed:", e);
+    }
   };
 
   // Refresh FCM token
@@ -389,7 +417,7 @@ export function PushNotificationDebug() {
                 onClick={testDelayedNotification}
               >
                 <Clock className="h-3.5 w-3.5" />
-                بعد 10 ثواني
+                اختبار الخلفية
               </Button>
             </div>
 
@@ -413,7 +441,7 @@ export function PushNotificationDebug() {
 
             {/* Help Text */}
             <p className="text-[10px] text-center text-muted-foreground pt-1">
-              اضغط "بعد 10 ثواني" ثم أغلق التطبيق لاختبار الإشعارات في الخلفية
+              اضغط "اختبار الخلفية" ثم أغلق التطبيق فوراً لاختبار الإشعارات
             </p>
           </div>
         </CardContent>
