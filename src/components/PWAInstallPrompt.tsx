@@ -25,6 +25,7 @@ const DISMISS_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 export function PWAInstallPrompt() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
@@ -35,21 +36,35 @@ export function PWAInstallPrompt() {
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     setIsStandalone(standalone);
 
-    // Check if iOS
+    console.log("[PWA Install] Standalone mode:", standalone);
+
+    // Don't show if already installed
+    if (standalone) {
+      console.log("[PWA Install] Already installed as PWA, not showing prompt");
+      return;
+    }
+
+    // Check platform
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const android = /Android/.test(navigator.userAgent);
     setIsIOS(iOS);
+    setIsAndroid(android);
+
+    console.log("[PWA Install] Platform - iOS:", iOS, "Android:", android);
 
     // Check if recently dismissed
     const dismissedAt = localStorage.getItem(DISMISS_KEY);
     if (dismissedAt) {
       const elapsed = Date.now() - parseInt(dismissedAt, 10);
       if (elapsed < DISMISS_DURATION) {
-        return; // Don't show if recently dismissed
+        console.log("[PWA Install] Recently dismissed, not showing");
+        return;
       }
     }
 
-    // Listen for install prompt (Chrome, Edge, etc.)
+    // Listen for install prompt (Chrome, Edge, Samsung Internet, etc.)
     const handleBeforeInstall = (e: BeforeInstallPromptEvent) => {
+      console.log("[PWA Install] beforeinstallprompt event received!");
       e.preventDefault();
       setInstallPrompt(e);
       setShowPrompt(true);
@@ -57,11 +72,21 @@ export function PWAInstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
 
-    // Show iOS instructions after a delay if not installed
-    if (iOS && !standalone) {
+    // For iOS and Android (without beforeinstallprompt), show after delay
+    // This provides instructions on how to install manually
+    if (iOS || android) {
+      console.log("[PWA Install] Mobile detected, will show prompt after 3 seconds");
       const timer = setTimeout(() => {
-        setShowPrompt(true);
-      }, 5000); // Show after 5 seconds
+        // Only show if beforeinstallprompt hasn't fired
+        setShowPrompt((current) => {
+          if (!current) {
+            console.log("[PWA Install] Showing mobile install instructions");
+            return true;
+          }
+          return current;
+        });
+      }, 3000);
+
       return () => {
         clearTimeout(timer);
         window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
@@ -134,6 +159,15 @@ export function PWAInstallPrompt() {
                     <Download className="h-3.5 w-3.5" />
                     تثبيت الآن
                   </Button>
+                ) : isAndroid ? (
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setShowIOSInstructions(true)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    كيفية التثبيت
+                  </Button>
                 ) : null}
                 <Button size="sm" variant="ghost" onClick={handleDismiss}>
                   لاحقاً
@@ -152,7 +186,7 @@ export function PWAInstallPrompt() {
         </Card>
       )}
 
-      {/* iOS Instructions Modal */}
+      {/* Install Instructions Modal (iOS and Android) */}
       {showIOSInstructions && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4">
           <Card
@@ -160,7 +194,9 @@ export function PWAInstallPrompt() {
             dir="rtl"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg">تثبيت على iOS</h3>
+              <h3 className="font-bold text-lg">
+                {isIOS ? "تثبيت على iOS" : "تثبيت على Android"}
+              </h3>
               <Button
                 variant="ghost"
                 size="icon"
@@ -172,41 +208,83 @@ export function PWAInstallPrompt() {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
-                  1
-                </div>
-                <div>
-                  <p className="text-sm font-medium">اضغط على زر المشاركة</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    الزر الموجود أسفل Safari <Share className="h-3 w-3 inline" />
-                  </p>
-                </div>
-              </div>
+              {isIOS ? (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
+                      1
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">اضغط على زر المشاركة</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        الزر الموجود أسفل Safari <Share className="h-3 w-3 inline" />
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
-                  2
-                </div>
-                <div>
-                  <p className="text-sm font-medium">اختر "إضافة إلى الشاشة الرئيسية"</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    قد تحتاج للتمرير للأسفل لرؤية الخيار
-                  </p>
-                </div>
-              </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
+                      2
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">اختر "إضافة إلى الشاشة الرئيسية"</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        قد تحتاج للتمرير للأسفل لرؤية الخيار
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
-                  3
-                </div>
-                <div>
-                  <p className="text-sm font-medium">اضغط "إضافة"</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    سيظهر التطبيق على شاشتك الرئيسية
-                  </p>
-                </div>
-              </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
+                      3
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">اضغط "إضافة"</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        سيظهر التطبيق على شاشتك الرئيسية
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
+                      1
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">اضغط على قائمة المتصفح</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        النقاط الثلاث ⋮ في أعلى المتصفح
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
+                      2
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">اختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية"</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        قد يظهر كـ "Install app" أو "Add to Home screen"
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 font-bold text-sm">
+                      3
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">اضغط "تثبيت"</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        سيظهر التطبيق على شاشتك الرئيسية
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 mt-4">
                 <div className="flex items-start gap-2">
