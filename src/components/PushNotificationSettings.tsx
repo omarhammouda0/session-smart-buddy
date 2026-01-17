@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 
 
@@ -139,25 +141,39 @@ export function PushNotificationSettings() {
           <Button
             onClick={async () => {
               try {
-                const response = await fetch(
-                  'https://jguiqcroufwbxamfymnj.supabase.co/functions/v1/send-push-notification',
+                const { data, error } = await supabase.functions.invoke(
+                  "send-push-notification",
                   {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpndWlxY3JvdWZ3YnhhbWZ5bW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNDcyMDUsImV4cCI6MjA1MTgyMzIwNX0.SiM9Ebv5R-G9ORZgInf9VpPVz1h5ZmEoOV0IjhKzq-s'
+                    body: {
+                      title: "🔔 اختبار الإشعارات",
+                      body: "تم تفعيل إشعارات الخلفية بنجاح! ستصلك تنبيهات حتى عند إغلاق التطبيق.",
+                      priority: 100,
                     },
-                    body: JSON.stringify({
-                      title: '🔔 اختبار الإشعارات',
-                      body: 'تم تفعيل إشعارات الخلفية بنجاح! ستصلك تنبيهات حتى عند إغلاق التطبيق.',
-                      priority: 100
-                    })
                   }
                 );
-                const result = await response.json();
-                console.log('Test notification result:', result);
+
+                if (error) {
+                  console.error("Test notification error:", error);
+                  toast({
+                    title: "خطأ",
+                    description: "فشل إرسال الإشعار التجريبي",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                console.log("Test notification result:", data);
+                toast({
+                  title: "تم الإرسال ✓",
+                  description: `تم إرسال ${data?.sent ?? 0} إشعار تجريبي بنجاح`,
+                });
               } catch (error) {
-                console.error('Error sending test notification:', error);
+                console.error("Error sending test notification:", error);
+                toast({
+                  title: "خطأ",
+                  description: "حدث خطأ أثناء إرسال الإشعار التجريبي",
+                  variant: "destructive",
+                });
               }
             }}
             className="w-full"
