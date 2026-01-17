@@ -234,7 +234,7 @@ export function usePushNotifications() {
 
             console.log("Firebase messaging initialized (foreground handler disabled for stability)");
 
-            // Check if already has permission and token
+            // Check if already has permission and token - auto-refresh token
             if (mounted && Notification.permission === "granted") {
               const existingToken = localStorage.getItem("fcm_token");
               if (existingToken) {
@@ -244,6 +244,60 @@ export function usePushNotifications() {
                   token: existingToken,
                   permission: "granted"
                 }));
+
+                // Auto-refresh token in background to ensure it's still valid
+                // This helps recover from stale tokens
+                (async () => {
+                  try {
+                    const registration = await navigator.serviceWorker.ready;
+                    const { getToken } = await import("firebase/messaging");
+                    const newToken = await getToken(messagingInstance, {
+                      vapidKey,
+                      serviceWorkerRegistration: registration
+                    });
+
+                    if (newToken && newToken !== existingToken) {
+                      console.log("FCM Token refreshed (was different)");
+                      localStorage.setItem("fcm_token", newToken);
+
+                      // Update in database
+                      const userId = await getCurrentUserId();
+                      if (userId) {
+                        const deviceInfo = {
+                          userAgent: navigator.userAgent,
+                          platform: navigator.platform,
+                          language: navigator.language,
+                          timestamp: new Date().toISOString(),
+                          refreshed: true
+                        };
+                        await saveFcmToken(newToken, deviceInfo, userId);
+
+                        // Deactivate old token
+                        await deactivateFcmToken(existingToken);
+                      }
+
+                      if (mounted) {
+                        setState(prev => ({ ...prev, token: newToken }));
+                      }
+                    } else if (newToken) {
+                      // Token is the same, but re-register to ensure it's active in DB
+                      const userId = await getCurrentUserId();
+                      if (userId) {
+                        const deviceInfo = {
+                          userAgent: navigator.userAgent,
+                          platform: navigator.platform,
+                          language: navigator.language,
+                          timestamp: new Date().toISOString(),
+                          reactivated: true
+                        };
+                        await saveFcmToken(newToken, deviceInfo, userId);
+                        console.log("FCM Token reactivated in database");
+                      }
+                    }
+                  } catch (refreshError) {
+                    console.warn("Failed to refresh FCM token:", refreshError);
+                  }
+                })();
               }
             }
           } catch (error) {

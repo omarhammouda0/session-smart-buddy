@@ -185,6 +185,28 @@ export function PushNotificationDebug() {
     }
   };
 
+  // Refresh FCM token
+  const refreshToken = async () => {
+    try {
+      // Clear existing token
+      const oldToken = localStorage.getItem("fcm_token");
+      if (oldToken) {
+        localStorage.removeItem("fcm_token");
+      }
+
+      // Re-enable notifications (will get fresh token)
+      const success = await enableNotifications();
+      if (success) {
+        alert("تم تحديث Token بنجاح! أعد التشخيص للتأكد.");
+        runDiagnostics();
+      } else {
+        alert("فشل في تحديث Token");
+      }
+    } catch (e) {
+      alert(`فشل: ${e}`);
+    }
+  };
+
   // Trigger check-critical-alerts manually
   const triggerCronJob = async () => {
     try {
@@ -299,6 +321,17 @@ export function PushNotificationDebug() {
               >
                 <Bell className="h-4 w-4 ml-2" />
                 تفعيل الإشعارات
+              </Button>
+            )}
+
+            {isEnabled && (
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={refreshToken}
+              >
+                <RefreshCw className="h-4 w-4 ml-2" />
+                تحديث Token
               </Button>
             )}
 
