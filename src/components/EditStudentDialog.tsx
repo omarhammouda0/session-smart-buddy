@@ -605,10 +605,11 @@ export const EditStudentDialog = ({
             </div>
           </DialogBody>
 
-          <DialogFooter className="flex-row-reverse gap-2">
-            <Button 
+          <DialogFooter className="flex-col sm:flex-row-reverse gap-2">
+            <Button
               onClick={handleSave} 
               disabled={!name.trim() || selectedDays.length === 0 || (timeChanged && conflictSummary.hasErrors) || isChecking}
+              className="w-full sm:w-auto"
             >
               {isChecking ? (
                 <>
@@ -619,10 +620,39 @@ export const EditStudentDialog = ({
                 'حفظ التعديلات'
               )}
             </Button>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">
               إلغاء
             </Button>
           </DialogFooter>
+
+          {/* Warning Confirmation Dialog */}
+      <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              تحذير: جلسات قريبة جداً
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-right space-y-2">
+              <p>
+                تغيير الوقت إلى {formatTimeAr(sessionTime)} سيجعل {conflictSummary.warningCount} جلسة بفاصل أقل من 30 دقيقة.
+              </p>
+              <p className="text-muted-foreground text-sm">
+                الطلاب المتأثرون: {conflictSummary.conflictingStudents.join('، ')}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={proceedWithSave}
+              className="bg-amber-500 hover:bg-amber-600"
+            >
+              نعم، احفظ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
         </DialogContent>
       </Dialog>
       

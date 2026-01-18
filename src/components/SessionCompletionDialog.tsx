@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Student, Session } from "@/types/student";
 import { formatShortDateAr } from "@/lib/arabicConstants";
+import { cn } from "@/lib/utils";
 
 interface SessionCompletionDialogProps {
   open: boolean;
@@ -192,14 +193,14 @@ export function SessionCompletionDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
           {action === null ? (
-            <Button variant="outline" onClick={resetAndClose}>
+            <Button variant="outline" onClick={resetAndClose} className="w-full sm:w-auto">
               إغلاق
             </Button>
           ) : (
             <>
-              <Button variant="outline" onClick={() => {
+              <Button variant="outline" className="w-full sm:w-auto" onClick={() => {
                 if (confirmDelete) {
                   setConfirmDelete(false);
                 } else {
@@ -208,7 +209,7 @@ export function SessionCompletionDialog({
               }}>
                 رجوع
               </Button>
-              <Button className={actionDetails?.confirmClass} onClick={handleConfirm}>
+              <Button className={cn("w-full sm:w-auto", actionDetails?.confirmClass)} onClick={handleConfirm}>
                 {actionDetails?.confirmText}
               </Button>
             </>
@@ -218,4 +219,3 @@ export function SessionCompletionDialog({
     </Dialog>
   );
 }
-

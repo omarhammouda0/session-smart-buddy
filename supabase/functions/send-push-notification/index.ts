@@ -166,15 +166,12 @@ serve(async (req) => {
     const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
     for (const sub of subscriptions) {
+      // For web push, we use data-only messages so the service worker has full control
+      // This ensures notifications work even when the browser is closed
       const message = {
         message: {
           token: sub.fcm_token,
-          // Notification payload - shown by system when app is in background
-          notification: {
-            title: body.title,
-            body: body.body
-          },
-          // Data payload - passed to service worker
+          // Data-only payload - service worker will show the notification
           data: {
             title: body.title,
             body: body.body,
@@ -186,40 +183,24 @@ serve(async (req) => {
             sessionId: body.sessionId || '',
             studentPhone: body.studentPhone || '',
             conditionKey: body.conditionKey || '',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            // Flag to indicate this is a data-only message
+            showNotification: 'true'
           },
-          // Android specific config for background delivery
-          android: {
-            priority: "high",
-            ttl: "86400s", // 24 hours
-            notification: {
-              channel_id: "critical_alerts",
-              priority: "high",
-              default_sound: true,
-              default_vibrate_timings: true,
-              visibility: "public",
-              notification_count: 1
-            }
-          },
-          // Web push config
+          // Web push config with high priority
           webpush: {
             headers: {
               Urgency: "high",
               TTL: "86400"
             },
-            notification: {
-              icon: '/favicon.ico',
-              badge: '/favicon.ico',
-              dir: 'rtl',
-              lang: 'ar',
-              requireInteraction: body.priority === 100,
-              vibrate: [100, 50, 100],
-              tag: body.conditionKey || `notification-${Date.now()}`,
-              renotify: true
-            },
             fcm_options: {
               link: body.actionUrl || '/'
             }
+          },
+          // Android config - high priority to wake device
+          android: {
+            priority: "high",
+            ttl: "86400s"
           }
         }
       };

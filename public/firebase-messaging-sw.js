@@ -1,4 +1,4 @@
-// Firebase Messaging Service Worker
+// Firebase Messaging Service Worker v1.2.0
 // Handles push notifications when the app is closed or in background
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
@@ -20,53 +20,61 @@ firebase.initializeApp(firebaseConfig);
 // Get messaging instance
 const messaging = firebase.messaging();
 
-// Helper function to show notification
+// Helper function to show notification - ALWAYS shows a notification
 function showNotification(payload) {
-  const notificationTitle = payload.notification?.title || payload.data?.title || 'تنبيه جديد';
-  const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body || '',
+  console.log('[SW] showNotification called with:', JSON.stringify(payload).substring(0, 200));
+
+  // Extract title and body from various possible locations
+  const title = payload.notification?.title || payload.data?.title || 'تنبيه جديد';
+  const body = payload.notification?.body || payload.data?.body || 'لديك إشعار جديد';
+
+  const options = {
+    body: body,
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    tag: payload.data?.tag || `notification-${Date.now()}`,
+    tag: payload.data?.conditionKey || payload.data?.tag || `notif-${Date.now()}`,
     data: payload.data || {},
     requireInteraction: payload.data?.priority === '100',
     dir: 'rtl',
     lang: 'ar',
     vibrate: [200, 100, 200],
     silent: false,
-    actions: []
+    renotify: true // Always notify even if same tag
   };
 
-  // Add action buttons based on suggestion type
+  // Add action buttons based on type
   if (payload.data?.actionType) {
     switch (payload.data.actionType) {
       case 'confirm_session':
-        notificationOptions.actions = [
-          { action: 'confirm', title: 'تأكيد الحصة' },
+        options.actions = [
+          { action: 'confirm', title: 'تأكيد' },
           { action: 'dismiss', title: 'لاحقاً' }
         ];
         break;
       case 'record_payment':
-        notificationOptions.actions = [
-          { action: 'payment', title: 'تسجيل دفعة' },
-          { action: 'whatsapp', title: 'تذكير واتساب' }
+        options.actions = [
+          { action: 'payment', title: 'دفع' },
+          { action: 'whatsapp', title: 'واتساب' }
         ];
         break;
       case 'pre_session':
-        notificationOptions.actions = [
-          { action: 'view', title: 'عرض التفاصيل' },
+        options.actions = [
+          { action: 'view', title: 'عرض' },
           { action: 'dismiss', title: 'لاحقاً' }
         ];
         break;
     }
   }
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  console.log('[SW] Showing notification:', title);
+  return self.registration.showNotification(title, options);
 }
 
-// Handle raw push events (more reliable for background on mobile)
+// Handle raw push events - THIS IS THE MAIN HANDLER
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push event received at:', new Date().toISOString());
+  console.log('[SW] ========== PUSH EVENT ==========');
+  console.log('[SW] Time:', new Date().toISOString());
+  console.log('[SW] Has data:', !!event.data);
 
   if (!event.data) {
     console.log('[SW] No data in push event');
@@ -172,7 +180,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 });
 
 // Cache version - increment to force update
-const CACHE_VERSION = 'v1.1.0';
+const CACHE_VERSION = 'v1.2.0';
 const CACHE_NAME = `session-smart-buddy-${CACHE_VERSION}`;
 
 // Install event - take control immediately

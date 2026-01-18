@@ -366,12 +366,12 @@ export const ReminderSettingsDialog = () => {
             </div>
           </DialogBody>
 
-          <DialogFooter className="flex-row-reverse gap-3 pt-2">
-            <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
-              إلغاء
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving} className="flex-1 gradient-primary">
+          <DialogFooter className="flex-col sm:flex-row-reverse gap-2 pt-2">
+            <Button onClick={handleSave} disabled={isSaving} className="w-full sm:flex-1 gradient-primary">
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ الإعدادات'}
+            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:flex-1">
+              إلغاء
             </Button>
           </DialogFooter>
           </>

@@ -617,14 +617,11 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
             </form>
           </DialogBody>
 
-          <DialogFooter className="flex-row-reverse gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
-              إلغاء
-            </Button>
-            <Button 
+          <DialogFooter className="flex-col sm:flex-row-reverse gap-2 pt-2">
+            <Button
               type="submit" 
               onClick={handleSubmit}
-              className="flex-1 gradient-primary"
+              className="w-full sm:flex-1 gradient-primary"
               disabled={!name.trim() || selectedDays.length === 0 || !sessionTime || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
             >
               {isChecking ? (
@@ -635,6 +632,9 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               ) : (
                 'إضافة الطالب'
               )}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="w-full sm:flex-1">
+              إلغاء
             </Button>
           </DialogFooter>
         </DialogContent>

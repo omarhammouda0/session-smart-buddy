@@ -159,12 +159,11 @@ async function sendPushNotification(
     const results: any[] = [];
 
     for (const sub of subscriptions) {
+      // Data-only message - service worker will show notification
       const message = {
         message: {
           token: sub.fcm_token,
-          // Notification payload - shown by system when app is in background
-          notification: { title: alert.title, body: alert.body },
-          // Data payload - passed to service worker
+          // Data-only payload for full service worker control
           data: {
             title: alert.title,
             body: alert.body,
@@ -176,37 +175,21 @@ async function sendPushNotification(
             sessionId: alert.sessionId || '',
             studentPhone: alert.studentPhone || '',
             conditionKey: alert.conditionKey || '',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            showNotification: 'true'
           },
-          // Android specific config for background delivery
-          android: {
-            priority: "high",
-            ttl: "86400s",
-            notification: {
-              channel_id: "critical_alerts",
-              priority: "high",
-              default_sound: true,
-              default_vibrate_timings: true,
-              visibility: "public"
-            }
-          },
-          // Web push config
+          // Web push config with high priority
           webpush: {
             headers: {
               Urgency: "high",
               TTL: "86400"
             },
-            notification: {
-              icon: '/favicon.ico',
-              badge: '/favicon.ico',
-              dir: 'rtl',
-              lang: 'ar',
-              requireInteraction: alert.priority === 100,
-              vibrate: [100, 50, 100],
-              tag: alert.conditionKey || `notification-${Date.now()}`,
-              renotify: true
-            },
             fcm_options: { link: '/' }
+          },
+          // Android config - high priority to wake device
+          android: {
+            priority: "high",
+            ttl: "86400s"
           }
         }
       };

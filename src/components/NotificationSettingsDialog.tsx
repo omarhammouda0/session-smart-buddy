@@ -273,11 +273,11 @@ export function NotificationSettingsDialog({ settings, onSave }: NotificationSet
           </Button>
         </div>
 
-        <DialogFooter className="flex-row-reverse gap-2">
-          <Button onClick={handleSave}>
+        <DialogFooter className="flex-col sm:flex-row-reverse gap-2">
+          <Button onClick={handleSave} className="w-full sm:w-auto">
             حفظ
           </Button>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">
             إلغاء
           </Button>
         </DialogFooter>

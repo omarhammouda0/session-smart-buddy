@@ -372,14 +372,14 @@ export const QuickPaymentDialog = ({
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+        <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto rounded-xl">
             إلغاء
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={amount <= 0 || amount > sessionPaymentInfo.remainingForSession}
-            className="rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg"
+            className="w-full sm:w-auto rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg"
           >
             تأكيد الدفع ({amount.toLocaleString()} جنيه)
           </Button>

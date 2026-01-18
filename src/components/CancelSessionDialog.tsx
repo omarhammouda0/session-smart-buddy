@@ -183,17 +183,17 @@ export const CancelSessionDialog = ({
           )}
         </div>
 
-        <DialogFooter className="flex-row-reverse gap-2">
-          <Button variant="outline" onClick={handleClose}>
-            رجوع
+        <DialogFooter className="flex-col sm:flex-row-reverse gap-2">
+          <Button variant="destructive" onClick={handleConfirm} className="w-full sm:w-auto gap-1">
+            نعم، إلغاء
           </Button>
           {onMarkAsVacation && (
-            <Button variant="secondary" onClick={handleVacation} className="gap-1">
+            <Button variant="secondary" onClick={handleVacation} className="w-full sm:w-auto gap-1">
               تحديد كإجازة
             </Button>
           )}
-          <Button variant="destructive" onClick={handleConfirm} className="gap-1">
-            نعم، إلغاء
+          <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto">
+            رجوع
           </Button>
         </DialogFooter>
       </DialogContent>
