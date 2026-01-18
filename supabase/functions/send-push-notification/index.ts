@@ -166,12 +166,18 @@ serve(async (req) => {
     const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
     for (const sub of subscriptions) {
-      // For web push, we use data-only messages so the service worker has full control
-      // This ensures notifications work even when the browser is closed
+      // IMPORTANT: Include BOTH notification AND data payloads
+      // - notification: Ensures system shows notification when app/browser is closed
+      // - data: Allows service worker to customize when app is open
       const message = {
         message: {
           token: sub.fcm_token,
-          // Data-only payload - service worker will show the notification
+          // Notification payload - REQUIRED for mobile background notifications
+          notification: {
+            title: body.title,
+            body: body.body
+          },
+          // Data payload - for custom handling by service worker
           data: {
             title: body.title,
             body: body.body,
@@ -183,9 +189,7 @@ serve(async (req) => {
             sessionId: body.sessionId || '',
             studentPhone: body.studentPhone || '',
             conditionKey: body.conditionKey || '',
-            timestamp: new Date().toISOString(),
-            // Flag to indicate this is a data-only message
-            showNotification: 'true'
+            timestamp: new Date().toISOString()
           },
           // Web push config with high priority
           webpush: {
@@ -193,14 +197,52 @@ serve(async (req) => {
               Urgency: "high",
               TTL: "86400"
             },
+            notification: {
+              title: body.title,
+              body: body.body,
+              icon: "/favicon.ico",
+              badge: "/favicon.ico",
+              dir: "rtl",
+              lang: "ar",
+              requireInteraction: body.priority === 100,
+              tag: body.conditionKey || `notif-${Date.now()}`
+            },
             fcm_options: {
               link: body.actionUrl || '/'
             }
           },
-          // Android config - high priority to wake device
+          // Android config - HIGH priority to wake device
           android: {
             priority: "high",
-            ttl: "86400s"
+            ttl: "86400s",
+            notification: {
+              title: body.title,
+              body: body.body,
+              icon: "notification_icon",
+              color: "#1e3a5f",
+              default_sound: true,
+              notification_priority: "PRIORITY_HIGH",
+              visibility: "PUBLIC",
+              channel_id: "high_importance_channel"
+            }
+          },
+          // APNs config for iOS
+          apns: {
+            headers: {
+              "apns-priority": "10",
+              "apns-push-type": "alert"
+            },
+            payload: {
+              aps: {
+                alert: {
+                  title: body.title,
+                  body: body.body
+                },
+                sound: "default",
+                badge: 1,
+                "content-available": 1
+              }
+            }
           }
         }
       };
