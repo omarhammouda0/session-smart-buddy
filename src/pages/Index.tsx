@@ -915,7 +915,6 @@ const Index = () => {
                   </div>
                 </SheetContent>
               </Sheet>
-              <AddStudentDialog onAdd={handleAddStudent} defaultStart={settings.defaultSemesterStart} defaultEnd={settings.defaultSemesterEnd} students={students} settings={settings} defaultDuration={settings.defaultSessionDuration} defaultPriceOnsite={settings.defaultPriceOnsite} defaultPriceOnline={settings.defaultPriceOnline} />
               <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <MonthlyReportDialog students={students} payments={payments} settings={settings} />
@@ -923,6 +922,7 @@ const Index = () => {
               <ReminderSettingsDialog />
               <NotificationSettingsDialog settings={notificationSettings} onSave={updateNotificationSettings} />
               <SemesterSettings settings={settings} onUpdate={updateSettings} />
+              <AddStudentDialog onAdd={handleAddStudent} defaultStart={settings.defaultSemesterStart} defaultEnd={settings.defaultSemesterEnd} students={students} settings={settings} defaultDuration={settings.defaultSessionDuration} defaultPriceOnsite={settings.defaultPriceOnsite} defaultPriceOnline={settings.defaultPriceOnline} />
             </div>
 
             {/* Mobile action buttons - simplified */}
