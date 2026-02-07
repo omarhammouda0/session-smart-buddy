@@ -48,6 +48,10 @@ import {
   Pencil,
   Save,
   Sparkles,
+  List,
+  Grid3X3,
+  Check,
+  Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -124,6 +128,7 @@ export const CalendarView = ({
 }: CalendarViewProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [mobileViewMode, setMobileViewMode] = useState<"grid" | "agenda">("agenda"); // Mobile-specific view
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>("all");
   const [showWeeklySummary, setShowWeeklySummary] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -1042,150 +1047,391 @@ export const CalendarView = ({
           </div>
         )}
 
-        <div className="grid gap-0.5 sm:gap-2 grid-cols-7">
-          {DAY_NAMES_SHORT_AR.map((day, i) => (
-            <div key={i} className="text-center text-[0.55rem] sm:text-xs font-bold text-muted-foreground py-1 sm:py-2 bg-muted/30 rounded-md">
-              {day.slice(0, 1)}
-            </div>
-          ))}
-          {days.map((day, index) => {
-            const dateStr = format(day, "yyyy-MM-dd");
-            const daySessions = sessionsByDate.get(dateStr) || [];
-            const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
-            const isToday = isSameDay(day, today);
-            const isDragging = dragState !== null || touchDragState?.active;
-            const isDropTarget =
-              dropTargetDate === dateStr &&
-              dragState?.originalDate !== dateStr &&
-              touchDragState?.originalDate !== dateStr;
-            const dropConflict = isDropTarget ? getDropTargetConflict(dateStr) : null;
-            const hasDropConflict = dropConflict?.hasConflict;
-            const hasDropWarning = dropConflict?.severity === "warning";
+        {/* Mobile View Toggle - Only visible on mobile */}
+        <div className="flex sm:hidden items-center justify-between mb-3">
+          <div className="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg">
+            <button
+              onClick={() => setMobileViewMode('agenda')}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all",
+                mobileViewMode === 'agenda' ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+              )}
+            >
+              <List className="h-3.5 w-3.5" />
+              قائمة
+            </button>
+            <button
+              onClick={() => setMobileViewMode('grid')}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all",
+                mobileViewMode === 'grid' ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+              )}
+            >
+              <Grid3X3 className="h-3.5 w-3.5" />
+              شبكة
+            </button>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {days.filter(d => (sessionsByDate.get(format(d, "yyyy-MM-dd")) || []).length > 0).length} أيام بحصص
+          </span>
+        </div>
 
-            return (
-              <div
-                key={index}
-                data-date={dateStr}
-                className={cn(
-                  "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200 touch-manipulation relative flex flex-col",
-                  viewMode === "week"
-                    ? "min-h-[160px] sm:min-h-[200px] max-h-[300px] sm:max-h-[400px]"
-                    : "min-h-[100px] sm:min-h-[140px] max-h-[180px] sm:max-h-[220px]",
-                  !isCurrentMonth && "opacity-40 bg-muted/20",
-                  isToday && "ring-2 ring-primary shadow-lg bg-primary/5",
-                  isDropTarget && hasDropConflict && "bg-rose-500/20 border-rose-500 border-dashed scale-105 shadow-xl",
-                  isDropTarget &&
-                    hasDropWarning &&
-                    "bg-amber-500/20 border-amber-500 border-dashed scale-105 shadow-xl",
-                  isDropTarget &&
-                    !hasDropConflict &&
-                    !hasDropWarning &&
-                    "bg-gradient-to-br from-primary/20 to-primary/5 border-primary border-dashed scale-105 shadow-xl",
-                  touchDragState?.active && "select-none",
-                  !isDropTarget && !isToday && isDragging && "hover:border-primary/30 hover:shadow-md",
-                )}
-                onDragOver={(e) => handleDragOver(e, dateStr)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, dateStr)}
-              >
-                {isDropTarget && dropConflict && (dropConflict.hasConflict || dropConflict.severity === "warning") && (
+        {/* Mobile Agenda View - Better for small screens */}
+        <div className={cn("sm:hidden", mobileViewMode === 'agenda' ? "block" : "hidden")}>
+          <div className="space-y-3">
+            {days.map((day) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const daySessions = sessionsByDate.get(dateStr) || [];
+              const isToday = isSameDay(day, today);
+              const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
+
+              // Skip days with no sessions in agenda view (except today)
+              if (daySessions.length === 0 && !isToday) return null;
+              if (!isCurrentMonth) return null;
+
+              return (
+                <div
+                  key={dateStr}
+                  className={cn(
+                    "rounded-xl border-2 overflow-hidden transition-all",
+                    isToday && "ring-2 ring-primary border-primary shadow-lg"
+                  )}
+                >
+                  {/* Day Header */}
                   <div
                     className={cn(
-                      "absolute top-1 left-1 right-1 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 z-10",
-                      hasDropConflict ? "bg-rose-500 text-white" : "bg-amber-500 text-white",
+                      "flex items-center justify-between p-3 cursor-pointer",
+                      isToday
+                        ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground"
+                        : "bg-muted/50 hover:bg-muted/70"
                     )}
+                    onClick={() => handleDayClick(dateStr, daySessions)}
                   >
-                    {hasDropConflict ? (
-                      <>
-                        <XCircle className="h-3 w-3" />
-                        تعارض مع {dropConflict.conflictStudent}
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="h-3 w-3" />
-                        قريب من {dropConflict.conflictStudent}
-                      </>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-10 h-10 rounded-lg flex flex-col items-center justify-center font-bold",
+                        isToday ? "bg-white/20" : "bg-background"
+                      )}>
+                        <span className="text-lg leading-none">{format(day, "d")}</span>
+                        <span className="text-[10px] opacity-70">{format(day, "EEE", { locale: ar })}</span>
+                      </div>
+                      <div>
+                        <p className={cn("font-bold text-sm", isToday && "text-primary-foreground")}>
+                          {format(day, "EEEE", { locale: ar })}
+                        </p>
+                        <p className={cn("text-xs", isToday ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                          {format(day, "d MMMM", { locale: ar })}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={isToday ? "secondary" : "outline"}
+                      className={cn(
+                        "font-bold",
+                        isToday && "bg-white/20 text-white border-0",
+                        daySessions.length === 0 && "opacity-50"
+                      )}
+                    >
+                      {daySessions.length} {daySessions.length === 1 ? 'حصة' : 'حصص'}
+                    </Badge>
                   </div>
-                )}
-                {/* Date header - clickable to see all sessions */}
-                <div
-                  className={cn(
-                    "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2 shrink-0 cursor-pointer hover:bg-muted/30 rounded-t-lg -mx-2 -mt-2 sm:-mx-3 sm:-mt-3 px-2 pt-2 sm:px-3 sm:pt-3 transition-colors",
-                    isToday ? "border-primary" : "border-border/50",
-                    isDropTarget && (hasDropConflict || hasDropWarning) && "mt-6",
-                  )}
-                  onClick={() => handleDayClick(dateStr, daySessions)}
-                >
-                  <span
-                    className={cn(
-                      "text-base sm:text-lg font-bold",
-                      isToday &&
-                        "bg-primary text-primary-foreground px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg shadow-sm",
-                    )}
-                  >
-                    {format(day, "d")}
-                  </span>
-                  {daySessions.length > 0 && (
-                    <span className="text-[10px] sm:text-xs bg-primary text-primary-foreground px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-bold shadow-sm cursor-pointer hover:scale-110 transition-transform">
-                      {daySessions.length}
-                    </span>
-                  )}
-                </div>
-                {/* Sessions - scrollable */}
-                <div className="space-y-1.5 sm:space-y-2 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                  {daySessions.map(({ session, student }) => {
-                    const time = session.time || student.sessionTime;
-                    const canDrag = session.status === "scheduled";
-                    return (
-                      <div
-                        key={session.id}
-                        draggable={canDrag}
-                        onDragStart={(e) =>
-                          canDrag && handleDragStart(e, session.id, student.id, student.name, session.date, time || "")
-                        }
-                        onDragEnd={handleDragEnd}
-                        onTouchStart={(e) =>
-                          canDrag && handleTouchStart(e, session.id, student.id, student.name, session.date, time || "")
-                        }
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                        onClick={(e) => handleSessionClick(e, session, student)}
-                        className={cn(
-                          "text-xs sm:text-sm p-2 sm:p-3 rounded-lg border-2 flex items-start gap-1.5 sm:gap-2 transition-all duration-200 touch-manipulation select-none cursor-pointer",
-                          getStatusColor(session.status),
-                          canDrag && "active:cursor-grabbing hover:shadow-lg active:scale-95",
-                          touchDragState?.sessionId === session.id && touchDragState?.active && "opacity-50 scale-95",
-                          dragState?.sessionId === session.id && "opacity-50 scale-95",
-                        )}
-                      >
-                        {canDrag && <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 opacity-50 mt-0.5" />}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1">
-                            <div className="font-bold truncate text-xs sm:text-sm flex-1">{student.name}</div>
-                            {/* Session type indicator */}
-                            {student.sessionType === "online" ? (
-                              <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
-                            ) : (
-                              <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+
+                  {/* Sessions List */}
+                  {daySessions.length > 0 ? (
+                    <div className="divide-y divide-border/50">
+                      {daySessions.map(({ session, student }) => {
+                        const time = session.time || student.sessionTime;
+                        const timeInfo = getTimeOfDayInfo(time || "12:00");
+                        const TimeIcon = timeInfo.icon;
+                        const isCompleted = session.status === "completed";
+                        const isCancelled = session.status === "cancelled";
+                        const isScheduled = session.status === "scheduled";
+                        const canComplete = isScheduled && isSessionEnded(
+                          session.date,
+                          time || "16:00",
+                          session.duration || student.sessionDuration || 60
+                        );
+
+                        return (
+                          <div
+                            key={session.id}
+                            className={cn(
+                              "flex items-center gap-3 p-3 transition-all",
+                              isCompleted && "bg-primary/5",
+                              isCancelled && "bg-muted/30 opacity-60"
+                            )}
+                            onClick={() => setSessionActionDialog({ open: true, session, student })}
+                          >
+                            {/* Time Column */}
+                            <div className={cn(
+                              "min-w-[55px] text-center p-2 rounded-lg",
+                              isCompleted ? "bg-primary/10" : isCancelled ? "bg-muted" : "bg-primary/5"
+                            )}>
+                              <TimeIcon className={cn("h-4 w-4 mx-auto mb-0.5", timeInfo.color)} />
+                              <p className={cn(
+                                "text-sm font-bold",
+                                isCompleted ? "text-primary" : isCancelled ? "text-muted-foreground" : "text-foreground"
+                              )}>
+                                {time}
+                              </p>
+                            </div>
+
+                            {/* Student Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className={cn(
+                                  "font-semibold truncate",
+                                  isCancelled && "line-through"
+                                )}>
+                                  {student.name}
+                                </p>
+                                {student.sessionType === "online" ? (
+                                  <Monitor className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                ) : (
+                                  <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[10px] h-5 px-1.5",
+                                    isCompleted && "border-primary/30 text-primary bg-primary/5",
+                                    isCancelled && "border-muted text-muted-foreground",
+                                    isScheduled && "border-primary/20 text-primary/80"
+                                  )}
+                                >
+                                  {isCompleted ? "✓ مكتملة" : isCancelled ? "✗ ملغاة" : "⏰ مجدولة"}
+                                </Badge>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {session.duration || student.sessionDuration || 60} د
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Quick Actions */}
+                            {isScheduled && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {canComplete && onToggleComplete && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-primary hover:bg-primary/10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCompleteConfirmDialog({ open: true, session, student });
+                                    }}
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {onCancelSession && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCancelConfirmDialog({ open: true, session, student });
+                                    }}
+                                  >
+                                    <Ban className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             )}
                           </div>
-                          <div className="text-[10px] sm:text-xs opacity-80 flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1">
-                            {(() => {
-                              const timeInfo = getTimeOfDayInfo(time || "12:00");
-                              const TimeIcon = timeInfo.icon;
-                              return <TimeIcon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", timeInfo.color)} />;
-                            })()}
-                            <span className="font-medium">{time}</span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-muted-foreground text-sm">
+                      لا توجد حصص
+                      {onAddSession && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="mt-2 w-full text-primary"
+                          onClick={() => setAddSessionDialog({
+                            open: true,
+                            date: dateStr,
+                            selectedStudentId: "",
+                            time: "",
+                          })}
+                        >
+                          <Plus className="h-4 w-4 ml-1" />
+                          إضافة حصة
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Show message if no days have sessions */}
+            {days.filter(d => {
+              const dateStr = format(d, "yyyy-MM-dd");
+              const daySessions = sessionsByDate.get(dateStr) || [];
+              const isToday = isSameDay(d, today);
+              const isCurrentMonth = viewMode === "month" ? isSameMonth(d, currentDate) : true;
+              return (daySessions.length > 0 || isToday) && isCurrentMonth;
+            }).length === 0 && (
+              <div className="py-12 text-center text-muted-foreground">
+                <CalendarIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">لا توجد حصص في هذه الفترة</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Grid View & Mobile Grid View (when selected) */}
+        <div className={cn("sm:block", mobileViewMode === 'grid' ? "block" : "hidden sm:block")}>
+          <div className="grid gap-0.5 sm:gap-2 grid-cols-7">
+            {DAY_NAMES_SHORT_AR.map((day, i) => (
+              <div key={i} className="text-center text-[0.55rem] sm:text-xs font-bold text-muted-foreground py-1 sm:py-2 bg-muted/30 rounded-md">
+                {day.slice(0, 1)}
+              </div>
+            ))}
+            {days.map((day, index) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const daySessions = sessionsByDate.get(dateStr) || [];
+              const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
+              const isToday = isSameDay(day, today);
+              const isDragging = dragState !== null || touchDragState?.active;
+              const isDropTarget =
+                dropTargetDate === dateStr &&
+                dragState?.originalDate !== dateStr &&
+                touchDragState?.originalDate !== dateStr;
+              const dropConflict = isDropTarget ? getDropTargetConflict(dateStr) : null;
+              const hasDropConflict = dropConflict?.hasConflict;
+              const hasDropWarning = dropConflict?.severity === "warning";
+
+              return (
+                <div
+                  key={index}
+                  data-date={dateStr}
+                  className={cn(
+                    "border-2 rounded-xl p-2 sm:p-3 transition-all duration-200 touch-manipulation relative flex flex-col",
+                    viewMode === "week"
+                      ? "min-h-[160px] sm:min-h-[200px] max-h-[300px] sm:max-h-[400px]"
+                      : "min-h-[100px] sm:min-h-[140px] max-h-[180px] sm:max-h-[220px]",
+                    !isCurrentMonth && "opacity-40 bg-muted/20",
+                    isToday && "ring-2 ring-primary shadow-lg bg-primary/5",
+                    isDropTarget && hasDropConflict && "bg-rose-500/20 border-rose-500 border-dashed scale-105 shadow-xl",
+                    isDropTarget &&
+                      hasDropWarning &&
+                      "bg-amber-500/20 border-amber-500 border-dashed scale-105 shadow-xl",
+                    isDropTarget &&
+                      !hasDropConflict &&
+                      !hasDropWarning &&
+                      "bg-gradient-to-br from-primary/20 to-primary/5 border-primary border-dashed scale-105 shadow-xl",
+                    touchDragState?.active && "select-none",
+                    !isDropTarget && !isToday && isDragging && "hover:border-primary/30 hover:shadow-md",
+                  )}
+                  onDragOver={(e) => handleDragOver(e, dateStr)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, dateStr)}
+                >
+                  {isDropTarget && dropConflict && (dropConflict.hasConflict || dropConflict.severity === "warning") && (
+                    <div
+                      className={cn(
+                        "absolute top-1 left-1 right-1 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 z-10",
+                        hasDropConflict ? "bg-rose-500 text-white" : "bg-amber-500 text-white",
+                      )}
+                    >
+                      {hasDropConflict ? (
+                        <>
+                          <XCircle className="h-3 w-3" />
+                          تعارض مع {dropConflict.conflictStudent}
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="h-3 w-3" />
+                          قريب من {dropConflict.conflictStudent}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {/* Date header - clickable to see all sessions */}
+                  <div
+                    className={cn(
+                      "flex items-center justify-between mb-2 sm:mb-3 pb-1 sm:pb-2 border-b-2 shrink-0 cursor-pointer hover:bg-muted/30 rounded-t-lg -mx-2 -mt-2 sm:-mx-3 sm:-mt-3 px-2 pt-2 sm:px-3 sm:pt-3 transition-colors",
+                      isToday ? "border-primary" : "border-border/50",
+                      isDropTarget && (hasDropConflict || hasDropWarning) && "mt-6",
+                    )}
+                    onClick={() => handleDayClick(dateStr, daySessions)}
+                  >
+                    <span
+                      className={cn(
+                        "text-base sm:text-lg font-bold",
+                        isToday &&
+                          "bg-primary text-primary-foreground px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg shadow-sm",
+                      )}
+                    >
+                      {format(day, "d")}
+                    </span>
+                    {daySessions.length > 0 && (
+                      <span className="text-[10px] sm:text-xs bg-primary text-primary-foreground px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-bold shadow-sm cursor-pointer hover:scale-110 transition-transform">
+                        {daySessions.length}
+                      </span>
+                    )}
+                  </div>
+                  {/* Sessions - scrollable */}
+                  <div className="space-y-1.5 sm:space-y-2 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                    {daySessions.map(({ session, student }) => {
+                      const time = session.time || student.sessionTime;
+                      const canDrag = session.status === "scheduled";
+                      return (
+                        <div
+                          key={session.id}
+                          draggable={canDrag}
+                          onDragStart={(e) =>
+                            canDrag && handleDragStart(e, session.id, student.id, student.name, session.date, time || "")
+                          }
+                          onDragEnd={handleDragEnd}
+                          onTouchStart={(e) =>
+                            canDrag && handleTouchStart(e, session.id, student.id, student.name, session.date, time || "")
+                          }
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          onClick={(e) => handleSessionClick(e, session, student)}
+                          className={cn(
+                            "text-xs sm:text-sm p-2 sm:p-3 rounded-lg border-2 flex items-start gap-1.5 sm:gap-2 transition-all duration-200 touch-manipulation select-none cursor-pointer",
+                            getStatusColor(session.status),
+                            canDrag && "active:cursor-grabbing hover:shadow-lg active:scale-95",
+                            touchDragState?.sessionId === session.id && touchDragState?.active && "opacity-50 scale-95",
+                            dragState?.sessionId === session.id && "opacity-50 scale-95",
+                          )}
+                        >
+                          {canDrag && <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 opacity-50 mt-0.5" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <div className="font-bold truncate text-xs sm:text-sm flex-1">{student.name}</div>
+                              {/* Session type indicator */}
+                              {student.sessionType === "online" ? (
+                                <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
+                              ) : (
+                                <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                              )}
+                            </div>
+                            <div className="text-[10px] sm:text-xs opacity-80 flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1">
+                              {(() => {
+                                const timeInfo = getTimeOfDayInfo(time || "12:00");
+                                const TimeIcon = timeInfo.icon;
+                                return <TimeIcon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", timeInfo.color)} />;
+                              })()}
+                              <span className="font-medium">{time}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         {/* Legend Footer */}
@@ -1537,8 +1783,8 @@ export const CalendarView = ({
                   <p className="text-sm text-amber-600 mt-1">
                     {confirmDialog.conflictInfo.gapMinutes !== undefined
                       ? `فاصل ${confirmDialog.conflictInfo.gapMinutes} دقيقة فقط`
-                      : 'حصة قريبة جداً'
-                    } مع <span className="font-bold">{confirmDialog.conflictInfo.conflictStudent}</span> في
+                      : 'حصة قريبة جداً'}
+                    مع <span className="font-bold">{confirmDialog.conflictInfo.conflictStudent}</span> في
                     الساعة {confirmDialog.conflictInfo.conflictTime}
                   </p>
                   <p className="text-xs text-amber-500 mt-1">ننصح بفاصل 30 دقيقة على الأقل بين الحصص</p>
@@ -1758,30 +2004,30 @@ export const CalendarView = ({
                               session.duration || student.sessionDuration || 60
                             ) && (
                               <Button
-                                size="sm"
+                                size="icon"
                                 variant="ghost"
-                                className="h-5 w-5 p-0 text-emerald-600 hover:bg-emerald-500/10 opacity-0 group-hover:opacity-100"
+                                className="h-8 w-8 text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setDayDetailsDialog(null);
                                   setCompleteConfirmDialog({ open: true, session, student });
                                 }}
                               >
-                                <CheckCircle2 className="h-3 w-3" />
+                                <Check className="h-4 w-4" />
                               </Button>
                             )}
                             {onDeleteSession && (
                               <Button
-                                size="sm"
+                                size="icon"
                                 variant="ghost"
-                                className="h-5 w-5 p-0 text-slate-400 hover:bg-slate-500/10 hover:text-slate-600 opacity-0 group-hover:opacity-100"
+                                className="h-8 w-8 text-slate-400 hover:bg-slate-500/10 hover:text-slate-600 opacity-0 group-hover:opacity-100"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setDayDetailsDialog(null);
                                   setDeleteConfirmDialog({ open: true, session, student });
                                 }}
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
@@ -1941,7 +2187,6 @@ export const CalendarView = ({
               );
             })()}
 
-            {/* Conflict Warning */}
             {/* Conflict Warning */}
             {addSessionDialog?.selectedStudentId &&
               addSessionDialog?.time &&
