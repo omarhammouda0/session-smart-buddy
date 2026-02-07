@@ -120,12 +120,13 @@ const toYmdLocal = (d: Date) => {
 
 // Convert DB student row to app Student type
 const dbStudentToStudent = (dbStudent: DbStudent, sessions: Session[]): Student => {
-  // Parse schedule_days from JSON
+  // Parse schedule_days from JSON - now includes optional time per day
   let scheduleDays: ScheduleDay[] = [];
   if (dbStudent.schedule_days) {
     if (Array.isArray(dbStudent.schedule_days)) {
-      scheduleDays = dbStudent.schedule_days.map((d: { dayOfWeek?: number; day_of_week?: number } | number) => ({
+      scheduleDays = dbStudent.schedule_days.map((d: { dayOfWeek?: number; day_of_week?: number; time?: string } | number) => ({
         dayOfWeek: typeof d === "number" ? d : (d.dayOfWeek ?? d.day_of_week ?? 0),
+        time: typeof d === "object" ? d.time : undefined,
       }));
     }
   }
@@ -541,6 +542,7 @@ export const useStudents = () => {
       customPriceOnline?: number,
       scheduleMode: ScheduleMode = "days",
       sessionsPerWeek?: number,
+      daySchedules?: Array<{ dayOfWeek: number; time: string }>,
     ) => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
@@ -549,12 +551,23 @@ export const useStudents = () => {
       const semesterEnd = customSemesterEnd || settings.defaultSemesterEnd;
       const duration = sessionDuration || settings.defaultSessionDuration || 60;
 
-      // Determine actual schedule days based on mode
-      const actualScheduleDays = scheduleMode === "perWeek" && sessionsPerWeek
-        ? getDistributedDays(sessionsPerWeek)
-        : scheduleDays;
+      // Determine actual schedule days based on mode or daySchedules
+      let actualScheduleDays: number[];
+      let scheduleDaysWithTimes: Array<{ dayOfWeek: number; time?: string }>;
 
-      // Insert student
+      if (daySchedules && daySchedules.length > 0) {
+        // Use the new daySchedules format with per-day times
+        actualScheduleDays = daySchedules.map(d => d.dayOfWeek);
+        scheduleDaysWithTimes = daySchedules;
+      } else if (scheduleMode === "perWeek" && sessionsPerWeek) {
+        actualScheduleDays = getDistributedDays(sessionsPerWeek);
+        scheduleDaysWithTimes = actualScheduleDays.map(d => ({ dayOfWeek: d }));
+      } else {
+        actualScheduleDays = scheduleDays;
+        scheduleDaysWithTimes = scheduleDays.map(d => ({ dayOfWeek: d }));
+      }
+
+      // Insert student - store schedule_days with times
       const { data: studentData, error: studentError } = await supabase
         .from("students")
         .insert({
@@ -568,7 +581,7 @@ export const useStudents = () => {
           use_custom_settings: useCustomPrices || false,
           custom_price_onsite: useCustomPrices ? customPriceOnsite : null,
           custom_price_online: useCustomPrices ? customPriceOnline : null,
-          schedule_days: actualScheduleDays.map((d) => ({ dayOfWeek: d })),
+          schedule_days: scheduleDaysWithTimes,
           schedule_mode: scheduleMode,
           sessions_per_week: scheduleMode === "perWeek" ? sessionsPerWeek : null,
           semester_start: semesterStart,
@@ -585,15 +598,30 @@ export const useStudents = () => {
         return;
       }
 
-      // Generate sessions
-      const sessionDates = generateSessionsForSchedule(actualScheduleDays, semesterStart, semesterEnd);
-      const sessionsToInsert = sessionDates.map((date) => ({
-        student_id: studentData.id,
-        user_id: currentUserId,
-        date,
-        duration,
-        status: "scheduled",
-      }));
+      // Generate sessions with per-day times
+      const sessionsToInsert: Array<{
+        student_id: string;
+        user_id: string;
+        date: string;
+        time?: string;
+        duration: number;
+        status: string;
+      }> = [];
+
+      // For each day in the schedule, generate sessions with the correct time
+      scheduleDaysWithTimes.forEach(schedule => {
+        const sessionDates = generateSessionsForSchedule([schedule.dayOfWeek], semesterStart, semesterEnd);
+        sessionDates.forEach(date => {
+          sessionsToInsert.push({
+            student_id: studentData.id,
+            user_id: currentUserId,
+            date,
+            time: schedule.time || sessionTime, // Use per-day time or fallback to default
+            duration,
+            status: "scheduled",
+          });
+        });
+      });
 
       if (sessionsToInsert.length > 0) {
         const { error: sessionsError } = await supabase.from("sessions").insert(sessionsToInsert);

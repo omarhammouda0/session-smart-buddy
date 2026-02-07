@@ -311,10 +311,11 @@ const Index = () => {
     customPriceOnsite?: number,
     customPriceOnline?: number,
     scheduleMode?: import("@/types/student").ScheduleMode,
-    sessionsPerWeek?: number
+    sessionsPerWeek?: number,
+    daySchedules?: Array<{ dayOfWeek: number; time: string }>
   ) => {
     // First add the student to the database
-    await addStudent(name, scheduleDays, sessionTime, sessionType, phone, parentPhone, customStart, customEnd, sessionDuration, materials, useCustomPrices, customPriceOnsite, customPriceOnline, scheduleMode, sessionsPerWeek);
+    await addStudent(name, scheduleDays, sessionTime, sessionType, phone, parentPhone, customStart, customEnd, sessionDuration, materials, useCustomPrices, customPriceOnsite, customPriceOnline, scheduleMode, sessionsPerWeek, daySchedules);
 
     // If materials were added, save them
     // We need to find the newly created student by name (since we don't have the ID yet)

@@ -25,8 +25,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+// Type for day schedule with time
+interface DaySchedule {
+  dayOfWeek: number;
+  time: string;
+}
+
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number, materials?: StudentMaterial[], useCustomPrices?: boolean, customPriceOnsite?: number, customPriceOnline?: number, scheduleMode?: ScheduleMode, sessionsPerWeek?: number) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number, materials?: StudentMaterial[], useCustomPrices?: boolean, customPriceOnsite?: number, customPriceOnline?: number, scheduleMode?: ScheduleMode, sessionsPerWeek?: number, daySchedules?: DaySchedule[]) => void;
   defaultStart: string;
   defaultEnd: string;
   students?: Student[];
@@ -41,6 +47,12 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [parentPhone, setParentPhone] = useState('');
+
+  // New: Per-day schedule with individual times
+  // Format: { dayOfWeek: number, time: string }[]
+  const [daySchedules, setDaySchedules] = useState<Array<{ dayOfWeek: number; time: string }>>([]);
+
+  // Legacy: for backwards compatibility
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [sessionTime, setSessionTime] = useState('');
   const [sessionDuration, setSessionDuration] = useState<number>(60); // Default to 1 hour
@@ -50,7 +62,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [customEnd, setCustomEnd] = useState(defaultEnd);
   const [materials, setMaterials] = useState<StudentMaterial[]>([]);
 
-  // Schedule mode state
+  // Schedule mode state - now simplified to just 'days' with per-day times
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('days');
   const [sessionsPerWeek, setSessionsPerWeek] = useState<number>(2);
 
@@ -66,17 +78,23 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   
   const { checkConflict } = useConflictDetection(students);
 
+  // Get effective days from daySchedules
+  const effectiveDaysFromSchedules = useMemo(() => {
+    return daySchedules.map(d => d.dayOfWeek).sort((a, b) => a - b);
+  }, [daySchedules]);
+
   // Compute effective days based on schedule mode
   const effectiveDays = useMemo(() => {
     if (scheduleMode === 'perWeek') {
       return getDistributedDays(sessionsPerWeek);
     }
-    return selectedDays;
-  }, [scheduleMode, sessionsPerWeek, selectedDays]);
+    // Use days from daySchedules
+    return effectiveDaysFromSchedules;
+  }, [scheduleMode, sessionsPerWeek, effectiveDaysFromSchedules]);
 
   // Check conflicts when time or days change (debounced)
   useEffect(() => {
-    if (!open || effectiveDays.length === 0 || !sessionTime) {
+    if (!open || daySchedules.length === 0) {
       setConflictResults(new Map());
       return;
     }
@@ -86,21 +104,21 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       const semesterStart = showCustomDates ? customStart : defaultStart;
       const semesterEnd = showCustomDates ? customEnd : defaultEnd;
       
-      // Generate session dates for effective days
-      const sessionDates = generateSessionsForSchedule(effectiveDays, semesterStart, semesterEnd);
-
-      // Check conflicts for each date
+      // Generate session dates and check conflicts for each day with its specific time
       const results = new Map<string, ConflictResult>();
-      let hasError = false;
-      let hasWarning = false;
-      
-      sessionDates.forEach(date => {
-        const result = checkConflict({ date, startTime: sessionTime });
-        if (result.severity !== 'none') {
-          results.set(date, result);
-          if (result.severity === 'error') hasError = true;
-          if (result.severity === 'warning') hasWarning = true;
-        }
+
+      daySchedules.forEach(schedule => {
+        if (!schedule.time) return;
+
+        // Generate dates for this specific day
+        const sessionDates = generateSessionsForSchedule([schedule.dayOfWeek], semesterStart, semesterEnd);
+
+        sessionDates.forEach(date => {
+          const result = checkConflict({ date, startTime: schedule.time });
+          if (result.severity !== 'none') {
+            results.set(`${date}-${schedule.dayOfWeek}`, result);
+          }
+        });
       });
       
       setConflictResults(results);
@@ -108,7 +126,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     }, 300); // 300ms debounce
     
     return () => clearTimeout(timer);
-  }, [open, sessionTime, effectiveDays, showCustomDates, customStart, customEnd, defaultStart, defaultEnd, checkConflict]);
+  }, [open, daySchedules, showCustomDates, customStart, customEnd, defaultStart, defaultEnd, checkConflict]);
 
   // Summarize conflicts
   const conflictSummary = useMemo(() => {
@@ -143,12 +161,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Validate based on schedule mode
-    const hasValidSchedule = scheduleMode === 'perWeek'
-      ? sessionsPerWeek >= 1 && sessionsPerWeek <= 7
-      : selectedDays.length > 0;
+    // Validate: must have at least one day with time, name, duration, and type
+    const hasValidSchedule = daySchedules.length > 0 && daySchedules.every(d => d.time);
 
-    if (!name.trim() || !hasValidSchedule || !sessionTime || !sessionDuration || !sessionType) return;
+    if (!name.trim() || !hasValidSchedule || !sessionDuration || !sessionType) return;
 
     // If there are error conflicts, block submission
     if (conflictSummary.hasErrors) {
@@ -166,12 +182,19 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   };
   
   const proceedWithAdd = () => {
-    if (!sessionType || !sessionDuration || !sessionTime) return;
+    if (!sessionType || !sessionDuration || daySchedules.length === 0) return;
     const useCustom = showCustomDates && (customStart !== defaultStart || customEnd !== defaultEnd);
+
+    // Get the first session time as the default (for backwards compatibility)
+    const primaryTime = daySchedules[0]?.time || '16:00';
+
+    // Convert daySchedules to the format expected by onAdd
+    const scheduleDaysWithTimes = daySchedules.map(d => d.dayOfWeek);
+
     onAdd(
       name.trim(),
-      scheduleMode === 'perWeek' ? effectiveDays : selectedDays,
-      sessionTime,
+      scheduleDaysWithTimes,
+      primaryTime, // Primary session time
       sessionType,
       phone.trim() || undefined,
       parentPhone.trim() || undefined,
@@ -182,8 +205,9 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       useCustomPrices || undefined,
       useCustomPrices ? customPriceOnsite : undefined,
       useCustomPrices ? customPriceOnline : undefined,
-      scheduleMode,
-      scheduleMode === 'perWeek' ? sessionsPerWeek : undefined
+      'days', // Always use 'days' mode now
+      undefined, // No sessionsPerWeek
+      daySchedules // Pass the full day schedules with times
     );
     resetForm();
     setOpen(false);
@@ -194,6 +218,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     setName('');
     setPhone('');
     setParentPhone('');
+    setDaySchedules([]);
     setSelectedDays([]);
     setSessionTime('');
     setSessionDuration(60); // Reset to default 1 hour
@@ -208,6 +233,27 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     setCustomPriceOnline(defaultPriceOnline);
     setScheduleMode('days');
     setSessionsPerWeek(2);
+  };
+
+  // Toggle a day in the schedule
+  const toggleDaySchedule = (day: number) => {
+    setDaySchedules(prev => {
+      const exists = prev.find(d => d.dayOfWeek === day);
+      if (exists) {
+        // Remove the day
+        return prev.filter(d => d.dayOfWeek !== day);
+      } else {
+        // Add the day with empty time (user will set it)
+        return [...prev, { dayOfWeek: day, time: '' }].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+      }
+    });
+  };
+
+  // Update time for a specific day
+  const updateDayTime = (day: number, time: string) => {
+    setDaySchedules(prev =>
+      prev.map(d => d.dayOfWeek === day ? { ...d, time } : d)
+    );
   };
 
   const toggleDay = (day: number) => {
@@ -274,189 +320,38 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="time" className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" />
-                  وقت الحصة
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="time"
-                    type="time"
-                    value={sessionTime}
-                    onChange={(e) => setSessionTime(e.target.value)}
-                    className={conflictSummary.hasErrors ? 'border-destructive' : ''}
-                  />
-                  {isChecking && (
-                    <div className="absolute left-2 top-1/2 -translate-y-1/2">
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Available Time Slots - Based on working hours and selected days */}
-                {(() => {
-                  // Show available slots based on working hours even without selected days
-                  const workStart = settings?.workingHoursStart || "14:00";
-                  const workEnd = settings?.workingHoursEnd || "22:00";
-
-                  // Parse working hours to minutes
-                  const parseTime = (time: string) => {
-                    const [h, m] = time.split(':').map(Number);
-                    return h * 60 + (m || 0);
-                  };
-
-                  const formatTimeArabic = (minutes: number) => {
-                    const h = Math.floor(minutes / 60);
-                    const m = minutes % 60;
-                    const period = h >= 12 ? 'م' : 'ص';
-                    const hour12 = h % 12 || 12;
-                    return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
-                  };
-
-                  const minutesToTimeStr = (minutes: number) => {
-                    const h = Math.floor(minutes / 60);
-                    const m = minutes % 60;
-                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                  };
-
-                  const workStartMin = parseTime(workStart);
-                  const workEndMin = parseTime(workEnd);
-                  const duration = sessionDuration || defaultDuration || 60;
-
-                  // Generate all possible slots within working hours (every 30 min)
-                  const allSlots: Array<{
-                    time: string;
-                    timeAr: string;
-                    type: 'morning' | 'afternoon' | 'evening';
-                    hasConflict: boolean;
-                    conflictDays: string[];
-                  }> = [];
-
-                  for (let min = workStartMin; min + duration <= workEndMin; min += 30) {
-                    const timeStr = minutesToTimeStr(min);
-                    const hour = Math.floor(min / 60);
-
-                    let type: 'morning' | 'afternoon' | 'evening';
-                    if (hour < 12) type = 'morning';
-                    else if (hour < 17) type = 'afternoon';
-                    else type = 'evening';
-
-                    // Check conflicts on effective days (based on schedule mode)
-                    let hasConflict = false;
-                    const conflictDays: string[] = [];
-
-                    if (effectiveDays.length > 0) {
-                      const semesterStart = showCustomDates ? customStart : defaultStart;
-                      const semesterEnd = showCustomDates ? customEnd : defaultEnd;
-                      const sessionDates = generateSessionsForSchedule(effectiveDays, semesterStart, semesterEnd);
-
-                      // Check first 5 dates of each day
-                      const sampleDates = sessionDates.slice(0, Math.min(10, sessionDates.length));
-
-                      sampleDates.forEach(date => {
-                        const result = checkConflict({ date, startTime: timeStr });
-                        if (result.severity === 'error') {
-                          hasConflict = true;
-                          const dayOfWeek = new Date(date).getDay();
-                          const dayName = DAY_NAMES_AR[dayOfWeek];
-                          if (!conflictDays.includes(dayName)) {
-                            conflictDays.push(dayName);
-                          }
-                        }
-                      });
+            {/* Session Type */}
+            <div className="space-y-2">
+              <Label>نوع الحصة</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSessionType('onsite')}
+                  className={`
+                    flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border transition-all
+                    ${sessionType === 'onsite'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card border-border hover:border-primary/50'
                     }
-
-                    allSlots.push({
-                      time: timeStr,
-                      timeAr: formatTimeArabic(min),
-                      type,
-                      hasConflict,
-                      conflictDays,
-                    });
-                  }
-
-                  if (allSlots.length === 0) return null;
-
-                  // Count conflicting slots for legend
-                  const conflictCount = allSlots.filter(s => s.hasConflict).length;
-
-                  return (
-                    <div className="space-y-2 pt-2">
-                      <Label className="text-xs font-medium flex items-center gap-1 text-emerald-700">
-                        <Sparkles className="h-3 w-3" />
-                        ساعات العمل ({formatTimeArabic(workStartMin)} - {formatTimeArabic(workEndMin)})
-                      </Label>
-
-                      {/* Available Slots */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {allSlots.map((slot) => (
-                          <Button
-                            key={slot.time}
-                            type="button"
-                            size="sm"
-                            variant={sessionTime === slot.time ? "default" : slot.hasConflict ? "ghost" : "outline"}
-                            disabled={slot.hasConflict}
-                            className={cn(
-                              "gap-1 h-7 text-xs px-2",
-                              sessionTime === slot.time && "ring-2 ring-primary ring-offset-1",
-                              slot.hasConflict && "opacity-40 line-through cursor-not-allowed text-muted-foreground"
-                            )}
-                            onClick={() => !slot.hasConflict && setSessionTime(slot.time)}
-                            title={slot.hasConflict ? `تعارض في: ${slot.conflictDays.join('، ')}` : ''}
-                          >
-                            {slot.type === "morning" && <Sunrise className="h-3 w-3" />}
-                            {slot.type === "afternoon" && <Sun className="h-3 w-3" />}
-                            {slot.type === "evening" && <Moon className="h-3 w-3" />}
-                            {slot.timeAr}
-                          </Button>
-                        ))}
-                      </div>
-
-                      {/* Legend */}
-                      {effectiveDays.length > 0 && conflictCount > 0 && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <span className="line-through opacity-50">2:00 م</span>
-                          <span>= وقت مشغول في أحد الأيام المحددة</span>
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="space-y-2">
-                <Label>نوع الحصة</Label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSessionType('onsite')}
-                    className={`
-                      flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border transition-all
-                      ${sessionType === 'onsite'
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card border-border hover:border-primary/50'
-                      }
-                    `}
-                  >
-                    <MapPin className="h-3.5 w-3.5" />
-                    <span className="text-sm">حضوري</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSessionType('online')}
-                    className={`
-                      flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border transition-all
-                      ${sessionType === 'online'
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card border-border hover:border-primary/50'
-                      }
-                    `}
-                  >
-                    <Monitor className="h-3.5 w-3.5" />
-                    <span className="text-sm">أونلاين</span>
-                  </button>
-                </div>
+                  `}
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span className="text-sm">حضوري</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSessionType('online')}
+                  className={`
+                    flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border transition-all
+                    ${sessionType === 'online'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card border-border hover:border-primary/50'
+                    }
+                  `}
+                >
+                  <Monitor className="h-3.5 w-3.5" />
+                  <span className="text-sm">أونلاين</span>
+                </button>
               </div>
             </div>
 
@@ -565,104 +460,93 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               </div>
             )}
             
-            {!isChecking && !conflictSummary.hasErrors && !conflictSummary.hasWarnings && effectiveDays.length > 0 && sessionTime && (
+            {!isChecking && !conflictSummary.hasErrors && !conflictSummary.hasWarnings && daySchedules.length > 0 && daySchedules.every(d => d.time) && (
               <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-500">
                 <Check className="h-4 w-4" />
-                <span>✓ الوقت متاح</span>
+                <span>✓ الأوقات متاحة</span>
               </div>
             )}
 
             <div className="space-y-3">
               <Label>جدول الحصص الأسبوعي</Label>
+              <p className="text-xs text-muted-foreground">اختر أيام الحصص وحدد الوقت لكل يوم</p>
 
-              {/* Schedule Mode Toggle */}
-              <div className="flex gap-2 p-1 bg-muted rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setScheduleMode('days')}
-                  className={cn(
-                    "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all",
-                    scheduleMode === 'days'
-                      ? "bg-background shadow text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  تحديد الأيام
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScheduleMode('perWeek')}
-                  className={cn(
-                    "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all",
-                    scheduleMode === 'perWeek'
-                      ? "bg-background shadow text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  عدد الحصص أسبوعياً
-                </button>
+              {/* Day Selection with Per-Day Time */}
+              <div className="space-y-2">
+                {DAY_NAMES_AR.map((day, index) => {
+                  const schedule = daySchedules.find(d => d.dayOfWeek === index);
+                  const isSelected = !!schedule;
+
+                  return (
+                    <div
+                      key={day}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
+                        isSelected
+                          ? "bg-primary/5 border-primary/30"
+                          : "bg-card border-border hover:border-primary/20"
+                      )}
+                    >
+                      {/* Day checkbox */}
+                      <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleDaySchedule(index)}
+                        />
+                        <span className={cn(
+                          "text-sm font-medium",
+                          isSelected ? "text-primary" : "text-foreground"
+                        )}>
+                          {day}
+                        </span>
+                      </label>
+
+                      {/* Time input - only show when day is selected */}
+                      {isSelected && (
+                        <div className="flex items-center gap-2 flex-1">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="time"
+                            value={schedule.time}
+                            onChange={(e) => updateDayTime(index, e.target.value)}
+                            className="w-32"
+                            placeholder="الوقت"
+                          />
+                          {schedule.time && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatTimeAr(schedule.time)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {scheduleMode === 'days' ? (
-                <>
-                  <p className="text-xs text-muted-foreground">اختر الأيام التي يحضر فيها الطالب أسبوعياً</p>
+              {/* Summary of selected days */}
+              {daySchedules.length > 0 && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-2">ملخص الجدول:</p>
                   <div className="flex flex-wrap gap-2">
-                    {DAY_NAMES_AR.map((day, index) => (
-                      <label
-                        key={day}
-                        className={`
-                          flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all
-                          ${selectedDays.includes(index)
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-card border-border hover:border-primary/50'
-                          }
-                        `}
+                    {daySchedules.map((schedule) => (
+                      <span
+                        key={schedule.dayOfWeek}
+                        className={cn(
+                          "px-2 py-1 rounded text-xs font-medium",
+                          schedule.time
+                            ? "bg-primary/10 text-primary"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        )}
                       >
-                        <Checkbox
-                          checked={selectedDays.includes(index)}
-                          onCheckedChange={() => toggleDay(index)}
-                          className="sr-only"
-                        />
-                        <span className="text-sm font-medium">{day}</span>
-                      </label>
+                        {DAY_NAMES_AR[schedule.dayOfWeek]}: {schedule.time ? formatTimeAr(schedule.time) : "⏰ حدد الوقت"}
+                      </span>
                     ))}
                   </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-muted-foreground">حدد عدد الحصص في الأسبوع وسيتم توزيعها تلقائياً</p>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={7}
-                        value={sessionsPerWeek}
-                        onChange={(e) => setSessionsPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
-                        className="w-20 text-center"
-                      />
-                      <span className="text-sm text-muted-foreground">حصة / أسبوع</span>
-                    </div>
-
-                    {/* Show distributed days preview */}
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-2">الأيام المحددة تلقائياً:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {effectiveDays.map((dayIndex) => (
-                          <span
-                            key={dayIndex}
-                            className="px-2 py-1 bg-primary/10 text-primary rounded text-sm font-medium"
-                          >
-                            {DAY_NAMES_AR[dayIndex]}
-                          </span>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {sessionsPerWeek} حصص/أسبوع ({effectiveDays.map(d => DAY_NAMES_AR[d]).join('، ')})
-                      </p>
-                    </div>
-                  </div>
-                </>
+                  {!daySchedules.every(d => d.time) && (
+                    <p className="text-xs text-amber-600 mt-2">⚠️ يرجى تحديد الوقت لجميع الأيام</p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -711,7 +595,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               type="submit" 
               onClick={handleSubmit}
               className="w-full sm:flex-1 gradient-primary"
-              disabled={!name.trim() || effectiveDays.length === 0 || !sessionTime || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
+              disabled={!name.trim() || daySchedules.length === 0 || !daySchedules.every(d => d.time) || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
             >
               {isChecking ? (
                 <>

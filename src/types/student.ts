@@ -28,6 +28,7 @@ export interface Session {
 
 export interface ScheduleDay {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+  time?: string; // HH:mm format - optional per-day time override
 }
 
 export type SessionType = "online" | "onsite";

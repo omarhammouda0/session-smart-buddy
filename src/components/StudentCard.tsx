@@ -278,13 +278,19 @@ export const StudentCard = ({
                   <span
                     key={d.dayOfWeek}
                     className={cn(
-                      "text-xs px-2.5 py-1 rounded-full font-medium",
+                      "text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1",
                       d.dayOfWeek === selectedDayOfWeek
                         ? "bg-primary text-primary-foreground shadow-sm"
                         : "bg-muted text-muted-foreground",
                     )}
+                    title={d.time ? `${DAY_NAMES_SHORT_AR[d.dayOfWeek]} - ${d.time}` : DAY_NAMES_SHORT_AR[d.dayOfWeek]}
                   >
                     {DAY_NAMES_SHORT_AR[d.dayOfWeek]}
+                    {d.time && d.time !== student.sessionTime && (
+                      <span className="text-[10px] opacity-75">
+                        {d.time}
+                      </span>
+                    )}
                   </span>
                 ))}
             </div>
