@@ -13,8 +13,9 @@ import {
   PaymentStatus,
   ScheduleDay,
   StudentMaterial,
+  ScheduleMode,
 } from "@/types/student";
-import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester } from "@/lib/dateUtils";
+import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester, getDistributedDays } from "@/lib/dateUtils";
 
 // ============================================================================
 // TYPES FOR DATABASE ROWS
@@ -33,6 +34,8 @@ interface DbStudent {
   custom_price_online: number | null;
   use_custom_settings: boolean | null;
   schedule_days: { dayOfWeek: number }[] | null; // JSON array of schedule days
+  schedule_mode: string | null; // 'days' or 'perWeek'
+  sessions_per_week: number | null; // Number of sessions per week (1-7)
   semester_start: string;
   semester_end: string;
   cancellation_monthly_limit: number | null;
@@ -139,6 +142,8 @@ const dbStudentToStudent = (dbStudent: DbStudent, sessions: Session[]): Student 
     customPriceOnline: dbStudent.custom_price_online || undefined,
     useCustomSettings: dbStudent.use_custom_settings || false,
     scheduleDays,
+    scheduleMode: (dbStudent.schedule_mode as ScheduleMode) || "days",
+    sessionsPerWeek: dbStudent.sessions_per_week || undefined,
     semesterStart: dbStudent.semester_start,
     semesterEnd: dbStudent.semester_end,
     sessions,
@@ -534,6 +539,8 @@ export const useStudents = () => {
       useCustomPrices?: boolean,
       customPriceOnsite?: number,
       customPriceOnline?: number,
+      scheduleMode: ScheduleMode = "days",
+      sessionsPerWeek?: number,
     ) => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
@@ -541,6 +548,11 @@ export const useStudents = () => {
       const semesterStart = customSemesterStart || settings.defaultSemesterStart;
       const semesterEnd = customSemesterEnd || settings.defaultSemesterEnd;
       const duration = sessionDuration || settings.defaultSessionDuration || 60;
+
+      // Determine actual schedule days based on mode
+      const actualScheduleDays = scheduleMode === "perWeek" && sessionsPerWeek
+        ? getDistributedDays(sessionsPerWeek)
+        : scheduleDays;
 
       // Insert student
       const { data: studentData, error: studentError } = await supabase
@@ -556,7 +568,9 @@ export const useStudents = () => {
           use_custom_settings: useCustomPrices || false,
           custom_price_onsite: useCustomPrices ? customPriceOnsite : null,
           custom_price_online: useCustomPrices ? customPriceOnline : null,
-          schedule_days: scheduleDays.map((d) => ({ dayOfWeek: d })),
+          schedule_days: actualScheduleDays.map((d) => ({ dayOfWeek: d })),
+          schedule_mode: scheduleMode,
+          sessions_per_week: scheduleMode === "perWeek" ? sessionsPerWeek : null,
           semester_start: semesterStart,
           semester_end: semesterEnd,
           cancellation_monthly_limit: 3,
@@ -572,7 +586,7 @@ export const useStudents = () => {
       }
 
       // Generate sessions
-      const sessionDates = generateSessionsForSchedule(scheduleDays, semesterStart, semesterEnd);
+      const sessionDates = generateSessionsForSchedule(actualScheduleDays, semesterStart, semesterEnd);
       const sessionsToInsert = sessionDates.map((date) => ({
         student_id: studentData.id,
         user_id: currentUserId,

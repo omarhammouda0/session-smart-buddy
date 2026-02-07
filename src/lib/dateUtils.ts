@@ -9,6 +9,38 @@ export const generateDefaultSemester = (months: number = 4): { start: string; en
   return { start, end };
 };
 
+/**
+ * Get evenly distributed days of the week based on sessions per week count.
+ * Days are distributed starting from Sunday (0) to maximize spacing.
+ *
+ * @param sessionsPerWeek - Number of sessions per week (1-7)
+ * @returns Array of day indices (0 = Sunday, 1 = Monday, etc.)
+ *
+ * Examples:
+ * - 1 session  → [0] (Sunday)
+ * - 2 sessions → [0, 3] (Sunday, Wednesday)
+ * - 3 sessions → [0, 2, 4] (Sunday, Tuesday, Thursday)
+ * - 4 sessions → [0, 2, 4, 6] (Sunday, Tuesday, Thursday, Saturday)
+ * - 5 sessions → [0, 1, 3, 4, 6] (Sunday, Monday, Wednesday, Thursday, Saturday)
+ * - 6 sessions → [0, 1, 2, 4, 5, 6] (Sunday, Monday, Tuesday, Thursday, Friday, Saturday)
+ * - 7 sessions → [0, 1, 2, 3, 4, 5, 6] (All days)
+ */
+export const getDistributedDays = (sessionsPerWeek: number): number[] => {
+  if (sessionsPerWeek <= 0) return [];
+  if (sessionsPerWeek >= 7) return [0, 1, 2, 3, 4, 5, 6];
+
+  const days: number[] = [];
+  const interval = 7 / sessionsPerWeek;
+
+  for (let i = 0; i < sessionsPerWeek; i++) {
+    const day = Math.round(i * interval) % 7;
+    days.push(day);
+  }
+
+  // Sort and remove duplicates
+  return [...new Set(days)].sort((a, b) => a - b);
+};
+
 export const generateSessionsForSchedule = (
   scheduleDays: number[],
   semesterStart: string,

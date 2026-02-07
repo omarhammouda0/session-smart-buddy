@@ -819,11 +819,13 @@ export type Database = {
           parent_phone?: string | null
           phone?: string | null
           schedule_days?: Json
+          schedule_mode?: string | null
           semester_end?: string
           semester_start?: string
           session_duration?: number | null
           session_time?: string
           session_type?: string
+          sessions_per_week?: number | null
           updated_at?: string
           use_custom_settings?: boolean | null
           user_id?: string

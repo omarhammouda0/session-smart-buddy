@@ -32,6 +32,9 @@ export interface ScheduleDay {
 
 export type SessionType = "online" | "onsite";
 
+// Schedule mode: select specific days or specify sessions per week
+export type ScheduleMode = "days" | "perWeek";
+
 // Cancellation policy settings per student
 export interface CancellationPolicy {
   monthlyLimit: number | null; // null = unlimited
@@ -67,6 +70,8 @@ export interface Student {
   parentPhone?: string; // Parent's WhatsApp number for notifications
   sessionType: SessionType; // online or on-site
   scheduleDays: ScheduleDay[]; // Which days of the week they have sessions
+  scheduleMode?: ScheduleMode; // 'days' = select specific days, 'perWeek' = specify number of sessions
+  sessionsPerWeek?: number; // Number of sessions per week (1-7), used when scheduleMode is 'perWeek'
   semesterStart: string; // YYYY-MM-DD
   semesterEnd: string; // YYYY-MM-DD
   sessions: Session[];

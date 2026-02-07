@@ -6,10 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign, Sparkles, Sunrise, Sun, Moon } from 'lucide-react';
-import { SessionType, Student, DEFAULT_DURATION, StudentMaterial, AppSettings } from '@/types/student';
+import { SessionType, Student, DEFAULT_DURATION, StudentMaterial, AppSettings, ScheduleMode } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { generateSessionsForSchedule } from '@/lib/dateUtils';
+import { generateSessionsForSchedule, getDistributedDays } from '@/lib/dateUtils';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
 import { DurationPicker } from '@/components/DurationPicker';
 import { StudentMaterialsSection } from '@/components/StudentMaterialsSection';
@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number, materials?: StudentMaterial[], useCustomPrices?: boolean, customPriceOnsite?: number, customPriceOnline?: number) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number, materials?: StudentMaterial[], useCustomPrices?: boolean, customPriceOnsite?: number, customPriceOnline?: number, scheduleMode?: ScheduleMode, sessionsPerWeek?: number) => void;
   defaultStart: string;
   defaultEnd: string;
   students?: Student[];
@@ -50,6 +50,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [customEnd, setCustomEnd] = useState(defaultEnd);
   const [materials, setMaterials] = useState<StudentMaterial[]>([]);
 
+  // Schedule mode state
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('days');
+  const [sessionsPerWeek, setSessionsPerWeek] = useState<number>(2);
+
   // Custom pricing state
   const [useCustomPrices, setUseCustomPrices] = useState(false);
   const [customPriceOnsite, setCustomPriceOnsite] = useState<number>(defaultPriceOnsite);
@@ -62,9 +66,17 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   
   const { checkConflict } = useConflictDetection(students);
 
+  // Compute effective days based on schedule mode
+  const effectiveDays = useMemo(() => {
+    if (scheduleMode === 'perWeek') {
+      return getDistributedDays(sessionsPerWeek);
+    }
+    return selectedDays;
+  }, [scheduleMode, sessionsPerWeek, selectedDays]);
+
   // Check conflicts when time or days change (debounced)
   useEffect(() => {
-    if (!open || selectedDays.length === 0 || !sessionTime) {
+    if (!open || effectiveDays.length === 0 || !sessionTime) {
       setConflictResults(new Map());
       return;
     }
@@ -74,9 +86,9 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       const semesterStart = showCustomDates ? customStart : defaultStart;
       const semesterEnd = showCustomDates ? customEnd : defaultEnd;
       
-      // Generate session dates for selected days
-      const sessionDates = generateSessionsForSchedule(selectedDays, semesterStart, semesterEnd);
-      
+      // Generate session dates for effective days
+      const sessionDates = generateSessionsForSchedule(effectiveDays, semesterStart, semesterEnd);
+
       // Check conflicts for each date
       const results = new Map<string, ConflictResult>();
       let hasError = false;
@@ -96,7 +108,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     }, 300); // 300ms debounce
     
     return () => clearTimeout(timer);
-  }, [open, sessionTime, selectedDays, showCustomDates, customStart, customEnd, defaultStart, defaultEnd, checkConflict]);
+  }, [open, sessionTime, effectiveDays, showCustomDates, customStart, customEnd, defaultStart, defaultEnd, checkConflict]);
 
   // Summarize conflicts
   const conflictSummary = useMemo(() => {
@@ -131,8 +143,13 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || selectedDays.length === 0 || !sessionTime || !sessionDuration || !sessionType) return;
-    
+    // Validate based on schedule mode
+    const hasValidSchedule = scheduleMode === 'perWeek'
+      ? sessionsPerWeek >= 1 && sessionsPerWeek <= 7
+      : selectedDays.length > 0;
+
+    if (!name.trim() || !hasValidSchedule || !sessionTime || !sessionDuration || !sessionType) return;
+
     // If there are error conflicts, block submission
     if (conflictSummary.hasErrors) {
       return;
@@ -153,7 +170,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     const useCustom = showCustomDates && (customStart !== defaultStart || customEnd !== defaultEnd);
     onAdd(
       name.trim(),
-      selectedDays,
+      scheduleMode === 'perWeek' ? effectiveDays : selectedDays,
       sessionTime,
       sessionType,
       phone.trim() || undefined,
@@ -164,7 +181,9 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       materials.length > 0 ? materials : undefined,
       useCustomPrices || undefined,
       useCustomPrices ? customPriceOnsite : undefined,
-      useCustomPrices ? customPriceOnline : undefined
+      useCustomPrices ? customPriceOnline : undefined,
+      scheduleMode,
+      scheduleMode === 'perWeek' ? sessionsPerWeek : undefined
     );
     resetForm();
     setOpen(false);
@@ -187,6 +206,8 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     setUseCustomPrices(false);
     setCustomPriceOnsite(defaultPriceOnsite);
     setCustomPriceOnline(defaultPriceOnline);
+    setScheduleMode('days');
+    setSessionsPerWeek(2);
   };
 
   const toggleDay = (day: number) => {
@@ -322,14 +343,14 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                     else if (hour < 17) type = 'afternoon';
                     else type = 'evening';
 
-                    // Check conflicts on selected days
+                    // Check conflicts on effective days (based on schedule mode)
                     let hasConflict = false;
                     const conflictDays: string[] = [];
 
-                    if (selectedDays.length > 0) {
+                    if (effectiveDays.length > 0) {
                       const semesterStart = showCustomDates ? customStart : defaultStart;
                       const semesterEnd = showCustomDates ? customEnd : defaultEnd;
-                      const sessionDates = generateSessionsForSchedule(selectedDays, semesterStart, semesterEnd);
+                      const sessionDates = generateSessionsForSchedule(effectiveDays, semesterStart, semesterEnd);
 
                       // Check first 5 dates of each day
                       const sampleDates = sessionDates.slice(0, Math.min(10, sessionDates.length));
@@ -394,7 +415,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                       </div>
 
                       {/* Legend */}
-                      {selectedDays.length > 0 && conflictCount > 0 && (
+                      {effectiveDays.length > 0 && conflictCount > 0 && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <span className="line-through opacity-50">2:00 م</span>
                           <span>= وقت مشغول في أحد الأيام المحددة</span>
@@ -544,7 +565,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               </div>
             )}
             
-            {!isChecking && !conflictSummary.hasErrors && !conflictSummary.hasWarnings && selectedDays.length > 0 && sessionTime && (
+            {!isChecking && !conflictSummary.hasErrors && !conflictSummary.hasWarnings && effectiveDays.length > 0 && sessionTime && (
               <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-500">
                 <Check className="h-4 w-4" />
                 <span>✓ الوقت متاح</span>
@@ -552,29 +573,97 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
             )}
 
             <div className="space-y-3">
-              <Label>أيام الحصص الأسبوعية</Label>
-              <p className="text-xs text-muted-foreground">اختر الأيام التي يحضر فيها الطالب أسبوعياً</p>
-              <div className="flex flex-wrap gap-2">
-                {DAY_NAMES_AR.map((day, index) => (
-                  <label
-                    key={day}
-                    className={`
-                      flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all
-                      ${selectedDays.includes(index)
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card border-border hover:border-primary/50'
-                      }
-                    `}
-                  >
-                    <Checkbox
-                      checked={selectedDays.includes(index)}
-                      onCheckedChange={() => toggleDay(index)}
-                      className="sr-only"
-                    />
-                    <span className="text-sm font-medium">{day}</span>
-                  </label>
-                ))}
+              <Label>جدول الحصص الأسبوعي</Label>
+
+              {/* Schedule Mode Toggle */}
+              <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setScheduleMode('days')}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                    scheduleMode === 'days'
+                      ? "bg-background shadow text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  تحديد الأيام
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleMode('perWeek')}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                    scheduleMode === 'perWeek'
+                      ? "bg-background shadow text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  عدد الحصص أسبوعياً
+                </button>
               </div>
+
+              {scheduleMode === 'days' ? (
+                <>
+                  <p className="text-xs text-muted-foreground">اختر الأيام التي يحضر فيها الطالب أسبوعياً</p>
+                  <div className="flex flex-wrap gap-2">
+                    {DAY_NAMES_AR.map((day, index) => (
+                      <label
+                        key={day}
+                        className={`
+                          flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all
+                          ${selectedDays.includes(index)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card border-border hover:border-primary/50'
+                          }
+                        `}
+                      >
+                        <Checkbox
+                          checked={selectedDays.includes(index)}
+                          onCheckedChange={() => toggleDay(index)}
+                          className="sr-only"
+                        />
+                        <span className="text-sm font-medium">{day}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">حدد عدد الحصص في الأسبوع وسيتم توزيعها تلقائياً</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={7}
+                        value={sessionsPerWeek}
+                        onChange={(e) => setSessionsPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
+                        className="w-20 text-center"
+                      />
+                      <span className="text-sm text-muted-foreground">حصة / أسبوع</span>
+                    </div>
+
+                    {/* Show distributed days preview */}
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">الأيام المحددة تلقائياً:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {effectiveDays.map((dayIndex) => (
+                          <span
+                            key={dayIndex}
+                            className="px-2 py-1 bg-primary/10 text-primary rounded text-sm font-medium"
+                          >
+                            {DAY_NAMES_AR[dayIndex]}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {sessionsPerWeek} حصص/أسبوع ({effectiveDays.map(d => DAY_NAMES_AR[d]).join('، ')})
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Student Materials Section */}
@@ -622,7 +711,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               type="submit" 
               onClick={handleSubmit}
               className="w-full sm:flex-1 gradient-primary"
-              disabled={!name.trim() || selectedDays.length === 0 || !sessionTime || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
+              disabled={!name.trim() || effectiveDays.length === 0 || !sessionTime || !sessionDuration || !sessionType || conflictSummary.hasErrors || isChecking}
             >
               {isChecking ? (
                 <>

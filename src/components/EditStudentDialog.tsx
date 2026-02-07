@@ -31,10 +31,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Student, SessionType, CancellationPolicy, AppSettings } from '@/types/student';
+import { Student, SessionType, CancellationPolicy, AppSettings, ScheduleMode } from '@/types/student';
 import { DAY_NAMES_AR, formatDurationAr, calculateEndTime } from '@/lib/arabicConstants';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
-import { generateSessionsForSchedule } from '@/lib/dateUtils';
+import { generateSessionsForSchedule, getDistributedDays } from '@/lib/dateUtils';
 import { DURATION_OPTIONS, DEFAULT_DURATION } from '@/types/student';
 import { CancellationPolicySettings } from '@/components/CancellationPolicySettings';
 import { format } from 'date-fns';
@@ -104,6 +104,10 @@ export const EditStudentDialog = ({
     student.scheduleDays.map(d => d.dayOfWeek)
   );
   
+  // Schedule mode state
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(student.scheduleMode || 'days');
+  const [sessionsPerWeek, setSessionsPerWeek] = useState<number>(student.sessionsPerWeek || 2);
+
   // Custom settings state
   const [useCustomSettings, setUseCustomSettings] = useState(student.useCustomSettings || false);
   const [customPriceOnsite, setCustomPriceOnsite] = useState<string>(student.customPriceOnsite?.toString() || '');
@@ -122,6 +126,14 @@ export const EditStudentDialog = ({
   const effectivePriceOnsite = hasCustomOnsite ? customOnsiteNum : defaultPriceOnsite;
   const effectivePriceOnline = hasCustomOnline ? customOnlineNum : defaultPriceOnline;
   
+  // Compute effective days based on schedule mode
+  const effectiveDays = useMemo(() => {
+    if (scheduleMode === 'perWeek') {
+      return getDistributedDays(sessionsPerWeek);
+    }
+    return selectedDays;
+  }, [scheduleMode, sessionsPerWeek, selectedDays]);
+
   // Conflict detection state
   const [isChecking, setIsChecking] = useState(false);
   const [conflictResults, setConflictResults] = useState<Map<string, ConflictResult>>(new Map());
@@ -131,7 +143,7 @@ export const EditStudentDialog = ({
 
   // Check conflicts when time or days change (debounced)
   useEffect(() => {
-    if (!open || selectedDays.length === 0) {
+    if (!open || effectiveDays.length === 0) {
       setConflictResults(new Map());
       return;
     }
@@ -169,7 +181,7 @@ export const EditStudentDialog = ({
     }, 300); // 300ms debounce
     
     return () => clearTimeout(timer);
-  }, [open, sessionTime, selectedDays, student, checkConflict]);
+  }, [open, sessionTime, effectiveDays, student, checkConflict]);
 
   // Summarize conflicts
   const conflictSummary = useMemo(() => {
@@ -249,9 +261,9 @@ export const EditStudentDialog = ({
     }
     
     const currentDays = student.scheduleDays.map(d => d.dayOfWeek).sort().join(',');
-    const newDays = selectedDays.sort().join(',');
-    if (currentDays !== newDays && selectedDays.length > 0) {
-      onUpdateSchedule(selectedDays);
+    const newDays = effectiveDays.sort().join(',');
+    if (currentDays !== newDays && effectiveDays.length > 0) {
+      onUpdateSchedule(effectiveDays);
     }
     
     setOpen(false);
@@ -268,6 +280,8 @@ export const EditStudentDialog = ({
       setSessionType(student.sessionType || 'onsite');
       setSessionDuration(student.sessionDuration || DEFAULT_DURATION);
       setSelectedDays(student.scheduleDays.map(d => d.dayOfWeek));
+      setScheduleMode(student.scheduleMode || 'days');
+      setSessionsPerWeek(student.sessionsPerWeek || 2);
       setUseCustomSettings(student.useCustomSettings || false);
       setCustomPriceOnsite(student.customPriceOnsite?.toString() || '');
       setCustomPriceOnline(student.customPriceOnline?.toString() || '');
@@ -466,32 +480,100 @@ export const EditStudentDialog = ({
             </div>
 
             {/* Schedule Days */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
-                أيام الحصص
+                جدول الحصص الأسبوعي
               </Label>
-              <div className="flex flex-wrap gap-2">
-                {[0, 1, 2, 3, 4, 5, 6].map(day => (
-                  <label
-                    key={day}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-                      selectedDays.includes(day)
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <Checkbox
-                      checked={selectedDays.includes(day)}
-                      onCheckedChange={() => toggleDay(day)}
-                      className="hidden"
-                    />
-                    <span className="text-sm">{DAY_NAMES_AR[day]}</span>
-                  </label>
-                ))}
+
+              {/* Schedule Mode Toggle */}
+              <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setScheduleMode('days')}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                    scheduleMode === 'days'
+                      ? "bg-background shadow text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  تحديد الأيام
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleMode('perWeek')}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                    scheduleMode === 'perWeek'
+                      ? "bg-background shadow text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  عدد الحصص أسبوعياً
+                </button>
               </div>
-              {selectedDays.length === 0 && (
-                <p className="text-xs text-destructive">يجب اختيار يوم واحد على الأقل</p>
+
+              {scheduleMode === 'days' ? (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {[0, 1, 2, 3, 4, 5, 6].map(day => (
+                      <label
+                        key={day}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                          selectedDays.includes(day)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <Checkbox
+                          checked={selectedDays.includes(day)}
+                          onCheckedChange={() => toggleDay(day)}
+                          className="hidden"
+                        />
+                        <span className="text-sm">{DAY_NAMES_AR[day]}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedDays.length === 0 && (
+                    <p className="text-xs text-destructive">يجب اختيار يوم واحد على الأقل</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">حدد عدد الحصص في الأسبوع وسيتم توزيعها تلقائياً</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={7}
+                        value={sessionsPerWeek}
+                        onChange={(e) => setSessionsPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
+                        className="w-20 text-center"
+                      />
+                      <span className="text-sm text-muted-foreground">حصة / أسبوع</span>
+                    </div>
+
+                    {/* Show distributed days preview */}
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">الأيام المحددة تلقائياً:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {effectiveDays.map((dayIndex) => (
+                          <span
+                            key={dayIndex}
+                            className="px-2 py-1 bg-primary/10 text-primary rounded text-sm font-medium"
+                          >
+                            {DAY_NAMES_AR[dayIndex]}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {sessionsPerWeek} حصص/أسبوع ({effectiveDays.map(d => DAY_NAMES_AR[d]).join('، ')})
+                      </p>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
@@ -608,7 +690,7 @@ export const EditStudentDialog = ({
           <DialogFooter className="flex-col sm:flex-row-reverse gap-2">
             <Button
               onClick={handleSave} 
-              disabled={!name.trim() || selectedDays.length === 0 || (timeChanged && conflictSummary.hasErrors) || isChecking}
+              disabled={!name.trim() || effectiveDays.length === 0 || (timeChanged && conflictSummary.hasErrors) || isChecking}
               className="w-full sm:w-auto"
             >
               {isChecking ? (

@@ -267,6 +267,12 @@ export const StudentCard = ({
                 )}
               </Badge>
 
+              {student.scheduleMode === 'perWeek' && student.sessionsPerWeek && (
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-primary/10 text-primary">
+                  {student.sessionsPerWeek} حصص/أسبوع
+                </span>
+              )}
+
               {student.scheduleDays &&
                 student.scheduleDays.map((d) => (
                   <span
