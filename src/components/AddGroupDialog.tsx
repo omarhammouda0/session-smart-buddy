@@ -5,11 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Users, Plus, Clock, Monitor, MapPin, DollarSign, Trash2, UserPlus, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, Clock, Monitor, MapPin, DollarSign, X, ChevronDown, ChevronUp, Lightbulb, Sparkles, AlertTriangle, Check, Calendar, UserCheck } from 'lucide-react';
 import { SessionType, Student, ScheduleDay, GroupMember } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { DurationPicker } from '@/components/DurationPicker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSchedulingSuggestions } from '@/hooks/useSchedulingSuggestions';
 import { cn } from '@/lib/utils';
 
 // Type for day schedule with time
@@ -58,9 +60,6 @@ const formatTimeAr = (time: string): string => {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-// Generate unique ID
-const generateId = () => `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
 // Color options for groups
 const GROUP_COLORS = [
   { value: 'blue', label: 'أزرق', class: 'bg-blue-500' },
@@ -89,7 +88,7 @@ export const AddGroupDialog = ({
   // Session settings
   const [sessionType, setSessionType] = useState<SessionType | null>(null);
   const [sessionDuration, setSessionDuration] = useState<number>(60);
-  const [defaultPrice, setDefaultPrice] = useState<number>(80); // Group default is usually lower
+  const [defaultPrice, setDefaultPrice] = useState<number>(80);
 
   // Schedule
   const [daySchedules, setDaySchedules] = useState<DayScheduleInput[]>([]);
@@ -99,12 +98,10 @@ export const AddGroupDialog = ({
 
   // Members
   const [members, setMembers] = useState<MemberInput[]>([]);
-  const [showAddExisting, setShowAddExisting] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
-  // New member form
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberPhone, setNewMemberPhone] = useState('');
-  const [newMemberParentPhone, setNewMemberParentPhone] = useState('');
+  // Get scheduling suggestions
+  const schedulingSuggestions = useSchedulingSuggestions(existingStudents, sessionType);
 
   // Get students not already in the group
   const availableStudents = useMemo(() => {
@@ -124,10 +121,7 @@ export const AddGroupDialog = ({
     setCustomStart(defaultStart);
     setCustomEnd(defaultEnd);
     setMembers([]);
-    setShowAddExisting(false);
-    setNewMemberName('');
-    setNewMemberPhone('');
-    setNewMemberParentPhone('');
+    setSelectedStudentId('');
   };
 
   const toggleDaySchedule = (day: number) => {
@@ -147,24 +141,12 @@ export const AddGroupDialog = ({
     );
   };
 
-  const addNewMember = () => {
-    if (!newMemberName.trim()) return;
+  const addSelectedStudent = () => {
+    if (!selectedStudentId) return;
 
-    const newMember: MemberInput = {
-      id: generateId(),
-      name: newMemberName.trim(),
-      phone: newMemberPhone.trim() || undefined,
-      parentPhone: newMemberParentPhone.trim() || undefined,
-      useCustomPrice: false,
-    };
+    const student = existingStudents.find(s => s.id === selectedStudentId);
+    if (!student) return;
 
-    setMembers(prev => [...prev, newMember]);
-    setNewMemberName('');
-    setNewMemberPhone('');
-    setNewMemberParentPhone('');
-  };
-
-  const addExistingStudent = (student: Student) => {
     const newMember: MemberInput = {
       id: student.id,
       name: student.name,
@@ -174,6 +156,7 @@ export const AddGroupDialog = ({
     };
 
     setMembers(prev => [...prev, newMember]);
+    setSelectedStudentId('');
   };
 
   const removeMember = (memberId: string) => {
@@ -195,16 +178,13 @@ export const AddGroupDialog = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate
     const hasValidSchedule = daySchedules.length > 0 && daySchedules.every(d => d.time);
     if (!groupName.trim() || !sessionType || !hasValidSchedule || members.length === 0) {
       return;
     }
 
-    // Get the first session time as the default
     const primaryTime = daySchedules[0]?.time || '16:00';
 
-    // Convert members to GroupMember format
     const groupMembers: Omit<GroupMember, 'joinedAt' | 'isActive'>[] = members.map(m => ({
       studentId: m.id,
       studentName: m.name,
@@ -213,7 +193,6 @@ export const AddGroupDialog = ({
       customPrice: m.useCustomPrice ? m.customPrice : undefined,
     }));
 
-    // Convert day schedules
     const scheduleDays: ScheduleDay[] = daySchedules.map(d => ({
       dayOfWeek: d.dayOfWeek,
       time: d.time,
@@ -369,60 +348,7 @@ export const AddGroupDialog = ({
               placeholder="اختر مدة الحصة"
             />
 
-            {/* Schedule */}
-            <div className="space-y-3">
-              <Label>جدول الحصص الأسبوعي</Label>
-              <div className="space-y-2">
-                {DAY_NAMES_AR.map((day, index) => {
-                  const schedule = daySchedules.find(d => d.dayOfWeek === index);
-                  const isSelected = !!schedule;
-
-                  return (
-                    <div
-                      key={day}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
-                        isSelected
-                          ? "bg-primary/5 border-primary/30"
-                          : "bg-card border-border hover:border-primary/20"
-                      )}
-                    >
-                      <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleDaySchedule(index)}
-                        />
-                        <span className={cn(
-                          "text-sm font-medium",
-                          isSelected ? "text-primary" : "text-foreground"
-                        )}>
-                          {day}
-                        </span>
-                      </label>
-
-                      {isSelected && (
-                        <div className="flex items-center gap-2 flex-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <Input
-                            type="time"
-                            value={schedule.time}
-                            onChange={(e) => updateDayTime(index, e.target.value)}
-                            className="w-32"
-                          />
-                          {schedule.time && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatTimeAr(schedule.time)}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Members Section */}
+            {/* Members Section - Dropdown Only */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2">
@@ -430,6 +356,45 @@ export const AddGroupDialog = ({
                   أعضاء المجموعة ({members.length})
                 </Label>
               </div>
+
+              {/* Student Dropdown */}
+              {availableStudents.length > 0 ? (
+                <div className="flex gap-2">
+                  <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="اختر طالب لإضافته..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableStudents.map(student => (
+                        <SelectItem key={student.id} value={student.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{student.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({student.sessionType === 'online' ? 'أونلاين' : 'حضوري'})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addSelectedStudent}
+                    disabled={!selectedStudentId}
+                  >
+                    إضافة
+                  </Button>
+                </div>
+              ) : existingStudents.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg text-center">
+                  لا يوجد طلاب. أضف طلاباً أولاً ثم أنشئ مجموعة.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg text-center">
+                  تم إضافة جميع الطلاب المتاحين
+                </p>
+              )}
 
               {/* Member List */}
               {members.length > 0 && (
@@ -453,7 +418,6 @@ export const AddGroupDialog = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* Custom Price Toggle */}
                         <div className="flex items-center gap-1.5">
                           <Switch
                             checked={member.useCustomPrice}
@@ -485,72 +449,266 @@ export const AddGroupDialog = ({
                   ))}
                 </div>
               )}
+            </div>
 
-              {/* Add New Member */}
-              <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
-                <p className="text-sm font-medium">إضافة عضو جديد</p>
-                <div className="grid grid-cols-1 gap-2">
-                  <Input
-                    value={newMemberName}
-                    onChange={(e) => setNewMemberName(e.target.value)}
-                    placeholder="اسم الطالب"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      value={newMemberPhone}
-                      onChange={(e) => setNewMemberPhone(e.target.value)}
-                      placeholder="رقم الطالب"
-                      dir="ltr"
-                    />
-                    <Input
-                      value={newMemberParentPhone}
-                      onChange={(e) => setNewMemberParentPhone(e.target.value)}
-                      placeholder="رقم ولي الأمر"
-                      dir="ltr"
-                    />
+            {/* Schedule Section with Smart Suggestions */}
+            <div className="space-y-3">
+              <Label>جدول الحصص الأسبوعي</Label>
+
+              {/* Smart Scheduling Tips */}
+              {sessionType && (schedulingSuggestions.generalTips.length > 0 || schedulingSuggestions.smartRecommendations.length > 0) && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-medium text-blue-700 dark:text-blue-300 text-sm">اقتراحات ذكية للجدولة</p>
+                      <ul className="space-y-1">
+                        {schedulingSuggestions.generalTips.slice(0, 3).map((tip, i) => (
+                          <li key={`tip-${i}`} className="text-xs text-blue-600 dark:text-blue-400">{tip}</li>
+                        ))}
+                        {schedulingSuggestions.smartRecommendations.slice(0, 2).map((rec, i) => (
+                          <li key={`rec-${i}`} className="text-xs text-indigo-600 dark:text-indigo-400">{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addNewMember}
-                    disabled={!newMemberName.trim()}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 ml-1" />
-                    إضافة
-                  </Button>
                 </div>
+              )}
+
+              {/* Similar Students Section */}
+              {sessionType && schedulingSuggestions.similarStudents.length > 0 && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border border-violet-200 dark:border-violet-800">
+                  <div className="flex items-start gap-2">
+                    <UserCheck className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+                    <div className="space-y-2 flex-1">
+                      <p className="font-medium text-violet-700 dark:text-violet-300 text-sm">
+                        👥 طلاب مشابهون ({sessionType === 'online' ? 'أونلاين' : 'حضوري'})
+                      </p>
+                      <div className="space-y-1.5">
+                        {schedulingSuggestions.similarStudents.slice(0, 3).map((student) => (
+                          <div
+                            key={student.studentId}
+                            className="flex items-center justify-between p-2 rounded-md bg-white/50 dark:bg-black/20"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Users className="h-3.5 w-3.5 text-violet-500" />
+                              <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
+                                {student.studentName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-violet-500 dark:text-violet-400">
+                                {student.matchingDayNames.slice(0, 2).join('، ')}
+                              </span>
+                              <span className="text-xs text-violet-600 dark:text-violet-300 font-medium">
+                                {student.sessionTimeAr}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Grouping Suggestions */}
+              {sessionType && schedulingSuggestions.groupingSuggestions.length > 0 && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30 border border-teal-200 dark:border-teal-800">
+                  <div className="flex items-start gap-2">
+                    <Calendar className="h-4 w-4 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
+                    <div className="space-y-2 flex-1">
+                      <p className="font-medium text-teal-700 dark:text-teal-300 text-sm">📅 اقتراحات التجميع</p>
+                      <div className="space-y-2">
+                        {schedulingSuggestions.groupingSuggestions.map((suggestion, i) => (
+                          <div
+                            key={`group-${i}`}
+                            className="p-2 rounded-md bg-white/50 dark:bg-black/20"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-teal-700 dark:text-teal-300">
+                                  {suggestion.dayName}
+                                </span>
+                                <span className="text-xs text-teal-600 dark:text-teal-400">
+                                  ({suggestion.reason})
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const existingSchedule = daySchedules.find(d => d.dayOfWeek === suggestion.dayOfWeek);
+                                  if (!existingSchedule) {
+                                    setDaySchedules(prev => [...prev, { dayOfWeek: suggestion.dayOfWeek, time: suggestion.suggestedTime }].sort((a, b) => a.dayOfWeek - b.dayOfWeek));
+                                  } else if (!existingSchedule.time) {
+                                    updateDayTime(suggestion.dayOfWeek, suggestion.suggestedTime);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700 hover:bg-teal-200 dark:bg-teal-900/50 dark:text-teal-300 dark:hover:bg-teal-900/70 transition-colors"
+                              >
+                                <Clock className="h-3 w-3" />
+                                {suggestion.suggestedTimeAr}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-teal-600 dark:text-teal-400">
+                              <span>{suggestion.benefit}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Day Selection with Per-Day Time */}
+              <div className="space-y-2">
+                {DAY_NAMES_AR.map((day, index) => {
+                  const schedule = daySchedules.find(d => d.dayOfWeek === index);
+                  const isSelected = !!schedule;
+                  const daySuggestion = schedulingSuggestions.daySuggestions[index];
+                  const isBestDay = schedulingSuggestions.bestDays.includes(index);
+                  const isAvoidDay = schedulingSuggestions.avoidDays.includes(index);
+
+                  return (
+                    <div
+                      key={day}
+                      className={cn(
+                        "flex flex-col gap-2 p-3 rounded-lg border-2 transition-all",
+                        isSelected
+                          ? "bg-primary/5 border-primary/30"
+                          : isBestDay && sessionType
+                            ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700"
+                            : isAvoidDay && sessionType
+                              ? "bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700"
+                              : "bg-card border-border hover:border-primary/20"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleDaySchedule(index)}
+                          />
+                          <span className={cn(
+                            "text-sm font-medium",
+                            isSelected ? "text-primary" : "text-foreground"
+                          )}>
+                            {day}
+                          </span>
+                        </label>
+
+                        {/* Smart suggestion badge */}
+                        {sessionType && daySuggestion && (
+                          <div className="flex items-center gap-1.5 flex-1">
+                            {daySuggestion.type === 'free_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                                <Sparkles className="h-3 w-3" />
+                                فارغ
+                              </span>
+                            )}
+                            {daySuggestion.type === 'light_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                                <Check className="h-3 w-3" />
+                                خفيف ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'moderate_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                <Clock className="h-3 w-3" />
+                                متوسط ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'busy_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+                                <AlertTriangle className="h-3 w-3" />
+                                مزدحم ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'same_type_cluster' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+                                {sessionType === 'online' ? <Monitor className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
+                                {sessionType === 'online' ? 'أونلاين' : 'حضوري'} ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'mixed_type' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                <Users className="h-3 w-3" />
+                                مختلط
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Time input */}
+                        {isSelected && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="time"
+                              value={schedule.time}
+                              onChange={(e) => updateDayTime(index, e.target.value)}
+                              className="w-32"
+                            />
+                            {schedule.time && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatTimeAr(schedule.time)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Suggested time slots */}
+                      {isSelected && !schedule.time && daySuggestion && daySuggestion.suggestedTimeSlots.length > 0 && (
+                        <div className="mr-8 mt-1">
+                          <p className="text-xs text-muted-foreground mb-1.5">⏰ أوقات مقترحة:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {daySuggestion.suggestedTimeSlots.map((slot, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => updateDayTime(index, slot.time)}
+                                className={cn(
+                                  "inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all",
+                                  slot.priority === 'high'
+                                    ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+                                )}
+                                title={slot.reason}
+                              >
+                                <Clock className="h-3 w-3" />
+                                {slot.timeAr}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Add from Existing Students */}
-              {availableStudents.length > 0 && (
-                <Collapsible open={showAddExisting} onOpenChange={setShowAddExisting}>
-                  <CollapsibleTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm" className="w-full justify-between">
-                      <span className="flex items-center gap-1">
-                        <UserPlus className="h-4 w-4" />
-                        إضافة من الطلاب الموجودين ({availableStudents.length})
+              {/* Summary of selected days */}
+              {daySchedules.length > 0 && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-2">ملخص الجدول:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {daySchedules.map((schedule) => (
+                      <span
+                        key={schedule.dayOfWeek}
+                        className={cn(
+                          "px-2 py-1 rounded text-xs font-medium",
+                          schedule.time
+                            ? "bg-primary/10 text-primary"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        )}
+                      >
+                        {DAY_NAMES_AR[schedule.dayOfWeek]}: {schedule.time ? formatTimeAr(schedule.time) : "⏰ حدد الوقت"}
                       </span>
-                      {showAddExisting ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-2">
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {availableStudents.map(student => (
-                        <button
-                          key={student.id}
-                          type="button"
-                          onClick={() => addExistingStudent(student)}
-                          className="w-full flex items-center justify-between p-2 rounded hover:bg-muted text-right"
-                        >
-                          <span className="text-sm">{student.name}</span>
-                          <Plus className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      ))}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
