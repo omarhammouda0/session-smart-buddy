@@ -477,7 +477,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               <p className="text-xs text-muted-foreground">اختر أيام الحصص وحدد الوقت لكل يوم</p>
 
               {/* Smart Scheduling Tips */}
-              {sessionType && schedulingSuggestions.generalTips.length > 0 && (
+              {sessionType && (schedulingSuggestions.generalTips.length > 0 || schedulingSuggestions.smartRecommendations.length > 0) && (
                 <div className="p-3 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800">
                   <div className="flex items-start gap-2">
                     <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
@@ -485,7 +485,10 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                       <p className="font-medium text-blue-700 dark:text-blue-300 text-sm">اقتراحات ذكية للجدولة</p>
                       <ul className="space-y-1">
                         {schedulingSuggestions.generalTips.map((tip, i) => (
-                          <li key={i} className="text-xs text-blue-600 dark:text-blue-400">{tip}</li>
+                          <li key={`tip-${i}`} className="text-xs text-blue-600 dark:text-blue-400">{tip}</li>
+                        ))}
+                        {schedulingSuggestions.smartRecommendations.map((rec, i) => (
+                          <li key={`rec-${i}`} className="text-xs text-indigo-600 dark:text-indigo-400">{rec}</li>
                         ))}
                       </ul>
                     </div>
@@ -627,6 +630,22 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                         <div className="mr-8 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                           <Car className="h-3 w-3" />
                           {daySuggestion.travelConsideration}
+                        </div>
+                      )}
+
+                      {/* Consecutive sessions warning */}
+                      {isSelected && daySuggestion?.consecutiveWarning && (
+                        <div className="mr-8 flex items-center gap-1.5 text-xs text-orange-600 dark:text-orange-400">
+                          <AlertTriangle className="h-3 w-3" />
+                          {daySuggestion.consecutiveWarning}
+                        </div>
+                      )}
+
+                      {/* Energy tip */}
+                      {isSelected && daySuggestion?.energyTip && (
+                        <div className="mr-8 flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400">
+                          <Sparkles className="h-3 w-3" />
+                          {daySuggestion.energyTip}
                         </div>
                       )}
                     </div>

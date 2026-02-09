@@ -13,11 +13,15 @@ export type SuggestionType =
 
 export type SuggestionPriority = 'high' | 'medium' | 'low';
 
+export type TimePeriod = 'morning' | 'afternoon' | 'evening';
+
 export interface SuggestedTimeSlot {
   time: string;        // HH:mm format
   timeAr: string;      // Arabic formatted time
   reason: string;      // Why this time is suggested
   priority: SuggestionPriority;
+  period?: TimePeriod;  // Time of day
+  isPeakHour?: boolean; // Whether this is a peak hour
 }
 
 export interface DaySuggestion {
@@ -33,15 +37,44 @@ export interface DaySuggestion {
   suggestedTimeSlots: SuggestedTimeSlot[];
   isRecommended: boolean;
   isWarning: boolean;
-  travelConsideration?: string; // For onsite sessions clustering
+  travelConsideration?: string;
+  consecutiveWarning?: string;     // Warning about back-to-back sessions
+  energyTip?: string;              // Tip about energy levels
+}
+
+// Peak hour analysis
+export interface PeakHourInfo {
+  hour: number;
+  sessionCount: number;
+  isPeak: boolean;
+}
+
+// Workload balance
+export interface WorkloadBalance {
+  morningCount: number;    // 8-12
+  afternoonCount: number;  // 12-17
+  eveningCount: number;    // 17-22
+  busiestPeriod: TimePeriod;
+  quietestPeriod: TimePeriod;
+  isBalanced: boolean;
 }
 
 export interface SchedulingSuggestions {
   daySuggestions: DaySuggestion[];
-  bestDays: number[];        // Top recommended days
-  avoidDays: number[];       // Days to avoid
+  bestDays: number[];
+  avoidDays: number[];
   generalTips: string[];
   overallLoad: 'light' | 'moderate' | 'heavy';
+  // Enhanced analytics
+  peakHours: PeakHourInfo[];
+  workloadBalance: WorkloadBalance;
+  weeklyStats: {
+    totalSessions: number;
+    avgSessionsPerDay: number;
+    consecutiveSessionDays: number[];
+    longestStreak: number;
+  };
+  smartRecommendations: string[];
 }
 
 // Threshold for busy day
@@ -70,6 +103,23 @@ const formatTimeAr = (time: string): string => {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
+// Get time period
+const getTimePeriod = (time: string): TimePeriod => {
+  const minutes = timeToMinutes(time);
+  if (minutes < 12 * 60) return 'morning';
+  if (minutes < 17 * 60) return 'afternoon';
+  return 'evening';
+};
+
+// Get Arabic name for time period
+const getPeriodNameAr = (period: TimePeriod): string => {
+  switch (period) {
+    case 'morning': return 'الصباح';
+    case 'afternoon': return 'الظهيرة';
+    case 'evening': return 'المساء';
+  }
+};
+
 interface ScheduledSession {
   time: string;
   duration: number;
@@ -83,6 +133,106 @@ interface DayStats {
   onlineSessions: number;
   onsiteSessions: number;
   scheduledSessions: ScheduledSession[];
+}
+
+/**
+ * Check if sessions are consecutive (back-to-back)
+ */
+function countConsecutiveSessions(sessions: ScheduledSession[]): number {
+  if (sessions.length < 2) return 0;
+
+  const sorted = [...sessions].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  let consecutiveCount = 0;
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const currentEnd = timeToMinutes(sorted[i].time) + sorted[i].duration;
+    const nextStart = timeToMinutes(sorted[i + 1].time);
+    const gap = nextStart - currentEnd;
+
+    // Less than 15 minutes gap = consecutive
+    if (gap < 15) {
+      consecutiveCount++;
+    }
+  }
+
+  return consecutiveCount;
+}
+
+/**
+ * Analyze peak hours across all days
+ */
+function analyzePeakHours(dayStats: DayStats[]): PeakHourInfo[] {
+  const hourCounts: Map<number, number> = new Map();
+
+  // Count sessions per hour
+  dayStats.forEach(day => {
+    day.scheduledSessions.forEach(session => {
+      const hour = Math.floor(timeToMinutes(session.time) / 60);
+      hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
+    });
+  });
+
+  // Find threshold for peak (60% of max)
+  const counts = Array.from(hourCounts.values());
+  const maxCount = Math.max(...counts, 0);
+  const peakThreshold = maxCount * 0.6;
+
+  // Build peak hours info
+  const peakHours: PeakHourInfo[] = [];
+  for (let hour = 8; hour <= 21; hour++) {
+    const count = hourCounts.get(hour) || 0;
+    peakHours.push({
+      hour,
+      sessionCount: count,
+      isPeak: count >= peakThreshold && count > 0,
+    });
+  }
+
+  return peakHours;
+}
+
+/**
+ * Analyze workload balance across time periods
+ */
+function analyzeWorkloadBalance(dayStats: DayStats[]): WorkloadBalance {
+  let morningCount = 0;
+  let afternoonCount = 0;
+  let eveningCount = 0;
+
+  dayStats.forEach(day => {
+    day.scheduledSessions.forEach(session => {
+      const period = getTimePeriod(session.time);
+      switch (period) {
+        case 'morning': morningCount++; break;
+        case 'afternoon': afternoonCount++; break;
+        case 'evening': eveningCount++; break;
+      }
+    });
+  });
+
+  const counts: Record<TimePeriod, number> = {
+    morning: morningCount,
+    afternoon: afternoonCount,
+    evening: eveningCount,
+  };
+
+  const periods: TimePeriod[] = ['morning', 'afternoon', 'evening'];
+  const busiestPeriod = periods.reduce((a, b) => counts[a] > counts[b] ? a : b);
+  const quietestPeriod = periods.reduce((a, b) => counts[a] < counts[b] ? a : b);
+
+  // Check if balanced (no period has more than 2x another)
+  const max = Math.max(morningCount, afternoonCount, eveningCount);
+  const min = Math.min(morningCount, afternoonCount, eveningCount);
+  const isBalanced = min === 0 ? max <= 3 : max / min <= 2;
+
+  return {
+    morningCount,
+    afternoonCount,
+    eveningCount,
+    busiestPeriod,
+    quietestPeriod,
+    isBalanced,
+  };
 }
 
 /**
@@ -129,8 +279,30 @@ export const useSchedulingSuggestions = (
       day.scheduledSessions.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
     });
 
+    // Analyze peak hours and workload balance
+    const peakHours = analyzePeakHours(dayStats);
+    const workloadBalance = analyzeWorkloadBalance(dayStats);
+
     // Calculate total weekly sessions
     const totalWeeklySessions = dayStats.reduce((sum, d) => sum + d.totalSessions, 0);
+    const avgSessionsPerDay = totalWeeklySessions / 7;
+
+    // Find days with consecutive sessions
+    const consecutiveSessionDays = dayStats
+      .filter(d => countConsecutiveSessions(d.scheduledSessions) > 0)
+      .map(d => d.dayOfWeek);
+
+    // Find longest streak of working days
+    let longestStreak = 0;
+    let currentStreak = 0;
+    for (let i = 0; i < 7; i++) {
+      if (dayStats[i].totalSessions > 0) {
+        currentStreak++;
+        longestStreak = Math.max(longestStreak, currentStreak);
+      } else {
+        currentStreak = 0;
+      }
+    }
 
     // Determine overall load
     let overallLoad: 'light' | 'moderate' | 'heavy' = 'light';
@@ -139,7 +311,8 @@ export const useSchedulingSuggestions = (
 
     // Generate suggestions for each day
     const daySuggestions: DaySuggestion[] = dayStats.map(day => {
-      const suggestedTimeSlots = findAvailableTimeSlots(day.scheduledSessions, newSessionType);
+      const suggestedTimeSlots = findAvailableTimeSlots(day.scheduledSessions, newSessionType, peakHours, workloadBalance);
+      const consecutiveCount = countConsecutiveSessions(day.scheduledSessions);
 
       const suggestion: DaySuggestion = {
         dayOfWeek: day.dayOfWeek,
@@ -225,6 +398,24 @@ export const useSchedulingSuggestions = (
         suggestion.travelConsideration = '🚗 يوجد ' + day.onsiteSessions + ' جلسات حضورية - تأكد من وجود وقت كافٍ للتنقل';
       }
 
+      // RULE 7: Consecutive sessions warning
+      if (consecutiveCount > 0) {
+        suggestion.consecutiveWarning = `⚡ ${consecutiveCount} جلسات متتالية بدون استراحة - قد تحتاج راحة بين الحصص`;
+      }
+
+      // RULE 8: Energy tip based on time distribution
+      if (day.scheduledSessions.length > 0) {
+        const periods = day.scheduledSessions.map(s => getTimePeriod(s.time));
+        const eveningSessionCount = periods.filter(p => p === 'evening').length;
+        const morningSessionCount = periods.filter(p => p === 'morning').length;
+
+        if (eveningSessionCount >= 3) {
+          suggestion.energyTip = '🌙 معظم الجلسات مسائية - تأكد من الحصول على راحة كافية';
+        } else if (morningSessionCount >= 3) {
+          suggestion.energyTip = '☀️ معظم الجلسات صباحية - ابدأ يومك بنشاط!';
+        }
+      }
+
       return suggestion;
     });
 
@@ -279,12 +470,60 @@ export const useSchedulingSuggestions = (
       }
     }
 
+    // Generate smart recommendations
+    const smartRecommendations: string[] = [];
+
+    // Peak hours recommendation
+    const peakHoursList = peakHours.filter(h => h.isPeak);
+    if (peakHoursList.length > 0) {
+      const peakTimes = peakHoursList.map(h => formatTimeAr(`${h.hour}:00`)).join('، ');
+      smartRecommendations.push(`🔥 أوقات الذروة: ${peakTimes} - فكر في أوقات أخرى لتوزيع أفضل`);
+    }
+
+    // Workload balance recommendation
+    if (!workloadBalance.isBalanced) {
+      const busyPeriod = getPeriodNameAr(workloadBalance.busiestPeriod);
+      const quietPeriod = getPeriodNameAr(workloadBalance.quietestPeriod);
+      smartRecommendations.push(`⚖️ معظم جلساتك في ${busyPeriod} - جرب إضافة جلسات في ${quietPeriod}`);
+    }
+
+    // Consecutive days recommendation
+    if (longestStreak >= 5) {
+      smartRecommendations.push(`📅 لديك ${longestStreak} أيام متتالية بها جلسات - خذ يوم راحة!`);
+    }
+
+    // Rest day recommendation
+    const restDays = dayStats.filter(d => d.totalSessions === 0).length;
+    if (restDays === 0 && totalWeeklySessions > 10) {
+      smartRecommendations.push('🧘 لا يوجد يوم راحة! حاول إبقاء يوم واحد على الأقل فارغاً');
+    }
+
+    // Session variety recommendation
+    const onlineTotal = dayStats.reduce((sum, d) => sum + d.onlineSessions, 0);
+    const onsiteTotal = dayStats.reduce((sum, d) => sum + d.onsiteSessions, 0);
+    if (onlineTotal > 0 && onsiteTotal > 0) {
+      const ratio = Math.max(onlineTotal, onsiteTotal) / Math.min(onlineTotal, onsiteTotal);
+      if (ratio > 3) {
+        const dominant = onlineTotal > onsiteTotal ? 'أونلاين' : 'حضوري';
+        smartRecommendations.push(`📊 معظم جلساتك ${dominant} - التنويع قد يساعد في تجديد النشاط`);
+      }
+    }
+
     return {
       daySuggestions,
       bestDays,
       avoidDays,
       generalTips,
       overallLoad,
+      peakHours,
+      workloadBalance,
+      weeklyStats: {
+        totalSessions: totalWeeklySessions,
+        avgSessionsPerDay,
+        consecutiveSessionDays,
+        longestStreak,
+      },
+      smartRecommendations,
     };
   }, [students, newSessionType]);
 };
@@ -294,7 +533,9 @@ export const useSchedulingSuggestions = (
  */
 function findAvailableTimeSlots(
   sessions: ScheduledSession[],
-  newSessionType: SessionType | null
+  newSessionType: SessionType | null,
+  peakHours: PeakHourInfo[],
+  workloadBalance: WorkloadBalance
 ): SuggestedTimeSlot[] {
   const availableSlots: SuggestedTimeSlot[] = [];
 
@@ -305,14 +546,44 @@ function findAvailableTimeSlots(
   const minGap = 30;          // Minimum 30 min gap
   const travelTime = 45;      // Extra time for onsite travel
 
+  // Helper to check if hour is peak
+  const isPeakHour = (hour: number): boolean => {
+    const info = peakHours.find(h => h.hour === hour);
+    return info?.isPeak || false;
+  };
+
+  // Get priority based on workload balance
+  const getPriorityForPeriod = (period: TimePeriod): SuggestionPriority => {
+    if (period === workloadBalance.quietestPeriod) return 'high';
+    if (period === workloadBalance.busiestPeriod) return 'low';
+    return 'medium';
+  };
+
   if (sessions.length === 0) {
-    // Return common time slots for empty days
-    return [
-      { time: '10:00', timeAr: formatTimeAr('10:00'), reason: 'وقت صباحي مريح', priority: 'high' },
-      { time: '14:00', timeAr: formatTimeAr('14:00'), reason: 'بعد الظهر', priority: 'medium' },
-      { time: '16:00', timeAr: formatTimeAr('16:00'), reason: 'وقت العصر - الأكثر شيوعاً', priority: 'high' },
-      { time: '18:00', timeAr: formatTimeAr('18:00'), reason: 'وقت المساء', priority: 'medium' },
+    // Return slots prioritizing quietest period and non-peak hours
+    const slots: SuggestedTimeSlot[] = [
+      { time: '10:00', timeAr: formatTimeAr('10:00'), reason: 'وقت صباحي مريح', priority: getPriorityForPeriod('morning'), period: 'morning', isPeakHour: isPeakHour(10) },
+      { time: '14:00', timeAr: formatTimeAr('14:00'), reason: 'بعد الظهر', priority: getPriorityForPeriod('afternoon'), period: 'afternoon', isPeakHour: isPeakHour(14) },
+      { time: '16:00', timeAr: formatTimeAr('16:00'), reason: 'وقت العصر - الأكثر شيوعاً', priority: getPriorityForPeriod('afternoon'), period: 'afternoon', isPeakHour: isPeakHour(16) },
+      { time: '18:00', timeAr: formatTimeAr('18:00'), reason: 'وقت المساء', priority: getPriorityForPeriod('evening'), period: 'evening', isPeakHour: isPeakHour(18) },
     ];
+
+    // Boost non-peak hours priority
+    slots.forEach(slot => {
+      if (!slot.isPeakHour && slot.priority === 'medium') {
+        slot.priority = 'high';
+        slot.reason += ' (غير مزدحم)';
+      } else if (slot.isPeakHour && slot.priority === 'high') {
+        slot.priority = 'medium';
+        slot.reason += ' (وقت ذروة)';
+      }
+    });
+
+    return slots.sort((a, b) => {
+      if (a.priority === 'high' && b.priority !== 'high') return -1;
+      if (b.priority === 'high' && a.priority !== 'high') return 1;
+      return 0;
+    });
   }
 
   // Sort sessions by time
@@ -329,11 +600,17 @@ function findAvailableTimeSlots(
   if (firstStart - startOfDay >= requiredGapBefore) {
     const suggestedTime = Math.max(startOfDay, firstStart - requiredGapBefore);
     const timeStr = minutesToTime(suggestedTime);
+    const hour = Math.floor(suggestedTime / 60);
+    const period = getTimePeriod(timeStr);
+    const peak = isPeakHour(hour);
+
     availableSlots.push({
       time: timeStr,
       timeAr: formatTimeAr(timeStr),
-      reason: `قبل جلسة ${sortedSessions[0].studentName}`,
-      priority: 'medium',
+      reason: peak ? `قبل جلسة ${sortedSessions[0].studentName} (وقت ذروة)` : `قبل جلسة ${sortedSessions[0].studentName}`,
+      priority: peak ? 'low' : getPriorityForPeriod(period),
+      period,
+      isPeakHour: peak,
     });
   }
 
@@ -355,11 +632,17 @@ function findAvailableTimeSlots(
       // There's room for a session in this gap
       const suggestedTime = currentEnd + (newSessionType === 'onsite' ? travelTime : minGap);
       const timeStr = minutesToTime(suggestedTime);
+      const hour = Math.floor(suggestedTime / 60);
+      const period = getTimePeriod(timeStr);
+      const peak = isPeakHour(hour);
+
       availableSlots.push({
         time: timeStr,
         timeAr: formatTimeAr(timeStr),
         reason: `بين ${currentSession.studentName} و ${nextSession.studentName}`,
-        priority: 'high',
+        priority: 'high', // Gaps between sessions are always good
+        period,
+        isPeakHour: peak,
       });
     }
   }
@@ -374,22 +657,34 @@ function findAvailableTimeSlots(
   if (endOfDay - lastEnd >= requiredGapAfter) {
     const suggestedTime = lastEnd + (newSessionType === 'onsite' ? travelTime : minGap);
     const timeStr = minutesToTime(suggestedTime);
+    const hour = Math.floor(suggestedTime / 60);
+    const period = getTimePeriod(timeStr);
+    const peak = isPeakHour(hour);
+
     availableSlots.push({
       time: timeStr,
       timeAr: formatTimeAr(timeStr),
-      reason: `بعد جلسة ${lastSession.studentName}`,
-      priority: 'medium',
+      reason: peak ? `بعد جلسة ${lastSession.studentName} (وقت ذروة)` : `بعد جلسة ${lastSession.studentName}`,
+      priority: peak ? 'medium' : getPriorityForPeriod(period),
+      period,
+      isPeakHour: peak,
     });
   }
 
-  // Sort by priority and limit to 4 suggestions
+  // Sort by priority (non-peak first, then by priority level) and limit to 5 suggestions
   return availableSlots
     .sort((a, b) => {
+      // Non-peak hours first
+      if (!a.isPeakHour && b.isPeakHour) return -1;
+      if (a.isPeakHour && !b.isPeakHour) return 1;
+      // Then by priority
       if (a.priority === 'high' && b.priority !== 'high') return -1;
       if (b.priority === 'high' && a.priority !== 'high') return 1;
+      if (a.priority === 'medium' && b.priority === 'low') return -1;
+      if (b.priority === 'medium' && a.priority === 'low') return 1;
       return 0;
     })
-    .slice(0, 4);
+    .slice(0, 5);
 }
 
 export default useSchedulingSuggestions;
