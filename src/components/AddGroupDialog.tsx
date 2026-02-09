@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Users, Clock, Monitor, MapPin, DollarSign, X, ChevronDown, ChevronUp, Lightbulb, Sparkles, AlertTriangle, Check, Calendar, UserCheck } from 'lucide-react';
-import { SessionType, Student, ScheduleDay, GroupMember } from '@/types/student';
+import { SessionType, Student, ScheduleDay, GroupMember, StudentGroup } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { DurationPicker } from '@/components/DurationPicker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -31,7 +31,9 @@ interface MemberInput {
 }
 
 interface AddGroupDialogProps {
-  onAdd: (
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddGroup: (
     name: string,
     members: Omit<GroupMember, 'joinedAt' | 'isActive'>[],
     defaultPricePerStudent: number,
@@ -43,12 +45,18 @@ interface AddGroupDialogProps {
     semesterEnd: string,
     description?: string,
     color?: string
-  ) => void;
-  existingStudents?: Student[];
-  defaultStart: string;
-  defaultEnd: string;
-  defaultPriceOnsite?: number;
-  defaultPriceOnline?: number;
+  ) => void | Promise<StudentGroup | null>;
+  students?: Student[];
+  settings?: {
+    defaultPriceOnline?: number;
+    defaultPriceOnsite?: number;
+    semesterStart?: string;
+    semesterEnd?: string;
+  };
+  // Edit mode props
+  editMode?: boolean;
+  groupToEdit?: StudentGroup | null;
+  onUpdateGroup?: (groupId: string, updates: Partial<StudentGroup>) => void | Promise<void>;
 }
 
 // Format time in Arabic
@@ -71,14 +79,19 @@ const GROUP_COLORS = [
 ];
 
 export const AddGroupDialog = ({
-  onAdd,
-  existingStudents = [],
-  defaultStart,
-  defaultEnd,
-  defaultPriceOnsite = 150,
-  defaultPriceOnline = 120,
+  open,
+  onOpenChange,
+  onAddGroup,
+  students: existingStudents = [],
+  settings = {},
+  editMode = false,
+  groupToEdit = null,
+  onUpdateGroup,
 }: AddGroupDialogProps) => {
-  const [open, setOpen] = useState(false);
+  const defaultStart = settings.semesterStart || new Date().toISOString().split('T')[0];
+  const defaultEnd = settings.semesterEnd || new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const defaultPriceOnsite = settings.defaultPriceOnsite || 150;
+  const defaultPriceOnline = settings.defaultPriceOnline || 120;
 
   // Group info
   const [groupName, setGroupName] = useState('');
@@ -99,6 +112,33 @@ export const AddGroupDialog = ({
   // Members
   const [members, setMembers] = useState<MemberInput[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+
+  // Initialize form when editing
+  useState(() => {
+    if (editMode && groupToEdit && open) {
+      setGroupName(groupToEdit.name);
+      setDescription(groupToEdit.description || '');
+      setSelectedColor(groupToEdit.color || 'blue');
+      setSessionType(groupToEdit.sessionType);
+      setSessionDuration(groupToEdit.sessionDuration);
+      setDefaultPrice(groupToEdit.defaultPricePerStudent);
+      setDaySchedules(groupToEdit.scheduleDays.map(d => ({
+        dayOfWeek: d.dayOfWeek,
+        time: d.time || groupToEdit.sessionTime,
+      })));
+      setCustomStart(groupToEdit.semesterStart);
+      setCustomEnd(groupToEdit.semesterEnd);
+      setMembers(groupToEdit.members.filter(m => m.isActive).map(m => ({
+        id: m.studentId,
+        name: m.studentName,
+        phone: m.phone,
+        parentPhone: m.parentPhone,
+        customPrice: m.customPrice,
+        useCustomPrice: !!m.customPrice,
+      })));
+    }
+  });
+
 
   // Get scheduling suggestions
   const schedulingSuggestions = useSchedulingSuggestions(existingStudents, sessionType);
@@ -200,43 +240,51 @@ export const AddGroupDialog = ({
 
     const useCustom = showCustomDates;
 
-    onAdd(
-      groupName.trim(),
-      groupMembers,
-      defaultPrice,
-      sessionType,
-      scheduleDays,
-      sessionDuration,
-      primaryTime,
-      useCustom ? customStart : defaultStart,
-      useCustom ? customEnd : defaultEnd,
-      description.trim() || undefined,
-      selectedColor
-    );
+    if (editMode && groupToEdit && onUpdateGroup) {
+      // Update existing group
+      onUpdateGroup(groupToEdit.id, {
+        name: groupName.trim(),
+        description: description.trim() || undefined,
+        color: selectedColor,
+        defaultPricePerStudent: defaultPrice,
+        sessionType,
+        sessionDuration,
+        sessionTime: primaryTime,
+      });
+    } else {
+      // Add new group
+      onAddGroup(
+        groupName.trim(),
+        groupMembers,
+        defaultPrice,
+        sessionType,
+        scheduleDays,
+        sessionDuration,
+        primaryTime,
+        useCustom ? customStart : defaultStart,
+        useCustom ? customEnd : defaultEnd,
+        description.trim() || undefined,
+        selectedColor
+      );
+    }
 
     resetForm();
-    setOpen(false);
+    onOpenChange(false);
   };
 
   const isValid = groupName.trim() &&
     sessionType &&
     daySchedules.length > 0 &&
     daySchedules.every(d => d.time) &&
-    members.length > 0;
+    (editMode || members.length > 0);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Users className="h-4 w-4" />
-          إضافة مجموعة
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetForm(); }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" dir="rtl">
         <DialogHeader>
           <DialogTitle className="font-heading text-xl flex items-center gap-2">
             <Users className="h-5 w-5" />
-            إضافة مجموعة جديدة
+            {editMode ? 'تعديل المجموعة' : 'إضافة مجموعة جديدة'}
           </DialogTitle>
         </DialogHeader>
         <DialogBody>
@@ -769,9 +817,9 @@ export const AddGroupDialog = ({
             disabled={!isValid}
           >
             <Users className="h-4 w-4 ml-2" />
-            إنشاء المجموعة
+            {editMode ? 'حفظ التغييرات' : 'إنشاء المجموعة'}
           </Button>
-          <Button type="button" variant="outline" onClick={() => setOpen(false)} className="w-full sm:flex-1">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:flex-1">
             إلغاء
           </Button>
         </DialogFooter>

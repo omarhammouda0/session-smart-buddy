@@ -75,6 +75,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Student, PaymentMethod, Session } from "@/types/student";
 import { SessionNotesDialog } from "@/components/SessionNotesDialog";
 import { useSessionNotifications } from "@/hooks/useSessionNotifications";
@@ -296,6 +302,11 @@ const Index = () => {
     group: StudentGroup | null;
     session: GroupSession | null;
   }>({ open: false, group: null, session: null });
+
+  // State for add/edit/delete group dialogs
+  const [addGroupDialog, setAddGroupDialog] = useState<{ open: boolean }>({ open: false });
+  const [editGroupDialog, setEditGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
+  const [deleteGroupDialog, setDeleteGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
 
   // Session Notifications
   const {
@@ -1103,7 +1114,7 @@ const Index = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-4 mb-3 sm:mb-4 h-auto min-h-[2.75rem] sm:h-12 bg-muted/50 p-0.5 sm:p-1 rounded-lg sm:rounded-xl gap-0.5 sm:gap-1">
+          <TabsList className="w-full grid grid-cols-5 mb-3 sm:mb-4 h-auto min-h-[2.75rem] sm:h-12 bg-muted/50 p-0.5 sm:p-1 rounded-lg sm:rounded-xl gap-0.5 sm:gap-1">
             <TabsTrigger
               value="sessions"
               className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
@@ -1122,8 +1133,15 @@ const Index = () => {
               value="history"
               className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
             >
-              <History className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
+              <GraduationCap className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
               <span className="leading-tight">الطلبة</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="groups"
+              className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
+            >
+              <Users className="h-4 w-4 sm:h-4 sm:w-4 shrink-0" />
+              <span className="leading-tight">المجموعات</span>
             </TabsTrigger>
             <TabsTrigger
               value="payments"
@@ -1826,6 +1844,196 @@ const Index = () => {
               settings={settings}
             />
           </TabsContent>
+
+          {/* Groups Tab */}
+          <TabsContent value="groups" className="mt-0 space-y-4">
+            <Card className="border overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-display font-bold flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-violet-500/10">
+                      <Users className="h-4 w-4 text-violet-600" />
+                    </div>
+                    المجموعات ({groups.length})
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => setAddGroupDialog({ open: true })}
+                    className="gap-1.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    إضافة مجموعة
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {groups.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center">
+                      <Users className="h-8 w-8 text-violet-500" />
+                    </div>
+                    <h3 className="font-display font-bold text-lg mb-2 text-violet-700 dark:text-violet-300">لا توجد مجموعات</h3>
+                    <p className="text-sm text-muted-foreground mb-4">أضف مجموعة جديدة لبدء إدارة حصص المجموعات</p>
+                    <Button
+                      onClick={() => setAddGroupDialog({ open: true })}
+                      className="gap-2 bg-gradient-to-r from-violet-500 to-purple-500"
+                    >
+                      <Plus className="h-4 w-4" />
+                      إضافة مجموعة
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {groups.map((group) => {
+                      const activeMembers = group.members.filter(m => m.isActive);
+                      const completedSessions = group.sessions.filter(s => s.status === 'completed').length;
+                      const totalSessions = group.sessions.length;
+                      const upcomingSessions = group.sessions.filter(s => s.status === 'scheduled' && new Date(s.date) >= new Date()).length;
+
+                      return (
+                        <div
+                          key={group.id}
+                          className={cn(
+                            "p-4 transition-all hover:bg-violet-50/50 dark:hover:bg-violet-950/20",
+                            !group.isActive && "opacity-50 bg-muted/30"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shrink-0 shadow-md">
+                                <Users className="h-6 w-6 text-white" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-bold text-base truncate text-violet-700 dark:text-violet-300">
+                                    {group.name}
+                                  </h4>
+                                  {!group.isActive && (
+                                    <Badge variant="outline" className="text-[10px] h-5 bg-muted text-muted-foreground">
+                                      محذوفة
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-2">
+                                  <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {activeMembers.length} طالب
+                                  </span>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1">
+                                    {group.sessionType === 'online' ? (
+                                      <Monitor className="h-3 w-3 text-blue-500" />
+                                    ) : (
+                                      <MapPin className="h-3 w-3 text-emerald-500" />
+                                    )}
+                                    {group.sessionType === 'online' ? 'أونلاين' : 'حضوري'}
+                                  </span>
+                                  <span>•</span>
+                                  <span>{group.sessionDuration} دقيقة</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] h-5 bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">
+                                    {completedSessions}/{totalSessions} حصة
+                                  </Badge>
+                                  {upcomingSessions > 0 && (
+                                    <Badge variant="outline" className="text-[10px] h-5 bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                      {upcomingSessions} قادمة
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-[10px] h-5">
+                                    {group.defaultPricePerStudent} ج.م/طالب
+                                  </Badge>
+                                </div>
+                                {/* Members list */}
+                                {activeMembers.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {activeMembers.slice(0, 5).map(member => (
+                                      <Badge key={member.studentId} variant="secondary" className="text-[10px] h-5">
+                                        {member.studentName}
+                                      </Badge>
+                                    ))}
+                                    {activeMembers.length > 5 && (
+                                      <Badge variant="secondary" className="text-[10px] h-5">
+                                        +{activeMembers.length - 5}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {group.isActive ? (
+                                <>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-violet-600 hover:text-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30"
+                                    onClick={() => setEditGroupDialog({ open: true, group })}
+                                    title="تعديل المجموعة"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          const todaySession = group.sessions.find(s => s.date === todayStr);
+                                          if (todaySession) {
+                                            setGroupAttendanceDialog({ open: true, group, session: todaySession });
+                                          }
+                                        }}
+                                        disabled={!group.sessions.find(s => s.date === todayStr)}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4 ml-2" />
+                                        تسجيل حضور اليوم
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => setEditGroupDialog({ open: true, group })}
+                                      >
+                                        <Pencil className="h-4 w-4 ml-2" />
+                                        تعديل المجموعة
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-red-600 focus:text-red-600"
+                                        onClick={() => setDeleteGroupDialog({ open: true, group })}
+                                      >
+                                        <Trash2 className="h-4 w-4 ml-2" />
+                                        حذف المجموعة
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateGroup(group.id, { isActive: true })}
+                                  className="h-8 text-xs"
+                                >
+                                  استعادة
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         <EndOfMonthReminder students={students} payments={payments} onTogglePayment={togglePaymentStatus} />
@@ -2186,6 +2394,60 @@ const Index = () => {
           onCompleteSession={completeGroupSession}
         />
       )}
+
+      {/* Add Group Dialog */}
+      <AddGroupDialog
+        open={addGroupDialog.open}
+        onOpenChange={(open) => setAddGroupDialog({ open })}
+        onAddGroup={addGroup}
+        students={students}
+        settings={settings}
+      />
+
+      {/* Edit Group Dialog */}
+      {editGroupDialog.group && (
+        <AddGroupDialog
+          open={editGroupDialog.open}
+          onOpenChange={(open) => !open && setEditGroupDialog({ open: false, group: null })}
+          onAddGroup={addGroup}
+          students={students}
+          settings={settings}
+          editMode
+          groupToEdit={editGroupDialog.group}
+          onUpdateGroup={updateGroup}
+        />
+      )}
+
+      {/* Delete Group Confirmation Dialog */}
+      <AlertDialog
+        open={deleteGroupDialog.open}
+        onOpenChange={(open) => !open && setDeleteGroupDialog({ open: false, group: null })}
+      >
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف المجموعة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف مجموعة "{deleteGroupDialog.group?.name}"؟
+              <br />
+              سيتم حذف جميع الحصص والسجلات المرتبطة بها.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (deleteGroupDialog.group) {
+                  deleteGroup(deleteGroupDialog.group.id);
+                  setDeleteGroupDialog({ open: false, group: null });
+                }
+              }}
+            >
+              حذف المجموعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
