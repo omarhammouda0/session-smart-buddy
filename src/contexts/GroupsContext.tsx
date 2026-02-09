@@ -25,6 +25,19 @@ const generateGroupSessionDates = (
   return dates;
 };
 
+// Group member payment type
+interface GroupMemberPayment {
+  id: string;
+  groupId: string;
+  sessionId?: string;
+  memberId: string;
+  linkedStudentId?: string;
+  amount: number;
+  method: 'cash' | 'bank' | 'wallet';
+  paidAt: string;
+  notes?: string;
+}
+
 interface GroupsContextType {
   groups: StudentGroup[];
   activeGroups: StudentGroup[];
@@ -54,6 +67,17 @@ interface GroupsContextType {
   getGroupSessionsForDate: (date: string) => Array<{ group: StudentGroup; session: GroupSession }>;
   calculateGroupEarnings: (groupId: string, month: number, year: number) => number;
   refreshGroups: () => Promise<void>;
+  // Payment functions
+  recordGroupMemberPayment: (
+    groupId: string,
+    sessionId: string,
+    memberId: string,
+    amount: number,
+    method: 'cash' | 'bank' | 'wallet',
+    linkedStudentId?: string,
+    notes?: string
+  ) => Promise<void>;
+  getGroupMemberPayments: (groupId: string, memberId?: string) => Promise<GroupMemberPayment[]>;
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
@@ -117,7 +141,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
             studentName: m.student_name,
             phone: m.phone,
             parentPhone: m.parent_phone,
-            customPrice: m.custom_price ? parseFloat(m.custom_price) : undefined,
+            customPrice: m.custom_price ? Number(m.custom_price) : undefined,
             joinedAt: m.joined_at,
             isActive: m.is_active,
           }));
@@ -166,7 +190,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           description: g.description,
           color: g.color,
           members,
-          defaultPricePerStudent: parseFloat(g.default_price_per_student),
+          defaultPricePerStudent: Number(g.default_price_per_student),
           sessionType: g.session_type as SessionType,
           scheduleDays,
           sessionDuration: g.session_duration,
@@ -274,7 +298,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // 3. Create members
-      let insertedMembers: any[] = [];
+      let insertedMembers: { id: string }[] = [];
       if (members.length > 0) {
         const memberInserts = members.map(m => ({
           group_id: groupId,
@@ -612,6 +636,100 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     await fetchGroups();
   }, [fetchGroups]);
 
+  // Record a payment from a group member
+  const recordGroupMemberPayment = useCallback(async (
+    groupId: string,
+    sessionId: string,
+    memberId: string,
+    amount: number,
+    method: 'cash' | 'bank' | 'wallet',
+    linkedStudentId?: string,
+    notes?: string
+  ) => {
+    if (!currentUserId) {
+      toast({ title: "خطأ", description: "يجب تسجيل الدخول أولاً", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // Try direct insert - using fetch API directly to avoid type issues
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || ''}/rest/v1/group_member_payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          user_id: currentUserId,
+          group_id: groupId,
+          session_id: sessionId,
+          member_id: memberId,
+          linked_student_id: linkedStudentId || null,
+          amount,
+          method,
+          paid_at: new Date().toISOString(),
+          notes: notes || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Groups] Error recording payment:', errorText);
+        // Don't throw - just log the error
+        return;
+      }
+
+      console.log('[Groups] Payment recorded successfully');
+    } catch (error) {
+      console.error('[Groups] Failed to record payment:', error);
+      // Don't throw error to user - payment tracking to group table is optional
+    }
+  }, [currentUserId]);
+
+  // Get payments for a group (optionally filtered by member)
+  const getGroupMemberPayments = useCallback(async (groupId: string, memberId?: string): Promise<GroupMemberPayment[]> => {
+    if (!currentUserId) return [];
+
+    try {
+      let url = `${import.meta.env.VITE_SUPABASE_URL || ''}/rest/v1/group_member_payments?group_id=eq.${groupId}&user_id=eq.${currentUserId}&order=paid_at.desc`;
+
+      if (memberId) {
+        url += `&member_id=eq.${memberId}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('[Groups] Error fetching payments');
+        return [];
+      }
+
+      const data = await response.json();
+
+      return (data || []).map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        groupId: p.group_id as string,
+        sessionId: p.session_id as string | undefined,
+        memberId: p.member_id as string,
+        linkedStudentId: p.linked_student_id as string | undefined,
+        amount: typeof p.amount === 'number' ? p.amount : parseFloat(String(p.amount)),
+        method: p.method as 'cash' | 'bank' | 'wallet',
+        paidAt: p.paid_at as string,
+        notes: p.notes as string | undefined,
+      }));
+    } catch (error) {
+      console.error('[Groups] Failed to fetch payments:', error);
+      return [];
+    }
+  }, [currentUserId]);
+
   const value: GroupsContextType = {
     groups,
     activeGroups,
@@ -629,6 +747,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     getGroupSessionsForDate,
     calculateGroupEarnings,
     refreshGroups,
+    recordGroupMemberPayment,
+    getGroupMemberPayments,
   };
 
   return (

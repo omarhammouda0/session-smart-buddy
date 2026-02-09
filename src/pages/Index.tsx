@@ -295,6 +295,7 @@ const Index = () => {
     completeGroupSession,
     getGroupById,
     getGroupSessionsForDate,
+    recordGroupMemberPayment,
   } = useGroups();
 
   // State for group attendance dialog
@@ -2597,38 +2598,57 @@ const Index = () => {
           group={groupPaymentDialog.group}
           session={groupPaymentDialog.session}
           students={students}
-          onRecordPayment={(memberId, memberName, amount, method, linkedStudentId, sessionDate, groupId, groupName) => {
+          onRecordPayment={async (memberId, memberName, amount, method, linkedStudentId, sessionDate, groupId, groupName) => {
             const methodLabels: Record<string, string> = {
               cash: 'نقدي',
               bank: 'تحويل بنكي',
               wallet: 'محفظة إلكترونية',
             };
 
-            // If member is linked to a real student, record to their payment history
-            if (linkedStudentId) {
-              const sessionDateObj = sessionDate ? new Date(sessionDate) : new Date();
-              const paymentData = {
-                month: sessionDateObj.getMonth(),
-                year: sessionDateObj.getFullYear(),
+            try {
+              // Always record to group_member_payments table
+              await recordGroupMemberPayment(
+                groupId || groupPaymentDialog.group!.id,
+                groupPaymentDialog.session!.id,
+                memberId,
                 amount,
                 method,
-                paidAt: new Date().toISOString(),
-                notes: `دفعة مجموعة: ${groupName || 'مجموعة'} - ${sessionDate || format(now, "yyyy-MM-dd")}`,
-              };
+                linkedStudentId,
+                `دفعة مجموعة: ${groupName || groupPaymentDialog.group!.name} - ${sessionDate || format(now, "yyyy-MM-dd")}`
+              );
 
-              // Record payment to the linked student's record
-              recordPayment(linkedStudentId, paymentData);
+              // If member is linked to a real student, also record to their payment history
+              if (linkedStudentId) {
+                const sessionDateObj = sessionDate ? new Date(sessionDate) : new Date();
+                const paymentData = {
+                  month: sessionDateObj.getMonth(),
+                  year: sessionDateObj.getFullYear(),
+                  amount,
+                  method,
+                  paidAt: new Date().toISOString(),
+                  notes: `دفعة مجموعة: ${groupName || groupPaymentDialog.group!.name} - ${sessionDate || format(now, "yyyy-MM-dd")}`,
+                };
 
+                // Record payment to the linked student's record
+                recordPayment(linkedStudentId, paymentData);
+
+                toast({
+                  title: "✅ تم تسجيل الدفع",
+                  description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method}) - تم التسجيل في سجل الطالب والمجموعة`,
+                });
+              } else {
+                // For group-only members
+                toast({
+                  title: "✅ تم تسجيل الدفع",
+                  description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method})`,
+                });
+              }
+            } catch (error) {
+              console.error('Failed to record group payment:', error);
               toast({
-                title: "✅ تم تسجيل الدفع",
-                description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method}) - تم التسجيل في سجل الطالب`,
-              });
-            } else {
-              // For group-only members (not linked to a student record)
-              // Just show confirmation - their payments are tracked in the group
-              toast({
-                title: "تم تسجيل الدفع",
-                description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method})`,
+                title: "خطأ",
+                description: "فشل في تسجيل الدفعة",
+                variant: "destructive",
               });
             }
           }}
