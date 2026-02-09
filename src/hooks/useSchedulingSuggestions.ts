@@ -59,6 +59,30 @@ export interface WorkloadBalance {
   isBalanced: boolean;
 }
 
+// Similar student for grouping suggestions
+export interface SimilarStudentMatch {
+  studentId: string;
+  studentName: string;
+  matchingDays: number[];
+  matchingDayNames: string[];
+  sessionType: SessionType;
+  sessionTime: string;
+  sessionTimeAr: string;
+  matchScore: number; // 0-100 how similar
+  reason: string;
+}
+
+// Grouping suggestion
+export interface GroupingSuggestion {
+  dayOfWeek: number;
+  dayName: string;
+  existingStudents: string[];
+  suggestedTime: string;
+  suggestedTimeAr: string;
+  reason: string;
+  benefit: string;
+}
+
 export interface SchedulingSuggestions {
   daySuggestions: DaySuggestion[];
   bestDays: number[];
@@ -75,6 +99,9 @@ export interface SchedulingSuggestions {
     longestStreak: number;
   };
   smartRecommendations: string[];
+  // NEW: Similar student grouping
+  similarStudents: SimilarStudentMatch[];
+  groupingSuggestions: GroupingSuggestion[];
 }
 
 // Threshold for busy day
@@ -524,6 +551,8 @@ export const useSchedulingSuggestions = (
         longestStreak,
       },
       smartRecommendations,
+      similarStudents: [], // TODO: Implement similar student detection
+      groupingSuggestions: [], // TODO: Implement grouping suggestions
     };
   }, [students, newSessionType]);
 };
