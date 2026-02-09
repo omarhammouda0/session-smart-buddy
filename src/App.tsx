@@ -8,6 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GroupsProvider } from "@/hooks/useGroups";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -454,30 +455,32 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        {/* Animated Background */}
-        <AnimatedBackground />
+      <GroupsProvider>
+        <TooltipProvider>
+          {/* Animated Background */}
+          <AnimatedBackground />
 
-        {/* Toast notifications */}
-        <Toaster />
-        <Sonner />
+          {/* Toast notifications */}
+          <Toaster />
+          <Sonner />
 
-        {/* Main App Routes */}
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/"
-              element={
-                <RequireAuth>
-                  <Index />
-                </RequireAuth>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+          {/* Main App Routes */}
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route
+                path="/"
+                element={
+                  <RequireAuth>
+                    <Index />
+                  </RequireAuth>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </GroupsProvider>
     </QueryClientProvider>
   </ErrorBoundary>
 );
