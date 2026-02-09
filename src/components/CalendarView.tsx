@@ -73,6 +73,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useConflictDetection } from "@/hooks/useConflictDetection";
+import { useGroups } from "@/hooks/useGroups";
+import { StudentGroup, GroupSession } from "@/types/student";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -99,6 +101,10 @@ interface CalendarViewProps {
 interface SessionWithStudent {
   session: Session;
   student: Student;
+  // Group session fields
+  isGroup?: boolean;
+  group?: StudentGroup;
+  groupSession?: GroupSession;
 }
 interface DragState {
   sessionId: string;
@@ -136,6 +142,9 @@ export const CalendarView = ({
 
   // Get available slots from conflict detection hook
   const { getSuggestedSlots } = useConflictDetection(students);
+
+  // Get groups for calendar display
+  const { activeGroups, getGroupSessionsForDate } = useGroups();
 
   // Add Session Dialog State
   const [addSessionDialog, setAddSessionDialog] = useState<{
@@ -206,6 +215,8 @@ export const CalendarView = ({
 
   const sessionsByDate = useMemo(() => {
     const map = new Map<string, SessionWithStudent[]>();
+
+    // Add individual student sessions
     filteredStudents.forEach((student) => {
       student.sessions.forEach((session) => {
         const existing = map.get(session.date) || [];
@@ -213,6 +224,38 @@ export const CalendarView = ({
         map.set(session.date, existing);
       });
     });
+
+    // Add group sessions (only if viewing all students)
+    if (selectedStudentFilter === "all") {
+      activeGroups.forEach((group) => {
+        group.sessions.forEach((groupSession) => {
+          const existing = map.get(groupSession.date) || [];
+          // Create a pseudo-student and session for display
+          const pseudoStudent: Student = {
+            id: `group_${group.id}`,
+            name: group.name,
+            sessionTime: group.sessionTime,
+            sessionDuration: group.sessionDuration,
+            sessionType: group.sessionType,
+            scheduleDays: group.scheduleDays,
+            semesterStart: group.semesterStart,
+            semesterEnd: group.semesterEnd,
+            sessions: [],
+            createdAt: group.createdAt,
+          };
+          existing.push({
+            session: groupSession,
+            student: pseudoStudent,
+            isGroup: true,
+            group,
+            groupSession,
+          });
+          map.set(groupSession.date, existing);
+        });
+      });
+    }
+
+    // Sort all sessions by time
     map.forEach((sessions) => {
       sessions.sort((a, b) => {
         const timeA = a.session.time || a.student.sessionTime;
@@ -221,7 +264,7 @@ export const CalendarView = ({
       });
     });
     return map;
-  }, [filteredStudents]);
+  }, [filteredStudents, selectedStudentFilter, activeGroups]);
 
   const days = useMemo(() => {
     if (viewMode === "week") {
@@ -1139,7 +1182,7 @@ export const CalendarView = ({
                   {/* Sessions List */}
                   {daySessions.length > 0 ? (
                     <div className="divide-y divide-border/50">
-                      {daySessions.map(({ session, student }) => {
+                      {daySessions.map(({ session, student, isGroup, group, groupSession }) => {
                         const time = session.time || student.sessionTime;
                         const timeInfo = getTimeOfDayInfo(time || "12:00");
                         const TimeIcon = timeInfo.icon;
@@ -1151,6 +1194,7 @@ export const CalendarView = ({
                           time || "16:00",
                           session.duration || student.sessionDuration || 60
                         );
+                        const memberCount = isGroup && group ? group.members.filter(m => m.isActive).length : 0;
 
                         return (
                           <div
@@ -1158,34 +1202,44 @@ export const CalendarView = ({
                             className={cn(
                               "flex items-center gap-3 p-3 transition-all",
                               isCompleted && "bg-primary/5",
-                              isCancelled && "bg-muted/30 opacity-60"
+                              isCancelled && "bg-muted/30 opacity-60",
+                              isGroup && "bg-violet-50 dark:bg-violet-950/20"
                             )}
-                            onClick={() => setSessionActionDialog({ open: true, session, student })}
+                            onClick={() => !isGroup && setSessionActionDialog({ open: true, session, student })}
                           >
                             {/* Time Column */}
                             <div className={cn(
                               "min-w-[55px] text-center p-2 rounded-lg",
-                              isCompleted ? "bg-primary/10" : isCancelled ? "bg-muted" : "bg-primary/5"
+                              isCompleted ? "bg-primary/10" : isCancelled ? "bg-muted" : isGroup ? "bg-violet-100 dark:bg-violet-900/30" : "bg-primary/5"
                             )}>
-                              <TimeIcon className={cn("h-4 w-4 mx-auto mb-0.5", timeInfo.color)} />
+                              {isGroup ? (
+                                <Users className="h-4 w-4 mx-auto mb-0.5 text-violet-600 dark:text-violet-400" />
+                              ) : (
+                                <TimeIcon className={cn("h-4 w-4 mx-auto mb-0.5", timeInfo.color)} />
+                              )}
                               <p className={cn(
                                 "text-sm font-bold",
-                                isCompleted ? "text-primary" : isCancelled ? "text-muted-foreground" : "text-foreground"
+                                isCompleted ? "text-primary" : isCancelled ? "text-muted-foreground" : isGroup ? "text-violet-700 dark:text-violet-300" : "text-foreground"
                               )}>
                                 {time}
                               </p>
                             </div>
 
-                            {/* Student Info */}
+                            {/* Student/Group Info */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className={cn(
                                   "font-semibold truncate",
-                                  isCancelled && "line-through"
+                                  isCancelled && "line-through",
+                                  isGroup && "text-violet-700 dark:text-violet-300"
                                 )}>
-                                  {student.name}
+                                  {isGroup ? `👥 ${student.name}` : student.name}
                                 </p>
-                                {student.sessionType === "online" ? (
+                                {isGroup ? (
+                                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-violet-300 text-violet-600 bg-violet-50 dark:bg-violet-900/30 dark:border-violet-700 dark:text-violet-300">
+                                    {memberCount} طالب
+                                  </Badge>
+                                ) : student.sessionType === "online" ? (
                                   <Monitor className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                                 ) : (
                                   <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
@@ -1198,19 +1252,25 @@ export const CalendarView = ({
                                     "text-[10px] h-5 px-1.5",
                                     isCompleted && "border-primary/30 text-primary bg-primary/5",
                                     isCancelled && "border-muted text-muted-foreground",
-                                    isScheduled && "border-primary/20 text-primary/80"
+                                    isScheduled && !isGroup && "border-primary/20 text-primary/80",
+                                    isScheduled && isGroup && "border-violet-300 text-violet-600 dark:border-violet-700 dark:text-violet-400"
                                   )}
                                 >
-                                  {isCompleted ? "✓ مكتملة" : isCancelled ? "✗ ملغاة" : "⏰ مجدولة"}
+                                  {isCompleted ? "✓ مكتملة" : isCancelled ? "✗ ملغاة" : isGroup ? "👥 مجموعة" : "⏰ مجدولة"}
                                 </Badge>
                                 <span className="text-[10px] text-muted-foreground">
                                   {session.duration || student.sessionDuration || 60} د
                                 </span>
+                                {isGroup && group && (
+                                  <span className="text-[10px] text-violet-500">
+                                    {group.sessionType === 'online' ? '💻' : '🏠'}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
                             {/* Quick Actions */}
-                            {isScheduled && (
+                            {isScheduled && !isGroup && (
                               <div className="flex items-center gap-1 shrink-0">
                                 {canComplete && onToggleComplete && (
                                   <Button
@@ -1379,9 +1439,11 @@ export const CalendarView = ({
                   </div>
                   {/* Sessions - scrollable */}
                   <div className="space-y-1.5 sm:space-y-2 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                    {daySessions.map(({ session, student }) => {
+                    {daySessions.map(({ session, student, isGroup, group }) => {
                       const time = session.time || student.sessionTime;
-                      const canDrag = session.status === "scheduled";
+                      const canDrag = session.status === "scheduled" && !isGroup;
+                      const memberCount = isGroup && group ? group.members.filter(m => m.isActive).length : 0;
+
                       return (
                         <div
                           key={session.id}
@@ -1395,21 +1457,33 @@ export const CalendarView = ({
                           }
                           onTouchMove={handleTouchMove}
                           onTouchEnd={handleTouchEnd}
-                          onClick={(e) => handleSessionClick(e, session, student)}
+                          onClick={(e) => !isGroup && handleSessionClick(e, session, student)}
                           className={cn(
                             "text-xs sm:text-sm p-2 sm:p-3 rounded-lg border-2 flex items-start gap-1.5 sm:gap-2 transition-all duration-200 touch-manipulation select-none cursor-pointer",
-                            getStatusColor(session.status),
+                            isGroup
+                              ? "bg-violet-100 dark:bg-violet-950/30 border-violet-300 dark:border-violet-700"
+                              : getStatusColor(session.status),
                             canDrag && "active:cursor-grabbing hover:shadow-lg active:scale-95",
                             touchDragState?.sessionId === session.id && touchDragState?.active && "opacity-50 scale-95",
                             dragState?.sessionId === session.id && "opacity-50 scale-95",
                           )}
                         >
                           {canDrag && <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 opacity-50 mt-0.5" />}
+                          {isGroup && <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-violet-600 dark:text-violet-400 mt-0.5" />}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1">
-                              <div className="font-bold truncate text-xs sm:text-sm flex-1">{student.name}</div>
+                              <div className={cn(
+                                "font-bold truncate text-xs sm:text-sm flex-1",
+                                isGroup && "text-violet-700 dark:text-violet-300"
+                              )}>
+                                {isGroup ? `👥 ${student.name}` : student.name}
+                              </div>
                               {/* Session type indicator */}
-                              {student.sessionType === "online" ? (
+                              {isGroup ? (
+                                <Badge variant="outline" className="text-[8px] h-4 px-1 border-violet-300 text-violet-600 dark:border-violet-700 dark:text-violet-400">
+                                  {memberCount}
+                                </Badge>
+                              ) : student.sessionType === "online" ? (
                                 <Monitor className="h-3 w-3 text-blue-500 shrink-0" />
                               ) : (
                                 <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
@@ -1419,9 +1493,14 @@ export const CalendarView = ({
                               {(() => {
                                 const timeInfo = getTimeOfDayInfo(time || "12:00");
                                 const TimeIcon = timeInfo.icon;
-                                return <TimeIcon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", timeInfo.color)} />;
+                                return <TimeIcon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", isGroup ? "text-violet-500" : timeInfo.color)} />;
                               })()}
                               <span className="font-medium">{time}</span>
+                              {isGroup && group && (
+                                <span className="text-violet-500">
+                                  {group.sessionType === 'online' ? '💻' : '🏠'}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1442,6 +1521,7 @@ export const CalendarView = ({
             { color: "bg-primary/50", label: "مكتملة", icon: CheckCircle2 },
             { color: "bg-muted", label: "ملغاة", icon: XCircle },
             { color: "bg-secondary", label: "إجازة", icon: Coffee },
+            { color: "bg-violet-100 dark:bg-violet-900/30", label: "مجموعة", icon: Users },
           ].map(({ color, label, icon: Icon }) => (
             <div key={label} className="flex items-center gap-1.5">
               <div className={cn("w-4 h-4 rounded-md border-2 border-current flex items-center justify-center", color)}>
