@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { StudentGroup, GroupMember, GroupSession, SessionStatus, ScheduleDay, SessionType } from '@/types/student';
+import { StudentGroup, GroupMember, GroupSession, SessionStatus, ScheduleDay, SessionType, GroupMemberAttendance } from '@/types/student';
+
+const STORAGE_KEY = 'session-smart-buddy-groups';
+
+// Generate unique ID
+const generateId = () => `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 // Generate session dates based on schedule
 const generateGroupSessionDates = (
@@ -24,6 +28,45 @@ const generateGroupSessionDates = (
   return dates;
 };
 
+// Create initial group sessions
+const createGroupSessions = (
+  groupId: string,
+  members: GroupMember[],
+  scheduleDays: ScheduleDay[],
+  startDate: string,
+  endDate: string,
+  sessionTime: string,
+  sessionDuration: number
+): GroupSession[] => {
+  const dates = generateGroupSessionDates(scheduleDays, startDate, endDate);
+
+  return dates.map(date => {
+    const scheduleDay = scheduleDays.find(d => {
+      const dateObj = new Date(date);
+      return d.dayOfWeek === dateObj.getDay();
+    });
+
+    return {
+      id: generateId(),
+      groupId,
+      date,
+      time: scheduleDay?.time || sessionTime,
+      duration: sessionDuration,
+      completed: false,
+      status: 'scheduled' as SessionStatus,
+      history: [{
+        status: 'scheduled' as SessionStatus,
+        timestamp: new Date().toISOString(),
+      }],
+      memberAttendance: members.filter(m => m.isActive).map(m => ({
+        memberId: m.studentId,
+        memberName: m.studentName,
+        status: 'scheduled' as SessionStatus,
+      })),
+    };
+  });
+};
+
 interface GroupsContextType {
   groups: StudentGroup[];
   activeGroups: StudentGroup[];
@@ -40,19 +83,19 @@ interface GroupsContextType {
     semesterEnd: string,
     description?: string,
     color?: string
-  ) => Promise<StudentGroup | null>;
-  updateGroup: (groupId: string, updates: Partial<Omit<StudentGroup, 'id' | 'createdAt' | 'sessions'>>) => Promise<void>;
-  deleteGroup: (groupId: string) => Promise<void>;
-  permanentlyDeleteGroup: (groupId: string) => Promise<void>;
-  addMemberToGroup: (groupId: string, member: Omit<GroupMember, 'joinedAt' | 'isActive'>) => Promise<void>;
-  removeMemberFromGroup: (groupId: string, studentId: string) => Promise<void>;
-  updateMemberPrice: (groupId: string, studentId: string, customPrice: number | undefined) => Promise<void>;
-  updateMemberAttendance: (groupId: string, sessionId: string, memberId: string, status: SessionStatus, note?: string) => Promise<void>;
-  completeGroupSession: (groupId: string, sessionId: string) => Promise<void>;
+  ) => StudentGroup;
+  updateGroup: (groupId: string, updates: Partial<Omit<StudentGroup, 'id' | 'createdAt' | 'sessions'>>) => void;
+  deleteGroup: (groupId: string) => void;
+  permanentlyDeleteGroup: (groupId: string) => void;
+  addMemberToGroup: (groupId: string, member: Omit<GroupMember, 'joinedAt' | 'isActive'>) => void;
+  removeMemberFromGroup: (groupId: string, studentId: string) => void;
+  updateMemberPrice: (groupId: string, studentId: string, customPrice: number | undefined) => void;
+  updateMemberAttendance: (groupId: string, sessionId: string, memberId: string, status: SessionStatus, note?: string) => void;
+  completeGroupSession: (groupId: string, sessionId: string) => void;
   getGroupById: (groupId: string) => StudentGroup | undefined;
   getGroupSessionsForDate: (date: string) => Array<{ group: StudentGroup; session: GroupSession }>;
   calculateGroupEarnings: (groupId: string, month: number, year: number) => number;
-  refreshGroups: () => Promise<void>;
+  refreshGroups: () => void;
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
@@ -61,130 +104,32 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
   const [groups, setGroups] = useState<StudentGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch all groups with related data from Supabase
-  const fetchGroups = useCallback(async () => {
+  // Load groups from localStorage on mount
+  useEffect(() => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setGroups([]);
-        setIsLoading(false);
-        return;
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsedGroups = JSON.parse(stored);
+        console.log('[Groups] Loaded from localStorage:', parsedGroups.length, 'groups');
+        setGroups(parsedGroups);
       }
-
-      // Fetch groups
-      const { data: groupsData, error: groupsError } = await supabase
-        .from('student_groups')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (groupsError) throw groupsError;
-
-      if (!groupsData || groupsData.length === 0) {
-        setGroups([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch all related data
-      const groupIds = groupsData.map(g => g.id);
-
-      const [membersResult, scheduleResult, sessionsResult] = await Promise.all([
-        supabase.from('group_members').select('*').in('group_id', groupIds),
-        supabase.from('group_schedule_days').select('*').in('group_id', groupIds),
-        supabase.from('group_sessions').select('*').in('group_id', groupIds).order('date', { ascending: true }),
-      ]);
-
-      // Fetch attendance for all sessions
-      const sessionIds = sessionsResult.data?.map(s => s.id) || [];
-      const attendanceResult = sessionIds.length > 0
-        ? await supabase.from('group_session_attendance').select('*').in('session_id', sessionIds)
-        : { data: [] };
-
-      // Transform to our types
-      const transformedGroups: StudentGroup[] = groupsData.map(g => {
-        const members: GroupMember[] = (membersResult.data || [])
-          .filter(m => m.group_id === g.id)
-          .map(m => ({
-            studentId: m.student_id || m.id,
-            studentName: m.student_name,
-            phone: m.phone,
-            parentPhone: m.parent_phone,
-            customPrice: m.custom_price,
-            joinedAt: m.joined_at,
-            isActive: m.is_active,
-          }));
-
-        const scheduleDays: ScheduleDay[] = (scheduleResult.data || [])
-          .filter(s => s.group_id === g.id)
-          .map(s => ({
-            dayOfWeek: s.day_of_week,
-            time: s.time,
-          }));
-
-        const sessions: GroupSession[] = (sessionsResult.data || [])
-          .filter(s => s.group_id === g.id)
-          .map(s => {
-            const attendance = (attendanceResult.data || [])
-              .filter(a => a.session_id === s.id)
-              .map(a => ({
-                memberId: a.member_id,
-                memberName: members.find(m => m.studentId === a.member_id)?.studentName || '',
-                status: a.status as SessionStatus,
-                note: a.note,
-              }));
-
-            return {
-              id: s.id,
-              groupId: s.group_id,
-              date: s.date,
-              time: s.time,
-              duration: s.duration,
-              completed: s.status === 'completed',
-              status: s.status as SessionStatus,
-              completedAt: s.completed_at,
-              notes: s.notes,
-              topic: s.topic,
-              history: [],
-              memberAttendance: attendance,
-            };
-          });
-
-        return {
-          id: g.id,
-          name: g.name,
-          description: g.description,
-          color: g.color,
-          members,
-          defaultPricePerStudent: Number(g.default_price_per_student),
-          sessionType: g.session_type as SessionType,
-          scheduleDays,
-          sessionDuration: g.session_duration,
-          sessionTime: g.session_time,
-          semesterStart: g.semester_start,
-          semesterEnd: g.semester_end,
-          sessions,
-          isActive: g.is_active,
-          createdAt: g.created_at,
-          updatedAt: g.updated_at,
-        };
-      });
-
-      setGroups(transformedGroups);
     } catch (error) {
-      console.error('Failed to fetch groups:', error);
+      console.error('[Groups] Failed to load from localStorage:', error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Load groups on mount
+  // Save groups to localStorage whenever they change
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    if (!isLoading) {
+      console.log('[Groups] Saving to localStorage:', groups.length, 'groups');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
+    }
+  }, [groups, isLoading]);
 
   // Add a new group
-  const addGroup = useCallback(async (
+  const addGroup = useCallback((
     name: string,
     members: Omit<GroupMember, 'joinedAt' | 'isActive'>[],
     defaultPricePerStudent: number,
@@ -196,303 +141,251 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     semesterEnd: string,
     description?: string,
     color?: string
-  ): Promise<StudentGroup | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+  ): StudentGroup => {
+    const now = new Date().toISOString();
+    const groupId = generateId();
 
-      // 1. Create the group
-      const { data: groupData, error: groupError } = await supabase
-        .from('student_groups')
-        .insert({
-          user_id: user.id,
-          name,
-          description,
-          color: color || 'blue',
-          default_price_per_student: defaultPricePerStudent,
-          session_type: sessionType,
-          session_duration: sessionDuration,
-          session_time: sessionTime,
-          semester_start: semesterStart,
-          semester_end: semesterEnd,
-        })
-        .select()
-        .single();
+    // Create members with joinedAt and isActive
+    const fullMembers: GroupMember[] = members.map(m => ({
+      ...m,
+      joinedAt: now,
+      isActive: true,
+    }));
 
-      if (groupError) throw groupError;
+    // Generate sessions
+    const sessions = createGroupSessions(
+      groupId,
+      fullMembers,
+      scheduleDays,
+      semesterStart,
+      semesterEnd,
+      sessionTime,
+      sessionDuration
+    );
 
-      const groupId = groupData.id;
+    const newGroup: StudentGroup = {
+      id: groupId,
+      name,
+      members: fullMembers,
+      defaultPricePerStudent,
+      sessionType,
+      scheduleDays,
+      sessionDuration,
+      sessionTime,
+      semesterStart,
+      semesterEnd,
+      sessions,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+      description,
+      color,
+    };
 
-      // 2. Create schedule days
-      if (scheduleDays.length > 0) {
-        const { error: scheduleError } = await supabase
-          .from('group_schedule_days')
-          .insert(scheduleDays.map(d => ({
-            group_id: groupId,
-            day_of_week: d.dayOfWeek,
-            time: d.time,
-          })));
-
-        if (scheduleError) throw scheduleError;
-      }
-
-      // 3. Create members
-      const memberInserts = members.map(m => ({
-        group_id: groupId,
-        student_id: m.studentId,
-        student_name: m.studentName,
-        phone: m.phone,
-        parent_phone: m.parentPhone,
-        custom_price: m.customPrice,
-      }));
-
-      const { data: membersData, error: membersError } = await supabase
-        .from('group_members')
-        .insert(memberInserts)
-        .select();
-
-      if (membersError) throw membersError;
-
-      // 4. Generate and create sessions
-      const sessionDates = generateGroupSessionDates(scheduleDays, semesterStart, semesterEnd);
-
-      if (sessionDates.length > 0) {
-        const sessionInserts = sessionDates.map(date => {
-          const dayOfWeek = new Date(date).getDay();
-          const scheduleDay = scheduleDays.find(d => d.dayOfWeek === dayOfWeek);
-          return {
-            group_id: groupId,
-            date,
-            time: scheduleDay?.time || sessionTime,
-            duration: sessionDuration,
-            status: 'scheduled',
-          };
-        });
-
-        const { data: sessionsData, error: sessionsError } = await supabase
-          .from('group_sessions')
-          .insert(sessionInserts)
-          .select();
-
-        if (sessionsError) throw sessionsError;
-
-        // 5. Create attendance records for each session
-        if (sessionsData && membersData) {
-          const attendanceInserts = sessionsData.flatMap(session =>
-            membersData.map(member => ({
-              session_id: session.id,
-              member_id: member.id,
-              status: 'scheduled',
-            }))
-          );
-
-          if (attendanceInserts.length > 0) {
-            const { error: attendanceError } = await supabase
-              .from('group_session_attendance')
-              .insert(attendanceInserts);
-
-            if (attendanceError) throw attendanceError;
-          }
-        }
-      }
-
-      // Refresh groups
-      await fetchGroups();
-
-      return groups.find(g => g.id === groupId) || null;
-    } catch (error) {
-      console.error('Failed to add group:', error);
-      return null;
-    }
-  }, [fetchGroups, groups]);
+    setGroups(prev => [...prev, newGroup]);
+    console.log('[Groups] Added new group:', newGroup.name);
+    return newGroup;
+  }, []);
 
   // Update a group
-  const updateGroup = useCallback(async (
+  const updateGroup = useCallback((
     groupId: string,
     updates: Partial<Omit<StudentGroup, 'id' | 'createdAt' | 'sessions'>>
   ) => {
-    try {
-      const { error } = await supabase
-        .from('student_groups')
-        .update({
-          name: updates.name,
-          description: updates.description,
-          color: updates.color,
-          default_price_per_student: updates.defaultPricePerStudent,
-          session_type: updates.sessionType,
-          session_duration: updates.sessionDuration,
-          session_time: updates.sessionTime,
-          is_active: updates.isActive,
-        })
-        .eq('id', groupId);
+    setGroups(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
+      return {
+        ...group,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  }, []);
 
-      if (error) throw error;
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to update group:', error);
-    }
-  }, [fetchGroups]);
-
-  // Delete a group (soft delete)
-  const deleteGroup = useCallback(async (groupId: string) => {
-    try {
-      const { error } = await supabase
-        .from('student_groups')
-        .update({ is_active: false })
-        .eq('id', groupId);
-
-      if (error) throw error;
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to delete group:', error);
-    }
-  }, [fetchGroups]);
+  // Delete a group (soft delete - mark as inactive)
+  const deleteGroup = useCallback((groupId: string) => {
+    setGroups(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
+      return {
+        ...group,
+        isActive: false,
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  }, []);
 
   // Permanently delete a group
-  const permanentlyDeleteGroup = useCallback(async (groupId: string) => {
-    try {
-      const { error } = await supabase
-        .from('student_groups')
-        .delete()
-        .eq('id', groupId);
-
-      if (error) throw error;
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to permanently delete group:', error);
-    }
-  }, [fetchGroups]);
+  const permanentlyDeleteGroup = useCallback((groupId: string) => {
+    setGroups(prev => prev.filter(group => group.id !== groupId));
+  }, []);
 
   // Add member to group
-  const addMemberToGroup = useCallback(async (
+  const addMemberToGroup = useCallback((
     groupId: string,
     member: Omit<GroupMember, 'joinedAt' | 'isActive'>
   ) => {
-    try {
-      const { data: memberData, error: memberError } = await supabase
-        .from('group_members')
-        .insert({
-          group_id: groupId,
-          student_id: member.studentId,
-          student_name: member.studentName,
-          phone: member.phone,
-          parent_phone: member.parentPhone,
-          custom_price: member.customPrice,
-        })
-        .select()
-        .single();
+    const now = new Date().toISOString();
 
-      if (memberError) throw memberError;
+    setGroups(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
 
-      // Add attendance records for future sessions
-      const { data: futureSessions } = await supabase
-        .from('group_sessions')
-        .select('id')
-        .eq('group_id', groupId)
-        .gte('date', new Date().toISOString().split('T')[0]);
-
-      if (futureSessions && futureSessions.length > 0) {
-        const attendanceInserts = futureSessions.map(s => ({
-          session_id: s.id,
-          member_id: memberData.id,
-          status: 'scheduled',
-        }));
-
-        await supabase.from('group_session_attendance').insert(attendanceInserts);
+      // Check if member already exists
+      if (group.members.some(m => m.studentId === member.studentId)) {
+        return group;
       }
 
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to add member to group:', error);
-    }
-  }, [fetchGroups]);
+      const newMember: GroupMember = {
+        ...member,
+        joinedAt: now,
+        isActive: true,
+      };
+
+      // Add member to future sessions
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const updatedSessions = group.sessions.map(session => {
+        const sessionDate = new Date(session.date);
+        // Only add to future sessions
+        if (sessionDate >= today) {
+          return {
+            ...session,
+            memberAttendance: [
+              ...session.memberAttendance,
+              {
+                memberId: member.studentId,
+                memberName: member.studentName,
+                status: 'scheduled' as SessionStatus,
+              },
+            ],
+          };
+        }
+        return session;
+      });
+
+      return {
+        ...group,
+        members: [...group.members, newMember],
+        sessions: updatedSessions,
+        updatedAt: now,
+      };
+    }));
+  }, []);
 
   // Remove member from group (soft delete)
-  const removeMemberFromGroup = useCallback(async (groupId: string, studentId: string) => {
-    try {
-      const { error } = await supabase
-        .from('group_members')
-        .update({ is_active: false })
-        .eq('group_id', groupId)
-        .eq('student_id', studentId);
+  const removeMemberFromGroup = useCallback((groupId: string, studentId: string) => {
+    setGroups(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
 
-      if (error) throw error;
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to remove member from group:', error);
-    }
-  }, [fetchGroups]);
+      return {
+        ...group,
+        members: group.members.map(m =>
+          m.studentId === studentId ? { ...m, isActive: false } : m
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  }, []);
 
   // Update member's custom price
-  const updateMemberPrice = useCallback(async (
+  const updateMemberPrice = useCallback((
     groupId: string,
     studentId: string,
     customPrice: number | undefined
   ) => {
-    try {
-      const { error } = await supabase
-        .from('group_members')
-        .update({ custom_price: customPrice })
-        .eq('group_id', groupId)
-        .eq('student_id', studentId);
+    setGroups(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
 
-      if (error) throw error;
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to update member price:', error);
-    }
-  }, [fetchGroups]);
+      return {
+        ...group,
+        members: group.members.map(m =>
+          m.studentId === studentId ? { ...m, customPrice } : m
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  }, []);
 
   // Update session attendance for a member
-  const updateMemberAttendance = useCallback(async (
+  const updateMemberAttendance = useCallback((
     groupId: string,
     sessionId: string,
     memberId: string,
     status: SessionStatus,
     note?: string
   ) => {
-    try {
-      const { error } = await supabase
-        .from('group_session_attendance')
-        .update({ status, note })
-        .eq('session_id', sessionId)
-        .eq('member_id', memberId);
+    console.log('[Groups] Updating attendance:', { groupId, sessionId, memberId, status });
 
-      if (error) throw error;
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to update member attendance:', error);
-    }
-  }, [fetchGroups]);
+    setGroups(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
+
+      const updatedSessions = group.sessions.map(session => {
+        if (session.id !== sessionId) return session;
+
+        const updatedAttendance = session.memberAttendance.map(att => {
+          if (att.memberId !== memberId) return att;
+          console.log('[Groups] Found member, updating status from', att.status, 'to', status);
+          return { ...att, status, note };
+        });
+
+        return {
+          ...session,
+          memberAttendance: updatedAttendance,
+          history: [
+            ...(session.history || []),
+            {
+              status,
+              timestamp: new Date().toISOString(),
+              note: `${memberId}: ${status}`,
+            },
+          ],
+        };
+      });
+
+      return {
+        ...group,
+        sessions: updatedSessions,
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  }, []);
 
   // Mark entire group session as completed
-  const completeGroupSession = useCallback(async (groupId: string, sessionId: string) => {
-    try {
-      // Update session status
-      const { error: sessionError } = await supabase
-        .from('group_sessions')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', sessionId);
+  const completeGroupSession = useCallback((groupId: string, sessionId: string) => {
+    const now = new Date().toISOString();
 
-      if (sessionError) throw sessionError;
+    setGroups(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
 
-      // Update all scheduled attendance to completed
-      const { error: attendanceError } = await supabase
-        .from('group_session_attendance')
-        .update({ status: 'completed' })
-        .eq('session_id', sessionId)
-        .eq('status', 'scheduled');
+      const updatedSessions = group.sessions.map(session => {
+        if (session.id !== sessionId) return session;
 
-      if (attendanceError) throw attendanceError;
+        return {
+          ...session,
+          completed: true,
+          status: 'completed' as SessionStatus,
+          completedAt: now,
+          memberAttendance: session.memberAttendance.map(att => ({
+            ...att,
+            status: att.status === 'scheduled' ? 'completed' as SessionStatus : att.status,
+          })),
+          history: [
+            ...(session.history || []),
+            {
+              status: 'completed' as SessionStatus,
+              timestamp: now,
+            },
+          ],
+        };
+      });
 
-      await fetchGroups();
-    } catch (error) {
-      console.error('Failed to complete group session:', error);
-    }
-  }, [fetchGroups]);
+      return {
+        ...group,
+        sessions: updatedSessions,
+        updatedAt: now,
+      };
+    }));
+  }, []);
 
   // Get active groups only
   const activeGroups = groups.filter(g => g.isActive);
@@ -543,9 +436,17 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     return total;
   }, [groups]);
 
-  const refreshGroups = useCallback(async () => {
-    await fetchGroups();
-  }, [fetchGroups]);
+  const refreshGroups = useCallback(() => {
+    // Trigger re-render by re-reading from localStorage
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        setGroups(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('[Groups] Failed to refresh:', error);
+    }
+  }, []);
 
   const value: GroupsContextType = {
     groups,

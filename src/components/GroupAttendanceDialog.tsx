@@ -14,8 +14,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  User,
-  Loader2
+  User
 } from 'lucide-react';
 import { StudentGroup, GroupSession, GroupMemberAttendance, SessionStatus } from '@/types/student';
 import { cn } from '@/lib/utils';
@@ -31,8 +30,8 @@ interface GroupAttendanceDialogProps {
     memberId: string,
     status: SessionStatus,
     note?: string
-  ) => void | Promise<void>;
-  onCompleteSession: (groupId: string, sessionId: string) => void | Promise<void>;
+  ) => void;
+  onCompleteSession: (groupId: string, sessionId: string) => void;
 }
 
 // Format time in Arabic
@@ -89,9 +88,6 @@ export const GroupAttendanceDialog = ({
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [sessionTopic, setSessionTopic] = useState(session.topic || '');
   const [sessionNotes, setSessionNotes] = useState(session.notes || '');
-  const [loadingMember, setLoadingMember] = useState<string | null>(null);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [isMarkingAll, setIsMarkingAll] = useState(false);
 
   // Track local attendance state for immediate UI updates
   const [localAttendance, setLocalAttendance] = useState<Record<string, SessionStatus>>(() => {
@@ -113,26 +109,15 @@ export const GroupAttendanceDialog = ({
     pending: Object.values(localAttendance).filter(s => s === 'scheduled').length,
   };
 
-  const handleStatusChange = async (memberId: string, status: SessionStatus) => {
+  const handleStatusChange = (memberId: string, status: SessionStatus) => {
     // Update local state immediately for responsive UI
     setLocalAttendance(prev => ({ ...prev, [memberId]: status }));
-    setLoadingMember(memberId);
 
-    try {
-      await onUpdateAttendance(group.id, session.id, memberId, status, notes[memberId]);
-    } catch (error) {
-      // Revert on error
-      const originalStatus = session.memberAttendance.find(a => a.memberId === memberId)?.status || 'scheduled';
-      setLocalAttendance(prev => ({ ...prev, [memberId]: originalStatus }));
-      console.error('Failed to update attendance:', error);
-    } finally {
-      setLoadingMember(null);
-    }
+    // Call the update function (synchronous localStorage update)
+    onUpdateAttendance(group.id, session.id, memberId, status, notes[memberId]);
   };
 
-  const handleMarkAllAttended = async () => {
-    setIsMarkingAll(true);
-
+  const handleMarkAllAttended = () => {
     // Update local state immediately
     const newAttendance: Record<string, SessionStatus> = { ...localAttendance };
     Object.keys(newAttendance).forEach(memberId => {
@@ -142,28 +127,16 @@ export const GroupAttendanceDialog = ({
     });
     setLocalAttendance(newAttendance);
 
-    try {
-      const pendingMembers = session.memberAttendance.filter(att => att.status === 'scheduled');
-      for (const att of pendingMembers) {
-        await onUpdateAttendance(group.id, session.id, att.memberId, 'completed');
-      }
-    } catch (error) {
-      console.error('Failed to mark all attended:', error);
-    } finally {
-      setIsMarkingAll(false);
-    }
+    // Update each pending member
+    const pendingMembers = session.memberAttendance.filter(att => att.status === 'scheduled');
+    pendingMembers.forEach(att => {
+      onUpdateAttendance(group.id, session.id, att.memberId, 'completed');
+    });
   };
 
-  const handleCompleteSession = async () => {
-    setIsCompleting(true);
-    try {
-      await onCompleteSession(group.id, session.id);
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Failed to complete session:', error);
-    } finally {
-      setIsCompleting(false);
-    }
+  const handleCompleteSession = () => {
+    onCompleteSession(group.id, session.id);
+    onOpenChange(false);
   };
 
   const getMemberAttendance = (memberId: string): GroupMemberAttendance | undefined => {
@@ -225,13 +198,8 @@ export const GroupAttendanceDialog = ({
                 size="sm"
                 onClick={handleMarkAllAttended}
                 className="w-full"
-                disabled={isMarkingAll}
               >
-                {isMarkingAll ? (
-                  <Loader2 className="h-4 w-4 ml-1 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4 ml-1" />
-                )}
+                <Check className="h-4 w-4 ml-1" />
                 تسجيل حضور الجميع
               </Button>
             )}
@@ -245,25 +213,19 @@ export const GroupAttendanceDialog = ({
                   const status = localAttendance[member.studentId] || attendance?.status || 'scheduled';
                   const statusInfo = getStatusInfo(status);
                   const StatusIcon = statusInfo.icon;
-                  const isLoading = loadingMember === member.studentId;
 
                   return (
                     <div
                       key={member.studentId}
                       className={cn(
                         "p-3 rounded-lg border transition-all",
-                        statusInfo.bg,
-                        isLoading && "opacity-70"
+                        statusInfo.bg
                       )}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            {isLoading ? (
-                              <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                            ) : (
-                              <User className="h-4 w-4 text-primary" />
-                            )}
+                            <User className="h-4 w-4 text-primary" />
                           </div>
                           <div>
                             <p className="font-medium text-sm">{member.studentName}</p>
@@ -285,7 +247,6 @@ export const GroupAttendanceDialog = ({
                               e.stopPropagation();
                               handleStatusChange(member.studentId, 'completed');
                             }}
-                            disabled={isLoading}
                             className={cn(
                               "h-8 w-8 p-0 touch-manipulation",
                               status === 'completed' && "bg-emerald-600 hover:bg-emerald-700"
@@ -302,7 +263,6 @@ export const GroupAttendanceDialog = ({
                               e.stopPropagation();
                               handleStatusChange(member.studentId, 'cancelled');
                             }}
-                            disabled={isLoading}
                             className={cn(
                               "h-8 w-8 p-0 touch-manipulation",
                               status === 'cancelled' && "bg-red-600 hover:bg-red-700"
@@ -319,7 +279,6 @@ export const GroupAttendanceDialog = ({
                               e.stopPropagation();
                               handleStatusChange(member.studentId, 'vacation');
                             }}
-                            disabled={isLoading}
                             className={cn(
                               "h-8 w-8 p-0 touch-manipulation",
                               status === 'vacation' && "bg-amber-600 hover:bg-amber-700"
@@ -373,13 +332,9 @@ export const GroupAttendanceDialog = ({
           <Button
             onClick={handleCompleteSession}
             className="w-full sm:flex-1 gradient-primary"
-            disabled={stats.pending === activeMembers.length || isCompleting}
+            disabled={stats.pending === activeMembers.length}
           >
-            {isCompleting ? (
-              <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4 ml-2" />
-            )}
+            <CheckCircle2 className="h-4 w-4 ml-2" />
             إنهاء الحصة
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:flex-1">
