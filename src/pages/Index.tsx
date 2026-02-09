@@ -116,6 +116,10 @@ const openWhatsApp = (phone: string) => {
 interface SessionWithStudent {
   session: Session;
   student: Student;
+  // Group session fields
+  isGroup?: boolean;
+  group?: StudentGroup;
+  groupSession?: GroupSession;
 }
 
 // Helper function to check if a session has ended
@@ -685,6 +689,8 @@ const Index = () => {
 
   const allTodaySessions = useMemo((): SessionWithStudent[] => {
     const sessions: SessionWithStudent[] = [];
+
+    // Add individual student sessions
     students.forEach((student) => {
       student.sessions
         .filter((s) => s.date === todayStr)
@@ -692,12 +698,41 @@ const Index = () => {
           sessions.push({ session, student });
         });
     });
+
+    // Add group sessions
+    activeGroups.forEach((group) => {
+      const todayGroupSession = group.sessions.find(s => s.date === todayStr);
+      if (todayGroupSession) {
+        // Create a pseudo-student and session for unified display
+        const pseudoStudent: Student = {
+          id: `group_${group.id}`,
+          name: group.name,
+          sessionTime: group.sessionTime,
+          sessionDuration: group.sessionDuration,
+          sessionType: group.sessionType,
+          scheduleDays: group.scheduleDays,
+          semesterStart: group.semesterStart,
+          semesterEnd: group.semesterEnd,
+          sessions: [],
+          createdAt: group.createdAt,
+        };
+        sessions.push({
+          session: todayGroupSession,
+          student: pseudoStudent,
+          isGroup: true,
+          group,
+          groupSession: todayGroupSession,
+        });
+      }
+    });
+
+    // Sort all sessions by time
     return sessions.sort((a, b) => {
       const timeA = a.session.time || a.student.sessionTime || "00:00";
       const timeB = b.session.time || b.student.sessionTime || "00:00";
       return timeA.localeCompare(timeB);
     });
-  }, [students, todayStr]);
+  }, [students, todayStr, activeGroups]);
 
   const todayStats = useMemo(() => {
     const total = allTodaySessions.length;
@@ -1118,49 +1153,6 @@ const Index = () => {
                 {/* Today's Stats Dashboard */}
                 <TodaySessionsStats students={students} settings={settings} payments={payments} />
 
-                {/* Groups Section - Only show groups with sessions today */}
-                {(() => {
-                  const groupsWithTodaySessions = activeGroups.filter(group =>
-                    group.sessions.some(s => s.date === todayStr)
-                  );
-
-                  if (groupsWithTodaySessions.length === 0) return null;
-
-                  return (
-                    <Card className="border overflow-hidden">
-                      <CardHeader className="pb-3 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base font-display font-bold flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-violet-500/10">
-                              <Users className="h-4 w-4 text-violet-600" />
-                            </div>
-                            مجموعات اليوم ({groupsWithTodaySessions.length})
-                          </CardTitle>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-3">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {groupsWithTodaySessions.map(group => {
-                            const todayGroupSession = group.sessions.find(s => s.date === todayStr);
-                            return (
-                              <GroupCard
-                                key={group.id}
-                                group={group}
-                                compact
-                                onViewDetails={(g) => {
-                                  if (todayGroupSession) {
-                                    setGroupAttendanceDialog({ open: true, group: g, session: todayGroupSession });
-                                  }
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })()}
-
                 {/* End of Day Checker - Floating button that appears after all sessions end */}
                 <EndOfDayChecker students={students} onToggleComplete={handleToggleComplete} />
 
@@ -1408,44 +1400,69 @@ const Index = () => {
                   <CardContent className="p-0">
                     <div className="divide-y">
                       {visibleSessions.map((item, index) => {
-                        const { session, student } = item;
+                        const { session, student, isGroup, group, groupSession } = item;
                         const sessionTime = session.time || student.sessionTime || "16:00";
                         const sessionDuration = session.duration || student.sessionDuration || 60;
                         const isCompleted = session.status === "completed";
                         const isCancelled = session.status === "cancelled";
                         const isVacation = session.status === "vacation";
                         const isScheduled = session.status === "scheduled";
-                        const isNextSession = nextSession?.session.id === session.id;
+                        const isNextSession = !isGroup && nextSession?.session.id === session.id;
                         const isOnline = student.sessionType === "online";
+                        const memberCount = isGroup && group ? group.members.filter(m => m.isActive).length : 0;
+
                         return (
                           <div
                             key={session.id}
                             className={cn(
-                              "flex gap-3 sm:gap-4 p-3 sm:p-4 transition-all group",
-                              isCompleted && "bg-primary/5",
+                              "flex gap-3 sm:gap-4 p-3 sm:p-4 transition-all group/item cursor-pointer",
+                              isCompleted && !isGroup && "bg-primary/5",
                               isCancelled && "bg-muted/50 opacity-60",
                               isVacation && "bg-muted/30",
-                              isScheduled && !isNextSession && "hover:bg-muted/50",
+                              isScheduled && !isNextSession && !isGroup && "hover:bg-muted/50",
                               isNextSession && "bg-gradient-to-r from-primary/10 to-transparent ring-1 ring-primary/20",
+                              isGroup && "bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/30",
+                              isGroup && isCompleted && "bg-violet-100 dark:bg-violet-950/40",
                             )}
+                            onClick={() => {
+                              if (isGroup && group && groupSession) {
+                                setGroupAttendanceDialog({ open: true, group, session: groupSession });
+                              }
+                            }}
                           >
                             <div className="flex flex-col items-center">
                               <div
                                 className={cn(
                                   "w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-sm border-2 shadow-sm relative overflow-hidden",
-                                  isCompleted && "bg-primary text-primary-foreground border-primary",
+                                  isCompleted && !isGroup && "bg-primary text-primary-foreground border-primary",
                                   isCancelled && "bg-muted text-muted-foreground border-border",
                                   isVacation && "bg-secondary text-secondary-foreground border-border",
-                                  isScheduled && "bg-primary/90 text-primary-foreground border-primary",
-                                  isScheduled && "cursor-pointer hover:scale-105 transition-transform",
+                                  isScheduled && !isGroup && "bg-primary/90 text-primary-foreground border-primary",
+                                  isScheduled && !isGroup && "cursor-pointer hover:scale-105 transition-transform",
+                                  isGroup && "bg-violet-500 text-white border-violet-600",
+                                  isGroup && isCompleted && "bg-violet-600 border-violet-700",
                                 )}
-                                onClick={() => isScheduled && handleQuickTimeEdit(student, session)}
-                                title={isScheduled ? "اضغط لتعديل الوقت" : undefined}
+                                onClick={(e) => {
+                                  if (!isGroup && isScheduled) {
+                                    e.stopPropagation();
+                                    handleQuickTimeEdit(student, session);
+                                  }
+                                }}
+                                title={!isGroup && isScheduled ? "اضغط لتعديل الوقت" : isGroup ? "مجموعة" : undefined}
                               >
-                                <span className="text-base font-bold">{sessionTime.substring(0, 5)}</span>
-                                <span className="text-[9px] opacity-80">{sessionDuration}د</span>
-                                {isScheduled && (
-                                  <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {isGroup ? (
+                                  <>
+                                    <Users className="h-5 w-5" />
+                                    <span className="text-[9px] opacity-90">{memberCount} طالب</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-base font-bold">{sessionTime.substring(0, 5)}</span>
+                                    <span className="text-[9px] opacity-80">{sessionDuration}د</span>
+                                  </>
+                                )}
+                                {!isGroup && isScheduled && (
+                                  <div className="absolute top-0.5 right-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
                                     <Pencil className="h-2.5 w-2.5" />
                                   </div>
                                 )}
@@ -1470,28 +1487,45 @@ const Index = () => {
                                 <div className="flex items-center gap-2 min-w-0">
                                   <div className={cn(
                                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                                    isOnline ? "bg-primary/10" : "bg-primary/15"
+                                    isGroup ? "bg-violet-100 dark:bg-violet-900/30" : isOnline ? "bg-primary/10" : "bg-primary/15"
                                   )}>
-                                    {isOnline ? (
+                                    {isGroup ? (
+                                      <Users className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                    ) : isOnline ? (
                                       <Monitor className="h-4 w-4 text-primary" />
                                     ) : (
                                       <MapPin className="h-4 w-4 text-primary" />
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <h4 className="font-bold text-base truncate">{student.name}</h4>
-                                    <p className="text-xs text-muted-foreground">
-                                      {isOnline ? "أونلاين" : "حضوري"} • {sessionDuration} دقيقة
+                                    <h4 className={cn(
+                                      "font-bold text-base truncate",
+                                      isGroup && "text-violet-700 dark:text-violet-300"
+                                    )}>
+                                      {isGroup ? `👥 ${student.name}` : student.name}
+                                    </h4>
+                                    <p className={cn(
+                                      "text-xs",
+                                      isGroup ? "text-violet-600 dark:text-violet-400" : "text-muted-foreground"
+                                    )}>
+                                      {isGroup ? (
+                                        <>مجموعة • {memberCount} طالب • {sessionTime}</>
+                                      ) : (
+                                        <>{isOnline ? "أونلاين" : "حضوري"} • {sessionDuration} دقيقة</>
+                                      )}
                                     </p>
                                   </div>
-                                  {/* Contact Buttons */}
-                                  {student.phone && (
-                                    <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {/* Contact Buttons - only for individual sessions */}
+                                  {!isGroup && student.phone && (
+                                    <div className="flex items-center gap-1 mr-2 opacity-0 group-hover/item:opacity-100 transition-opacity">
                                       <Button
                                         size="icon"
                                         variant="ghost"
                                         className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
-                                        onClick={() => openWhatsApp(student.phone!)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openWhatsApp(student.phone!);
+                                        }}
                                         title="رسالة واتساب"
                                       >
                                         <WhatsAppIcon className="h-4 w-4" />
@@ -1500,7 +1534,10 @@ const Index = () => {
                                         size="icon"
                                         variant="ghost"
                                         className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
-                                        onClick={() => window.open(`tel:${student.phone}`, "_self")}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          window.open(`tel:${student.phone}`, "_self");
+                                        }}
                                         title="اتصال هاتفي"
                                       >
                                         <Phone className="h-4 w-4" />
@@ -1509,31 +1546,41 @@ const Index = () => {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                  {/* Session Notes Button */}
-                                  <SessionNotesDialog
-                                    session={session}
-                                    studentName={student.name}
-                                    onSave={(details) => updateSessionDetails(student.id, session.id, details)}
-                                  />
+                                  {/* Session Notes Button - only for individual sessions */}
+                                  {!isGroup && (
+                                    <SessionNotesDialog
+                                      session={session}
+                                      studentName={student.name}
+                                      onSave={(details) => updateSessionDetails(student.id, session.id, details)}
+                                    />
+                                  )}
                                   <Badge
                                     className={cn(
                                       "shrink-0 text-xs font-semibold",
-                                      isCompleted && "bg-primary text-primary-foreground",
+                                      isCompleted && !isGroup && "bg-primary text-primary-foreground",
                                       isCancelled && "bg-muted text-muted-foreground",
                                       isVacation && "bg-secondary text-secondary-foreground",
-                                      isScheduled && "bg-primary/80 text-primary-foreground",
+                                      isScheduled && !isGroup && "bg-primary/80 text-primary-foreground",
+                                      isGroup && "bg-violet-500 text-white",
+                                      isGroup && isCompleted && "bg-violet-600",
                                     )}
                                   >
-                                    {isCompleted && "✓ مكتملة"}
-                                    {isCancelled && "✕ ملغاة"}
-                                    {isVacation && "🏖 إجازة"}
-                                    {isScheduled && "◉ مجدولة"}
+                                    {isGroup ? (
+                                      isCompleted ? "✓ مكتملة" : "👥 مجموعة"
+                                    ) : (
+                                      <>
+                                        {isCompleted && "✓ مكتملة"}
+                                        {isCancelled && "✕ ملغاة"}
+                                        {isVacation && "🏖 إجازة"}
+                                        {isScheduled && "◉ مجدولة"}
+                                      </>
+                                    )}
                                   </Badge>
                                 </div>
                               </div>
 
-                              {/* Last Session Notes - Show notes from the student's previous session */}
-                              {(() => {
+                              {/* Last Session Notes - Show notes from the student's previous session (not for groups) */}
+                              {!isGroup && (() => {
                                 const todayStr = format(now, "yyyy-MM-dd");
                                 const lastSession = getLastSessionWithNotes(student, todayStr);
 
@@ -1577,7 +1624,7 @@ const Index = () => {
                                 );
                               })()}
 
-                              {isScheduled && !isNextSession && (
+                              {isScheduled && !isNextSession && !isGroup && (
                                 <div className="flex items-center gap-2 flex-wrap">
                                   {/* Status/Complete button based on session timing */}
                                   {isSessionEnded(
