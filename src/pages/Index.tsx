@@ -2596,19 +2596,41 @@ const Index = () => {
           onOpenChange={(open) => !open && setGroupPaymentDialog({ open: false, group: null, session: null })}
           group={groupPaymentDialog.group}
           session={groupPaymentDialog.session}
-          onRecordPayment={(memberId, memberName, amount, method) => {
-            // Record payment for group member
+          students={students}
+          onRecordPayment={(memberId, memberName, amount, method, linkedStudentId, sessionDate, groupId, groupName) => {
             const methodLabels: Record<string, string> = {
               cash: 'نقدي',
-              vodafone_cash: 'فودافون كاش',
-              instapay: 'انستاباي',
+              bank: 'تحويل بنكي',
+              wallet: 'محفظة إلكترونية',
             };
-            toast({
-              title: "تم تسجيل الدفع",
-              description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method})`,
-            });
-            // Note: You may want to integrate this with your payment system
-            // For now, it just shows a toast notification
+
+            // If member is linked to a real student, record to their payment history
+            if (linkedStudentId) {
+              const sessionDateObj = sessionDate ? new Date(sessionDate) : new Date();
+              const paymentData = {
+                month: sessionDateObj.getMonth(),
+                year: sessionDateObj.getFullYear(),
+                amount,
+                method,
+                paidAt: new Date().toISOString(),
+                notes: `دفعة مجموعة: ${groupName || 'مجموعة'} - ${sessionDate || format(now, "yyyy-MM-dd")}`,
+              };
+
+              // Record payment to the linked student's record
+              recordPayment(linkedStudentId, paymentData);
+
+              toast({
+                title: "✅ تم تسجيل الدفع",
+                description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method}) - تم التسجيل في سجل الطالب`,
+              });
+            } else {
+              // For group-only members (not linked to a student record)
+              // Just show confirmation - their payments are tracked in the group
+              toast({
+                title: "تم تسجيل الدفع",
+                description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method})`,
+              });
+            }
           }}
         />
       )}
