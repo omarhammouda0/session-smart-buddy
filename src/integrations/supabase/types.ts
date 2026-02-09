@@ -104,6 +104,168 @@ export type Database = {
         }
         Relationships: []
       }
+      group_members: {
+        Row: {
+          custom_price: number | null
+          group_id: string
+          id: string
+          is_active: boolean
+          joined_at: string
+          parent_phone: string | null
+          phone: string | null
+          student_id: string | null
+          student_name: string
+        }
+        Insert: {
+          custom_price?: number | null
+          group_id: string
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          parent_phone?: string | null
+          phone?: string | null
+          student_id?: string | null
+          student_name: string
+        }
+        Update: {
+          custom_price?: number | null
+          group_id?: string
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          parent_phone?: string | null
+          phone?: string | null
+          student_id?: string | null
+          student_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "student_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_schedule_days: {
+        Row: {
+          day_of_week: number
+          group_id: string
+          id: string
+          time: string
+        }
+        Insert: {
+          day_of_week: number
+          group_id: string
+          id?: string
+          time: string
+        }
+        Update: {
+          day_of_week?: number
+          group_id?: string
+          id?: string
+          time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_schedule_days_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "student_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_session_attendance: {
+        Row: {
+          id: string
+          member_id: string
+          note: string | null
+          session_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          note?: string | null
+          session_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          note?: string | null
+          session_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_session_attendance_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "group_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_session_attendance_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "group_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          date: string
+          duration: number
+          group_id: string
+          id: string
+          notes: string | null
+          status: string
+          time: string
+          topic: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          date: string
+          duration?: number
+          group_id: string
+          id?: string
+          notes?: string | null
+          status?: string
+          time: string
+          topic?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          date?: string
+          duration?: number
+          group_id?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          time?: string
+          topic?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_sessions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "student_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       homework: {
         Row: {
           completed_at: string | null
@@ -714,6 +876,57 @@ export type Database = {
           parent_notified?: boolean
           parent_notified_at?: string | null
           student_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      student_groups: {
+        Row: {
+          color: string | null
+          created_at: string
+          default_price_per_student: number
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          semester_end: string
+          semester_start: string
+          session_duration: number
+          session_time: string
+          session_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          default_price_per_student?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          semester_end: string
+          semester_start: string
+          session_duration?: number
+          session_time?: string
+          session_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          default_price_per_student?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          semester_end?: string
+          semester_start?: string
+          session_duration?: number
+          session_time?: string
+          session_type?: string
           updated_at?: string
           user_id?: string
         }
