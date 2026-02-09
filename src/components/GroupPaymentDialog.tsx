@@ -73,20 +73,10 @@ export const GroupPaymentDialog = ({
   // Track paid members in this session (for UI feedback)
   const [paidMembers, setPaidMembers] = useState<Set<string>>(new Set());
 
-  // Find linked students for each member
-  const memberStudentLinks = useMemo(() => {
-    const links: Record<string, Student | undefined> = {};
-    activeMembers.forEach(member => {
-      // Check if studentId is a valid UUID (not a group-generated ID)
-      if (member.studentId && !member.studentId.startsWith('group_')) {
-        const linkedStudent = students.find(s => s.id === member.studentId);
-        if (linkedStudent) {
-          links[member.studentId] = linkedStudent;
-        }
-      }
-    });
-    return links;
-  }, [activeMembers, students]);
+  // Check if any members are linked to students
+  const hasAnyLinkedMembers = useMemo(() => {
+    return activeMembers.some(member => !!member.linkedStudentId);
+  }, [activeMembers]);
 
   // Calculate total
   const totalAmount = useMemo(() => {
@@ -127,14 +117,13 @@ export const GroupPaymentDialog = ({
       const member = activeMembers.find(m => m.studentId === memberId);
       if (member) {
         const amount = customAmounts[memberId] ?? member.customPrice ?? group.defaultPricePerStudent;
-        const linkedStudent = memberStudentLinks[memberId];
 
         onRecordPayment(
           memberId,
           member.studentName,
           amount,
           paymentMethod,
-          linkedStudent?.id, // Pass linked student ID if exists
+          member.linkedStudentId, // Pass linked student ID directly from member
           session.date,
           group.id,
           group.name
@@ -234,7 +223,7 @@ export const GroupPaymentDialog = ({
                 const isPaid = paidMembers.has(member.studentId);
                 const memberPrice = member.customPrice ?? group.defaultPricePerStudent;
                 const currentAmount = customAmounts[member.studentId] ?? memberPrice;
-                const linkedStudent = memberStudentLinks[member.studentId];
+                const hasLinkedStudent = !!member.linkedStudentId;
 
                 return (
                   <div
@@ -265,9 +254,9 @@ export const GroupPaymentDialog = ({
                         <div className="flex items-center gap-2">
                           <div className={cn(
                             "w-8 h-8 rounded-full flex items-center justify-center",
-                            linkedStudent ? "bg-primary/10" : "bg-violet-100 dark:bg-violet-900/30"
+                            hasLinkedStudent ? "bg-primary/10" : "bg-violet-100 dark:bg-violet-900/30"
                           )}>
-                            {linkedStudent ? (
+                            {hasLinkedStudent ? (
                               <User className="h-4 w-4 text-primary" />
                             ) : (
                               <Users className="h-4 w-4 text-violet-500" />
@@ -279,7 +268,7 @@ export const GroupPaymentDialog = ({
                               {isPaid && (
                                 <span className="text-xs text-emerald-600 dark:text-emerald-400">✓ تم الدفع</span>
                               )}
-                              {linkedStudent && !isPaid && (
+                              {hasLinkedStudent && !isPaid && (
                                 <span className="text-xs text-primary flex items-center gap-0.5">
                                   <Link className="h-3 w-3" />
                                   مرتبط بسجل الطالب
@@ -339,7 +328,7 @@ export const GroupPaymentDialog = ({
             )}
 
             {/* Info about linked students */}
-            {Object.keys(memberStudentLinks).length > 0 && (
+            {hasAnyLinkedMembers && (
               <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs">
                 <div className="flex items-center gap-1.5 text-primary font-medium mb-1">
                   <Link className="h-3.5 w-3.5" />

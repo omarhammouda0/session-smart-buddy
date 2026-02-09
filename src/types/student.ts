@@ -152,7 +152,8 @@ export const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 // Group member with optional custom price
 export interface GroupMember {
-  studentId: string;
+  studentId: string;             // The member's ID in the group_members table
+  linkedStudentId?: string;      // The linked student's ID in the students table (for payment tracking)
   studentName: string;           // Denormalized for display
   phone?: string;                // Student phone
   parentPhone?: string;          // Parent phone

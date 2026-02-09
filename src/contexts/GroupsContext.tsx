@@ -137,7 +137,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
         const members: GroupMember[] = (membersResult.data || [])
           .filter(m => m.group_id === g.id)
           .map(m => ({
-            studentId: m.id, // Use the member's own ID as studentId
+            studentId: m.id, // The member's own ID (for group_members table operations)
+            linkedStudentId: m.student_id || undefined, // The linked student's ID (for payment tracking)
             studentName: m.student_name,
             phone: m.phone,
             parentPhone: m.parent_phone,
@@ -652,14 +653,31 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Try direct insert - using fetch API directly to avoid type issues
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || ''}/rest/v1/group_member_payments`, {
+      // Get the session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        console.error('[Groups] No access token available');
+        return;
+      }
+
+      // Use the supabase URL from the client
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        console.error('[Groups] Missing Supabase configuration');
+        return;
+      }
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/group_member_payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
-          'Prefer': 'return=minimal',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${accessToken}`,
+          'Prefer': 'return=representation',
         },
         body: JSON.stringify({
           user_id: currentUserId,
@@ -676,15 +694,17 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[Groups] Error recording payment:', errorText);
-        // Don't throw - just log the error
+        console.error('[Groups] Error recording payment:', response.status, errorText);
+        toast({ title: "خطأ", description: "فشل في تسجيل الدفعة في قاعدة البيانات", variant: "destructive" });
         return;
       }
 
-      console.log('[Groups] Payment recorded successfully');
+      const result = await response.json();
+      console.log('[Groups] Payment recorded successfully:', result);
+      toast({ title: "✅ تم حفظ الدفعة", description: "تم تسجيل الدفعة بنجاح" });
     } catch (error) {
       console.error('[Groups] Failed to record payment:', error);
-      // Don't throw error to user - payment tracking to group table is optional
+      toast({ title: "خطأ", description: "فشل في تسجيل الدفعة", variant: "destructive" });
     }
   }, [currentUserId]);
 
@@ -693,7 +713,23 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUserId) return [];
 
     try {
-      let url = `${import.meta.env.VITE_SUPABASE_URL || ''}/rest/v1/group_member_payments?group_id=eq.${groupId}&user_id=eq.${currentUserId}&order=paid_at.desc`;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        console.error('[Groups] No access token available');
+        return [];
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        console.error('[Groups] Missing Supabase configuration');
+        return [];
+      }
+
+      let url = `${supabaseUrl}/rest/v1/group_member_payments?group_id=eq.${groupId}&user_id=eq.${currentUserId}&order=paid_at.desc`;
 
       if (memberId) {
         url += `&member_id=eq.${memberId}`;
@@ -701,13 +737,13 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
 
       const response = await fetch(url, {
         headers: {
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${accessToken}`,
         },
       });
 
       if (!response.ok) {
-        console.error('[Groups] Error fetching payments');
+        console.error('[Groups] Error fetching payments:', response.status);
         return [];
       }
 
