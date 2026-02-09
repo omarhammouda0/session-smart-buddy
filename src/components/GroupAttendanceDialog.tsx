@@ -30,8 +30,8 @@ interface GroupAttendanceDialogProps {
     memberId: string,
     status: SessionStatus,
     note?: string
-  ) => void;
-  onCompleteSession: (groupId: string, sessionId: string) => void;
+  ) => void | Promise<void>;
+  onCompleteSession: (groupId: string, sessionId: string) => void | Promise<void>;
 }
 
 // Format time in Arabic
