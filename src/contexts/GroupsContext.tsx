@@ -156,7 +156,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           description: g.description,
           color: g.color,
           members,
-          defaultPricePerStudent: parseFloat(g.default_price_per_student),
+          defaultPricePerStudent: Number(g.default_price_per_student),
           sessionType: g.session_type as SessionType,
           scheduleDays,
           sessionDuration: g.session_duration,
