@@ -263,6 +263,159 @@ function analyzeWorkloadBalance(dayStats: DayStats[]): WorkloadBalance {
 }
 
 /**
+ * Find students with similar schedules for grouping suggestions
+ */
+function findSimilarStudents(
+  students: Student[],
+  newSessionType: SessionType | null,
+  selectedDays: number[]
+): SimilarStudentMatch[] {
+  if (!newSessionType || students.length === 0) return [];
+
+  const similarStudents: SimilarStudentMatch[] = [];
+
+  students.forEach(student => {
+    // Check if same session type
+    if (student.sessionType !== newSessionType) return;
+
+    // Get student's schedule days
+    const studentDays = student.scheduleDays.map(d => d.dayOfWeek);
+
+    // Find matching days with selected days (if any selected)
+    const matchingDays = selectedDays.length > 0
+      ? studentDays.filter(d => selectedDays.includes(d))
+      : studentDays;
+
+    // Calculate match score based on various factors
+    let matchScore = 0;
+
+    // Same session type = 40 points
+    matchScore += 40;
+
+    // Matching days = up to 30 points
+    if (selectedDays.length > 0 && matchingDays.length > 0) {
+      matchScore += Math.min(30, matchingDays.length * 15);
+    } else if (selectedDays.length === 0) {
+      // No days selected yet, show all same-type students
+      matchScore += 20;
+    }
+
+    // Similar time preference = up to 30 points
+    const studentTime = student.sessionTime || '16:00';
+    const studentPeriod = getTimePeriod(studentTime);
+    // We'll give points based on time period match potential
+    matchScore += 20;
+
+    // Only include if score >= 50
+    if (matchScore >= 50) {
+      const primaryTime = student.scheduleDays[0]?.time || student.sessionTime || '16:00';
+
+      similarStudents.push({
+        studentId: student.id,
+        studentName: student.name,
+        matchingDays: studentDays,
+        matchingDayNames: studentDays.map(d => DAY_NAMES_AR[d]),
+        sessionType: student.sessionType,
+        sessionTime: primaryTime,
+        sessionTimeAr: formatTimeAr(primaryTime),
+        matchScore,
+        reason: generateSimilarityReason(student, newSessionType, matchingDays),
+      });
+    }
+  });
+
+  // Sort by match score (highest first) and limit to 5
+  return similarStudents
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 5);
+}
+
+/**
+ * Generate reason text for why a student is similar
+ */
+function generateSimilarityReason(
+  student: Student,
+  newSessionType: SessionType,
+  matchingDays: number[]
+): string {
+  const reasons: string[] = [];
+
+  if (student.sessionType === newSessionType) {
+    reasons.push(newSessionType === 'online' ? 'نفس النوع (أونلاين)' : 'نفس النوع (حضوري)');
+  }
+
+  if (matchingDays.length > 0) {
+    const dayNames = matchingDays.map(d => DAY_NAMES_AR[d]).join('، ');
+    reasons.push(`أيام مشتركة: ${dayNames}`);
+  }
+
+  return reasons.join(' | ') || 'طالب مشابه';
+}
+
+/**
+ * Generate grouping suggestions based on existing students
+ */
+function generateGroupingSuggestions(
+  students: Student[],
+  newSessionType: SessionType | null,
+  dayStats: DayStats[]
+): GroupingSuggestion[] {
+  if (!newSessionType || students.length === 0) return [];
+
+  const suggestions: GroupingSuggestion[] = [];
+
+  // Find days where same-type students are already scheduled
+  dayStats.forEach(day => {
+    const sameTypeSessions = day.scheduledSessions.filter(s =>
+      (newSessionType === 'online' && s.type === 'online') ||
+      (newSessionType === 'onsite' && s.type === 'onsite')
+    );
+
+    if (sameTypeSessions.length >= 1 && day.totalSessions < BUSY_DAY_THRESHOLD) {
+      // Find a good time slot near existing same-type sessions
+      const existingTimes = sameTypeSessions.map(s => timeToMinutes(s.time));
+      const avgTime = Math.round(existingTimes.reduce((a, b) => a + b, 0) / existingTimes.length);
+
+      // Suggest time before or after the cluster
+      const minTime = Math.min(...existingTimes);
+      const maxTime = Math.max(...existingTimes);
+
+      let suggestedMinutes: number;
+      if (minTime > 9 * 60) {
+        // Suggest before the first session
+        suggestedMinutes = minTime - 90; // 1.5 hours before
+      } else {
+        // Suggest after the last session
+        suggestedMinutes = maxTime + 90; // 1.5 hours after
+      }
+
+      // Clamp to working hours
+      suggestedMinutes = Math.max(8 * 60, Math.min(21 * 60, suggestedMinutes));
+
+      const suggestedTime = minutesToTime(suggestedMinutes);
+      const studentNames = sameTypeSessions.map(s => s.studentName);
+
+      suggestions.push({
+        dayOfWeek: day.dayOfWeek,
+        dayName: DAY_NAMES_AR[day.dayOfWeek],
+        existingStudents: studentNames,
+        suggestedTime,
+        suggestedTimeAr: formatTimeAr(suggestedTime),
+        reason: `${studentNames.length} طالب ${newSessionType === 'online' ? 'أونلاين' : 'حضوري'} في نفس اليوم`,
+        benefit: newSessionType === 'online'
+          ? '💻 تنظيم أفضل - كل الجلسات أونلاين'
+          : '🚗 توفير وقت التنقل - كل الجلسات حضورية',
+      });
+    }
+  });
+
+  // Sort by number of existing students (more = better grouping)
+  return suggestions
+    .sort((a, b) => b.existingStudents.length - a.existingStudents.length)
+    .slice(0, 3);
+}
+
+/**
  * Hook to generate smart scheduling suggestions when adding a new student
  */
 export const useSchedulingSuggestions = (
@@ -536,6 +689,13 @@ export const useSchedulingSuggestions = (
       }
     }
 
+    // Find similar students for grouping
+    const selectedDays = []; // Will be populated from UI when days are selected
+    const similarStudents = findSimilarStudents(students, newSessionType, selectedDays);
+
+    // Generate grouping suggestions
+    const groupingSuggestions = generateGroupingSuggestions(students, newSessionType, dayStats);
+
     return {
       daySuggestions,
       bestDays,
@@ -551,8 +711,8 @@ export const useSchedulingSuggestions = (
         longestStreak,
       },
       smartRecommendations,
-      similarStudents: [], // TODO: Implement similar student detection
-      groupingSuggestions: [], // TODO: Implement grouping suggestions
+      similarStudents,
+      groupingSuggestions,
     };
   }, [students, newSessionType]);
 };

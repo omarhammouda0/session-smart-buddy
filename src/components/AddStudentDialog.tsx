@@ -5,17 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign, Sparkles, Sunrise, Sun, Moon, Lightbulb, Car, Users } from 'lucide-react';
+import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign, Sparkles, Lightbulb, Car, Users, UserCheck, Calendar } from 'lucide-react';
 import { SessionType, Student, DEFAULT_DURATION, StudentMaterial, AppSettings, ScheduleMode } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateSessionsForSchedule, getDistributedDays } from '@/lib/dateUtils';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
-import { useSchedulingSuggestions, DaySuggestion, SuggestedTimeSlot } from '@/hooks/useSchedulingSuggestions';
+import { useSchedulingSuggestions } from '@/hooks/useSchedulingSuggestions';
 import { DurationPicker } from '@/components/DurationPicker';
 import { StudentMaterialsSection } from '@/components/StudentMaterialsSection';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -491,6 +490,98 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                           <li key={`rec-${i}`} className="text-xs text-indigo-600 dark:text-indigo-400">{rec}</li>
                         ))}
                       </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Similar Students Section - Grouping Suggestions */}
+              {sessionType && schedulingSuggestions.similarStudents.length > 0 && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border border-violet-200 dark:border-violet-800">
+                  <div className="flex items-start gap-2">
+                    <UserCheck className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+                    <div className="space-y-2 flex-1">
+                      <p className="font-medium text-violet-700 dark:text-violet-300 text-sm">👥 طلاب مشابهون ({sessionType === 'online' ? 'أونلاين' : 'حضوري'})</p>
+                      <p className="text-xs text-violet-600 dark:text-violet-400">يمكنك تجميع الجلسات المتشابهة لتنظيم أفضل</p>
+                      <div className="space-y-1.5">
+                        {schedulingSuggestions.similarStudents.slice(0, 3).map((student, i) => (
+                          <div
+                            key={student.studentId}
+                            className="flex items-center justify-between p-2 rounded-md bg-white/50 dark:bg-black/20"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Users className="h-3.5 w-3.5 text-violet-500" />
+                              <span className="text-xs font-medium text-violet-700 dark:text-violet-300">{student.studentName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-violet-500 dark:text-violet-400">
+                                {student.matchingDayNames.slice(0, 2).join('، ')}
+                                {student.matchingDayNames.length > 2 && ` +${student.matchingDayNames.length - 2}`}
+                              </span>
+                              <span className="text-xs text-violet-600 dark:text-violet-300 font-medium">
+                                {student.sessionTimeAr}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Grouping Suggestions - Days with same-type sessions */}
+              {sessionType && schedulingSuggestions.groupingSuggestions.length > 0 && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30 border border-teal-200 dark:border-teal-800">
+                  <div className="flex items-start gap-2">
+                    <Calendar className="h-4 w-4 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
+                    <div className="space-y-2 flex-1">
+                      <p className="font-medium text-teal-700 dark:text-teal-300 text-sm">📅 اقتراحات التجميع</p>
+                      <div className="space-y-2">
+                        {schedulingSuggestions.groupingSuggestions.map((suggestion, i) => (
+                          <div
+                            key={`group-${i}`}
+                            className="p-2 rounded-md bg-white/50 dark:bg-black/20"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-teal-700 dark:text-teal-300">
+                                  {suggestion.dayName}
+                                </span>
+                                <span className="text-xs text-teal-600 dark:text-teal-400">
+                                  ({suggestion.reason})
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Add this day and set the suggested time
+                                  const existingSchedule = daySchedules.find(d => d.dayOfWeek === suggestion.dayOfWeek);
+                                  if (!existingSchedule) {
+                                    setDaySchedules(prev => [...prev, { dayOfWeek: suggestion.dayOfWeek, time: suggestion.suggestedTime }].sort((a, b) => a.dayOfWeek - b.dayOfWeek));
+                                  } else if (!existingSchedule.time) {
+                                    updateDayTime(suggestion.dayOfWeek, suggestion.suggestedTime);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700 hover:bg-teal-200 dark:bg-teal-900/50 dark:text-teal-300 dark:hover:bg-teal-900/70 transition-colors"
+                              >
+                                <Clock className="h-3 w-3" />
+                                {suggestion.suggestedTimeAr}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-teal-600 dark:text-teal-400">
+                              <span>{suggestion.benefit}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {suggestion.existingStudents.map((name, j) => (
+                                <span key={j} className="px-1.5 py-0.5 rounded bg-teal-100/50 dark:bg-teal-900/30 text-xs text-teal-600 dark:text-teal-400">
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
