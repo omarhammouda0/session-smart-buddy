@@ -90,6 +90,11 @@ import { ActionHandlers } from "@/lib/suggestionActions";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { useNotificationPrompt } from "@/hooks/useNotificationPrompt";
 import { PushNotificationDebug } from "@/components/PushNotificationDebug";
+import { useGroups } from "@/hooks/useGroups";
+import { AddGroupDialog } from "@/components/AddGroupDialog";
+import { GroupCard } from "@/components/GroupCard";
+import { GroupAttendanceDialog } from "@/components/GroupAttendanceDialog";
+import { StudentGroup, GroupSession } from "@/types/student";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -264,6 +269,29 @@ const Index = () => {
   } = useCancellationTracking(students);
 
   const { checkConflict, getSuggestedSlots } = useConflictDetection(students);
+
+  // Groups
+  const {
+    groups,
+    activeGroups,
+    addGroup,
+    updateGroup,
+    deleteGroup,
+    addMemberToGroup,
+    removeMemberFromGroup,
+    updateMemberPrice,
+    updateMemberAttendance,
+    completeGroupSession,
+    getGroupById,
+    getGroupSessionsForDate,
+  } = useGroups();
+
+  // State for group attendance dialog
+  const [groupAttendanceDialog, setGroupAttendanceDialog] = useState<{
+    open: boolean;
+    group: StudentGroup | null;
+    session: GroupSession | null;
+  }>({ open: false, group: null, session: null });
 
   // Session Notifications
   const {
@@ -917,6 +945,14 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
               <AddStudentDialog onAdd={handleAddStudent} defaultStart={settings.defaultSemesterStart} defaultEnd={settings.defaultSemesterEnd} students={students} settings={settings} defaultDuration={settings.defaultSessionDuration} defaultPriceOnsite={settings.defaultPriceOnsite} defaultPriceOnline={settings.defaultPriceOnline} />
+              <AddGroupDialog
+                onAdd={addGroup}
+                existingStudents={students}
+                defaultStart={settings.defaultSemesterStart}
+                defaultEnd={settings.defaultSemesterEnd}
+                defaultPriceOnsite={settings.defaultPriceOnsite}
+                defaultPriceOnline={settings.defaultPriceOnline}
+              />
               <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <MonthlyReportDialog students={students} payments={payments} settings={settings} />
@@ -1081,6 +1117,41 @@ const Index = () => {
               <div className="space-y-4">
                 {/* Today's Stats Dashboard */}
                 <TodaySessionsStats students={students} settings={settings} payments={payments} />
+
+                {/* Groups Section */}
+                {activeGroups.length > 0 && (
+                  <Card className="border overflow-hidden">
+                    <CardHeader className="pb-3 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base font-display font-bold flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-violet-500/10">
+                            <Users className="h-4 w-4 text-violet-600" />
+                          </div>
+                          المجموعات ({activeGroups.length})
+                        </CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {activeGroups.map(group => {
+                          const todayGroupSession = group.sessions.find(s => s.date === todayStr);
+                          return (
+                            <GroupCard
+                              key={group.id}
+                              group={group}
+                              compact
+                              onViewDetails={(g) => {
+                                if (todayGroupSession) {
+                                  setGroupAttendanceDialog({ open: true, group: g, session: todayGroupSession });
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* End of Day Checker - Floating button that appears after all sessions end */}
                 <EndOfDayChecker students={students} onToggleComplete={handleToggleComplete} />
@@ -2048,6 +2119,18 @@ const Index = () => {
 
       {/* Push Notification Debug Tool */}
       <PushNotificationDebug />
+
+      {/* Group Attendance Dialog */}
+      {groupAttendanceDialog.group && groupAttendanceDialog.session && (
+        <GroupAttendanceDialog
+          open={groupAttendanceDialog.open}
+          onOpenChange={(open) => !open && setGroupAttendanceDialog({ open: false, group: null, session: null })}
+          group={groupAttendanceDialog.group}
+          session={groupAttendanceDialog.session}
+          onUpdateAttendance={updateMemberAttendance}
+          onCompleteSession={completeGroupSession}
+        />
+      )}
     </div>
   );
 };

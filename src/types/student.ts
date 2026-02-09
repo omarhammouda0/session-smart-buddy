@@ -145,3 +145,53 @@ export const MAX_DURATION = 240;
 
 export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// =============================================
+// GROUP SESSIONS - Multiple students in one session
+// =============================================
+
+// Group member with optional custom price
+export interface GroupMember {
+  studentId: string;
+  studentName: string;           // Denormalized for display
+  phone?: string;                // Student phone
+  parentPhone?: string;          // Parent phone
+  customPrice?: number;          // Override group default price if needed
+  joinedAt: string;              // When they joined the group
+  isActive: boolean;             // Whether still active in group
+}
+
+// Attendance for individual member in a group session
+export interface GroupMemberAttendance {
+  memberId: string;
+  memberName: string;
+  status: SessionStatus;         // attended/cancelled/vacation
+  note?: string;
+}
+
+// Group session (extends regular Session)
+export interface GroupSession extends Session {
+  groupId: string;               // Reference to the group
+  memberAttendance: GroupMemberAttendance[]; // Per-member attendance
+}
+
+// Student Group - reusable group of students
+export interface StudentGroup {
+  id: string;
+  name: string;                    // e.g., "مجموعة الثانوية"
+  members: GroupMember[];
+  defaultPricePerStudent: number;  // Default price per student (e.g., 80 ج.م)
+  sessionType: SessionType;        // online or onsite
+  scheduleDays: ScheduleDay[];     // Shared schedule for all members
+  sessionDuration: number;         // Session duration in minutes
+  sessionTime: string;             // Default session time HH:mm
+  semesterStart: string;           // YYYY-MM-DD
+  semesterEnd: string;             // YYYY-MM-DD
+  sessions: GroupSession[];        // Group sessions
+  isActive: boolean;               // Whether group is active
+  createdAt: string;
+  updatedAt: string;
+  // Optional fields
+  description?: string;            // Group description/notes
+  color?: string;                  // Color for calendar display
+}
