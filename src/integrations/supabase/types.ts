@@ -104,6 +104,77 @@ export type Database = {
         }
         Relationships: []
       }
+      group_member_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          group_id: string
+          id: string
+          linked_student_id: string | null
+          member_id: string
+          method: string
+          notes: string | null
+          paid_at: string
+          session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          group_id: string
+          id?: string
+          linked_student_id?: string | null
+          member_id: string
+          method?: string
+          notes?: string | null
+          paid_at?: string
+          session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          group_id?: string
+          id?: string
+          linked_student_id?: string | null
+          member_id?: string
+          method?: string
+          notes?: string | null
+          paid_at?: string
+          session_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_member_payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "student_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_member_payments_linked_student_id_fkey"
+            columns: ["linked_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_member_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "group_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_member_payments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "group_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
           custom_price: number | null
