@@ -1118,40 +1118,48 @@ const Index = () => {
                 {/* Today's Stats Dashboard */}
                 <TodaySessionsStats students={students} settings={settings} payments={payments} />
 
-                {/* Groups Section */}
-                {activeGroups.length > 0 && (
-                  <Card className="border overflow-hidden">
-                    <CardHeader className="pb-3 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base font-display font-bold flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-violet-500/10">
-                            <Users className="h-4 w-4 text-violet-600" />
-                          </div>
-                          المجموعات ({activeGroups.length})
-                        </CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {activeGroups.map(group => {
-                          const todayGroupSession = group.sessions.find(s => s.date === todayStr);
-                          return (
-                            <GroupCard
-                              key={group.id}
-                              group={group}
-                              compact
-                              onViewDetails={(g) => {
-                                if (todayGroupSession) {
-                                  setGroupAttendanceDialog({ open: true, group: g, session: todayGroupSession });
-                                }
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                {/* Groups Section - Only show groups with sessions today */}
+                {(() => {
+                  const groupsWithTodaySessions = activeGroups.filter(group =>
+                    group.sessions.some(s => s.date === todayStr)
+                  );
+
+                  if (groupsWithTodaySessions.length === 0) return null;
+
+                  return (
+                    <Card className="border overflow-hidden">
+                      <CardHeader className="pb-3 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base font-display font-bold flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-violet-500/10">
+                              <Users className="h-4 w-4 text-violet-600" />
+                            </div>
+                            مجموعات اليوم ({groupsWithTodaySessions.length})
+                          </CardTitle>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {groupsWithTodaySessions.map(group => {
+                            const todayGroupSession = group.sessions.find(s => s.date === todayStr);
+                            return (
+                              <GroupCard
+                                key={group.id}
+                                group={group}
+                                compact
+                                onViewDetails={(g) => {
+                                  if (todayGroupSession) {
+                                    setGroupAttendanceDialog({ open: true, group: g, session: todayGroupSession });
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
                 {/* End of Day Checker - Floating button that appears after all sessions end */}
                 <EndOfDayChecker students={students} onToggleComplete={handleToggleComplete} />

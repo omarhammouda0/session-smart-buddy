@@ -75,6 +75,7 @@ import {
 import { useConflictDetection } from "@/hooks/useConflictDetection";
 import { useGroups } from "@/hooks/useGroups";
 import { StudentGroup, GroupSession } from "@/types/student";
+import { GroupAttendanceDialog } from "@/components/GroupAttendanceDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -144,7 +145,7 @@ export const CalendarView = ({
   const { getSuggestedSlots } = useConflictDetection(students);
 
   // Get groups for calendar display
-  const { activeGroups, getGroupSessionsForDate } = useGroups();
+  const { activeGroups, getGroupSessionsForDate, updateMemberAttendance, completeGroupSession } = useGroups();
 
   // Add Session Dialog State
   const [addSessionDialog, setAddSessionDialog] = useState<{
@@ -205,6 +206,13 @@ export const CalendarView = ({
     open: boolean;
     date: string;
     sessions: SessionWithStudent[];
+  } | null>(null);
+
+  // Group session dialog - for viewing/editing group session attendance
+  const [groupSessionDialog, setGroupSessionDialog] = useState<{
+    open: boolean;
+    group: StudentGroup;
+    session: GroupSession;
   } | null>(null);
 
   // Filter students based on selection
@@ -1200,12 +1208,18 @@ export const CalendarView = ({
                           <div
                             key={session.id}
                             className={cn(
-                              "flex items-center gap-3 p-3 transition-all",
+                              "flex items-center gap-3 p-3 transition-all cursor-pointer",
                               isCompleted && "bg-primary/5",
                               isCancelled && "bg-muted/30 opacity-60",
-                              isGroup && "bg-violet-50 dark:bg-violet-950/20"
+                              isGroup && "bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/40"
                             )}
-                            onClick={() => !isGroup && setSessionActionDialog({ open: true, session, student })}
+                            onClick={() => {
+                              if (isGroup && group && groupSession) {
+                                setGroupSessionDialog({ open: true, group, session: groupSession });
+                              } else {
+                                setSessionActionDialog({ open: true, session, student });
+                              }
+                            }}
                           >
                             {/* Time Column */}
                             <div className={cn(
@@ -1457,11 +1471,20 @@ export const CalendarView = ({
                           }
                           onTouchMove={handleTouchMove}
                           onTouchEnd={handleTouchEnd}
-                          onClick={(e) => !isGroup && handleSessionClick(e, session, student)}
+                          onClick={(e) => {
+                            if (isGroup && group) {
+                              const groupSession = group.sessions.find(s => s.date === session.date);
+                              if (groupSession) {
+                                setGroupSessionDialog({ open: true, group, session: groupSession });
+                              }
+                            } else {
+                              handleSessionClick(e, session, student);
+                            }
+                          }}
                           className={cn(
                             "text-xs sm:text-sm p-2 sm:p-3 rounded-lg border-2 flex items-start gap-1.5 sm:gap-2 transition-all duration-200 touch-manipulation select-none cursor-pointer",
                             isGroup
-                              ? "bg-violet-100 dark:bg-violet-950/30 border-violet-300 dark:border-violet-700"
+                              ? "bg-violet-100 dark:bg-violet-950/30 border-violet-300 dark:border-violet-700 hover:bg-violet-200 dark:hover:bg-violet-950/50"
                               : getStatusColor(session.status),
                             canDrag && "active:cursor-grabbing hover:shadow-lg active:scale-95",
                             touchDragState?.sessionId === session.id && touchDragState?.active && "opacity-50 scale-95",
