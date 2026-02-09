@@ -100,6 +100,7 @@ import { useGroups } from "@/hooks/useGroups";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { GroupCard } from "@/components/GroupCard";
 import { GroupAttendanceDialog } from "@/components/GroupAttendanceDialog";
+import { GroupPaymentDialog } from "@/components/GroupPaymentDialog";
 import { StudentGroup, GroupSession } from "@/types/student";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -307,6 +308,7 @@ const Index = () => {
   const [addGroupDialog, setAddGroupDialog] = useState<{ open: boolean }>({ open: false });
   const [editGroupDialog, setEditGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
   const [deleteGroupDialog, setDeleteGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
+  const [groupPaymentDialog, setGroupPaymentDialog] = useState<{ open: boolean; group: StudentGroup | null; session: GroupSession | null }>({ open: false, group: null, session: null });
 
   // Session Notifications
   const {
@@ -1836,6 +1838,20 @@ const Index = () => {
                                       </AlertDialogFooter>
                                     </AlertDialogContent>
                                   </AlertDialog>
+
+                                  {/* Group Payment Button */}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30 gap-1.5 h-9 px-4"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGroupPaymentDialog({ open: true, group, session: groupSession });
+                                    }}
+                                  >
+                                    <DollarSign className="h-4 w-4" />
+                                    دفع
+                                  </Button>
                                 </div>
                               )}
 
@@ -1854,6 +1870,19 @@ const Index = () => {
                                   >
                                     <Users className="h-3.5 w-3.5" />
                                     عرض الحضور
+                                  </Button>
+                                  {/* Payment button for completed sessions */}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 gap-1.5 h-8 px-3 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGroupPaymentDialog({ open: true, group, session: groupSession });
+                                    }}
+                                  >
+                                    <DollarSign className="h-3.5 w-3.5" />
+                                    دفع
                                   </Button>
                                 </div>
                               )}
@@ -2559,6 +2588,30 @@ const Index = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Group Payment Dialog */}
+      {groupPaymentDialog.group && groupPaymentDialog.session && (
+        <GroupPaymentDialog
+          open={groupPaymentDialog.open}
+          onOpenChange={(open) => !open && setGroupPaymentDialog({ open: false, group: null, session: null })}
+          group={groupPaymentDialog.group}
+          session={groupPaymentDialog.session}
+          onRecordPayment={(memberId, memberName, amount, method) => {
+            // Record payment for group member
+            const methodLabels: Record<string, string> = {
+              cash: 'نقدي',
+              vodafone_cash: 'فودافون كاش',
+              instapay: 'انستاباي',
+            };
+            toast({
+              title: "تم تسجيل الدفع",
+              description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method})`,
+            });
+            // Note: You may want to integrate this with your payment system
+            // For now, it just shows a toast notification
+          }}
+        />
+      )}
     </div>
   );
 };
