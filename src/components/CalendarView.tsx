@@ -2357,6 +2357,18 @@ export const CalendarView = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Group Session Attendance Dialog */}
+      {groupSessionDialog && (
+        <GroupAttendanceDialog
+          open={groupSessionDialog.open}
+          onOpenChange={(open) => !open && setGroupSessionDialog(null)}
+          group={groupSessionDialog.group}
+          session={groupSessionDialog.session}
+          onUpdateAttendance={updateMemberAttendance}
+          onCompleteSession={completeGroupSession}
+        />
+      )}
     </Card>
   );
 };
