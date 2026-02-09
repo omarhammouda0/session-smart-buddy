@@ -995,12 +995,16 @@ const Index = () => {
               </Sheet>
               <AddStudentDialog onAdd={handleAddStudent} defaultStart={settings.defaultSemesterStart} defaultEnd={settings.defaultSemesterEnd} students={students} settings={settings} defaultDuration={settings.defaultSessionDuration} defaultPriceOnsite={settings.defaultPriceOnsite} defaultPriceOnline={settings.defaultPriceOnline} />
               <AddGroupDialog
-                onAdd={addGroup}
-                existingStudents={students}
-                defaultStart={settings.defaultSemesterStart}
-                defaultEnd={settings.defaultSemesterEnd}
-                defaultPriceOnsite={settings.defaultPriceOnsite}
-                defaultPriceOnline={settings.defaultPriceOnline}
+                open={false}
+                onOpenChange={() => {}}
+                onAddGroup={addGroup}
+                students={students}
+                settings={{
+                  defaultPriceOnsite: settings.defaultPriceOnsite,
+                  defaultPriceOnline: settings.defaultPriceOnline,
+                  semesterStart: settings.defaultSemesterStart,
+                  semesterEnd: settings.defaultSemesterEnd,
+                }}
               />
               <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
               <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
