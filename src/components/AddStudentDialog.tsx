@@ -5,15 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign, Sparkles, Sunrise, Sun, Moon } from 'lucide-react';
+import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign, Sparkles, Sunrise, Sun, Moon, Lightbulb, Car, Users } from 'lucide-react';
 import { SessionType, Student, DEFAULT_DURATION, StudentMaterial, AppSettings, ScheduleMode } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateSessionsForSchedule, getDistributedDays } from '@/lib/dateUtils';
 import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useConflictDetection';
+import { useSchedulingSuggestions, DaySuggestion, SuggestedTimeSlot } from '@/hooks/useSchedulingSuggestions';
 import { DurationPicker } from '@/components/DurationPicker';
 import { StudentMaterialsSection } from '@/components/StudentMaterialsSection';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,6 +79,9 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   
   const { checkConflict } = useConflictDetection(students);
+
+  // Get scheduling suggestions based on existing students
+  const schedulingSuggestions = useSchedulingSuggestions(students, sessionType);
 
   // Get effective days from daySchedules
   const effectiveDaysFromSchedules = useMemo(() => {
@@ -471,52 +476,157 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
               <Label>جدول الحصص الأسبوعي</Label>
               <p className="text-xs text-muted-foreground">اختر أيام الحصص وحدد الوقت لكل يوم</p>
 
-              {/* Day Selection with Per-Day Time */}
+              {/* Smart Scheduling Tips */}
+              {sessionType && schedulingSuggestions.generalTips.length > 0 && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-medium text-blue-700 dark:text-blue-300 text-sm">اقتراحات ذكية للجدولة</p>
+                      <ul className="space-y-1">
+                        {schedulingSuggestions.generalTips.map((tip, i) => (
+                          <li key={i} className="text-xs text-blue-600 dark:text-blue-400">{tip}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Day Selection with Per-Day Time and Smart Suggestions */}
               <div className="space-y-2">
                 {DAY_NAMES_AR.map((day, index) => {
                   const schedule = daySchedules.find(d => d.dayOfWeek === index);
                   const isSelected = !!schedule;
+                  const daySuggestion = schedulingSuggestions.daySuggestions[index];
+                  const isBestDay = schedulingSuggestions.bestDays.includes(index);
+                  const isAvoidDay = schedulingSuggestions.avoidDays.includes(index);
 
                   return (
                     <div
                       key={day}
                       className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
+                        "flex flex-col gap-2 p-3 rounded-lg border-2 transition-all",
                         isSelected
                           ? "bg-primary/5 border-primary/30"
-                          : "bg-card border-border hover:border-primary/20"
+                          : isBestDay && sessionType
+                            ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700"
+                            : isAvoidDay && sessionType
+                              ? "bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700"
+                              : "bg-card border-border hover:border-primary/20"
                       )}
                     >
-                      {/* Day checkbox */}
-                      <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleDaySchedule(index)}
-                        />
-                        <span className={cn(
-                          "text-sm font-medium",
-                          isSelected ? "text-primary" : "text-foreground"
-                        )}>
-                          {day}
-                        </span>
-                      </label>
-
-                      {/* Time input - only show when day is selected */}
-                      {isSelected && (
-                        <div className="flex items-center gap-2 flex-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <Input
-                            type="time"
-                            value={schedule.time}
-                            onChange={(e) => updateDayTime(index, e.target.value)}
-                            className="w-32"
-                            placeholder="الوقت"
+                      <div className="flex items-center gap-3">
+                        {/* Day checkbox */}
+                        <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleDaySchedule(index)}
                           />
-                          {schedule.time && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatTimeAr(schedule.time)}
-                            </span>
-                          )}
+                          <span className={cn(
+                            "text-sm font-medium",
+                            isSelected ? "text-primary" : "text-foreground"
+                          )}>
+                            {day}
+                          </span>
+                        </label>
+
+                        {/* Smart suggestion badge */}
+                        {sessionType && daySuggestion && (
+                          <div className="flex items-center gap-1.5 flex-1">
+                            {daySuggestion.type === 'free_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                                <Sparkles className="h-3 w-3" />
+                                فارغ
+                              </span>
+                            )}
+                            {daySuggestion.type === 'light_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                                <Check className="h-3 w-3" />
+                                خفيف ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'moderate_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                <Clock className="h-3 w-3" />
+                                متوسط ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'busy_day' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+                                <AlertTriangle className="h-3 w-3" />
+                                مزدحم ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'same_type_cluster' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+                                {sessionType === 'online' ? <Monitor className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
+                                {sessionType === 'online' ? 'أونلاين' : 'حضوري'} ({daySuggestion.sessionCount})
+                              </span>
+                            )}
+                            {daySuggestion.type === 'mixed_type' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                <Users className="h-3 w-3" />
+                                مختلط
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Time input - only show when day is selected */}
+                        {isSelected && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="time"
+                              value={schedule.time}
+                              onChange={(e) => updateDayTime(index, e.target.value)}
+                              className="w-32"
+                              placeholder="الوقت"
+                            />
+                            {schedule.time && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatTimeAr(schedule.time)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Suggested time slots dropdown - show when day is selected but no time set */}
+                      {isSelected && !schedule.time && daySuggestion && daySuggestion.suggestedTimeSlots.length > 0 && (
+                        <div className="mr-8 mt-1">
+                          <p className="text-xs text-muted-foreground mb-1.5">⏰ أوقات مقترحة:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {daySuggestion.suggestedTimeSlots.map((slot, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => updateDayTime(index, slot.time)}
+                                className={cn(
+                                  "inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all",
+                                  slot.priority === 'high'
+                                    ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300 dark:hover:bg-emerald-900/70"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                                )}
+                                title={slot.reason}
+                              >
+                                <Clock className="h-3 w-3" />
+                                {slot.timeAr}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {daySuggestion.suggestedTimeSlots[0]?.reason}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Travel time consideration warning */}
+                      {isSelected && daySuggestion?.travelConsideration && (
+                        <div className="mr-8 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                          <Car className="h-3 w-3" />
+                          {daySuggestion.travelConsideration}
                         </div>
                       )}
                     </div>
