@@ -17,7 +17,7 @@ import {
   Users,
   Link,
 } from 'lucide-react';
-import { StudentGroup, GroupSession, PaymentMethod, Student } from '@/types/student';
+import { StudentGroup, GroupSession, PaymentMethod } from '@/types/student';
 import { cn } from '@/lib/utils';
 
 interface GroupPaymentDialogProps {
@@ -25,7 +25,7 @@ interface GroupPaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   group: StudentGroup;
   session: GroupSession;
-  students?: Student[]; // All students to find linked ones
+  students?: never[]; // Kept for backwards compatibility but not used
   onRecordPayment: (
     memberId: string,
     memberName: string,
@@ -58,7 +58,6 @@ export const GroupPaymentDialog = ({
   onOpenChange,
   group,
   session,
-  students = [],
   onRecordPayment,
 }: GroupPaymentDialogProps) => {
   const activeMembers = group.members.filter(m => m.isActive);
