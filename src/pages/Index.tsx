@@ -1747,7 +1747,118 @@ const Index = () => {
                                   </Button>
                                 </div>
                               )}
-                              {isCompleted && (
+
+                              {/* Group Session Actions */}
+                              {isGroup && isScheduled && group && groupSession && (
+                                <div className="flex items-center gap-2 flex-wrap mt-2">
+                                  {/* Complete/Attendance button */}
+                                  <Button
+                                    size="sm"
+                                    className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5 h-9 px-4"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGroupAttendanceDialog({ open: true, group, session: groupSession });
+                                    }}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    تسجيل الحضور
+                                  </Button>
+
+                                  {/* Quick Complete All */}
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30 gap-1.5 h-9 px-4"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Check className="h-4 w-4" />
+                                        إكمال الكل
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent dir="rtl">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>تأكيد إكمال حصة المجموعة</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          هل تريد تسجيل حضور جميع طلاب مجموعة <strong>{group.name}</strong>؟
+                                          <br />
+                                          سيتم تسجيل {group.members.filter(m => m.isActive).length} طالب كحاضرين.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter className="flex-row-reverse gap-2">
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => completeGroupSession(group.id, groupSession.id)}
+                                          className="bg-violet-600 text-white hover:bg-violet-700"
+                                        >
+                                          تأكيد الإكمال
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+
+                                  {/* Cancel Group Session */}
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1.5 h-9 px-4"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <XCircle className="h-4 w-4" />
+                                        إلغاء
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent dir="rtl">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>تأكيد إلغاء حصة المجموعة</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          هل تريد إلغاء حصة مجموعة <strong>{group.name}</strong> اليوم؟
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter className="flex-row-reverse gap-2">
+                                        <AlertDialogCancel>رجوع</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => {
+                                            // Mark all members as cancelled
+                                            groupSession.memberAttendance.forEach(att => {
+                                              if (att.status === 'scheduled') {
+                                                updateMemberAttendance(group.id, groupSession.id, att.memberId, 'cancelled');
+                                              }
+                                            });
+                                          }}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                          تأكيد الإلغاء
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              )}
+
+                              {/* Group Completed Status */}
+                              {isGroup && isCompleted && group && groupSession && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="text-sm text-violet-600 dark:text-violet-400 font-medium">✓ تم إكمال الحصة</span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 gap-1.5 h-8 px-3 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGroupAttendanceDialog({ open: true, group, session: groupSession });
+                                    }}
+                                  >
+                                    <Users className="h-3.5 w-3.5" />
+                                    عرض الحضور
+                                  </Button>
+                                </div>
+                              )}
+
+                              {isCompleted && !isGroup && (
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-primary font-medium">✓ تم إكمال الحصة</span>
                                   <Button
