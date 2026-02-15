@@ -1319,7 +1319,13 @@ const Index = () => {
             ) : (
               <div className="space-y-4">
                 {/* Today's Stats Dashboard */}
-                <TodaySessionsStats students={students} settings={settings} payments={payments} />
+                <TodaySessionsStats
+                  students={students}
+                  settings={settings}
+                  payments={payments}
+                  groups={groups}
+                  groupPayments={allGroupPayments}
+                />
 
                 {/* End of Day Checker - Floating button that appears after all sessions end */}
                 <EndOfDayChecker students={students} onToggleComplete={handleToggleComplete} />

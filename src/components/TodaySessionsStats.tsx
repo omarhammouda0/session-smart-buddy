@@ -9,18 +9,33 @@ import {
   Calendar,
   DollarSign,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Student, Session, AppSettings, StudentPayments } from "@/types/student";
+import { Student, Session, AppSettings, StudentPayments, StudentGroup } from "@/types/student";
 import { format, differenceInMinutes, differenceInSeconds } from "date-fns";
 import { ar } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+
+interface GroupMemberPayment {
+  id: string;
+  groupId: string;
+  sessionId?: string;
+  memberId: string;
+  linkedStudentId?: string;
+  amount: number;
+  method: 'cash' | 'bank' | 'wallet';
+  paidAt: string;
+  notes?: string;
+}
 
 interface TodaySessionsStatsProps {
   students: Student[];
   settings: AppSettings;
   payments?: StudentPayments[];
+  groups?: StudentGroup[];
+  groupPayments?: GroupMemberPayment[];
 }
 
 // Motivational quotes in Arabic - Navy blue theme
@@ -45,7 +60,7 @@ const TEACHING_TIPS = [
   "استخدم الرسومات والصور للشرح",
 ];
 
-export function TodaySessionsStats({ students, settings, payments }: TodaySessionsStatsProps) {
+export function TodaySessionsStats({ students, settings, payments, groups = [], groupPayments = [] }: TodaySessionsStatsProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [dailyQuote] = useState(() =>
     MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]
@@ -64,7 +79,7 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
 
   const todayStr = format(currentTime, "yyyy-MM-dd");
 
-  // Calculate today's sessions statistics
+  // Calculate today's sessions statistics (including groups)
   const stats = useMemo(() => {
     let total = 0;
     let completed = 0;
@@ -75,11 +90,19 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
     let nextSession: { session: Session; student: Student; minutesUntil: number } | null = null;
     let currentSession: { session: Session; student: Student; minutesRemaining: number } | null = null;
 
+    // Group session counters
+    let groupTotal = 0;
+    let groupCompleted = 0;
+    let groupScheduled = 0;
+    let groupExpectedValue = 0;
+    let groupPaidAmount = 0;
+
     // Get today's date info for payment lookup
     const todayDate = new Date(currentTime);
     const todayMonth = todayDate.getMonth();
     const todayYear = todayDate.getFullYear();
 
+    // Calculate individual student sessions
     students.forEach((student) => {
       // Get student's payments for this month
       const studentPayments = payments?.find((p) => p.studentId === student.id);
@@ -140,20 +163,70 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
         });
     });
 
-    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    // Calculate group sessions for today
+    groups.forEach((group) => {
+      const todayGroupSession = group.sessions.find((s) => s.date === todayStr);
+      if (!todayGroupSession) return;
+
+      // Count active members
+      const activeMembers = group.members.filter((m) => m.isActive);
+
+      activeMembers.forEach((member) => {
+        groupTotal++;
+
+        const memberPrice = member.customPrice ?? group.defaultPricePerStudent;
+
+        // Check member attendance status
+        const attendance = todayGroupSession.memberAttendance.find(
+          (a) => a.memberId === member.studentId
+        );
+
+        const memberStatus = attendance?.status || todayGroupSession.status;
+
+        if (memberStatus === "completed") {
+          groupCompleted++;
+          groupExpectedValue += memberPrice;
+        } else if (memberStatus === "scheduled") {
+          groupScheduled++;
+          groupExpectedValue += memberPrice;
+        }
+
+        // Check if member has paid for this session
+        const memberPayment = groupPayments.find(
+          (p) => p.sessionId === todayGroupSession.id && p.memberId === member.studentId
+        );
+        if (memberPayment) {
+          groupPaidAmount += memberPayment.amount;
+        }
+      });
+    });
+
+    // Combined totals
+    const combinedTotal = total + groupTotal;
+    const combinedCompleted = completed + groupCompleted;
+    const combinedScheduled = scheduled + groupScheduled;
+    const combinedExpectedValue = expectedValue + groupExpectedValue;
+    const combinedPaidAmount = paidAmount + groupPaidAmount;
+
+    const completionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
 
     return {
-      total,
-      completed,
+      total: combinedTotal,
+      completed: combinedCompleted,
       cancelled,
-      scheduled,
+      scheduled: combinedScheduled,
       completionRate,
-      expectedValue,
-      paidAmount,
+      expectedValue: combinedExpectedValue,
+      paidAmount: combinedPaidAmount,
       nextSession,
       currentSession,
+      // Keep individual counts for display
+      privateTotal: total,
+      groupTotal,
+      privateCompleted: completed,
+      groupCompleted,
     };
-  }, [students, todayStr, currentTime, settings, payments]);
+  }, [students, todayStr, currentTime, settings, payments, groups, groupPayments]);
 
   const formatCountdown = (minutes: number) => {
     if (minutes < 1) {
@@ -223,7 +296,14 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
             <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
               <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
               <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.total}</p>
-              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">حصص</p>
+              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">
+                {stats.groupTotal > 0 ? (
+                  <span className="flex items-center justify-center gap-0.5">
+                    حصص
+                    <span className="text-violet-200">({stats.privateTotal}+{stats.groupTotal}👥)</span>
+                  </span>
+                ) : "حصص"}
+              </p>
             </CardContent>
           </Card>
 
@@ -234,7 +314,14 @@ export function TodaySessionsStats({ students, settings, payments }: TodaySessio
             <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
               <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
               <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.completed}</p>
-              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">مكتملة</p>
+              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">
+                {stats.groupCompleted > 0 ? (
+                  <span className="flex items-center justify-center gap-0.5">
+                    مكتملة
+                    <span className="text-violet-200">({stats.privateCompleted}+{stats.groupCompleted}👥)</span>
+                  </span>
+                ) : "مكتملة"}
+              </p>
             </CardContent>
           </Card>
 
