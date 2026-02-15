@@ -1,8 +1,8 @@
-import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check, DollarSign, FileText, BookOpen, ChevronDown, ChevronUp, History } from "lucide-react";
+import { Trash2, Clock, Monitor, MapPin, Phone, CheckCircle2, Ban, Check, DollarSign, FileText, BookOpen, ChevronDown, ChevronUp, History, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Student, SessionType, AppSettings, Session } from "@/types/student";
+import {Student, SessionType, AppSettings, Session, StudentGroup} from "@/types/student";
 import { EditStudentDialog } from "@/components/EditStudentDialog";
 import { cn } from "@/lib/utils";
 import { DAY_NAMES_SHORT_AR, formatDurationAr } from "@/lib/arabicConstants";
@@ -83,6 +83,7 @@ interface StudentCardProps {
   settings?: AppSettings;
   selectedDayOfWeek: number;
   todaySessions?: Session[];
+  groups?: StudentGroup[]; // For counting group sessions
   onRemove: () => void;
   onUpdateName: (name: string) => void;
   onUpdateTime: (time: string) => void;
@@ -140,6 +141,7 @@ export const StudentCard = ({
   settings,
   selectedDayOfWeek,
   todaySessions = [],
+  groups = [],
   onRemove,
   onUpdateName,
   onUpdateTime,
@@ -157,6 +159,35 @@ export const StudentCard = ({
 
   // Get today's date string for comparison
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+
+  // Get group sessions for this student (if linked to any groups)
+  const groupSessionsInfo = useMemo(() => {
+    const studentGroupSessions: Array<{
+      date: string;
+      status: string;
+      groupName: string;
+      time: string;
+    }> = [];
+
+    groups.forEach(group => {
+      const member = group.members.find(m => m.linkedStudentId === student.id && m.isActive);
+      if (!member) return;
+
+      group.sessions.forEach(session => {
+        const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+        if (attendance) {
+          studentGroupSessions.push({
+            date: session.date,
+            status: attendance.status,
+            groupName: group.name,
+            time: session.time || group.sessionTime,
+          });
+        }
+      });
+    });
+
+    return studentGroupSessions;
+  }, [groups, student.id]);
 
   // Get the last session with notes (excluding today) - prioritize sessions with content
   const lastSessionWithNotes = useMemo(() => {
@@ -180,7 +211,7 @@ export const StudentCard = ({
     return pastCompletedSessions[0] || null;
   }, [student.sessions, todayStr]);
 
-  // Get all past sessions for history (with notes or completed)
+  // Get all past sessions for history (with notes or completed) - PRIVATE ONLY for display
   const allPastSessions = useMemo(() => {
     return student.sessions
       .filter(s =>
@@ -189,6 +220,21 @@ export const StudentCard = ({
       )
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [student.sessions, todayStr]);
+
+  // Count past GROUP sessions
+  const pastGroupSessions = useMemo(() => {
+    return groupSessionsInfo.filter(s => s.date < todayStr && s.status === "completed");
+  }, [groupSessionsInfo, todayStr]);
+
+  // Combined past sessions count
+  const totalPastSessionsCount = allPastSessions.length + pastGroupSessions.length;
+
+  // Future sessions count (private + group)
+  const futureSessions = useMemo(() => {
+    const privateCount = student.sessions.filter(s => s.date >= todayStr && s.status === "scheduled").length;
+    const groupCount = groupSessionsInfo.filter(s => s.date >= todayStr && s.status === "scheduled").length;
+    return { privateCount, groupCount, total: privateCount + groupCount };
+  }, [student.sessions, groupSessionsInfo, todayStr]);
 
   // Check if last session has any content
   const lastSessionHasContent = lastSessionWithNotes &&
@@ -362,7 +408,7 @@ export const StudentCard = ({
                   <span className="text-xs text-muted-foreground">
                     {formatDateAr(lastSessionWithNotes.date)}
                   </span>
-                  {allPastSessions.length > 1 && (
+                  {totalPastSessionsCount > 1 && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -370,7 +416,7 @@ export const StudentCard = ({
                       onClick={() => setShowHistoryDialog(true)}
                     >
                       <History className="h-3.5 w-3.5" />
-                      السجل ({allPastSessions.length})
+                      السجل ({totalPastSessionsCount})
                     </Button>
                   )}
                 </div>
@@ -446,11 +492,42 @@ export const StudentCard = ({
                   سجل حصص {student.name}
                 </DialogTitle>
                 <DialogDescription>
-                  {allPastSessions.length} حصة سابقة
+                  {totalPastSessionsCount} حصة سابقة
+                  {pastGroupSessions.length > 0 && (
+                    <span className="text-violet-500 mr-1">
+                      ({allPastSessions.length} فردي + {pastGroupSessions.length} مجموعة)
+                    </span>
+                  )}
                 </DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[60vh] pr-4">
                 <div className="space-y-4">
+                  {/* Group Sessions Summary */}
+                  {pastGroupSessions.length > 0 && (
+                    <div className="p-3 rounded-xl border-2 border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-violet-500" />
+                        <span className="font-medium text-violet-700 dark:text-violet-300">
+                          حصص المجموعات ({pastGroupSessions.length})
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {Array.from(new Set(pastGroupSessions.map(s => s.groupName))).map(groupName => {
+                          const count = pastGroupSessions.filter(s => s.groupName === groupName).length;
+                          return (
+                            <div key={groupName} className="flex items-center justify-between">
+                              <span>{groupName}</span>
+                              <Badge variant="outline" className="bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400">
+                                {count} حصة
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Private Sessions */}
                   {allPastSessions.map((session) => (
                     <div
                       key={session.id}

@@ -110,6 +110,7 @@ interface CancellationRecord {
 
 interface SessionHistoryBarProps {
   students: Student[];
+  groups?: StudentGroup[]; // For counting group sessions for linked students
   onCancelSession?: (studentId: string, sessionId: string, reason?: string) => void;
   onDeleteSession?: (studentId: string, sessionId: string) => void;
   onRestoreSession?: (studentId: string, sessionId: string) => void;
@@ -148,6 +149,7 @@ type SortOrder = "date-asc" | "date-desc" | "time-asc";
 
 export const SessionHistoryBar = ({
   students,
+  groups = [],
   onCancelSession,
   onDeleteSession,
   onRestoreSession,
@@ -855,9 +857,11 @@ export const SessionHistoryBar = ({
   };
 
   const getHistoryStats = () => {
-    if (!selectedStudent) return { completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0 };
+    if (!selectedStudent) return { completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0, groupCompleted: 0, groupTotal: 0 };
 
     const { start, end } = getFilterDateRange();
+
+    // Private sessions
     const filteredSessions = selectedStudent.sessions.filter((s) => s.date >= start && s.date <= end);
 
     let completed = 0,
@@ -870,6 +874,25 @@ export const SessionHistoryBar = ({
       else if (session.status === "vacation") vacation++;
     });
 
+    // Group sessions for this student
+    let groupCompleted = 0,
+      groupTotal = 0;
+
+    groups.forEach(group => {
+      const member = group.members.find(m => m.linkedStudentId === selectedStudent.id && m.isActive);
+      if (!member) return;
+
+      group.sessions.forEach(session => {
+        if (session.date < start || session.date > end) return;
+
+        const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+        if (attendance) {
+          groupTotal++;
+          if (attendance.status === "completed") groupCompleted++;
+        }
+      });
+    });
+
     const total = completed + cancelled + vacation;
     const rateTotal = completed + cancelled;
 
@@ -879,6 +902,8 @@ export const SessionHistoryBar = ({
       vacation,
       total,
       completionRate: rateTotal > 0 ? Math.round((completed / rateTotal) * 100) : 0,
+      groupCompleted,
+      groupTotal,
     };
   };
 
@@ -887,11 +912,36 @@ export const SessionHistoryBar = ({
   const historyStats = getHistoryStats();
 
   const todayStr = format(today, "yyyy-MM-dd");
-  const scheduledCount =
+
+  // Private scheduled sessions
+  const privateScheduledCount =
     selectedStudent?.sessions.filter((s) => s.status === "scheduled" && s.date >= todayStr).length ?? 0;
-  const completedCount = historyStats.completed;
+
+  // Group scheduled sessions for this student
+  const groupScheduledCount = useMemo(() => {
+    if (!selectedStudent) return 0;
+    let count = 0;
+    groups.forEach(group => {
+      const member = group.members.find(m => m.linkedStudentId === selectedStudent.id && m.isActive);
+      if (!member) return;
+
+      group.sessions.forEach(session => {
+        if (session.date < todayStr) return;
+        const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+        if (attendance && attendance.status === "scheduled") count++;
+      });
+    });
+    return count;
+  }, [selectedStudent, groups, todayStr]);
+
+  // Combined counts
+  const scheduledCount = privateScheduledCount + groupScheduledCount;
+  const completedCount = historyStats.completed + historyStats.groupCompleted;
   const cancelledCount = historyStats.cancelled;
   const vacationCount = historyStats.vacation;
+
+  // Check if student has group sessions
+  const hasGroupSessions = historyStats.groupTotal > 0 || groupScheduledCount > 0;
 
   // ==================== RENDER ====================
 
@@ -943,12 +993,23 @@ export const SessionHistoryBar = ({
 
         {selectedStudentId !== "all" && selectedStudent ? (
           <>
+            {/* Group Session Indicator */}
+            {hasGroupSessions && (
+              <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 text-sm">
+                <span className="text-violet-700 dark:text-violet-300 flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  هذا الطالب مشترك في مجموعات - الأرقام تشمل الحصص الفردية والجماعية
+                </span>
+              </div>
+            )}
+
             {/* Status Cards */}
             <div className="grid grid-cols-4 gap-2">
               {[
                 {
                   label: "قادمة",
                   count: scheduledCount,
+                  subtitle: hasGroupSessions ? `${privateScheduledCount}+${groupScheduledCount}` : undefined,
                   icon: CalendarClock,
                   bg: "bg-blue-500/10",
                   border: "border-blue-500/30",
@@ -956,6 +1017,7 @@ export const SessionHistoryBar = ({
                 {
                   label: "مكتملة",
                   count: completedCount,
+                  subtitle: hasGroupSessions ? `${historyStats.completed}+${historyStats.groupCompleted}` : undefined,
                   icon: Check,
                   bg: "bg-emerald-500/10",
                   border: "border-emerald-500/30",
@@ -963,6 +1025,7 @@ export const SessionHistoryBar = ({
                 {
                   label: "ملغية",
                   count: cancelledCount,
+                  subtitle: undefined,
                   icon: Ban,
                   bg: "bg-rose-500/10",
                   border: "border-rose-500/30",
@@ -970,6 +1033,7 @@ export const SessionHistoryBar = ({
                 {
                   label: "إجازة",
                   count: vacationCount,
+                  subtitle: undefined,
                   icon: Palmtree,
                   bg: "bg-amber-500/10",
                   border: "border-amber-500/30",
@@ -978,6 +1042,9 @@ export const SessionHistoryBar = ({
                 <div key={i} className={cn("rounded-xl border-2 p-3 text-center", stat.bg, stat.border)}>
                   <stat.icon className="h-4 w-4 mx-auto mb-1" />
                   <p className="text-2xl font-bold">{stat.count}</p>
+                  {stat.subtitle && (
+                    <p className="text-[10px] text-violet-600 dark:text-violet-400">({stat.subtitle})</p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
                 </div>
               ))}

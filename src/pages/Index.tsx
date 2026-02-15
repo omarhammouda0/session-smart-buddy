@@ -2100,6 +2100,7 @@ const Index = () => {
           <TabsContent value="history" className="mt-0">
             <SessionHistoryBar
               students={students}
+              groups={groups}
               onCancelSession={handleCancelSession}
               onDeleteSession={handleDeleteSession}
               onRestoreSession={handleRestoreSession}
