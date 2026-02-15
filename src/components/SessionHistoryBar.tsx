@@ -40,7 +40,7 @@ import {
   Filter,
   CalendarRange,
 } from "lucide-react";
-import { Student, Session, HomeworkStatus } from "@/types/student";
+import { Student, Session, HomeworkStatus, StudentGroup } from "@/types/student";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -784,7 +784,7 @@ export const SessionHistoryBar = ({
     return "";
   };
 
-  const sortSessions = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+  const sortSessions = <T extends Session & { studentName: string; studentId: string }>(sessions: T[]): T[] => {
     return sessions.sort((a, b) => {
       const student = students.find((s) => s.id === a.studentId);
       const dateCompare = sortOrder === "date-desc" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
@@ -802,17 +802,17 @@ export const SessionHistoryBar = ({
     });
   };
 
-  const filterSessionsByDateRange = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+  const filterSessionsByDateRange = <T extends Session & { studentName: string; studentId: string }>(sessions: T[]): T[] => {
     const { start, end } = getFilterDateRange();
     return sessions.filter((s) => s.date >= start && s.date <= end);
   };
 
-  const filterSessionsByStatus = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+  const filterSessionsByStatus = <T extends Session & { studentName: string; studentId: string }>(sessions: T[]): T[] => {
     if (statusFilter === "all") return sessions;
     return sessions.filter((s) => s.status === statusFilter);
   };
 
-  const filterSessionsBySearch = (sessions: (Session & { studentName: string; studentId: string })[]) => {
+  const filterSessionsBySearch = <T extends Session & { studentName: string; studentId: string }>(sessions: T[]): T[] => {
     if (!searchQuery.trim()) return sessions;
 
     const query = searchQuery.toLowerCase();
