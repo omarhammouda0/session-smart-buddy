@@ -842,36 +842,79 @@ const Index = () => {
   }, [students, todayStr, activeGroups]);
 
   const todayStats = useMemo(() => {
-    const total = allTodaySessions.length;
-    const completed = allTodaySessions.filter((s) => s.session.status === "completed").length;
-    const scheduled = allTodaySessions.filter((s) => s.session.status === "scheduled").length;
-    const cancelled = allTodaySessions.filter((s) => s.session.status === "cancelled").length;
-    const vacation = allTodaySessions.filter((s) => s.session.status === "vacation").length;
-    const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    // Private sessions stats
+    let privateTotal = 0;
+    let privateCompleted = 0;
+    let privateScheduled = 0;
+    let privateCancelled = 0;
+    let privateVacation = 0;
+
+    // Group member stats (count per member, not per session)
+    let groupTotal = 0;
+    let groupCompleted = 0;
+    let groupScheduled = 0;
+    let groupCancelled = 0;
+    let groupVacation = 0;
 
     // Calculate payment stats for today's sessions
     let totalDue = 0;
     let totalPaid = 0;
 
     allTodaySessions.forEach(({ student, session, isGroup, group }) => {
-      if (session.status === 'completed' || session.status === 'scheduled') {
-        if (isGroup && group) {
-          // For group sessions, find linked students
-          group.members.forEach(member => {
-            if (member.isActive && member.linkedStudentId) {
-              const memberPrice = member.customPrice ?? group.defaultPricePerStudent;
-              totalDue += memberPrice;
-              // Check if paid for this session
-              const sessionPayment = allGroupPayments.find(
-                p => p.sessionId === session.id && p.memberId === member.studentId
-              );
-              if (sessionPayment) {
-                totalPaid += sessionPayment.amount;
-              }
+      if (isGroup && group) {
+        // For group sessions, count each active member
+        group.members.forEach(member => {
+          if (!member.isActive) return;
+
+          groupTotal++;
+
+          // Check member's attendance status from the group session
+          const groupSess = group.sessions.find(gs => gs.date === session.date);
+          const attendance = groupSess?.memberAttendance?.find(
+            a => a.memberId === member.studentId
+          );
+          const memberStatus = attendance?.status || session.status;
+
+          if (memberStatus === "completed") {
+            groupCompleted++;
+          } else if (memberStatus === "scheduled") {
+            groupScheduled++;
+          } else if (memberStatus === "cancelled") {
+            groupCancelled++;
+          } else if (memberStatus === "vacation") {
+            groupVacation++;
+          }
+
+          // Calculate payment for billable sessions
+          if (memberStatus === 'completed' || memberStatus === 'scheduled') {
+            const memberPrice = member.customPrice ?? group.defaultPricePerStudent;
+            totalDue += memberPrice;
+
+            // Check if paid for this session
+            const sessionPayment = allGroupPayments.find(
+              p => p.sessionId === session.id && p.memberId === member.studentId
+            );
+            if (sessionPayment) {
+              totalPaid += sessionPayment.amount;
             }
-          });
-        } else {
-          // For individual sessions
+          }
+        });
+      } else {
+        // For individual sessions
+        privateTotal++;
+
+        if (session.status === "completed") {
+          privateCompleted++;
+        } else if (session.status === "scheduled") {
+          privateScheduled++;
+        } else if (session.status === "cancelled") {
+          privateCancelled++;
+        } else if (session.status === "vacation") {
+          privateVacation++;
+        }
+
+        // Calculate payment for billable sessions
+        if (session.status === 'completed' || session.status === 'scheduled') {
           const price = student.useCustomSettings
             ? (student.sessionType === 'online'
                 ? (student.customPriceOnline || settings?.defaultPriceOnline || 120)
@@ -880,6 +923,7 @@ const Index = () => {
                 ? (settings?.defaultPriceOnline || 120)
                 : (settings?.defaultPriceOnsite || 150));
           totalDue += price;
+
           // Check payments for this specific session
           const studentPayments = payments.find(p => p.studentId === student.id);
           if (studentPayments) {
@@ -899,11 +943,24 @@ const Index = () => {
       }
     });
 
+    // Combined totals
+    const total = privateTotal + groupTotal;
+    const completed = privateCompleted + groupCompleted;
+    const scheduled = privateScheduled + groupScheduled;
+    const cancelled = privateCancelled + groupCancelled;
+    const vacation = privateVacation + groupVacation;
+
+    // Completion rate: completed / (completed + scheduled) - meaningful rate excluding cancelled/vacation
+    const billable = completed + scheduled;
+    const progressPercent = billable > 0 ? Math.round((completed / billable) * 100) : 0;
     const paymentPercent = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0;
 
     return {
       total, completed, scheduled, cancelled, vacation, progressPercent,
-      totalDue, totalPaid, paymentPercent
+      totalDue, totalPaid, paymentPercent,
+      // Keep separate counts for display if needed
+      privateTotal, groupTotal,
+      privateCompleted, groupCompleted
     };
   }, [allTodaySessions, allGroupPayments, payments, settings, now]);
 

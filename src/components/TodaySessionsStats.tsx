@@ -85,6 +85,7 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
     let completed = 0;
     let cancelled = 0;
     let scheduled = 0;
+    let vacation = 0;
     let expectedValue = 0; // Expected value from non-cancelled sessions
     let paidAmount = 0; // Actual paid amount for today's sessions
     let nextSession: { session: Session; student: Student; minutesUntil: number } | null = null;
@@ -94,6 +95,8 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
     let groupTotal = 0;
     let groupCompleted = 0;
     let groupScheduled = 0;
+    let groupCancelled = 0;
+    let groupVacation = 0;
     let groupExpectedValue = 0;
     let groupPaidAmount = 0;
 
@@ -143,6 +146,9 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
           } else if (session.status === "cancelled") {
             cancelled++;
             // Cancelled sessions don't add to expected value
+          } else if (session.status === "vacation") {
+            vacation++;
+            // Vacation sessions don't add to expected value
           } else if (session.status === "scheduled") {
             scheduled++;
             expectedValue += price;
@@ -176,7 +182,7 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
 
         const memberPrice = member.customPrice ?? group.defaultPricePerStudent;
 
-        // Check member attendance status
+        // Check member attendance status - default to session status if no attendance record
         const attendance = todayGroupSession.memberAttendance.find(
           (a) => a.memberId === member.studentId
         );
@@ -189,6 +195,12 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
         } else if (memberStatus === "scheduled") {
           groupScheduled++;
           groupExpectedValue += memberPrice;
+        } else if (memberStatus === "cancelled") {
+          groupCancelled++;
+          // Cancelled doesn't add to expected value
+        } else if (memberStatus === "vacation") {
+          groupVacation++;
+          // Vacation doesn't add to expected value
         }
 
         // Check if member has paid for this session
@@ -205,15 +217,20 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
     const combinedTotal = total + groupTotal;
     const combinedCompleted = completed + groupCompleted;
     const combinedScheduled = scheduled + groupScheduled;
+    const combinedCancelled = cancelled + groupCancelled;
+    const combinedVacation = vacation + groupVacation;
     const combinedExpectedValue = expectedValue + groupExpectedValue;
     const combinedPaidAmount = paidAmount + groupPaidAmount;
 
-    const completionRate = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
+    // Completion rate: completed / (completed + scheduled) - excludes cancelled and vacation for meaningful rate
+    const billableSessions = combinedCompleted + combinedScheduled;
+    const completionRate = billableSessions > 0 ? Math.round((combinedCompleted / billableSessions) * 100) : 0;
 
     return {
       total: combinedTotal,
       completed: combinedCompleted,
-      cancelled,
+      cancelled: combinedCancelled,
+      vacation: combinedVacation,
       scheduled: combinedScheduled,
       completionRate,
       expectedValue: combinedExpectedValue,
