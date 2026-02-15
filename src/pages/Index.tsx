@@ -334,21 +334,23 @@ const Index = () => {
     notes?: string;
   }>>([]);
 
+  // Function to refresh all group payments
+  const refreshAllGroupPayments = async () => {
+    const allPayments: typeof allGroupPayments = [];
+    for (const group of groups) {
+      const payments = await getGroupMemberPayments(group.id);
+      allPayments.push(...payments);
+    }
+    setAllGroupPayments(allPayments);
+  };
+
   // Fetch all group payments when groups change
   useEffect(() => {
-    const fetchAllGroupPayments = async () => {
-      const allPayments: typeof allGroupPayments = [];
-      for (const group of groups) {
-        const payments = await getGroupMemberPayments(group.id);
-        allPayments.push(...payments);
-      }
-      setAllGroupPayments(allPayments);
-    };
-
     if (groups.length > 0) {
-      fetchAllGroupPayments();
+      refreshAllGroupPayments();
     }
-  }, [groups, getGroupMemberPayments]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups]);
 
   // Session Notifications
   const {
@@ -2942,6 +2944,9 @@ const Index = () => {
                   description: `${memberName}: ${amount} ج.م (${methodLabels[method] || method})`,
                 });
               }
+
+              // Refresh group payments to update the dashboard
+              await refreshAllGroupPayments();
             } catch (error) {
               console.error('Failed to record group payment:', error);
               toast({

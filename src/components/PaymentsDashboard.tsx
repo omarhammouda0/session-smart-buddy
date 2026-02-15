@@ -64,8 +64,8 @@ const CURRENCY = "جنيه";
 // HELPER FUNCTIONS
 // ============================================
 
-// Count session stats for a student in a given month
-const getStudentMonthStats = (student: Student, month: number, year: number) => {
+// Count session stats for a student in a given month (PRIVATE sessions only)
+const getStudentPrivateMonthStats = (student: Student, month: number, year: number) => {
   const sessions = student.sessions.filter((s) => {
     const sessionDate = new Date(s.date);
     return sessionDate.getMonth() === month && sessionDate.getFullYear() === year;
@@ -77,6 +77,76 @@ const getStudentMonthStats = (student: Student, month: number, year: number) => 
   const scheduled = sessions.filter((s) => s.status === "scheduled").length;
 
   return { completed, vacation, cancelled, scheduled, total: sessions.length };
+};
+
+// Count group session stats for a linked student in a given month
+const getStudentGroupMonthStats = (
+  studentId: string,
+  groups: StudentGroup[],
+  month: number,
+  year: number
+) => {
+  let completed = 0;
+  let vacation = 0;
+  let cancelled = 0;
+  let scheduled = 0;
+
+  groups.forEach(group => {
+    // Find if this student is a linked member in this group
+    const member = group.members.find(m => m.linkedStudentId === studentId && m.isActive);
+    if (!member) return;
+
+    // Count sessions for this month
+    group.sessions.forEach(session => {
+      const sessionDate = new Date(session.date);
+      if (sessionDate.getMonth() !== month || sessionDate.getFullYear() !== year) return;
+
+      // Check member's attendance status
+      const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+      if (attendance) {
+        if (attendance.status === 'completed') completed++;
+        else if (attendance.status === 'vacation') vacation++;
+        else if (attendance.status === 'cancelled') cancelled++;
+        else if (attendance.status === 'scheduled') scheduled++;
+      } else if (session.status === 'scheduled') {
+        // If no attendance record but session is scheduled, count as scheduled
+        scheduled++;
+      }
+    });
+  });
+
+  return { completed, vacation, cancelled, scheduled, total: completed + vacation + cancelled + scheduled };
+};
+
+// Combined stats (private + group) for a student
+const getStudentCombinedMonthStats = (
+  student: Student,
+  groups: StudentGroup[],
+  month: number,
+  year: number
+) => {
+  const privateStats = getStudentPrivateMonthStats(student, month, year);
+  const groupStats = getStudentGroupMonthStats(student.id, groups, month, year);
+
+  return {
+    completed: privateStats.completed + groupStats.completed,
+    vacation: privateStats.vacation + groupStats.vacation,
+    cancelled: privateStats.cancelled + groupStats.cancelled,
+    scheduled: privateStats.scheduled + groupStats.scheduled,
+    total: privateStats.total + groupStats.total,
+    // Keep separate counts for display
+    privateCompleted: privateStats.completed,
+    privateScheduled: privateStats.scheduled,
+    privateTotal: privateStats.total,
+    groupCompleted: groupStats.completed,
+    groupScheduled: groupStats.scheduled,
+    groupTotal: groupStats.total,
+  };
+};
+
+// Legacy function for backwards compatibility
+const getStudentMonthStats = (student: Student, month: number, year: number) => {
+  return getStudentPrivateMonthStats(student, month, year);
 };
 
 // Get session price for a student
@@ -640,14 +710,14 @@ export const PaymentsDashboard = ({
 
     for (let i = 0; i < studentsWithPhone.length; i++) {
       const student = studentsWithPhone[i];
-      const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
-      const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+      const monthStats = getStudentCombinedMonthStats(student, groups, selectedMonth, selectedYear);
+      const studentTotal = getStudentCombinedTotal(student, groups, selectedMonth, selectedYear, settings);
       const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
       const remaining = studentTotal - amountPaid;
 
       const messageText = `عزيزي ولي الأمر،
 تذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}
-عدد الجلسات: ${monthStats.completed + monthStats.scheduled}
+عدد الجلسات: ${monthStats.completed + monthStats.scheduled}${monthStats.groupTotal > 0 ? ` (${monthStats.privateCompleted + monthStats.privateScheduled} فردي + ${monthStats.groupCompleted + monthStats.groupScheduled} مجموعة)` : ''}
 المبلغ المستحق: ${studentTotal} ${CURRENCY}${amountPaid > 0 ? `\nالمدفوع: ${amountPaid} ${CURRENCY}\nالمتبقي: ${remaining} ${CURRENCY}` : ""}
 شكراً لتعاونكم`;
 
@@ -711,9 +781,9 @@ export const PaymentsDashboard = ({
     students.forEach((student) => {
       const paymentStatus = getPaymentStatusLocal(student.id);
       const paymentDetails = getPaymentDetails(student.id);
-      const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+      const monthStats = getStudentCombinedMonthStats(student, groups, selectedMonth, selectedYear);
       const billableCount = monthStats.completed + monthStats.scheduled;
-      const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+      const studentTotal = getStudentCombinedTotal(student, groups, selectedMonth, selectedYear, settings);
       const pricePerSession = getStudentSessionPrice(student, settings);
       const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
 
@@ -723,7 +793,10 @@ export const PaymentsDashboard = ({
       reportLines.push(`${statusIcon} ${student.name} ${statusText}`);
 
       if (billableCount > 0) {
-        reportLines.push(`   ${billableCount} حصص × ${pricePerSession} ${CURRENCY} = ${studentTotal} ${CURRENCY}`);
+        const sessionBreakdown = monthStats.groupTotal > 0
+          ? ` (${monthStats.privateCompleted + monthStats.privateScheduled} فردي + ${monthStats.groupCompleted + monthStats.groupScheduled} مجموعة)`
+          : '';
+        reportLines.push(`   ${billableCount} حصص${sessionBreakdown} = ${studentTotal} ${CURRENCY}`);
       }
 
       if (paymentStatus === "partial") {
@@ -1351,10 +1424,11 @@ export const PaymentsDashboard = ({
                   {students.map((student) => {
                     const paymentStatus = getPaymentStatusLocal(student.id);
                     const paymentDetails = getPaymentDetails(student.id);
-                    const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
-                    const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
+                    const studentTotal = getStudentCombinedTotal(student, groups, selectedMonth, selectedYear, settings);
+                    const monthStats = getStudentCombinedMonthStats(student, groups, selectedMonth, selectedYear);
                     const billableCount = monthStats.completed + monthStats.scheduled;
                     const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
+                    const hasGroupSessions = monthStats.groupTotal > 0;
 
                     return (
                       <div
@@ -1381,8 +1455,13 @@ export const PaymentsDashboard = ({
                             <div className="text-xs text-muted-foreground space-y-0.5">
                               {billableCount > 0 && (
                                 <p>
-                                  {billableCount} حصص × {getStudentSessionPrice(student, settings)} {CURRENCY} ={" "}
-                                  {studentTotal.toLocaleString()} {CURRENCY}
+                                  {billableCount} حصص
+                                  {hasGroupSessions && (
+                                    <span className="text-violet-500">
+                                      {' '}({monthStats.privateCompleted + monthStats.privateScheduled} فردي + {monthStats.groupCompleted + monthStats.groupScheduled} مجموعة)
+                                    </span>
+                                  )}
+                                  {' '}= {studentTotal.toLocaleString()} {CURRENCY}
                                 </p>
                               )}
                               {paymentStatus === "partial" && (
@@ -1461,14 +1540,16 @@ export const PaymentsDashboard = ({
                       </div>
                     ) : (
                       getPaymentHistory(selectedStudent.id).map((payment) => {
-                        const studentTotal = getStudentMonthTotal(
+                        const studentTotal = getStudentCombinedTotal(
                           selectedStudent,
+                          groups,
                           payment.month,
                           payment.year,
                           settings,
                         );
-                        const monthStats = getStudentMonthStats(selectedStudent, payment.month, payment.year);
+                        const monthStats = getStudentCombinedMonthStats(selectedStudent, groups, payment.month, payment.year);
                         const billableCount = monthStats.completed + monthStats.scheduled;
+                        const hasGroupSessions = monthStats.groupTotal > 0;
                         const amountPaid = payment.amountPaid || payment.amount || 0;
                         const isFullyPaid = amountPaid >= studentTotal;
 
@@ -1492,7 +1573,13 @@ export const PaymentsDashboard = ({
                                 </div>
                                 <div className="text-xs text-muted-foreground space-y-0.5">
                                   <p>
-                                    {billableCount} حصص = {studentTotal.toLocaleString()} {CURRENCY}
+                                    {billableCount} حصص
+                                    {hasGroupSessions && (
+                                      <span className="text-violet-500">
+                                        {' '}({monthStats.privateCompleted + monthStats.privateScheduled} فردي + {monthStats.groupCompleted + monthStats.groupScheduled} مجموعة)
+                                      </span>
+                                    )}
+                                    {' '}= {studentTotal.toLocaleString()} {CURRENCY}
                                   </p>
                                   <p
                                     className={isFullyPaid ? "text-success font-medium" : "text-amber-600 font-medium"}
