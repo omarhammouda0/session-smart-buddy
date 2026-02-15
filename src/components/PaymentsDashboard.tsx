@@ -528,12 +528,13 @@ export const PaymentsDashboard = ({
   // ============================================
 
   const openRecordPaymentDialog = (student: Student, isAddingToPartial: boolean = false) => {
-    const monthTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+    // Use COMBINED total (private + group sessions)
+    const combinedTotal = getStudentCombinedTotal(student, groups, selectedMonth, selectedYear, settings);
     const alreadyPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
-    const remaining = monthTotal - alreadyPaid;
+    const remaining = Math.max(0, combinedTotal - alreadyPaid);
 
-    // Default amount: remaining for partial, full amount for new
-    setPaymentAmount(isAddingToPartial ? Math.max(0, remaining).toString() : monthTotal.toString());
+    // Default amount: remaining for partial, full remaining amount for new
+    setPaymentAmount(remaining > 0 ? remaining.toString() : "0");
     setPaymentMethod("cash");
     setPaymentDate(format(now, "yyyy-MM-dd"));
     setPaymentNotes("");
@@ -546,6 +547,30 @@ export const PaymentsDashboard = ({
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
       toast({ title: "خطأ", description: "المبلغ غير صحيح", variant: "destructive" });
+      return;
+    }
+
+    // Validate max amount - cannot exceed remaining balance
+    const combinedTotal = getStudentCombinedTotal(recordPaymentDialog.student, groups, selectedMonth, selectedYear, settings);
+    const alreadyPaid = getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear);
+    const remaining = Math.max(0, combinedTotal - alreadyPaid);
+
+    if (amount > remaining && remaining > 0) {
+      toast({ 
+        title: "خطأ", 
+        description: `المبلغ يتجاوز المتبقي. الحد الأقصى: ${remaining.toLocaleString()} ${CURRENCY}`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Warning if paying more than total due (overpayment)
+    if (amount > combinedTotal) {
+      toast({ 
+        title: "تنبيه", 
+        description: `المبلغ المدخل (${amount.toLocaleString()}) يتجاوز المستحق (${combinedTotal.toLocaleString()})`, 
+        variant: "destructive" 
+      });
       return;
     }
 
@@ -1274,27 +1299,54 @@ export const PaymentsDashboard = ({
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Show current status for partial payments */}
-            {recordPaymentDialog.isAddingToPartial && recordPaymentDialog.student && (
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                <div className="flex justify-between text-sm">
-                  <span>المدفوع سابقاً:</span>
-                  <span className="font-medium text-amber-600">
-                    {getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear).toLocaleString()}{" "}
-                    {CURRENCY}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm mt-1">
-                  <span>المتبقي:</span>
-                  <span className="font-medium">
-                    {Math.max(
-                      0,
-                      getStudentMonthTotal(recordPaymentDialog.student, selectedMonth, selectedYear, settings) -
-                        getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear),
-                    ).toLocaleString()}{" "}
-                    {CURRENCY}
-                  </span>
-                </div>
+            {/* Show current status - Always show for context */}
+            {recordPaymentDialog.student && (
+              <div className={cn(
+                "p-3 rounded-lg border",
+                recordPaymentDialog.isAddingToPartial
+                  ? "bg-amber-500/10 border-amber-500/30"
+                  : "bg-muted/50 border-border"
+              )}>
+                {/* Combined total breakdown */}
+                {(() => {
+                  const privateTotal = getStudentMonthTotal(recordPaymentDialog.student, selectedMonth, selectedYear, settings);
+                  const groupTotal = getStudentGroupSessionsDue(recordPaymentDialog.student.id, groups, selectedMonth, selectedYear);
+                  const combinedTotal = privateTotal + groupTotal;
+                  const alreadyPaid = getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear);
+                  const remaining = Math.max(0, combinedTotal - alreadyPaid);
+
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span>إجمالي المستحق:</span>
+                        <span className="font-medium">
+                          {combinedTotal.toLocaleString()} {CURRENCY}
+                          {groupTotal > 0 && (
+                            <span className="text-violet-600 text-xs mr-1">
+                              ({privateTotal}+{groupTotal}👥)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {alreadyPaid > 0 && (
+                        <>
+                          <div className="flex justify-between text-sm mt-1">
+                            <span>المدفوع سابقاً:</span>
+                            <span className="font-medium text-amber-600">
+                              {alreadyPaid.toLocaleString()} {CURRENCY}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm mt-1">
+                            <span>المتبقي:</span>
+                            <span className="font-medium text-primary">
+                              {remaining.toLocaleString()} {CURRENCY}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
 
@@ -1306,21 +1358,35 @@ export const PaymentsDashboard = ({
                   id="amount"
                   type="number"
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    // Enforce max amount in real-time
+                    if (recordPaymentDialog.student) {
+                      const combinedTotal = getStudentCombinedTotal(recordPaymentDialog.student, groups, selectedMonth, selectedYear, settings);
+                      const alreadyPaid = getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear);
+                      const maxAmount = Math.max(0, combinedTotal - alreadyPaid);
+                      const numVal = parseFloat(val);
+                      if (!isNaN(numVal) && numVal > maxAmount && maxAmount > 0) {
+                        setPaymentAmount(maxAmount.toString());
+                        return;
+                      }
+                    }
+                    setPaymentAmount(val);
+                  }}
                   placeholder="0"
                   className="text-left"
                   dir="ltr"
+                  min={0}
                 />
                 <span className="flex items-center px-3 rounded-md border bg-muted text-sm">{CURRENCY}</span>
               </div>
               {recordPaymentDialog.student && (
-                <p className="text-xs text-muted-foreground">
-                  الإجمالي المستحق:{" "}
-                  {getStudentMonthTotal(
-                    recordPaymentDialog.student,
-                    selectedMonth,
-                    selectedYear,
-                    settings,
+                <p className="text-xs text-amber-600 font-medium">
+                  الحد الأقصى:{" "}
+                  {Math.max(
+                    0,
+                    getStudentCombinedTotal(recordPaymentDialog.student, groups, selectedMonth, selectedYear, settings) -
+                      getAmountPaid(recordPaymentDialog.student.id, selectedMonth, selectedYear),
                   ).toLocaleString()}{" "}
                   {CURRENCY}
                 </p>
