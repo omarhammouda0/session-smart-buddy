@@ -105,12 +105,77 @@ const getStudentSessionPrice = (student: Student, settings?: AppSettings): numbe
     : defaultOnsite;
 };
 
-// Calculate total price (amount due) for a student in a month based on sessions
+// Calculate total price (amount due) for a student in a month based on PRIVATE sessions only
 const getStudentMonthTotal = (student: Student, month: number, year: number, settings?: AppSettings): number => {
   const stats = getStudentMonthStats(student, month, year);
   const pricePerSession = getStudentSessionPrice(student, settings);
   const billableCount = stats.completed + stats.scheduled;
   return billableCount * pricePerSession;
+};
+
+// Calculate group sessions amount due for a linked student
+const getStudentGroupSessionsDue = (
+  studentId: string,
+  groups: StudentGroup[],
+  month: number,
+  year: number
+): number => {
+  let total = 0;
+
+  groups.forEach(group => {
+    // Find if this student is a linked member in this group
+    const member = group.members.find(m => m.linkedStudentId === studentId && m.isActive);
+    if (!member) return;
+
+    // Get the price for this member
+    const memberPrice = member.customPrice ?? group.defaultPricePerStudent;
+
+    // Count billable sessions for this month
+    group.sessions.forEach(session => {
+      const sessionDate = new Date(session.date);
+      if (sessionDate.getMonth() !== month || sessionDate.getFullYear() !== year) return;
+
+      // Check if this session is completed or scheduled (billable)
+      if (session.status === 'completed' || session.status === 'scheduled') {
+        // Check member's attendance status
+        const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+        if (attendance && (attendance.status === 'completed' || attendance.status === 'scheduled')) {
+          total += memberPrice;
+        }
+      }
+    });
+  });
+
+  return total;
+};
+
+// Calculate total group payments made by a linked student for a month
+const getStudentGroupPaymentsMade = (
+  studentId: string,
+  groupPayments: GroupMemberPayment[],
+  month: number,
+  year: number
+): number => {
+  return groupPayments
+    .filter(p => {
+      if (p.linkedStudentId !== studentId) return false;
+      const paidDate = new Date(p.paidAt);
+      return paidDate.getMonth() === month && paidDate.getFullYear() === year;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+};
+
+// Get combined total (private + group) for a student
+const getStudentCombinedTotal = (
+  student: Student,
+  groups: StudentGroup[],
+  month: number,
+  year: number,
+  settings?: AppSettings
+): number => {
+  const privateTotal = getStudentMonthTotal(student, month, year, settings);
+  const groupTotal = getStudentGroupSessionsDue(student.id, groups, month, year);
+  return privateTotal + groupTotal;
 };
 
 // Get payment method label in Arabic
@@ -143,6 +208,21 @@ const formatDateAr = (dateStr?: string): string => {
 // COMPONENT PROPS
 // ============================================
 
+import { StudentGroup, GroupSession } from "@/types/student";
+
+// Type for group member payment (from GroupsContext)
+interface GroupMemberPayment {
+  id: string;
+  groupId: string;
+  sessionId?: string;
+  memberId: string;
+  linkedStudentId?: string;
+  amount: number;
+  method: 'cash' | 'bank' | 'wallet';
+  paidAt: string;
+  notes?: string;
+}
+
 interface PaymentsDashboardProps {
   students: Student[];
   payments: StudentPayments[];
@@ -162,6 +242,9 @@ interface PaymentsDashboardProps {
   ) => void;
   onResetPayment?: (studentId: string, month: number, year: number) => void;
   settings?: AppSettings;
+  // Group data for comprehensive payment tracking
+  groups?: StudentGroup[];
+  groupPayments?: GroupMemberPayment[];
 }
 
 type PaymentFilter = "all" | "paid" | "partial" | "unpaid";
@@ -180,6 +263,8 @@ export const PaymentsDashboard = ({
   onRecordPayment,
   onResetPayment,
   settings,
+  groups = [],
+  groupPayments = [],
 }: PaymentsDashboardProps) => {
   const now = new Date();
 
@@ -225,14 +310,22 @@ export const PaymentsDashboard = ({
     );
   };
 
-  // Get the actual amount paid by a student for a specific month
+  // Get the actual amount paid by a student for a specific month (including group payments)
   const getAmountPaid = (studentId: string, month?: number, year?: number): number => {
-    const payment = getPaymentDetails(studentId, month, year);
-    if (!payment) return 0;
-    return payment.amountPaid || payment.amount || 0;
+    const m = month ?? selectedMonth;
+    const y = year ?? selectedYear;
+
+    // Private session payments
+    const payment = getPaymentDetails(studentId, m, y);
+    const privatePayments = payment ? (payment.amountPaid || payment.amount || 0) : 0;
+
+    // Group payments for this linked student
+    const groupPaymentsAmount = getStudentGroupPaymentsMade(studentId, groupPayments, m, y);
+
+    return privatePayments + groupPaymentsAmount;
   };
 
-  // Get payment status for a student
+  // Get payment status for a student (including group sessions)
   const getPaymentStatusLocal = (studentId: string, month?: number, year?: number): "paid" | "partial" | "unpaid" => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return "unpaid";
@@ -241,7 +334,8 @@ export const PaymentsDashboard = ({
     const y = year ?? selectedYear;
 
     const amountPaid = getAmountPaid(studentId, m, y);
-    const amountDue = getStudentMonthTotal(student, m, y, settings);
+    // Use combined total (private + group sessions)
+    const amountDue = getStudentCombinedTotal(student, groups, m, y, settings);
 
     if (amountDue === 0) return "unpaid";
     if (amountPaid >= amountDue) return "paid";
@@ -262,7 +356,7 @@ export const PaymentsDashboard = ({
   // CALCULATED VALUES (MEMOIZED)
   // ============================================
 
-  // Count students by payment status
+  // Count students by payment status (including group sessions)
   const { paidCount, partialCount, unpaidCount, unpaidStudents } = useMemo(() => {
     let paid = 0;
     let partial = 0;
@@ -283,22 +377,22 @@ export const PaymentsDashboard = ({
     });
 
     return { paidCount: paid, partialCount: partial, unpaidCount: unpaid, unpaidStudents: unpaidList };
-  }, [students, payments, selectedMonth, selectedYear, settings]);
+  }, [students, payments, groupPayments, groups, selectedMonth, selectedYear, settings]);
 
-  // Calculate total expected (amount due from all students)
+  // Calculate total expected (amount due from all students including group sessions)
   const totalExpected = useMemo(() => {
     return students.reduce((sum, student) => {
-      return sum + getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+      return sum + getStudentCombinedTotal(student, groups, selectedMonth, selectedYear, settings);
     }, 0);
-  }, [students, selectedMonth, selectedYear, settings]);
+  }, [students, groups, selectedMonth, selectedYear, settings]);
 
-  // Calculate total collected (sum of ALL amountPaid including partial payments)
+  // Calculate total collected (sum of ALL amountPaid including partial payments and group payments)
   const totalCollected = useMemo(() => {
     return students.reduce((sum, student) => {
       const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
       return sum + amountPaid;
     }, 0);
-  }, [students, payments, selectedMonth, selectedYear]);
+  }, [students, payments, groupPayments, selectedMonth, selectedYear]);
 
   // Calculate total pending
   const totalPending = totalExpected - totalCollected;

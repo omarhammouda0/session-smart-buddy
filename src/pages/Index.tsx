@@ -321,6 +321,35 @@ const Index = () => {
     time: string;
   }>({ open: false, selectedGroupId: "", time: "" });
 
+  // State for all group payments (for payment dashboard integration)
+  const [allGroupPayments, setAllGroupPayments] = useState<Array<{
+    id: string;
+    groupId: string;
+    sessionId?: string;
+    memberId: string;
+    linkedStudentId?: string;
+    amount: number;
+    method: 'cash' | 'bank' | 'wallet';
+    paidAt: string;
+    notes?: string;
+  }>>([]);
+
+  // Fetch all group payments when groups change
+  useEffect(() => {
+    const fetchAllGroupPayments = async () => {
+      const allPayments: typeof allGroupPayments = [];
+      for (const group of groups) {
+        const payments = await getGroupMemberPayments(group.id);
+        allPayments.push(...payments);
+      }
+      setAllGroupPayments(allPayments);
+    };
+
+    if (groups.length > 0) {
+      fetchAllGroupPayments();
+    }
+  }, [groups, getGroupMemberPayments]);
+
   // Session Notifications
   const {
     settings: notificationSettings,
@@ -817,8 +846,64 @@ const Index = () => {
     const cancelled = allTodaySessions.filter((s) => s.session.status === "cancelled").length;
     const vacation = allTodaySessions.filter((s) => s.session.status === "vacation").length;
     const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
-    return { total, completed, scheduled, cancelled, vacation, progressPercent };
-  }, [allTodaySessions]);
+
+    // Calculate payment stats for today's sessions
+    let totalDue = 0;
+    let totalPaid = 0;
+
+    allTodaySessions.forEach(({ student, session, isGroup, group }) => {
+      if (session.status === 'completed' || session.status === 'scheduled') {
+        if (isGroup && group) {
+          // For group sessions, find linked students
+          group.members.forEach(member => {
+            if (member.isActive && member.linkedStudentId) {
+              const memberPrice = member.customPrice ?? group.defaultPricePerStudent;
+              totalDue += memberPrice;
+              // Check if paid for this session
+              const sessionPayment = allGroupPayments.find(
+                p => p.sessionId === session.id && p.memberId === member.studentId
+              );
+              if (sessionPayment) {
+                totalPaid += sessionPayment.amount;
+              }
+            }
+          });
+        } else {
+          // For individual sessions
+          const price = student.useCustomSettings
+            ? (student.sessionType === 'online'
+                ? (student.customPriceOnline || settings?.defaultPriceOnline || 120)
+                : (student.customPriceOnsite || settings?.defaultPriceOnsite || 150))
+            : (student.sessionType === 'online'
+                ? (settings?.defaultPriceOnline || 120)
+                : (settings?.defaultPriceOnsite || 150));
+          totalDue += price;
+          // Check payments for this specific session
+          const studentPayments = payments.find(p => p.studentId === student.id);
+          if (studentPayments) {
+            const monthPayment = studentPayments.payments.find(
+              p => p.month === now.getMonth() && p.year === now.getFullYear()
+            );
+            if (monthPayment?.paymentRecords) {
+              // Check for payments specifically for this session
+              monthPayment.paymentRecords.forEach(record => {
+                if (record.notes?.includes(`session:${session.id}`)) {
+                  totalPaid += record.amount;
+                }
+              });
+            }
+          }
+        }
+      }
+    });
+
+    const paymentPercent = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0;
+
+    return {
+      total, completed, scheduled, cancelled, vacation, progressPercent,
+      totalDue, totalPaid, paymentPercent
+    };
+  }, [allTodaySessions, allGroupPayments, payments, settings, now]);
 
   const nextSession = useMemo((): SessionWithStudent | null => {
     return (
@@ -2044,6 +2129,8 @@ const Index = () => {
               onRecordPayment={handleRecordPayment}
               onResetPayment={resetMonthlyPayment}
               settings={settings}
+              groups={groups}
+              groupPayments={allGroupPayments}
             />
           </TabsContent>
 
