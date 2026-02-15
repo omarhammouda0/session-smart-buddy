@@ -830,9 +830,45 @@ export const SessionHistoryBar = ({
     if (!selectedStudent) return [];
     const todayStr = format(today, "yyyy-MM-dd");
 
+    // Private sessions
     let sessions = selectedStudent.sessions
       .filter((session) => session.status === "scheduled" && session.date >= todayStr)
-      .map((session) => ({ ...session, studentName: selectedStudent.name, studentId: selectedStudent.id }));
+      .map((session) => ({
+        ...session,
+        studentName: selectedStudent.name,
+        studentId: selectedStudent.id,
+        isGroupSession: false,
+        groupName: undefined as string | undefined,
+      }));
+
+    // Group sessions for this student
+    groups.forEach(group => {
+      const member = group.members.find(m => m.linkedStudentId === selectedStudent.id && m.isActive);
+      if (!member) return;
+
+      group.sessions.forEach(session => {
+        if (session.date < todayStr) return;
+
+        const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+        if (attendance && attendance.status === "scheduled") {
+          sessions.push({
+            id: `group_${session.id}_${member.studentId}`,
+            date: session.date,
+            time: session.time || group.sessionTime,
+            duration: session.duration || group.sessionDuration,
+            status: "scheduled",
+            completed: false,
+            topic: session.topic,
+            notes: session.notes,
+            studentName: selectedStudent.name,
+            studentId: selectedStudent.id,
+            isGroupSession: true,
+            groupName: group.name,
+            history: [],
+          });
+        }
+      });
+    });
 
     sessions = filterSessionsByDateRange(sessions);
     sessions = filterSessionsBySearch(sessions);
@@ -844,9 +880,44 @@ export const SessionHistoryBar = ({
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
 
+    // Private sessions
     let sessions = selectedStudent.sessions
       .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
-      .map((s) => ({ ...s, studentName: selectedStudent.name, studentId: selectedStudent.id }));
+      .map((s) => ({
+        ...s,
+        studentName: selectedStudent.name,
+        studentId: selectedStudent.id,
+        isGroupSession: false,
+        groupName: undefined as string | undefined,
+      }));
+
+    // Group sessions for this student (history)
+    groups.forEach(group => {
+      const member = group.members.find(m => m.linkedStudentId === selectedStudent.id && m.isActive);
+      if (!member) return;
+
+      group.sessions.forEach(session => {
+        const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+        if (attendance && (attendance.status === "completed" || attendance.status === "cancelled" || attendance.status === "vacation")) {
+          sessions.push({
+            id: `group_${session.id}_${member.studentId}`,
+            date: session.date,
+            time: session.time || group.sessionTime,
+            duration: session.duration || group.sessionDuration,
+            status: attendance.status,
+            completed: attendance.status === "completed",
+            completedAt: session.completedAt,
+            topic: session.topic,
+            notes: attendance.note || session.notes,
+            studentName: selectedStudent.name,
+            studentId: selectedStudent.id,
+            isGroupSession: true,
+            groupName: group.name,
+            history: [],
+          });
+        }
+      });
+    });
 
     sessions = filterSessionsByDateRange(sessions);
     sessions = filterSessionsByStatus(sessions);
@@ -1224,22 +1295,25 @@ export const SessionHistoryBar = ({
                         const sessionGapInfo = sessionsWithGaps.find((s) => s.session.id === session.id);
                         const hasConflict = sessionGapInfo?.hasConflict || false;
                         const conflictType = sessionGapInfo?.conflictType;
+                        const isGroupSession = (session as any).isGroupSession;
+                        const groupName = (session as any).groupName;
 
                         return (
                           <div
                             key={session.id}
                             className={cn(
                               "relative rounded-xl border-2 p-3 bg-card transition-all hover:shadow-md",
+                              isGroupSession && "border-violet-300 dark:border-violet-700 bg-violet-50/50 dark:bg-violet-950/30",
                               hasConflict &&
                                 (conflictType === "exact" || conflictType === "partial") &&
                                 "border-destructive/50 bg-destructive/5",
                               hasConflict && conflictType === "close" && "border-warning/50 bg-warning/5",
-                              !hasConflict && "border-border",
+                              !hasConflict && !isGroupSession && "border-border",
                             )}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                   <Badge variant="outline" className="text-xs font-semibold">
                                     {formatShortDateAr(session.date)}
                                   </Badge>
@@ -1248,6 +1322,12 @@ export const SessionHistoryBar = ({
                                   </span>
                                   {relativeTime && (
                                     <span className="text-xs text-muted-foreground">{relativeTime}</span>
+                                  )}
+                                  {isGroupSession && groupName && (
+                                    <Badge className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-xs gap-1">
+                                      <Users className="h-3 w-3" />
+                                      {groupName}
+                                    </Badge>
                                   )}
                                 </div>
 
@@ -1271,56 +1351,61 @@ export const SessionHistoryBar = ({
                                   studentId={session.studentId}
                                   studentName={session.studentName}
                                 />
-                                {/* Complete button - only show if session has ended */}
-                                {isSessionEnded(
-                                  session.date,
-                                  session.time || selectedStudent.sessionTime || "16:00",
-                                  session.duration || selectedStudent.sessionDuration || 60
-                                ) ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-success hover:bg-success/10"
-                                    onClick={() => openCompleteDialog(session.studentId, session.id)}
-                                    title="إكمال"
-                                  >
-                                    <Check className="h-4 w-4" />
-                                  </Button>
-                                ) : (
-                                  <div
-                                    className="h-8 w-8 flex items-center justify-center text-blue-500"
-                                    title="الحصة لم تنتهِ بعد"
-                                  >
-                                    <Clock className="h-4 w-4 animate-pulse" />
-                                  </div>
+                                {/* Hide action buttons for group sessions - managed from the group */}
+                                {!isGroupSession && (
+                                  <>
+                                    {/* Complete button - only show if session has ended */}
+                                    {isSessionEnded(
+                                      session.date,
+                                      session.time || selectedStudent.sessionTime || "16:00",
+                                      session.duration || selectedStudent.sessionDuration || 60
+                                    ) ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-success hover:bg-success/10"
+                                        onClick={() => openCompleteDialog(session.studentId, session.id)}
+                                        title="إكمال"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                    ) : (
+                                      <div
+                                        className="h-8 w-8 flex items-center justify-center text-blue-500"
+                                        title="الحصة لم تنتهِ بعد"
+                                      >
+                                        <Clock className="h-4 w-4 animate-pulse" />
+                                      </div>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-warning hover:bg-warning/10"
+                                      onClick={() => handleMarkAsVacation(session.studentId, session.id)}
+                                      title="إجازة"
+                                    >
+                                      <Palmtree className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                      onClick={() => openCancelDialog(session.studentId, session.id)}
+                                      title="إلغاء"
+                                    >
+                                      <Ban className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
+                                      title="حذف"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-warning hover:bg-warning/10"
-                                  onClick={() => handleMarkAsVacation(session.studentId, session.id)}
-                                  title="إجازة"
-                                >
-                                  <Palmtree className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                  onClick={() => openCancelDialog(session.studentId, session.id)}
-                                  title="إلغاء"
-                                >
-                                  <Ban className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                                  title="حذف"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
                               </div>
                             </div>
                           </div>
@@ -1374,29 +1459,36 @@ export const SessionHistoryBar = ({
                         const todayStr = format(today, "yyyy-MM-dd");
                         const isPastSession = session.date < todayStr;
                         const relativeTime = getRelativeTimeLabel(session.date);
+                        const isGroupSession = (session as any).isGroupSession;
+                        const groupName = (session as any).groupName;
 
                         return (
                           <div
                             key={session.id}
                             className={cn(
                               "rounded-xl border-2 p-3 transition-all hover:shadow-md",
-                              session.status === "completed" && "bg-success/5 border-success/30",
+                              isGroupSession && "border-violet-300 dark:border-violet-700",
+                              session.status === "completed" && !isGroupSession && "bg-success/5 border-success/30",
+                              session.status === "completed" && isGroupSession && "bg-violet-50 dark:bg-violet-950/30",
                               session.status === "vacation" && "bg-warning/5 border-warning/30",
                               session.status === "cancelled" && "bg-destructive/5 border-destructive/30",
                             )}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                   <div
                                     className={cn(
                                       "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
-                                      session.status === "completed" && "bg-success/20 text-success",
+                                      isGroupSession && "bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300",
+                                      session.status === "completed" && !isGroupSession && "bg-success/20 text-success",
                                       session.status === "vacation" && "bg-warning/20 text-warning",
                                       session.status === "cancelled" && "bg-destructive/20 text-destructive",
                                     )}
                                   >
-                                    {session.status === "completed" ? (
+                                    {isGroupSession ? (
+                                      <Users className="h-3.5 w-3.5" />
+                                    ) : session.status === "completed" ? (
                                       <Check className="h-3.5 w-3.5" />
                                     ) : session.status === "vacation" ? (
                                       <Palmtree className="h-3.5 w-3.5" />
@@ -1414,6 +1506,12 @@ export const SessionHistoryBar = ({
                                   {relativeTime && (
                                     <span className="text-xs text-muted-foreground">{relativeTime}</span>
                                   )}
+                                  {isGroupSession && groupName && (
+                                    <Badge className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-xs gap-1">
+                                      <Users className="h-3 w-3" />
+                                      {groupName}
+                                    </Badge>
+                                  )}
                                 </div>
 
                                 {session.topic && (
@@ -1425,30 +1523,42 @@ export const SessionHistoryBar = ({
                               </div>
 
                               <div className="flex items-center gap-1 shrink-0">
-                                <Badge
-                                  className={cn(
-                                    "text-xs",
-                                    session.status === "completed" && "bg-success/20 text-success border-success/30",
-                                    session.status === "vacation" && "bg-warning/20 text-warning border-warning/30",
-                                    session.status === "cancelled" &&
-                                      "bg-destructive/20 text-destructive border-destructive/30",
-                                  )}
-                                >
-                                  {getStatusLabel(session.status)}
-                                </Badge>
+                                {/* Hide action buttons for group sessions - they should be managed from the group */}
+                                {!isGroupSession && (
+                                  <>
+                                    <Badge
+                                      className={cn(
+                                        "text-xs",
+                                        session.status === "completed" && "bg-success/20 text-success border-success/30",
+                                        session.status === "vacation" && "bg-warning/20 text-warning border-warning/30",
+                                        session.status === "cancelled" &&
+                                          "bg-destructive/20 text-destructive border-destructive/30",
+                                      )}
+                                    >
+                                      {getStatusLabel(session.status)}
+                                    </Badge>
 
-                                <SessionNotesDialog
-                                  session={session}
-                                  studentName={session.studentName}
-                                  onSave={(details) => onUpdateSessionDetails?.(session.studentId, session.id, details)}
-                                />
-                                <SessionHomeworkDialog
-                                  session={session}
-                                  studentId={session.studentId}
-                                  studentName={session.studentName}
-                                />
+                                    <SessionNotesDialog
+                                      session={session}
+                                      studentName={session.studentName}
+                                      onSave={(details) => onUpdateSessionDetails?.(session.studentId, session.id, details)}
+                                    />
+                                    <SessionHomeworkDialog
+                                      session={session}
+                                      studentId={session.studentId}
+                                      studentName={session.studentName}
+                                    />
+                                  </>
+                                )}
+                                {isGroupSession && (
+                                  <Badge
+                                    className="text-xs bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300"
+                                  >
+                                    {getStatusLabel(session.status)}
+                                  </Badge>
+                                )}
 
-                                {isPastSession ? (
+                                {!isGroupSession && isPastSession ? (
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -1458,7 +1568,7 @@ export const SessionHistoryBar = ({
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
-                                ) : (
+                                ) : !isGroupSession ? (
                                   <>
                                     {session.status === "completed" ? (
                                       <Button
@@ -1493,7 +1603,7 @@ export const SessionHistoryBar = ({
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                           </div>
