@@ -296,6 +296,7 @@ const Index = () => {
     getGroupById,
     getGroupSessionsForDate,
     recordGroupMemberPayment,
+    getGroupMemberPayments,
   } = useGroups();
 
   // State for group attendance dialog
@@ -2589,7 +2590,7 @@ const Index = () => {
           onOpenChange={(open) => !open && setGroupPaymentDialog({ open: false, group: null, session: null })}
           group={groupPaymentDialog.group}
           session={groupPaymentDialog.session}
-          students={students}
+          onFetchPayments={getGroupMemberPayments}
           onRecordPayment={async (memberId, memberName, amount, method, linkedStudentId, sessionDate, groupId, groupName) => {
             const methodLabels: Record<string, string> = {
               cash: 'نقدي',
