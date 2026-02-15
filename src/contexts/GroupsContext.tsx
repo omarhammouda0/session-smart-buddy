@@ -64,6 +64,7 @@ interface GroupsContextType {
   updateMemberAttendance: (groupId: string, sessionId: string, memberId: string, status: SessionStatus, note?: string) => Promise<void>;
   completeGroupSession: (groupId: string, sessionId: string) => Promise<void>;
   cancelGroupSession: (groupId: string, sessionId: string, reason?: string) => Promise<void>;
+  rescheduleGroupSession: (groupId: string, sessionId: string, newDate: string, newTime?: string) => Promise<void>;
   addGroupSessionForToday: (groupId: string, time?: string) => Promise<GroupSession | null>;
   getGroupById: (groupId: string) => StudentGroup | undefined;
   getGroupSessionsForDate: (date: string) => Array<{ group: StudentGroup; session: GroupSession }>;
@@ -616,6 +617,43 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [fetchGroups]);
 
+  // Reschedule a group session to a new date/time
+  const rescheduleGroupSession = useCallback(async (groupId: string, sessionId: string, newDate: string, newTime?: string) => {
+    try {
+      const group = groups.find(g => g.id === groupId);
+      if (!group) {
+        toast({ title: "خطأ", description: "المجموعة غير موجودة", variant: "destructive" });
+        return;
+      }
+
+      // Check if session already exists for the new date
+      const existingSession = group.sessions.find(s => s.date === newDate && s.id !== sessionId);
+      if (existingSession) {
+        toast({ title: "تعارض", description: "يوجد حصة بالفعل لهذه المجموعة في هذا التاريخ", variant: "destructive" });
+        return;
+      }
+
+      // Update session date and optionally time
+      const updateData: { date: string; time?: string } = { date: newDate };
+      if (newTime) {
+        updateData.time = newTime;
+      }
+
+      const { error } = await supabase
+        .from('group_sessions')
+        .update(updateData)
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      toast({ title: "تم نقل الحصة", description: `تم نقل حصة ${group.name} إلى ${newDate}` });
+      await fetchGroups();
+    } catch (error) {
+      console.error('[Groups] Failed to reschedule group session:', error);
+      toast({ title: "خطأ", description: "فشل في نقل الحصة", variant: "destructive" });
+    }
+  }, [groups, fetchGroups]);
+
   // Add a new session for today for a group
   const addGroupSessionForToday = useCallback(async (groupId: string, time?: string): Promise<GroupSession | null> => {
     try {
@@ -887,6 +925,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     updateMemberAttendance,
     completeGroupSession,
     cancelGroupSession,
+    rescheduleGroupSession,
     addGroupSessionForToday,
     getGroupById,
     getGroupSessionsForDate,

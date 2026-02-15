@@ -113,6 +113,8 @@ interface DragState {
   studentName: string;
   originalDate: string;
   originalTime: string;
+  isGroupSession?: boolean;
+  groupId?: string;
 }
 interface ConflictInfo {
   hasConflict: boolean;
@@ -145,7 +147,7 @@ export const CalendarView = ({
   const { getSuggestedSlots } = useConflictDetection(students);
 
   // Get groups for calendar display
-  const { activeGroups, getGroupSessionsForDate, updateMemberAttendance, completeGroupSession } = useGroups();
+  const { activeGroups, getGroupSessionsForDate, updateMemberAttendance, completeGroupSession, rescheduleGroupSession } = useGroups();
 
   // Add Session Dialog State
   const [addSessionDialog, setAddSessionDialog] = useState<{
@@ -164,6 +166,8 @@ export const CalendarView = ({
     studentName: string;
     originalDate: string;
     originalTime: string;
+    isGroupSession?: boolean;
+    groupId?: string;
   } | null>(null);
   const longPressTimer = React.useRef<NodeJS.Timeout | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -176,6 +180,8 @@ export const CalendarView = ({
     newDate: string;
     newTime: string;
     conflictInfo: ConflictInfo;
+    isGroupSession?: boolean;
+    groupId?: string;
   } | null>(null);
   const [sessionActionDialog, setSessionActionDialog] = useState<{
     open: boolean;
@@ -519,9 +525,11 @@ export const CalendarView = ({
     studentName: string,
     date: string,
     time: string,
+    isGroupSession?: boolean,
+    groupId?: string,
   ) => {
     e.dataTransfer.effectAllowed = "move";
-    setDragState({ sessionId, studentId, studentName, originalDate: date, originalTime: time });
+    setDragState({ sessionId, studentId, studentName, originalDate: date, originalTime: time, isGroupSession, groupId });
   };
   const handleDragEnd = () => {
     setDragState(null);
@@ -537,7 +545,7 @@ export const CalendarView = ({
   };
 
   const handleTouchStart = useCallback(
-    (e: React.TouchEvent, sessionId: string, studentId: string, studentName: string, date: string, time: string) => {
+    (e: React.TouchEvent, sessionId: string, studentId: string, studentName: string, date: string, time: string, isGroupSession?: boolean, groupId?: string) => {
       const touch = e.touches[0];
       longPressTimer.current = setTimeout(() => {
         setTouchDragState({
@@ -549,6 +557,8 @@ export const CalendarView = ({
           studentName,
           originalDate: date,
           originalTime: time,
+          isGroupSession,
+          groupId,
         });
         if (navigator.vibrate) navigator.vibrate(50);
         toast({ title: "اسحب الحصة", description: "حرك إصبعك لنقل الحصة إلى يوم آخر" });
@@ -601,6 +611,8 @@ export const CalendarView = ({
         newDate: dropTargetDate,
         newTime: touchDragState.originalTime,
         conflictInfo,
+        isGroupSession: touchDragState.isGroupSession,
+        groupId: touchDragState.groupId,
       });
     }
     setTouchDragState(null);
@@ -626,6 +638,8 @@ export const CalendarView = ({
       newDate,
       newTime: dragState.originalTime,
       conflictInfo,
+      isGroupSession: dragState.isGroupSession,
+      groupId: dragState.groupId,
     });
     setDragState(null);
   };
@@ -651,14 +665,27 @@ export const CalendarView = ({
       });
       return;
     }
-    if (onUpdateSessionDateTime)
-      onUpdateSessionDateTime(
-        confirmDialog.studentId,
+
+    // Handle group session reschedule
+    if (confirmDialog.isGroupSession && confirmDialog.groupId) {
+      rescheduleGroupSession(
+        confirmDialog.groupId,
         confirmDialog.sessionId,
         confirmDialog.newDate,
-        confirmDialog.newTime,
+        confirmDialog.newTime
       );
-    else onRescheduleSession(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate);
+    } else {
+      // Handle individual session reschedule
+      if (onUpdateSessionDateTime)
+        onUpdateSessionDateTime(
+          confirmDialog.studentId,
+          confirmDialog.sessionId,
+          confirmDialog.newDate,
+          confirmDialog.newTime,
+        );
+      else onRescheduleSession(confirmDialog.studentId, confirmDialog.sessionId, confirmDialog.newDate);
+    }
+
     toast({
       title: "✓ تم تعديل موعد الحصة",
       description: `تم نقل حصة ${confirmDialog.studentName} من ${format(parseISO(confirmDialog.originalDate), "dd/MM")} الساعة ${confirmDialog.originalTime} إلى ${format(parseISO(confirmDialog.newDate), "dd/MM")} الساعة ${confirmDialog.newTime}`,
@@ -1455,7 +1482,7 @@ export const CalendarView = ({
                   <div className="space-y-1.5 sm:space-y-2 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                     {daySessions.map(({ session, student, isGroup, group }) => {
                       const time = session.time || student.sessionTime;
-                      const canDrag = session.status === "scheduled" && !isGroup;
+                      const canDrag = session.status === "scheduled"; // Allow both individual and group sessions to be dragged
                       const memberCount = isGroup && group ? group.members.filter(m => m.isActive).length : 0;
 
                       return (
@@ -1463,11 +1490,11 @@ export const CalendarView = ({
                           key={session.id}
                           draggable={canDrag}
                           onDragStart={(e) =>
-                            canDrag && handleDragStart(e, session.id, student.id, student.name, session.date, time || "")
+                            canDrag && handleDragStart(e, session.id, student.id, student.name, session.date, time || "", isGroup, isGroup && group ? group.id.replace('group_', '') : undefined)
                           }
                           onDragEnd={handleDragEnd}
                           onTouchStart={(e) =>
-                            canDrag && handleTouchStart(e, session.id, student.id, student.name, session.date, time || "")
+                            canDrag && handleTouchStart(e, session.id, student.id, student.name, session.date, time || "", isGroup, isGroup && group ? group.id.replace('group_', '') : undefined)
                           }
                           onTouchMove={handleTouchMove}
                           onTouchEnd={handleTouchEnd}
@@ -1492,7 +1519,8 @@ export const CalendarView = ({
                           )}
                         >
                           {canDrag && <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 opacity-50 mt-0.5" />}
-                          {isGroup && <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-violet-600 dark:text-violet-400 mt-0.5" />}
+                          {isGroup && !canDrag && <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-violet-600 dark:text-violet-400 mt-0.5" />}
+                          {isGroup && canDrag && <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-violet-600 dark:text-violet-400 mt-0.5 mr-[-4px]" />}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1">
                               <div className={cn(
