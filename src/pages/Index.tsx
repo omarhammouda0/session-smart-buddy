@@ -1241,6 +1241,12 @@ const Index = () => {
                     {todayStats.completed} ✓
                   </Badge>
                 )}
+                {todayStats.totalDue > 0 && (
+                  <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[0.65rem] sm:text-xs px-1.5 py-0">
+                    <DollarSign className="h-2.5 w-2.5" />
+                    {todayStats.totalDue.toLocaleString()}
+                  </Badge>
+                )}
               </div>
             </div>
             {todayStats.total > 0 && (
@@ -1625,8 +1631,11 @@ const Index = () => {
                               >
                                 {isGroup ? (
                                   <>
-                                    <Users className="h-5 w-5" />
-                                    <span className="text-[9px] opacity-90">{memberCount} طالب</span>
+                                    <span className="text-base font-bold">{sessionTime.substring(0, 5)}</span>
+                                    <span className="text-[9px] opacity-90 flex items-center gap-0.5">
+                                      <Users className="h-2.5 w-2.5" />
+                                      {memberCount}
+                                    </span>
                                   </>
                                 ) : (
                                   <>
