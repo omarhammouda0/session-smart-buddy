@@ -1063,11 +1063,16 @@ export const PaymentsDashboard = ({
               const isPaid = paymentStatus === "paid";
               const isPartial = paymentStatus === "partial";
               const isSending = sendingReminder === student.id;
-              const monthStats = getStudentMonthStats(student, selectedMonth, selectedYear);
-              const billableCount = monthStats.completed + monthStats.scheduled;
-              const studentTotal = getStudentMonthTotal(student, selectedMonth, selectedYear, settings);
+
+              // Use COMBINED stats (private + group)
+              const combinedStats = getStudentCombinedMonthStats(student, groups, selectedMonth, selectedYear);
+              const billableCount = combinedStats.completed + combinedStats.scheduled;
+              const studentTotal = getStudentCombinedTotal(student, groups, selectedMonth, selectedYear, settings);
               const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
-              const remaining = studentTotal - amountPaid;
+              const remaining = Math.max(0, studentTotal - amountPaid);
+
+              // For display, show if student has group sessions
+              const hasGroupSessions = combinedStats.groupTotal > 0;
 
               return (
                 <div
@@ -1129,7 +1134,14 @@ export const PaymentsDashboard = ({
                         {billableCount > 0 && (
                           <>
                             <span>•</span>
-                            <span className="text-primary">{billableCount} جلسة</span>
+                            <span className="text-primary">
+                              {billableCount} جلسة
+                              {hasGroupSessions && (
+                                <span className="text-violet-600 mr-1">
+                                  ({combinedStats.privateCompleted + combinedStats.privateScheduled}+{combinedStats.groupCompleted + combinedStats.groupScheduled}👥)
+                                </span>
+                              )}
+                            </span>
                           </>
                         )}
                         {isPartial && (
@@ -1140,19 +1152,19 @@ export const PaymentsDashboard = ({
                             </span>
                           </>
                         )}
-                        {monthStats.vacation > 0 && (
+                        {combinedStats.vacation > 0 && (
                           <>
                             <span>•</span>
                             <span className="text-warning flex items-center gap-0.5">
                               <Palmtree className="h-3 w-3" />
-                              {monthStats.vacation} إجازة
+                              {combinedStats.vacation} إجازة
                             </span>
                           </>
                         )}
-                        {monthStats.cancelled > 0 && (
+                        {combinedStats.cancelled > 0 && (
                           <>
                             <span>•</span>
-                            <span className="text-destructive">{monthStats.cancelled} ملغاة</span>
+                            <span className="text-destructive">{combinedStats.cancelled} ملغاة</span>
                           </>
                         )}
                       </div>
