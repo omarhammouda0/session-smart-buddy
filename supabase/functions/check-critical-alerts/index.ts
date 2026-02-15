@@ -11,20 +11,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Germany timezone helpers
-function isDaylightSavingTime(date: Date): boolean {
-  const year = date.getUTCFullYear();
-  const marchLast = new Date(Date.UTC(year, 2, 31));
-  const dstStart = new Date(Date.UTC(year, 2, 31 - marchLast.getUTCDay(), 1, 0, 0));
-  const octLast = new Date(Date.UTC(year, 9, 31));
-  const dstEnd = new Date(Date.UTC(year, 9, 31 - octLast.getUTCDay(), 1, 0, 0));
-  return date >= dstStart && date < dstEnd;
-}
-
-function getGermanyTime(date: Date): Date {
-  const offset = isDaylightSavingTime(date) ? 2 : 1;
+// Egypt timezone helper (UTC+2 always, no DST since 2014)
+function getLocalTime(date: Date): Date {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
-  return new Date(utc + (offset * 3600000));
+  return new Date(utc + (2 * 3600000));
 }
 
 // Convert number to Arabic numerals
@@ -121,13 +111,18 @@ async function sendPushNotification(
 
     // Check for duplicate notification (prevent spam)
     if (alert.conditionKey) {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // Payment alerts: deduplicate for 24 hours (only remind once per day)
+      // Session alerts: deduplicate for 1 hour (more time-sensitive)
+      const dedupMs = alert.suggestionType === 'payment'
+        ? 24 * 60 * 60 * 1000   // 24 hours for payment
+        : 60 * 60 * 1000;        // 1 hour for sessions
+      const dedupCutoff = new Date(Date.now() - dedupMs).toISOString();
       const { data: existing } = await supabase
           .from('push_notification_log')
           .select('id')
           .eq('condition_key', alert.conditionKey)
           .eq('status', 'sent')
-          .gte('sent_at', oneHourAgo)
+          .gte('sent_at', dedupCutoff)
           .maybeSingle();
 
       if (existing) {
@@ -324,12 +319,12 @@ serve(async (req) => {
 
   try {
     const now = new Date();
-    const localNow = getGermanyTime(now);
+    const localNow = getLocalTime(now);
     const today = localNow.toISOString().split('T')[0];
     const currentHour = localNow.getHours();
     const currentMinute = localNow.getMinutes();
 
-    console.log(`Current Germany time: ${localNow.toISOString()}, Date: ${today}, Time: ${currentHour}:${currentMinute}`);
+    console.log(`Current Egypt time: ${localNow.toISOString()}, Date: ${today}, Time: ${currentHour}:${currentMinute}`);
 
     const alerts: Array<{
       title: string;
@@ -356,7 +351,7 @@ serve(async (req) => {
         duration,
         status,
         student_id,
-        students!inner (id, name, phone, parent_phone, session_time, default_duration, user_id)
+        students!inner (id, name, phone, parent_phone, session_time, session_duration, user_id)
       `)
         .eq('date', today)
         .eq('status', 'scheduled');
@@ -369,7 +364,7 @@ serve(async (req) => {
       for (const session of sessions) {
         const student = Array.isArray(session.students) ? session.students[0] : session.students;
         const sessionTime = session.time || student?.session_time || '16:00';
-        const duration = session.duration || student?.default_duration || 60;
+        const duration = session.duration || student?.session_duration || 60;
         const userId = student?.user_id;
 
         const [hour, minute] = sessionTime.split(':').map(Number);
