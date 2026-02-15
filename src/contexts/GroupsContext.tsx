@@ -63,6 +63,8 @@ interface GroupsContextType {
   updateMemberPrice: (groupId: string, memberId: string, customPrice: number | undefined) => Promise<void>;
   updateMemberAttendance: (groupId: string, sessionId: string, memberId: string, status: SessionStatus, note?: string) => Promise<void>;
   completeGroupSession: (groupId: string, sessionId: string) => Promise<void>;
+  cancelGroupSession: (groupId: string, sessionId: string, reason?: string) => Promise<void>;
+  addGroupSessionForToday: (groupId: string, time?: string) => Promise<GroupSession | null>;
   getGroupById: (groupId: string) => StudentGroup | undefined;
   getGroupSessionsForDate: (date: string) => Array<{ group: StudentGroup; session: GroupSession }>;
   calculateGroupEarnings: (groupId: string, month: number, year: number) => number;
@@ -584,6 +586,111 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [fetchGroups]);
 
+  // Cancel a group session
+  const cancelGroupSession = useCallback(async (groupId: string, sessionId: string, reason?: string) => {
+    try {
+      // Update session status to cancelled
+      const { error: sessionError } = await supabase
+        .from('group_sessions')
+        .update({
+          status: 'cancelled',
+          notes: reason || 'ملغاة',
+        })
+        .eq('id', sessionId);
+
+      if (sessionError) throw sessionError;
+
+      // Update all attendance records to cancelled
+      const { error: attendanceError } = await supabase
+        .from('group_session_attendance')
+        .update({ status: 'cancelled' })
+        .eq('session_id', sessionId);
+
+      if (attendanceError) throw attendanceError;
+
+      toast({ title: "تم إلغاء الحصة" });
+      await fetchGroups();
+    } catch (error) {
+      console.error('[Groups] Failed to cancel group session:', error);
+      toast({ title: "خطأ", description: "فشل في إلغاء الحصة", variant: "destructive" });
+    }
+  }, [fetchGroups]);
+
+  // Add a new session for today for a group
+  const addGroupSessionForToday = useCallback(async (groupId: string, time?: string): Promise<GroupSession | null> => {
+    try {
+      const group = groups.find(g => g.id === groupId);
+      if (!group) {
+        toast({ title: "خطأ", description: "المجموعة غير موجودة", variant: "destructive" });
+        return null;
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // Check if session already exists for today
+      const existingSession = group.sessions.find(s => s.date === today);
+      if (existingSession) {
+        toast({ title: "تنبيه", description: "يوجد حصة بالفعل لهذه المجموعة اليوم", variant: "destructive" });
+        return null;
+      }
+
+      // Get today's day of week to find if there's a scheduled time
+      const dayOfWeek = new Date().getDay();
+      const scheduleDay = group.scheduleDays.find(d => d.dayOfWeek === dayOfWeek);
+      const sessionTime = time || scheduleDay?.time || group.sessionTime;
+
+      // Create the new session
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('group_sessions')
+        .insert({
+          group_id: groupId,
+          date: today,
+          time: sessionTime,
+          duration: group.sessionDuration,
+          status: 'scheduled',
+        })
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      // Get all active members of the group to create attendance records
+      const { data: membersData, error: membersError } = await supabase
+        .from('group_members')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('is_active', true);
+
+      if (membersError) throw membersError;
+
+      // Create attendance records for all active members
+      if (membersData && membersData.length > 0) {
+        const attendanceInserts = membersData.map(member => ({
+          session_id: sessionData.id,
+          member_id: member.id,
+          status: 'scheduled',
+        }));
+
+        const { error: attendanceError } = await supabase
+          .from('group_session_attendance')
+          .insert(attendanceInserts);
+
+        if (attendanceError) throw attendanceError;
+      }
+
+      toast({ title: "✅ تمت إضافة الحصة", description: `تمت إضافة حصة اليوم لمجموعة "${group.name}"` });
+      await fetchGroups();
+
+      // Return the created session
+      const updatedGroup = groups.find(g => g.id === groupId);
+      return updatedGroup?.sessions.find(s => s.id === sessionData.id) || null;
+    } catch (error) {
+      console.error('[Groups] Failed to add group session for today:', error);
+      toast({ title: "خطأ", description: "فشل في إضافة الحصة", variant: "destructive" });
+      return null;
+    }
+  }, [groups, fetchGroups]);
+
   // Get active groups only
   const activeGroups = groups.filter(g => g.isActive);
 
@@ -779,6 +886,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     updateMemberPrice,
     updateMemberAttendance,
     completeGroupSession,
+    cancelGroupSession,
+    addGroupSessionForToday,
     getGroupById,
     getGroupSessionsForDate,
     calculateGroupEarnings,

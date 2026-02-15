@@ -293,6 +293,8 @@ const Index = () => {
     updateMemberPrice,
     updateMemberAttendance,
     completeGroupSession,
+    cancelGroupSession,
+    addGroupSessionForToday,
     getGroupById,
     getGroupSessionsForDate,
     recordGroupMemberPayment,
@@ -311,6 +313,13 @@ const Index = () => {
   const [editGroupDialog, setEditGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
   const [deleteGroupDialog, setDeleteGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
   const [groupPaymentDialog, setGroupPaymentDialog] = useState<{ open: boolean; group: StudentGroup | null; session: GroupSession | null }>({ open: false, group: null, session: null });
+
+  // State for adding group session for today
+  const [addGroupTodaySessionDialog, setAddGroupTodaySessionDialog] = useState<{
+    open: boolean;
+    selectedGroupId: string;
+    time: string;
+  }>({ open: false, selectedGroupId: "", time: "" });
 
   // Session Notifications
   const {
@@ -529,6 +538,58 @@ const Index = () => {
       description: `تمت إضافة حصة لـ ${student?.name} اليوم الساعة ${addTodaySessionDialog.time}`,
     });
     setAddTodaySessionDialog({ open: false, selectedStudentId: "", time: "" });
+  };
+
+  // Add group session for today handlers
+  const getAddGroupTodaySessionConflict = () => {
+    if (!addGroupTodaySessionDialog.selectedGroupId || !addGroupTodaySessionDialog.time) return null;
+
+    const group = activeGroups.find(g => g.id === addGroupTodaySessionDialog.selectedGroupId);
+    if (!group) return null;
+
+    // Check if group already has a session today
+    const hasSessionToday = group.sessions.some(s => s.date === todayStr);
+    if (hasSessionToday) {
+      return {
+        severity: "error" as const,
+        conflicts: [{
+          message: "يوجد حصة بالفعل لهذه المجموعة اليوم",
+          student: { name: group.name } as Student,
+          session: group.sessions.find(s => s.date === todayStr)!,
+        }],
+      };
+    }
+
+    // Check for time conflicts with other sessions (individual and group)
+    return checkConflict(
+      { date: todayStr, startTime: addGroupTodaySessionDialog.time },
+      undefined,
+      `group_${addGroupTodaySessionDialog.selectedGroupId}`
+    );
+  };
+
+  const handleAddGroupTodaySession = async () => {
+    if (!addGroupTodaySessionDialog.selectedGroupId || !addGroupTodaySessionDialog.time) return;
+
+    const conflict = getAddGroupTodaySessionConflict();
+    if (conflict?.severity === "error") {
+      const firstConflict = conflict.conflicts[0];
+      toast({
+        title: "⚠️ تعارض في الوقت",
+        description: firstConflict ? `لا يمكن إضافة الحصة - ${firstConflict.message || `يوجد تعارض مع ${firstConflict.student.name}`}` : "يوجد تعارض في الوقت",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const group = activeGroups.find(g => g.id === addGroupTodaySessionDialog.selectedGroupId);
+    await addGroupSessionForToday(addGroupTodaySessionDialog.selectedGroupId, addGroupTodaySessionDialog.time);
+    setAddGroupTodaySessionDialog({ open: false, selectedGroupId: "", time: "" });
+  };
+
+  // Handle cancel group session
+  const handleCancelGroupSession = async (groupId: string, sessionId: string, reason?: string) => {
+    await cancelGroupSession(groupId, sessionId, reason);
   };
 
   const handleRestoreSession = async (studentId: string, sessionId: string) => {
@@ -1394,8 +1455,19 @@ const Index = () => {
                           className="h-8 gap-1.5 bg-gradient-to-r from-primary to-blue-500 text-xs"
                         >
                           <Plus className="h-3.5 w-3.5" />
-                          إضافة حصة
+                          <span className="hidden sm:inline">إضافة حصة</span>
                         </Button>
+                        {/* Add Group Session Button */}
+                        {activeGroups.length > 0 && (
+                          <Button
+                            size="sm"
+                            onClick={() => setAddGroupTodaySessionDialog({ open: true, selectedGroupId: "", time: "" })}
+                            className="h-8 gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-xs"
+                          >
+                            <Users className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">حصة مجموعة</span>
+                          </Button>
+                        )}
                         <div className="flex items-center gap-1.5 text-xs">
                           {todayStats.scheduled > 0 && (
                             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 font-semibold">
@@ -1818,12 +1890,8 @@ const Index = () => {
                                         <AlertDialogCancel>رجوع</AlertDialogCancel>
                                         <AlertDialogAction
                                           onClick={() => {
-                                            // Mark all members as cancelled
-                                            groupSession.memberAttendance.forEach(att => {
-                                              if (att.status === 'scheduled') {
-                                                updateMemberAttendance(group.id, groupSession.id, att.memberId, 'cancelled');
-                                              }
-                                            });
+                                            const reason = prompt("سبب الإلغاء (اختياري):");
+                                            handleCancelGroupSession(group.id, groupSession.id, reason || undefined);
                                           }}
                                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                         >
@@ -2496,6 +2564,157 @@ const Index = () => {
                       hasError
                         ? "bg-muted text-muted-foreground cursor-not-allowed"
                         : "bg-gradient-to-r from-primary to-blue-500"
+                    )}
+                  >
+                    <Plus className="h-4 w-4 ml-2" />
+                    {hasError ? "غير متاح" : "إضافة الحصة"}
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Group Session for Today Dialog */}
+      <Dialog
+        open={addGroupTodaySessionDialog.open}
+        onOpenChange={(open) => !open && setAddGroupTodaySessionDialog({ open: false, selectedGroupId: "", time: "" })}
+      >
+        <DialogContent dir="rtl" className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
+                <Users className="h-5 w-5" />
+              </div>
+              إضافة حصة مجموعة لليوم
+            </DialogTitle>
+            <DialogDescription>
+              {format(now, "EEEE، d MMMM yyyy", { locale: ar })}
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const conflict = getAddGroupTodaySessionConflict();
+            const hasError = conflict?.severity === "error";
+            const hasWarning = conflict?.severity === "warning";
+            const selectedGroup = activeGroups.find(g => g.id === addGroupTodaySessionDialog.selectedGroupId);
+
+            // Groups that don't have a session today
+            const availableGroups = activeGroups.filter(g => !g.sessions.some(s => s.date === todayStr));
+
+            return (
+              <>
+                <div className="space-y-4 py-4">
+                  {/* Group Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="group-select" className="text-sm font-medium">
+                      اختر المجموعة
+                    </Label>
+                    <Select
+                      value={addGroupTodaySessionDialog.selectedGroupId}
+                      onValueChange={(value) => {
+                        const group = activeGroups.find(g => g.id === value);
+                        setAddGroupTodaySessionDialog({
+                          ...addGroupTodaySessionDialog,
+                          selectedGroupId: value,
+                          time: group?.sessionTime || addGroupTodaySessionDialog.time || "16:00",
+                        });
+                      }}
+                    >
+                      <SelectTrigger id="group-select" className="w-full">
+                        <SelectValue placeholder="اختر مجموعة..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableGroups.length === 0 ? (
+                          <div className="p-3 text-center text-muted-foreground text-sm">
+                            جميع المجموعات لديها حصص اليوم
+                          </div>
+                        ) : (
+                          availableGroups.map((group) => (
+                            <SelectItem key={group.id} value={group.id}>
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-violet-500" />
+                                <span>{group.name}</span>
+                                <span className="text-muted-foreground text-xs">
+                                  ({group.members.filter(m => m.isActive).length} طلاب)
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Time Input */}
+                  {selectedGroup && (
+                    <div className="space-y-2">
+                      <Label htmlFor="group-time" className="text-sm font-medium">
+                        وقت الحصة
+                      </Label>
+                      <Input
+                        id="group-time"
+                        type="time"
+                        value={addGroupTodaySessionDialog.time}
+                        onChange={(e) => setAddGroupTodaySessionDialog({ ...addGroupTodaySessionDialog, time: e.target.value })}
+                        className="text-lg h-12"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        الوقت الافتراضي للمجموعة: {selectedGroup.sessionTime}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Selected Group Info */}
+                  {selectedGroup && (
+                    <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="h-4 w-4 text-violet-600" />
+                        <span className="font-medium text-violet-700 dark:text-violet-300">{selectedGroup.name}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>عدد الطلاب: {selectedGroup.members.filter(m => m.isActive).length}</p>
+                        <p>مدة الحصة: {selectedGroup.sessionDuration} دقيقة</p>
+                        <p>نوع الحصة: {selectedGroup.sessionType === "online" ? "أونلاين" : "حضوري"}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Conflict Warning */}
+                  {hasError && conflict && conflict.conflicts[0] && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-sm">
+                      <XCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                      <span className="text-rose-700">
+                        {conflict.conflicts[0].message || `تعارض مع ${conflict.conflicts[0].student.name}`}
+                      </span>
+                    </div>
+                  )}
+                  {hasWarning && conflict && conflict.conflicts[0] && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
+                      <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                      <span className="text-amber-700">
+                        قريب من حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setAddGroupTodaySessionDialog({ open: false, selectedGroupId: "", time: "" })}
+                    className="rounded-xl"
+                  >
+                    إلغاء
+                  </Button>
+                  <Button
+                    onClick={handleAddGroupTodaySession}
+                    disabled={!addGroupTodaySessionDialog.selectedGroupId || !addGroupTodaySessionDialog.time || hasError}
+                    className={cn(
+                      "rounded-xl",
+                      hasError
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : "bg-gradient-to-r from-violet-500 to-purple-600"
                     )}
                   >
                     <Plus className="h-4 w-4 ml-2" />
