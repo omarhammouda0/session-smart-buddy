@@ -151,11 +151,12 @@ async function sendViaMeta(
   phone: string,
   message: string,
   templateName?: string,
-  templateParams?: string[]
+  templateParams?: string[],
+  templateLanguage: string = "ar"
 ): Promise<{ success: boolean; messageSid?: string; error?: string; method?: string }> {
   // If template is specified, use it (works outside 24h window)
-  if (templateName && templateParams) {
-    const result = await sendMetaTemplateMessage(phone, templateName, "ar", templateParams);
+  if (templateName && templateParams !== undefined) {
+    const result = await sendMetaTemplateMessage(phone, templateName, templateLanguage, templateParams);
     return { ...result, method: "template" };
   }
 
@@ -210,7 +211,8 @@ async function sendWhatsAppMessage(
   phone: string,
   message: string,
   templateName?: string,
-  templateParams?: string[]
+  templateParams?: string[],
+  templateLanguage: string = "ar"
 ): Promise<{ success: boolean; messageSid?: string; error?: string; provider: string; method?: string }> {
   const provider = WHATSAPP_PROVIDER.toLowerCase();
 
@@ -218,7 +220,7 @@ async function sendWhatsAppMessage(
     const result = await sendViaTwilio(phone, message);
     return { ...result, provider: "twilio", method: "text" };
   } else {
-    const result = await sendViaMeta(phone, message, templateName, templateParams);
+    const result = await sendViaMeta(phone, message, templateName, templateParams, templateLanguage);
     return { ...result, provider: "meta" };
   }
 }
@@ -242,26 +244,39 @@ interface RequestBody {
   useTemplate?: boolean;
   templateName?: string;
   templateParams?: string[];
-  reminderType?: "session_24h" | "session_1h" | "payment" | "cancellation" | "custom";
+  templateLanguage?: string; // Language code for template (default: ar)
+  reminderType?: "test" | "session_24h" | "session_1h" | "payment" | "cancellation" | "custom";
 }
 
 // Pre-defined template configurations
-// Create these templates in Meta Business Suite with the EXACT names below
-const TEMPLATE_CONFIGS: Record<string, { name: string; buildParams: (data: any) => string[] }> = {
+// For TRIAL MODE: Use "hello_world" template (pre-approved by Meta)
+// For PRODUCTION: Create custom templates in Meta Business Suite
+const TEMPLATE_CONFIGS: Record<string, { name: string; languageCode: string; buildParams: (data: any) => string[] }> = {
+  // Default test template (works without business verification)
+  test: {
+    name: "hello_world",
+    languageCode: "en_US", // hello_world is in English
+    buildParams: () => [] // No parameters needed
+  },
+  // Custom templates (need to be created in Meta Business Suite after verification)
   session_24h: {
-    name: "session_reminder_24h", // Template name in Meta
+    name: "session_reminder_24h",
+    languageCode: "ar",
     buildParams: (data) => [data.studentName, data.sessionDate, data.sessionTime]
   },
   session_1h: {
     name: "session_reminder_1h",
+    languageCode: "ar",
     buildParams: (data) => [data.studentName, data.sessionTime]
   },
   payment: {
     name: "payment_reminder",
+    languageCode: "ar",
     buildParams: (data) => [data.studentName, String(data.amount)]
   },
   cancellation: {
     name: "cancellation_warning",
+    languageCode: "ar",
     buildParams: (data) => [data.studentName, String(data.cancellationCount), String(data.cancellationLimit)]
   }
 };
@@ -293,6 +308,7 @@ serve(async (req) => {
     const reminderType = body.reminderType;
     let templateName = body.templateName;
     let templateParams = body.templateParams;
+    let templateLanguage = body.templateLanguage || "ar";
 
     console.log("Parsed fields:", {
       studentName,
@@ -344,8 +360,9 @@ serve(async (req) => {
       const config = TEMPLATE_CONFIGS[reminderType];
       if (config) {
         templateName = config.name;
+        templateLanguage = config.languageCode;
         templateParams = config.buildParams({ studentName, sessionDate, sessionTime, amount, cancellationCount, cancellationLimit });
-        console.log(`Using template "${templateName}" with params:`, templateParams);
+        console.log(`Using template "${templateName}" (${templateLanguage}) with params:`, templateParams);
       }
     }
 
@@ -394,7 +411,7 @@ serve(async (req) => {
     }
 
     // Send message using unified function
-    const result = await sendWhatsAppMessage(phoneNumber, message, templateName, templateParams);
+    const result = await sendWhatsAppMessage(phoneNumber, message, templateName, templateParams, templateLanguage);
 
     if (!result.success) {
       console.error(`WhatsApp send failed via ${result.provider} (${result.method}):`, result.error);

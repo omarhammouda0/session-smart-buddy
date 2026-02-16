@@ -1970,3 +1970,540 @@
   }
 }
 
+/* =====================================================
+   ENHANCED MOBILE STYLES - COMPREHENSIVE FIX
+   ===================================================== */
+@media (max-width: 639px) {
+
+  /* === GLOBAL BUTTON FIXES === */
+  /* Ensure all buttons have minimum touch target */
+  button,
+  [role="button"],
+  .btn,
+  a[href] {
+    min-height: 2.25rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Icon-only buttons - ensure proper sizing */
+  button:has(svg:only-child),
+  [role="button"]:has(svg:only-child) {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.375rem !important;
+    min-width: 2rem !important;
+    min-height: 2rem !important;
+  }
+
+  button:has(svg:only-child) svg,
+  [role="button"]:has(svg:only-child) svg {
+    width: 1rem !important;
+    height: 1rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* === CARD ACTION BUTTONS === */
+  /* Session card action buttons in flex container */
+  .flex.items-center.shrink-0 button,
+  .flex.shrink-0.items-center button,
+  .card-actions button {
+    min-width: 2rem !important;
+    min-height: 2rem !important;
+    padding: 0.375rem !important;
+  }
+
+  .flex.items-center.shrink-0 button svg,
+  .flex.shrink-0.items-center button svg {
+    width: 0.875rem !important;
+    height: 0.875rem !important;
+  }
+
+  /* Gap between action buttons */
+  .flex.items-center.shrink-0,
+  .flex.shrink-0.items-center {
+    gap: 0.25rem !important;
+  }
+
+  /* === GROUP CARD FIXES === */
+  /* Group card container */
+  .group-card,
+  [class*="GroupCard"] {
+    padding: 0.75rem !important;
+  }
+
+  /* Group card header */
+  .group-card .flex.items-center.justify-between,
+  [class*="GroupCard"] .flex.items-center.justify-between {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Group card action buttons */
+  .group-card button.h-8,
+  .group-card button.h-9,
+  [class*="GroupCard"] button.h-8,
+  [class*="GroupCard"] button.h-9 {
+    width: 2rem !important;
+    height: 2rem !important;
+    min-width: 2rem !important;
+    padding: 0.375rem !important;
+  }
+
+  /* Group members list */
+  .group-card .space-y-2 > div,
+  [class*="GroupCard"] .space-y-2 > div {
+    padding: 0.5rem !important;
+  }
+
+  /* === DIALOG/SHEET FIXES === */
+  /* Dialog content */
+  [role="dialog"],
+  [data-state="open"][role="dialog"],
+  .dialog-content,
+  [class*="DialogContent"],
+  [class*="SheetContent"] {
+    max-width: calc(100vw - 1rem) !important;
+    max-height: 90vh !important;
+    margin: 0.5rem !important;
+    padding: 1rem !important;
+    overflow-y: auto !important;
+  }
+
+  /* Dialog header */
+  [class*="DialogHeader"],
+  [class*="SheetHeader"] {
+    padding-bottom: 0.75rem !important;
+  }
+
+  [class*="DialogTitle"],
+  [class*="SheetTitle"] {
+    font-size: 1rem !important;
+  }
+
+  /* Dialog body scrollable */
+  [class*="DialogBody"],
+  .dialog-body {
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Dialog footer buttons */
+  [class*="DialogFooter"],
+  [class*="SheetFooter"] {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    padding-top: 0.75rem !important;
+  }
+
+  [class*="DialogFooter"] button,
+  [class*="SheetFooter"] button {
+    width: 100% !important;
+    min-height: 2.5rem !important;
+  }
+
+  /* === FORM ELEMENTS === */
+  /* Input fields */
+  input,
+  textarea,
+  select,
+  [role="combobox"] {
+    min-height: 2.5rem !important;
+    font-size: 16px !important; /* Prevents iOS zoom */
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Select triggers */
+  [class*="SelectTrigger"],
+  [data-slot="trigger"] {
+    min-height: 2.5rem !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Checkbox and radio */
+  input[type="checkbox"],
+  input[type="radio"],
+  [role="checkbox"],
+  [role="radio"] {
+    min-width: 1.25rem !important;
+    min-height: 1.25rem !important;
+  }
+
+  /* Switch toggle */
+  [role="switch"] {
+    min-width: 2.5rem !important;
+    min-height: 1.5rem !important;
+  }
+
+  /* === BADGES === */
+  [class*="Badge"],
+  .badge {
+    font-size: 0.625rem !important;
+    padding: 0.125rem 0.375rem !important;
+    min-height: 1.25rem !important;
+  }
+
+  /* === TODAY'S SESSIONS VIEW === */
+  /* Session list item */
+  .session-item,
+  [class*="session-card"] {
+    padding: 0.75rem !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Session time indicator */
+  .session-time-box,
+  .w-14.h-14 {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-width: 2.75rem !important;
+  }
+
+  .session-time-box .text-lg,
+  .w-14.h-14 .text-lg,
+  .w-14.h-14 .text-base {
+    font-size: 0.75rem !important;
+  }
+
+  /* Session info section */
+  .session-info {
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .session-info h4,
+  .session-info .font-bold {
+    font-size: 0.875rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Session action buttons row */
+  .session-actions,
+  .flex.flex-wrap.gap-1\.5,
+  .flex.flex-wrap.gap-2 {
+    gap: 0.25rem !important;
+    flex-wrap: wrap !important;
+  }
+
+  .session-actions button {
+    min-height: 1.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.6875rem !important;
+  }
+
+  .session-actions button svg {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+  }
+
+  /* === CALENDAR VIEW === */
+  /* Calendar header */
+  .calendar-header {
+    padding: 0.5rem !important;
+  }
+
+  .calendar-header button {
+    min-width: 2rem !important;
+    min-height: 2rem !important;
+  }
+
+  /* Calendar grid */
+  .calendar-grid,
+  .grid.grid-cols-7 {
+    gap: 0.125rem !important;
+  }
+
+  /* Calendar day cells */
+  .calendar-day,
+  [data-date] {
+    min-height: 3rem !important;
+    padding: 0.125rem !important;
+    font-size: 0.625rem !important;
+  }
+
+  /* Calendar session indicators */
+  .calendar-session-indicator {
+    font-size: 0.5rem !important;
+    padding: 0.0625rem 0.125rem !important;
+    margin: 0.0625rem !important;
+    line-height: 1.1 !important;
+  }
+
+  /* === STUDENT MANAGEMENT VIEW === */
+  /* Student card in list */
+  .student-card {
+    padding: 0.75rem !important;
+  }
+
+  /* Student info header */
+  .student-card .flex.items-start {
+    gap: 0.5rem !important;
+  }
+
+  /* Student avatar */
+  .student-avatar,
+  .w-10.h-10.rounded-full,
+  .w-12.h-12.rounded-full {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    min-width: 2.5rem !important;
+  }
+
+  /* Student schedule days */
+  .student-schedule-days {
+    flex-wrap: wrap !important;
+    gap: 0.25rem !important;
+  }
+
+  .student-schedule-days span {
+    font-size: 0.5625rem !important;
+    padding: 0.125rem 0.25rem !important;
+  }
+
+  /* === PAYMENT DASHBOARD === */
+  /* Payment card */
+  .payment-card {
+    padding: 0.75rem !important;
+  }
+
+  /* Payment stats grid */
+  .payment-stats,
+  .grid.grid-cols-2,
+  .grid.grid-cols-3 {
+    gap: 0.5rem !important;
+  }
+
+  .payment-stats > div {
+    padding: 0.5rem !important;
+  }
+
+  /* Payment amount display */
+  .payment-amount {
+    font-size: 1.125rem !important;
+  }
+
+  /* Payment action buttons */
+  .payment-actions button {
+    min-height: 2rem !important;
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* === GROUPS VIEW === */
+  /* Group list item */
+  .group-list-item {
+    padding: 0.75rem !important;
+  }
+
+  /* Group member badge */
+  .group-member-badge {
+    font-size: 0.625rem !important;
+    padding: 0.125rem 0.25rem !important;
+  }
+
+  /* === BOTTOM NAVIGATION === */
+  /* Mobile bottom nav */
+  .bottom-nav,
+  .fixed.bottom-0.left-0.right-0 {
+    padding: 0.5rem !important;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .bottom-nav button {
+    min-height: 2.5rem !important;
+    padding: 0.5rem !important;
+  }
+
+  .bottom-nav button svg {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+
+  .bottom-nav button span {
+    font-size: 0.625rem !important;
+  }
+
+  /* === STATS CARDS === */
+  /* Stat card grid */
+  .stats-grid,
+  .grid.grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  .stats-grid > div,
+  .grid.grid-cols-4 > div {
+    padding: 0.5rem !important;
+  }
+
+  .stats-grid .text-2xl,
+  .stats-grid .text-xl {
+    font-size: 1.125rem !important;
+  }
+
+  .stats-grid p,
+  .grid.grid-cols-4 p {
+    font-size: 0.625rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* === EMPTY STATES === */
+  .empty-state {
+    padding: 2rem 1rem !important;
+  }
+
+  .empty-state svg {
+    width: 3rem !important;
+    height: 3rem !important;
+  }
+
+  .empty-state p {
+    font-size: 0.875rem !important;
+  }
+
+  /* === ALERT DIALOGS === */
+  [class*="AlertDialog"] [class*="AlertDialogContent"] {
+    max-width: calc(100vw - 2rem) !important;
+    padding: 1rem !important;
+  }
+
+  [class*="AlertDialog"] [class*="AlertDialogFooter"] {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  [class*="AlertDialog"] [class*="AlertDialogFooter"] button {
+    width: 100% !important;
+  }
+
+  /* === DROPDOWN MENUS === */
+  [role="menu"],
+  [class*="DropdownMenuContent"] {
+    min-width: 10rem !important;
+    max-width: calc(100vw - 1rem) !important;
+  }
+
+  [role="menuitem"],
+  [class*="DropdownMenuItem"] {
+    min-height: 2.5rem !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* === TOOLTIPS DISABLED ON MOBILE === */
+  [role="tooltip"] {
+    display: none !important;
+  }
+
+  /* === SCROLL AREAS === */
+  [class*="ScrollArea"] {
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* === LOADING SPINNERS === */
+  .loading-spinner,
+  .animate-spin {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+  }
+
+  /* === TOAST NOTIFICATIONS === */
+  [class*="Toaster"],
+  [class*="Toast"] {
+    bottom: calc(4rem + env(safe-area-inset-bottom)) !important;
+    max-width: calc(100vw - 1rem) !important;
+    margin: 0 0.5rem !important;
+  }
+
+  /* === POPOVER CONTENT === */
+  [class*="PopoverContent"] {
+    max-width: calc(100vw - 1rem) !important;
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* === ACCORDION === */
+  [class*="AccordionTrigger"] {
+    min-height: 2.5rem !important;
+    padding: 0.75rem !important;
+  }
+
+  [class*="AccordionContent"] {
+    padding: 0.75rem !important;
+  }
+
+  /* === TABS (when visible) === */
+  [role="tablist"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+
+  [role="tablist"]::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  [role="tab"] {
+    min-height: 2.25rem !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* === SEPARATOR/DIVIDER === */
+  [class*="Separator"],
+  hr {
+    margin: 0.5rem 0 !important;
+  }
+
+  /* === AVATAR === */
+  [class*="Avatar"] {
+    width: 2rem !important;
+    height: 2rem !important;
+    min-width: 2rem !important;
+  }
+
+  [class*="AvatarFallback"] {
+    font-size: 0.75rem !important;
+  }
+
+  /* === PROGRESS BAR === */
+  [class*="Progress"],
+  [role="progressbar"] {
+    height: 0.375rem !important;
+  }
+}
+
+/* === ULTRA SMALL SCREENS (320px and below) === */
+@media (max-width: 320px) {
+  html {
+    font-size: 13px !important;
+  }
+
+  /* Stack more elements vertically */
+  .flex.items-center.justify-between {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Full width buttons */
+  button:not(.h-6):not(.h-7):not(.w-6):not(.w-7) {
+    width: 100% !important;
+  }
+
+  /* Reduce padding further */
+  .p-4, .p-3 {
+    padding: 0.5rem !important;
+  }
+
+  /* Stats in single column */
+  .grid.grid-cols-4,
+  .grid.grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
