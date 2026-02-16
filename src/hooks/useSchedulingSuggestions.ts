@@ -783,74 +783,34 @@ export const useSchedulingSuggestions = (
       .filter(d => d.isWarning)
       .map(d => d.dayOfWeek);
 
-    // Generate general tips
+    // Generate general tips - SIMPLIFIED: Only show most important (max 2)
     const generalTips: string[] = [];
 
-    if (overallLoad === 'heavy') {
-      generalTips.push('⚡ جدولك مزدحم هذا الأسبوع، حاول توزيع الجلسات بشكل أفضل');
-    }
-
+    // Most important: Best days recommendation
     if (bestDays.length > 0) {
-      const bestDayNames = bestDays.map(d => DAY_NAMES_AR[d]).join('، ');
-      generalTips.push(`🌟 أفضل الأيام للإضافة: ${bestDayNames}`);
+      const bestDayNames = bestDays.slice(0, 3).map(d => DAY_NAMES_AR[d]).join('، ');
+      generalTips.push(`🌟 أفضل الأيام: ${bestDayNames}`);
     }
 
-    if (avoidDays.length > 0 && avoidDays.length < 5) {
+    // Second priority: Avoid days (only if there are some)
+    if (avoidDays.length > 0 && avoidDays.length <= 3) {
       const avoidDayNames = avoidDays.map(d => DAY_NAMES_AR[d]).join('، ');
-      generalTips.push(`⚠️ أيام مزدحمة (${BUSY_DAY_THRESHOLD}+ جلسات): ${avoidDayNames}`);
+      generalTips.push(`⚠️ تجنب: ${avoidDayNames} (مزدحمة)`);
     }
 
-    // Check for day balance
-    const maxSessions = Math.max(...dayStats.map(d => d.totalSessions));
-    const minSessions = Math.min(...dayStats.map(d => d.totalSessions));
-    if (maxSessions - minSessions > 4) {
-      generalTips.push('💡 جدولك غير متوازن، حاول توزيع الجلسات بالتساوي على الأسبوع');
-    }
-
-    // Travel time tip for onsite sessions
-    if (newSessionType === 'onsite') {
-      const daysWithMultipleOnsite = dayStats.filter(d => d.onsiteSessions >= 2);
-      if (daysWithMultipleOnsite.length > 0) {
-        generalTips.push('🚗 نصيحة: اترك 30-60 دقيقة على الأقل بين الجلسات الحضورية للتنقل');
-      }
-    }
-
-    // Generate smart recommendations
+    // Generate smart recommendations - SIMPLIFIED: Only 1-2 most critical
     const smartRecommendations: string[] = [];
 
-    // Peak hours recommendation
-    const peakHoursList = peakHours.filter(h => h.isPeak);
-    if (peakHoursList.length > 0) {
-      const peakTimes = peakHoursList.map(h => formatTimeAr(`${h.hour}:00`)).join('، ');
-      smartRecommendations.push(`🔥 أوقات الذروة: ${peakTimes} - فكر في أوقات أخرى لتوزيع أفضل`);
+    // Only show rest day warning if critical
+    if (longestStreak >= 6) {
+      smartRecommendations.push(`📅 ${longestStreak} أيام متتالية - خذ يوم راحة!`);
     }
 
-    // Workload balance recommendation
-    if (!workloadBalance.isBalanced) {
-      const busyPeriod = getPeriodNameAr(workloadBalance.busiestPeriod);
-      const quietPeriod = getPeriodNameAr(workloadBalance.quietestPeriod);
-      smartRecommendations.push(`⚖️ معظم جلساتك في ${busyPeriod} - جرب إضافة جلسات في ${quietPeriod}`);
-    }
-
-    // Consecutive days recommendation
-    if (longestStreak >= 5) {
-      smartRecommendations.push(`📅 لديك ${longestStreak} أيام متتالية بها جلسات - خذ يوم راحة!`);
-    }
-
-    // Rest day recommendation
-    const restDays = dayStats.filter(d => d.totalSessions === 0).length;
-    if (restDays === 0 && totalWeeklySessions > 10) {
-      smartRecommendations.push('🧘 لا يوجد يوم راحة! حاول إبقاء يوم واحد على الأقل فارغاً');
-    }
-
-    // Session variety recommendation
-    const onlineTotal = dayStats.reduce((sum, d) => sum + d.onlineSessions, 0);
-    const onsiteTotal = dayStats.reduce((sum, d) => sum + d.onsiteSessions, 0);
-    if (onlineTotal > 0 && onsiteTotal > 0) {
-      const ratio = Math.max(onlineTotal, onsiteTotal) / Math.min(onlineTotal, onsiteTotal);
-      if (ratio > 3) {
-        const dominant = onlineTotal > onsiteTotal ? 'أونلاين' : 'حضوري';
-        smartRecommendations.push(`📊 معظم جلساتك ${dominant} - التنويع قد يساعد في تجديد النشاط`);
+    // Travel tip only for onsite with multiple same-day sessions
+    if (newSessionType === 'onsite') {
+      const daysWithMultipleOnsite = dayStats.filter(d => d.onsiteSessions >= 3);
+      if (daysWithMultipleOnsite.length > 0) {
+        smartRecommendations.push('🚗 اترك وقتاً للتنقل بين الجلسات الحضورية');
       }
     }
 
