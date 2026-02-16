@@ -75,8 +75,7 @@ function formatPhoneNumber(phone: string): string {
 
 // ============================================
 // META WHATSAPP CLOUD API (FREE)
-// ============================================
-
+// ===========================================
 // Send text message (only works within 24h window)
 async function sendMetaTextMessage(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
   if (!META_WHATSAPP_TOKEN || !META_WHATSAPP_PHONE_ID) {

@@ -6,12 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Users, Clock, Monitor, MapPin, DollarSign, X, ChevronDown, ChevronUp, Lightbulb, Sparkles, AlertTriangle, Check, Calendar, UserCheck } from 'lucide-react';
-import { SessionType, Student, ScheduleDay, GroupMember, StudentGroup } from '@/types/student';
+import { SessionType, Student, ScheduleDay, GroupMember, StudentGroup, Location } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { DurationPicker } from '@/components/DurationPicker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSchedulingSuggestions } from '@/hooks/useSchedulingSuggestions';
+import { LocationPicker, LocationData } from '@/components/LocationPicker';
 import { cn } from '@/lib/utils';
 
 // Type for day schedule with time
@@ -102,6 +103,7 @@ export const AddGroupDialog = ({
   const [sessionType, setSessionType] = useState<SessionType | null>(null);
   const [sessionDuration, setSessionDuration] = useState<number>(60);
   const [defaultPrice, setDefaultPrice] = useState<number>(80);
+  const [location, setLocation] = useState<LocationData | null>(null);
 
   // Schedule
   const [daySchedules, setDaySchedules] = useState<DayScheduleInput[]>([]);
@@ -162,6 +164,7 @@ export const AddGroupDialog = ({
     setCustomEnd(defaultEnd);
     setMembers([]);
     setSelectedStudentId('');
+    setLocation(null);
   };
 
   const toggleDaySchedule = (day: number) => {
@@ -367,6 +370,16 @@ export const AddGroupDialog = ({
                 </button>
               </div>
             </div>
+
+            {/* Location Picker - Only for onsite sessions */}
+            {sessionType === 'onsite' && (
+              <LocationPicker
+                value={location}
+                onChange={setLocation}
+                label="موقع الحصة (اختياري)"
+                placeholder="اختر موقع الحصة على الخريطة"
+              />
+            )}
 
             {/* Default Price */}
             <div className="space-y-2">

@@ -9,6 +9,7 @@ import { DAY_NAMES_SHORT_AR, formatDurationAr } from "@/lib/arabicConstants";
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import { LocationDisplay } from "@/components/LocationPicker";
 import {
   Dialog,
   DialogContent,

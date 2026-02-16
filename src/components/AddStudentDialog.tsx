@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { UserPlus, ChevronDown, ChevronUp, Clock, Monitor, MapPin, Phone, XCircle, AlertTriangle, Check, Loader2, DollarSign, Sparkles, Lightbulb, Car, Users, UserCheck, Calendar } from 'lucide-react';
-import { SessionType, Student, DEFAULT_DURATION, StudentMaterial, AppSettings, ScheduleMode } from '@/types/student';
+import { SessionType, Student, DEFAULT_DURATION, StudentMaterial, AppSettings, ScheduleMode, Location } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateSessionsForSchedule, getDistributedDays } from '@/lib/dateUtils';
@@ -14,6 +14,7 @@ import { useConflictDetection, formatTimeAr, ConflictResult } from '@/hooks/useC
 import { useSchedulingSuggestions } from '@/hooks/useSchedulingSuggestions';
 import { DurationPicker } from '@/components/DurationPicker';
 import { StudentMaterialsSection } from '@/components/StudentMaterialsSection';
+import { LocationPicker, LocationData } from '@/components/LocationPicker';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -71,6 +72,9 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [useCustomPrices, setUseCustomPrices] = useState(false);
   const [customPriceOnsite, setCustomPriceOnsite] = useState<number>(defaultPriceOnsite);
   const [customPriceOnline, setCustomPriceOnline] = useState<number>(defaultPriceOnline);
+
+  // Location state (for onsite sessions)
+  const [location, setLocation] = useState<LocationData | null>(null);
 
   // Conflict detection state
   const [isChecking, setIsChecking] = useState(false);
@@ -237,6 +241,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
     setCustomPriceOnline(defaultPriceOnline);
     setScheduleMode('days');
     setSessionsPerWeek(2);
+    setLocation(null);
   };
 
   // Toggle a day in the schedule
@@ -358,6 +363,16 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                 </button>
               </div>
             </div>
+
+            {/* Location Picker - Only for onsite sessions */}
+            {sessionType === 'onsite' && (
+              <LocationPicker
+                value={location}
+                onChange={setLocation}
+                label="موقع الدرس (اختياري)"
+                placeholder="اختر موقع الدرس على الخريطة"
+              />
+            )}
 
             {/* Custom Pricing Section */}
             <div className="space-y-3 p-3 rounded-lg border bg-muted/30">

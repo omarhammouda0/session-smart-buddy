@@ -1,5 +1,13 @@
 export type SessionStatus = "scheduled" | "completed" | "cancelled" | "vacation";
 
+// Location type for geographic coordinates
+export interface Location {
+  lat: number;
+  lng: number;
+  address?: string;  // Optional human-readable address
+  name?: string;     // Optional place name
+}
+
 export interface SessionHistory {
   status: SessionStatus;
   timestamp: string;
@@ -24,6 +32,7 @@ export interface Session {
   notes?: string; // Tutor notes about the session
   homework?: string; // Homework description
   homeworkStatus?: HomeworkStatus; // Homework completion status
+  location?: Location; // Session location (for onsite sessions)
 }
 
 export interface ScheduleDay {
@@ -81,6 +90,8 @@ export interface Student {
   cancellationPolicy?: CancellationPolicy;
   // Student materials (notes, PDFs, etc.)
   materials?: StudentMaterial[];
+  // Default lesson location (for onsite sessions)
+  location?: Location;
 }
 
 // ✅ NEW: Payment method type
@@ -195,4 +206,5 @@ export interface StudentGroup {
   // Optional fields
   description?: string;            // Group description/notes
   color?: string;                  // Color for calendar display
+  location?: Location;             // Default group location (for onsite sessions)
 }
