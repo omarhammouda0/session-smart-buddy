@@ -76,16 +76,18 @@ function formatPhoneNumber(phone: string): string {
 // ============================================
 // META WHATSAPP CLOUD API (FREE)
 // ============================================
-async function sendViaMeta(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
+
+// Send text message (only works within 24h window)
+async function sendMetaTextMessage(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
   if (!META_WHATSAPP_TOKEN || !META_WHATSAPP_PHONE_ID) {
-    return { success: false, error: "Meta WhatsApp credentials not configured (META_WHATSAPP_TOKEN, META_WHATSAPP_PHONE_ID)" };
+    return { success: false, error: "Meta WhatsApp credentials not configured" };
   }
 
   const formattedPhone = formatPhoneNumber(phone);
   const metaUrl = `https://graph.facebook.com/${META_WHATSAPP_VERSION}/${META_WHATSAPP_PHONE_ID}/messages`;
 
   try {
-    console.log(`[Meta] Sending to +${formattedPhone.substring(0, 6)}***`);
+    console.log(`[Meta Text] Sending to +${formattedPhone.substring(0, 6)}***`);
 
     const response = await fetch(metaUrl, {
       method: "POST",
@@ -98,10 +100,7 @@ async function sendViaMeta(phone: string, message: string): Promise<{ success: b
         recipient_type: "individual",
         to: formattedPhone,
         type: "text",
-        text: {
-          preview_url: false,
-          body: message
-        }
+        text: { preview_url: false, body: message }
       }),
     });
 
@@ -109,17 +108,91 @@ async function sendViaMeta(phone: string, message: string): Promise<{ success: b
 
     if (!response.ok) {
       const errorMsg = data.error?.message || data.error?.error_user_msg || `Meta API error: ${response.status}`;
-      console.error(`[Meta] Error: ${errorMsg}`);
+      console.error(`[Meta Text] Error: ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
 
-    const messageId = data.messages?.[0]?.id;
-    console.log(`[Meta] Success: ${messageId}`);
-    return { success: true, messageSid: messageId };
+    console.log(`[Meta Text] Success: ${data.messages?.[0]?.id}`);
+    return { success: true, messageSid: data.messages?.[0]?.id };
   } catch (err) {
-    console.error(`[Meta] Exception: ${err}`);
+    console.error(`[Meta Text] Exception: ${err}`);
     return { success: false, error: String(err) };
   }
+}
+
+// Send template message (works anytime, no 24h limit)
+async function sendMetaTemplateMessage(
+  phone: string,
+  templateName: string,
+  languageCode: string,
+  bodyParameters: string[]
+): Promise<{ success: boolean; messageSid?: string; error?: string }> {
+  if (!META_WHATSAPP_TOKEN || !META_WHATSAPP_PHONE_ID) {
+    return { success: false, error: "Meta WhatsApp credentials not configured" };
+  }
+
+  const formattedPhone = formatPhoneNumber(phone);
+  const metaUrl = `https://graph.facebook.com/${META_WHATSAPP_VERSION}/${META_WHATSAPP_PHONE_ID}/messages`;
+
+  const components: any[] = [];
+  if (bodyParameters.length > 0) {
+    components.push({
+      type: "body",
+      parameters: bodyParameters.map(text => ({ type: "text", text }))
+    });
+  }
+
+  try {
+    console.log(`[Meta Template] Sending "${templateName}" to +${formattedPhone.substring(0, 6)}***`);
+
+    const response = await fetch(metaUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${META_WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: formattedPhone,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: components
+        }
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMsg = data.error?.message || data.error?.error_user_msg || `Meta Template error: ${response.status}`;
+      console.error(`[Meta Template] Error:`, JSON.stringify(data.error));
+      return { success: false, error: errorMsg };
+    }
+
+    console.log(`[Meta Template] Success: ${data.messages?.[0]?.id}`);
+    return { success: true, messageSid: data.messages?.[0]?.id };
+  } catch (err) {
+    console.error(`[Meta Template] Exception:`, err);
+    return { success: false, error: String(err) };
+  }
+}
+
+// Send via Meta - uses template if available, falls back to text
+async function sendViaMeta(
+  phone: string,
+  message: string,
+  templateName?: string,
+  templateParams?: string[]
+): Promise<{ success: boolean; messageSid?: string; error?: string; method?: string }> {
+  if (templateName && templateParams) {
+    const result = await sendMetaTemplateMessage(phone, templateName, "ar", templateParams);
+    return { ...result, method: "template" };
+  }
+  const result = await sendMetaTextMessage(phone, message);
+  return { ...result, method: "text" };
 }
 
 // ============================================
@@ -178,17 +251,21 @@ async function sendViaTwilio(phone: string, message: string): Promise<{ success:
 // ============================================
 // UNIFIED SEND FUNCTION
 // ============================================
-async function sendWhatsAppMessage(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string; provider?: string }> {
+async function sendWhatsAppMessage(
+  phone: string,
+  message: string,
+  templateName?: string,
+  templateParams?: string[]
+): Promise<{ success: boolean; messageSid?: string; error?: string; provider?: string; method?: string }> {
   const provider = WHATSAPP_PROVIDER.toLowerCase();
 
   console.log(`Using provider: ${provider}`);
 
   if (provider === "twilio") {
     const result = await sendViaTwilio(phone, message);
-    return { ...result, provider: "twilio" };
+    return { ...result, provider: "twilio", method: "text" };
   } else {
-    // Default to Meta (FREE)
-    const result = await sendViaMeta(phone, message);
+    const result = await sendViaMeta(phone, message, templateName, templateParams);
     return { ...result, provider: "meta" };
   }
 }
@@ -203,7 +280,6 @@ function isProviderConfigured(): { ok: boolean; provider: string; error?: string
     }
     return { ok: false, provider: "twilio", error: "TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN required" };
   } else {
-    // Meta is default
     if (META_WHATSAPP_TOKEN && META_WHATSAPP_PHONE_ID) {
       return { ok: true, provider: "meta" };
     }

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// Version 3.0 - Multi-provider support: Meta WhatsApp Cloud API (FREE) + Twilio
+// Version 4.0 - Meta Message Templates support for automated reminders (no 24h limit)
 
 // Provider selection: 'meta' (default, FREE) or 'twilio'
 const WHATSAPP_PROVIDER = Deno.env.get("WHATSAPP_PROVIDER") || "meta";
@@ -31,8 +31,22 @@ function formatPhoneNumber(phone: string): string {
   return formatted;
 }
 
-// Send via Meta WhatsApp Cloud API
-async function sendViaMeta(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
+// ============================================
+// META MESSAGE TEMPLATES
+// Create these templates in Meta Business Suite:
+// https://business.facebook.com/ -> WhatsApp Manager -> Message Templates
+// ============================================
+interface TemplateMessage {
+  templateName: string;
+  languageCode: string;
+  components: Array<{
+    type: "body" | "header";
+    parameters: Array<{ type: "text"; text: string }>;
+  }>;
+}
+
+// Send via Meta WhatsApp Cloud API - Text Message (within 24h window)
+async function sendMetaTextMessage(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
   if (!META_WHATSAPP_TOKEN || !META_WHATSAPP_PHONE_ID) {
     return { success: false, error: "Meta WhatsApp credentials not configured" };
   }
@@ -41,7 +55,7 @@ async function sendViaMeta(phone: string, message: string): Promise<{ success: b
   const metaUrl = `https://graph.facebook.com/${META_WHATSAPP_VERSION}/${META_WHATSAPP_PHONE_ID}/messages`;
 
   try {
-    console.log(`[Meta] Sending to +${formattedPhone.substring(0, 6)}***`);
+    console.log(`[Meta Text] Sending to +${formattedPhone.substring(0, 6)}***`);
 
     const response = await fetch(metaUrl, {
       method: "POST",
@@ -69,6 +83,85 @@ async function sendViaMeta(phone: string, message: string): Promise<{ success: b
   } catch (err) {
     return { success: false, error: String(err) };
   }
+}
+
+// Send via Meta WhatsApp Cloud API - Template Message (works anytime, no 24h limit)
+async function sendMetaTemplateMessage(
+  phone: string,
+  templateName: string,
+  languageCode: string,
+  bodyParameters: string[]
+): Promise<{ success: boolean; messageSid?: string; error?: string }> {
+  if (!META_WHATSAPP_TOKEN || !META_WHATSAPP_PHONE_ID) {
+    return { success: false, error: "Meta WhatsApp credentials not configured" };
+  }
+
+  const formattedPhone = formatPhoneNumber(phone);
+  const metaUrl = `https://graph.facebook.com/${META_WHATSAPP_VERSION}/${META_WHATSAPP_PHONE_ID}/messages`;
+
+  // Build template components
+  const components: any[] = [];
+  if (bodyParameters.length > 0) {
+    components.push({
+      type: "body",
+      parameters: bodyParameters.map(text => ({ type: "text", text }))
+    });
+  }
+
+  try {
+    console.log(`[Meta Template] Sending "${templateName}" to +${formattedPhone.substring(0, 6)}***`);
+
+    const response = await fetch(metaUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${META_WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: formattedPhone,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: components
+        }
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMsg = data.error?.message || data.error?.error_user_msg || `Meta Template API error: ${response.status}`;
+      console.error(`[Meta Template] Error:`, JSON.stringify(data.error));
+      return { success: false, error: errorMsg };
+    }
+
+    console.log(`[Meta Template] Success:`, data.messages?.[0]?.id);
+    return { success: true, messageSid: data.messages?.[0]?.id };
+  } catch (err) {
+    console.error(`[Meta Template] Exception:`, err);
+    return { success: false, error: String(err) };
+  }
+}
+
+// Send via Meta - tries template first, falls back to text
+async function sendViaMeta(
+  phone: string,
+  message: string,
+  templateName?: string,
+  templateParams?: string[]
+): Promise<{ success: boolean; messageSid?: string; error?: string; method?: string }> {
+  // If template is specified, use it (works outside 24h window)
+  if (templateName && templateParams) {
+    const result = await sendMetaTemplateMessage(phone, templateName, "ar", templateParams);
+    return { ...result, method: "template" };
+  }
+
+  // Otherwise use text message (only works within 24h window)
+  const result = await sendMetaTextMessage(phone, message);
+  return { ...result, method: "text" };
 }
 
 // Send via Twilio
@@ -113,14 +206,19 @@ async function sendViaTwilio(phone: string, message: string): Promise<{ success:
 }
 
 // Unified send function
-async function sendWhatsAppMessage(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string; provider: string }> {
+async function sendWhatsAppMessage(
+  phone: string,
+  message: string,
+  templateName?: string,
+  templateParams?: string[]
+): Promise<{ success: boolean; messageSid?: string; error?: string; provider: string; method?: string }> {
   const provider = WHATSAPP_PROVIDER.toLowerCase();
 
   if (provider === "twilio") {
     const result = await sendViaTwilio(phone, message);
-    return { ...result, provider: "twilio" };
+    return { ...result, provider: "twilio", method: "text" };
   } else {
-    const result = await sendViaMeta(phone, message);
+    const result = await sendViaMeta(phone, message, templateName, templateParams);
     return { ...result, provider: "meta" };
   }
 }
@@ -140,7 +238,33 @@ interface RequestBody {
   sessions?: number;
   cancellationCount?: number;
   cancellationLimit?: number;
+  // Template support
+  useTemplate?: boolean;
+  templateName?: string;
+  templateParams?: string[];
+  reminderType?: "session_24h" | "session_1h" | "payment" | "cancellation" | "custom";
 }
+
+// Pre-defined template configurations
+// Create these templates in Meta Business Suite with the EXACT names below
+const TEMPLATE_CONFIGS: Record<string, { name: string; buildParams: (data: any) => string[] }> = {
+  session_24h: {
+    name: "session_reminder_24h", // Template name in Meta
+    buildParams: (data) => [data.studentName, data.sessionDate, data.sessionTime]
+  },
+  session_1h: {
+    name: "session_reminder_1h",
+    buildParams: (data) => [data.studentName, data.sessionTime]
+  },
+  payment: {
+    name: "payment_reminder",
+    buildParams: (data) => [data.studentName, String(data.amount)]
+  },
+  cancellation: {
+    name: "cancellation_warning",
+    buildParams: (data) => [data.studentName, String(data.cancellationCount), String(data.cancellationLimit)]
+  }
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -151,7 +275,6 @@ serve(async (req) => {
   try {
     const body: RequestBody = await req.json();
 
-    // Log incoming request for debugging
     console.log("Received request body:", JSON.stringify(body));
 
     // Support multiple field names for compatibility
@@ -166,12 +289,18 @@ serve(async (req) => {
     const sessions = body.sessions;
     const cancellationCount = body.cancellationCount;
     const cancellationLimit = body.cancellationLimit;
+    const useTemplate = body.useTemplate || false;
+    const reminderType = body.reminderType;
+    let templateName = body.templateName;
+    let templateParams = body.templateParams;
 
     console.log("Parsed fields:", {
       studentName,
       phoneNumber: phoneNumber ? "***" : "empty",
       hasCustomMessage: !!customMessage,
       testMode,
+      useTemplate,
+      reminderType,
       provider: WHATSAPP_PROVIDER
     });
 
@@ -210,7 +339,17 @@ serve(async (req) => {
       }
     }
 
-    // Build message
+    // Auto-detect template based on reminderType
+    if (useTemplate && reminderType && !templateName) {
+      const config = TEMPLATE_CONFIGS[reminderType];
+      if (config) {
+        templateName = config.name;
+        templateParams = config.buildParams({ studentName, sessionDate, sessionTime, amount, cancellationCount, cancellationLimit });
+        console.log(`Using template "${templateName}" with params:`, templateParams);
+      }
+    }
+
+    // Build fallback text message
     let message = customMessage || "";
 
     if (!message && studentName) {
@@ -223,11 +362,12 @@ serve(async (req) => {
       }
     }
 
-    if (!message) {
+    // Need either a message or a template
+    if (!message && !templateName) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Message content is required"
+          error: "Message content or template is required"
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -237,42 +377,46 @@ serve(async (req) => {
 
     // Test mode - don't actually send
     if (testMode) {
-      console.log("Test mode - would send:", { to: formattedPhone, message, provider });
+      console.log("Test mode - would send:", { to: formattedPhone, message, templateName, templateParams, provider });
       return new Response(
         JSON.stringify({
           success: true,
           testMode: true,
           provider: provider,
+          method: templateName ? "template" : "text",
+          templateName: templateName || null,
           message: `Test successful - ${provider} configured correctly`,
           wouldSendTo: `+${formattedPhone}`,
-          messagePreview: message.substring(0, 100) + "...",
+          messagePreview: message ? message.substring(0, 100) + "..." : `Template: ${templateName}`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Send message using unified function
-    const result = await sendWhatsAppMessage(phoneNumber, message);
+    const result = await sendWhatsAppMessage(phoneNumber, message, templateName, templateParams);
 
     if (!result.success) {
-      console.error(`WhatsApp send failed via ${result.provider}:`, result.error);
+      console.error(`WhatsApp send failed via ${result.provider} (${result.method}):`, result.error);
       return new Response(
         JSON.stringify({
           success: false,
           error: result.error,
           provider: result.provider,
+          method: result.method,
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`WhatsApp message sent successfully via ${result.provider}:`, result.messageSid);
+    console.log(`WhatsApp message sent successfully via ${result.provider} (${result.method}):`, result.messageSid);
 
     return new Response(
       JSON.stringify({
         success: true,
         messageSid: result.messageSid,
         provider: result.provider,
+        method: result.method,
         to: `+${formattedPhone}`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
