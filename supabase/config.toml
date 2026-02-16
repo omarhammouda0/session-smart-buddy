@@ -17,3 +17,7 @@ verify_jwt = false
 # Checks for Priority 100 alerts and sends push notifications
 # Triggered by pg_cron every 5 minutes
 # See migration: 20260115_check_critical_alerts_cron.sql
+
+[functions.location-search]
+verify_jwt = false
+# Handles location search with Google Places API and Nominatim fallback
