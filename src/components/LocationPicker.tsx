@@ -190,22 +190,101 @@ export function LocationPicker({
     setIsLoadingPredictions(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        // Search with Egypt bias for better local results
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=eg&limit=6&accept-language=ar&addressdetails=1`
-        );
-        const data = await response.json();
+        const query = searchQuery.trim();
+        const allResults: SearchPrediction[] = [];
 
-        if (data.length === 0) {
-          // Try without country restriction if no results
+        // Strategy 1: Search with Egypt country code and viewbox (Egypt bounding box)
+        // Egypt bounding box: minLon=24.7, minLat=22.0, maxLon=36.9, maxLat=31.7
+        const egyptViewbox = '24.7,22.0,36.9,31.7';
+
+        const response1 = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=5&accept-language=ar&addressdetails=1`
+        );
+        const data1 = await response1.json();
+        allResults.push(...data1);
+
+        // Strategy 2: If few results, try with "Egypt" appended
+        if (allResults.length < 3) {
           const response2 = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=6&accept-language=ar&addressdetails=1`
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' مصر')}&countrycodes=eg&limit=5&accept-language=ar&addressdetails=1`
           );
           const data2 = await response2.json();
-          setPredictions(data2);
-        } else {
-          setPredictions(data);
+          // Add only unique results
+          data2.forEach((item: SearchPrediction) => {
+            if (!allResults.find(r => r.place_id === item.place_id)) {
+              allResults.push(item);
+            }
+          });
         }
+
+        // Strategy 3: If still few results, try with common keywords
+        if (allResults.length < 3) {
+          // Check if query might be a street name
+          const streetKeywords = ['شارع', 'street', 'ش.', 'ش '];
+          const hasStreetKeyword = streetKeywords.some(k => query.includes(k));
+
+          let enhancedQuery = query;
+          if (!hasStreetKeyword && query.length > 2) {
+            // Try adding "شارع" prefix for potential street searches
+            enhancedQuery = `شارع ${query}`;
+          }
+
+          const response3 = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(enhancedQuery)}&countrycodes=eg&limit=5&accept-language=ar&addressdetails=1`
+          );
+          const data3 = await response3.json();
+          data3.forEach((item: SearchPrediction) => {
+            if (!allResults.find(r => r.place_id === item.place_id)) {
+              allResults.push(item);
+            }
+          });
+        }
+
+        // Strategy 4: Search major cities/areas if query matches
+        const majorAreas = [
+          { name: 'القاهرة', lat: '30.0444', lon: '31.2357' },
+          { name: 'الجيزة', lat: '30.0131', lon: '31.2089' },
+          { name: 'الإسكندرية', lat: '31.2001', lon: '29.9187' },
+          { name: 'مدينة نصر', lat: '30.0511', lon: '31.3656' },
+          { name: 'المعادي', lat: '29.9602', lon: '31.2569' },
+          { name: 'مصر الجديدة', lat: '30.0875', lon: '31.3428' },
+          { name: 'الزمالك', lat: '30.0659', lon: '31.2194' },
+          { name: 'المهندسين', lat: '30.0566', lon: '31.2003' },
+          { name: 'الدقي', lat: '30.0392', lon: '31.2125' },
+          { name: '6 أكتوبر', lat: '29.9285', lon: '30.9188' },
+          { name: 'الشيخ زايد', lat: '30.0394', lon: '30.9444' },
+          { name: 'التجمع الخامس', lat: '30.0074', lon: '31.4913' },
+          { name: 'الرحاب', lat: '30.0614', lon: '31.4903' },
+          { name: 'العبور', lat: '30.1736', lon: '31.4736' },
+          { name: 'شبرا', lat: '30.1094', lon: '31.2486' },
+          { name: 'عين شمس', lat: '30.1314', lon: '31.3283' },
+          { name: 'حلوان', lat: '29.8419', lon: '31.3342' },
+          { name: 'المقطم', lat: '30.0108', lon: '31.3019' },
+        ];
+
+        const matchingAreas = majorAreas.filter(area =>
+          area.name.includes(query) || query.includes(area.name)
+        );
+
+        matchingAreas.forEach(area => {
+          if (!allResults.find(r => r.display_name?.includes(area.name))) {
+            allResults.unshift({
+              place_id: `local_${area.name}`,
+              display_name: `${area.name}، القاهرة، مصر`,
+              lat: area.lat,
+              lon: area.lon,
+              type: 'suburb',
+              importance: 0.9
+            });
+          }
+        });
+
+        // Sort by importance and limit to 8 results
+        const sortedResults = allResults
+          .sort((a, b) => (b.importance || 0) - (a.importance || 0))
+          .slice(0, 8);
+
+        setPredictions(sortedResults);
         setShowPredictions(true);
       } catch (error) {
         console.error('Search predictions failed:', error);
@@ -213,7 +292,7 @@ export function LocationPicker({
       } finally {
         setIsLoadingPredictions(false);
       }
-    }, 300); // 300ms debounce
+    }, 400); // 400ms debounce for better API rate limiting
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -253,20 +332,50 @@ export function LocationPicker({
     }
   }, []);
 
-  // Search for location by name
+  // Search for location by name (Egypt only)
   const searchLocation = useCallback(async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
     try {
-      // Search with Egypt bias
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery + ', Egypt')}&limit=5&accept-language=ar`
-      );
-      const data = await response.json();
+      const query = searchQuery.trim();
+      const egyptViewbox = '24.7,22.0,36.9,31.7';
 
-      if (data.length > 0) {
-        const result = data[0];
+      // Try multiple search strategies
+      let result = null;
+
+      // Strategy 1: Direct search with Egypt bounds
+      const response1 = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=1&accept-language=ar`
+      );
+      const data1 = await response1.json();
+      if (data1.length > 0) {
+        result = data1[0];
+      }
+
+      // Strategy 2: Try with "مصر" appended
+      if (!result) {
+        const response2 = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' مصر')}&countrycodes=eg&limit=1&accept-language=ar`
+        );
+        const data2 = await response2.json();
+        if (data2.length > 0) {
+          result = data2[0];
+        }
+      }
+
+      // Strategy 3: Try with "شارع" prefix if might be a street
+      if (!result && !query.includes('شارع')) {
+        const response3 = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent('شارع ' + query + ' مصر')}&countrycodes=eg&limit=1&accept-language=ar`
+        );
+        const data3 = await response3.json();
+        if (data3.length > 0) {
+          result = data3[0];
+        }
+      }
+
+      if (result) {
         const lat = parseFloat(result.lat);
         const lng = parseFloat(result.lon);
         setMapCenter([lat, lng]);
@@ -274,27 +383,8 @@ export function LocationPicker({
           lat,
           lng,
           address: result.display_name,
-          name: searchQuery,
+          name: query,
         });
-      } else {
-        // Try without Egypt if no results
-        const response2 = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&accept-language=ar`
-        );
-        const data2 = await response2.json();
-
-        if (data2.length > 0) {
-          const result = data2[0];
-          const lat = parseFloat(result.lat);
-          const lng = parseFloat(result.lon);
-          setMapCenter([lat, lng]);
-          setSelectedLocation({
-            lat,
-            lng,
-            address: result.display_name,
-            name: searchQuery,
-          });
-        }
       }
     } catch (error) {
       console.error('Search failed:', error);
