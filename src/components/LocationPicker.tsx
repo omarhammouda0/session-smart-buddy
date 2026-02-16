@@ -6,6 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogB
 import { MapPin, Search, Navigation, X, ExternalLink, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Google Places API Key - You need to set this
+// Get your API key from: https://console.cloud.google.com/apis/credentials
+// Enable: Places API, Maps JavaScript API, Geocoding API
+const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
+
 export interface LocationData {
   lat: number;
   lng: number;
@@ -13,7 +18,16 @@ export interface LocationData {
   name?: string;
 }
 
-interface SearchPrediction {
+interface GooglePrediction {
+  place_id: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
+}
+
+interface NominatimPrediction {
   place_id: string;
   display_name: string;
   lat: string;
@@ -21,6 +35,16 @@ interface SearchPrediction {
   type: string;
   importance: number;
 }
+
+type SearchPrediction = {
+  place_id: string;
+  main_text: string;
+  secondary_text: string;
+  description: string;
+  lat?: string;
+  lon?: string;
+  source: 'google' | 'nominatim' | 'local';
+};
 
 interface LocationPickerProps {
   value?: LocationData | null;
@@ -41,19 +65,14 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
   const [MapComponents, setMapComponents] = useState<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Dynamically import Leaflet and react-leaflet
   useEffect(() => {
     let mounted = true;
 
     const loadMap = async () => {
       try {
-        // Import CSS
         await import('leaflet/dist/leaflet.css');
-
-        // Import Leaflet
         const L = await import('leaflet');
-
-        // Fix default marker icon
+        
         delete (L.Icon.Default.prototype as any)._getIconUrl;
         L.Icon.Default.mergeOptions({
           iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -61,7 +80,6 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
           shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
         });
 
-        // Import react-leaflet components
         const RL = await import('react-leaflet');
 
         if (mounted) {
@@ -74,10 +92,7 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
     };
 
     loadMap();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   if (!isLoaded || !MapComponents) {
@@ -93,7 +108,6 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
 
   const { MapContainer, TileLayer, Marker, useMapEvents, useMap } = MapComponents;
 
-  // Inner component for map events - must be inside MapContainer
   function MapEventHandler() {
     useMapEvents({
       click: (e: any) => {
@@ -103,7 +117,6 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
     return null;
   }
 
-  // Inner component for recentering - must be inside MapContainer
   function MapRecenter({ position }: { position: [number, number] }) {
     const map = useMap();
     useEffect(() => {
@@ -132,6 +145,45 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
   );
 }
 
+// Egyptian areas for local fallback
+const EGYPT_AREAS = [
+  { name: 'القاهرة', lat: '30.0444', lon: '31.2357', area: 'مصر' },
+  { name: 'الجيزة', lat: '30.0131', lon: '31.2089', area: 'مصر' },
+  { name: 'الإسكندرية', lat: '31.2001', lon: '29.9187', area: 'مصر' },
+  { name: 'مدينة نصر', lat: '30.0511', lon: '31.3656', area: 'القاهرة' },
+  { name: 'المعادي', lat: '29.9602', lon: '31.2569', area: 'القاهرة' },
+  { name: 'مصر الجديدة', lat: '30.0875', lon: '31.3428', area: 'القاهرة' },
+  { name: 'الزمالك', lat: '30.0659', lon: '31.2194', area: 'القاهرة' },
+  { name: 'المهندسين', lat: '30.0566', lon: '31.2003', area: 'الجيزة' },
+  { name: 'الدقي', lat: '30.0392', lon: '31.2125', area: 'الجيزة' },
+  { name: '6 أكتوبر', lat: '29.9285', lon: '30.9188', area: 'الجيزة' },
+  { name: 'الشيخ زايد', lat: '30.0394', lon: '30.9444', area: 'الجيزة' },
+  { name: 'التجمع الخامس', lat: '30.0074', lon: '31.4913', area: 'القاهرة الجديدة' },
+  { name: 'الرحاب', lat: '30.0614', lon: '31.4903', area: 'القاهرة الجديدة' },
+  { name: 'العبور', lat: '30.1736', lon: '31.4736', area: 'القليوبية' },
+  { name: 'شبرا', lat: '30.1094', lon: '31.2486', area: 'القاهرة' },
+  { name: 'عين شمس', lat: '30.1314', lon: '31.3283', area: 'القاهرة' },
+  { name: 'حلوان', lat: '29.8419', lon: '31.3342', area: 'القاهرة' },
+  { name: 'المقطم', lat: '30.0108', lon: '31.3019', area: 'القاهرة' },
+  { name: 'العجوزة', lat: '30.0578', lon: '31.2089', area: 'الجيزة' },
+  { name: 'فيصل', lat: '29.9869', lon: '31.1494', area: 'الجيزة' },
+  { name: 'الهرم', lat: '29.9792', lon: '31.1342', area: 'الجيزة' },
+  { name: 'شارع التحرير', lat: '30.0444', lon: '31.2357', area: 'وسط البلد، القاهرة' },
+  { name: 'شارع الهرم', lat: '30.0131', lon: '31.2089', area: 'الجيزة' },
+  { name: 'شارع جامعة الدول العربية', lat: '30.0566', lon: '31.2003', area: 'المهندسين' },
+  { name: 'شارع مصطفى النحاس', lat: '30.0511', lon: '31.3456', area: 'مدينة نصر' },
+  { name: 'شارع عباس العقاد', lat: '30.0561', lon: '31.3456', area: 'مدينة نصر' },
+  { name: 'شارع مكرم عبيد', lat: '30.0611', lon: '31.3456', area: 'مدينة نصر' },
+  { name: 'الكوربة', lat: '30.0875', lon: '31.3428', area: 'مصر الجديدة' },
+  { name: 'روكسي', lat: '30.0875', lon: '31.3250', area: 'مصر الجديدة' },
+  { name: 'ميدان التحرير', lat: '30.0444', lon: '31.2357', area: 'وسط البلد' },
+  { name: 'ميدان رمسيس', lat: '30.0619', lon: '31.2467', area: 'القاهرة' },
+  { name: 'شارع 9', lat: '30.0511', lon: '31.3656', area: 'المعادي' },
+  { name: 'المنيل', lat: '30.0167', lon: '31.2333', area: 'القاهرة' },
+  { name: 'جاردن سيتي', lat: '30.0361', lon: '31.2319', area: 'القاهرة' },
+  { name: 'وسط البلد', lat: '30.0500', lon: '31.2500', area: 'القاهرة' },
+];
+
 export function LocationPicker({
   value,
   onChange,
@@ -145,17 +197,15 @@ export function LocationPicker({
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
-    value ? [value.lat, value.lng] : [30.0444, 31.2357] // Default: Cairo, Egypt
+    value ? [value.lat, value.lng] : [30.0444, 31.2357]
   );
 
-  // Search predictions state
   const [predictions, setPredictions] = useState<SearchPrediction[]>([]);
   const [showPredictions, setShowPredictions] = useState(false);
   const [isLoadingPredictions, setIsLoadingPredictions] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const predictionsRef = useRef<HTMLDivElement>(null);
 
-  // Update selected location when value prop changes
   useEffect(() => {
     if (value) {
       setSelectedLocation(value);
@@ -163,19 +213,17 @@ export function LocationPicker({
     }
   }, [value]);
 
-  // Close predictions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (predictionsRef.current && !predictionsRef.current.contains(event.target as Node)) {
         setShowPredictions(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced search for predictions
+  // Search with Google Places API if available, fallback to Nominatim + local
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -190,98 +238,111 @@ export function LocationPicker({
     setIsLoadingPredictions(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const query = searchQuery.trim();
+        const query = searchQuery.trim().toLowerCase();
         const allResults: SearchPrediction[] = [];
 
-        // Strategy 1: Search with Egypt country code and viewbox (Egypt bounding box)
-        // Egypt bounding box: minLon=24.7, minLat=22.0, maxLon=36.9, maxLat=31.7
-        const egyptViewbox = '24.7,22.0,36.9,31.7';
+        // 1. Local Egyptian areas search (fastest, always works)
+        const localMatches = EGYPT_AREAS.filter(area => 
+          area.name.toLowerCase().includes(query) || 
+          query.includes(area.name.toLowerCase()) ||
+          area.name.includes(searchQuery) ||
+          searchQuery.includes(area.name)
+        ).slice(0, 5);
 
-        const response1 = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=5&accept-language=ar&addressdetails=1`
-        );
-        const data1 = await response1.json();
-        allResults.push(...data1);
-
-        // Strategy 2: If few results, try with "Egypt" appended
-        if (allResults.length < 3) {
-          const response2 = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' مصر')}&countrycodes=eg&limit=5&accept-language=ar&addressdetails=1`
-          );
-          const data2 = await response2.json();
-          // Add only unique results
-          data2.forEach((item: SearchPrediction) => {
-            if (!allResults.find(r => r.place_id === item.place_id)) {
-              allResults.push(item);
-            }
+        localMatches.forEach(area => {
+          allResults.push({
+            place_id: `local_${area.name}`,
+            main_text: area.name,
+            secondary_text: area.area + '، مصر',
+            description: `${area.name}، ${area.area}، مصر`,
+            lat: area.lat,
+            lon: area.lon,
+            source: 'local'
           });
-        }
+        });
 
-        // Strategy 3: If still few results, try with common keywords
-        if (allResults.length < 3) {
-          // Check if query might be a street name
-          const streetKeywords = ['شارع', 'street', 'ش.', 'ش '];
-          const hasStreetKeyword = streetKeywords.some(k => query.includes(k));
-
-          let enhancedQuery = query;
-          if (!hasStreetKeyword && query.length > 2) {
-            // Try adding "شارع" prefix for potential street searches
-            enhancedQuery = `شارع ${query}`;
+        // 2. Try Google Places API if key is available
+        if (GOOGLE_PLACES_API_KEY) {
+          try {
+            const googleResponse = await fetch(
+              `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchQuery)}&components=country:eg&language=ar&types=geocode|establishment&key=${GOOGLE_PLACES_API_KEY}`
+            );
+            const googleData = await googleResponse.json();
+            
+            if (googleData.predictions) {
+              googleData.predictions.slice(0, 5).forEach((pred: GooglePrediction) => {
+                if (!allResults.find(r => r.description === pred.description)) {
+                  allResults.push({
+                    place_id: pred.place_id,
+                    main_text: pred.structured_formatting.main_text,
+                    secondary_text: pred.structured_formatting.secondary_text,
+                    description: pred.description,
+                    source: 'google'
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            console.log('Google Places API not available, using fallback');
           }
-
-          const response3 = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(enhancedQuery)}&countrycodes=eg&limit=5&accept-language=ar&addressdetails=1`
-          );
-          const data3 = await response3.json();
-          data3.forEach((item: SearchPrediction) => {
-            if (!allResults.find(r => r.place_id === item.place_id)) {
-              allResults.push(item);
-            }
-          });
         }
 
-        // Strategy 4: Search major cities/areas if query matches
-        const majorAreas = [
-          { name: 'القاهرة', lat: '30.0444', lon: '31.2357' },
-          { name: 'الجيزة', lat: '30.0131', lon: '31.2089' },
-          { name: 'الإسكندرية', lat: '31.2001', lon: '29.9187' },
-          { name: 'مدينة نصر', lat: '30.0511', lon: '31.3656' },
-          { name: 'المعادي', lat: '29.9602', lon: '31.2569' },
-          { name: 'مصر الجديدة', lat: '30.0875', lon: '31.3428' },
-          { name: 'الزمالك', lat: '30.0659', lon: '31.2194' },
-          { name: 'المهندسين', lat: '30.0566', lon: '31.2003' },
-          { name: 'الدقي', lat: '30.0392', lon: '31.2125' },
-          { name: '6 أكتوبر', lat: '29.9285', lon: '30.9188' },
-          { name: 'الشيخ زايد', lat: '30.0394', lon: '30.9444' },
-          { name: 'التجمع الخامس', lat: '30.0074', lon: '31.4913' },
-          { name: 'الرحاب', lat: '30.0614', lon: '31.4903' },
-          { name: 'العبور', lat: '30.1736', lon: '31.4736' },
-          { name: 'شبرا', lat: '30.1094', lon: '31.2486' },
-          { name: 'عين شمس', lat: '30.1314', lon: '31.3283' },
-          { name: 'حلوان', lat: '29.8419', lon: '31.3342' },
-          { name: 'المقطم', lat: '30.0108', lon: '31.3019' },
-        ];
-
-        const matchingAreas = majorAreas.filter(area =>
-          area.name.includes(query) || query.includes(area.name)
+        // 3. Nominatim search for additional results
+        const egyptViewbox = '24.7,22.0,36.9,31.7';
+        
+        // Direct search
+        const response1 = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=5&accept-language=ar&addressdetails=1`
         );
-
-        matchingAreas.forEach(area => {
-          if (!allResults.find(r => r.display_name?.includes(area.name))) {
-            allResults.unshift({
-              place_id: `local_${area.name}`,
-              display_name: `${area.name}، القاهرة، مصر`,
-              lat: area.lat,
-              lon: area.lon,
-              type: 'suburb',
-              importance: 0.9
+        const data1: NominatimPrediction[] = await response1.json();
+        
+        data1.forEach(item => {
+          const mainText = item.display_name.split(',')[0];
+          const secondaryText = item.display_name.split(',').slice(1, 3).join(',');
+          if (!allResults.find(r => r.main_text === mainText)) {
+            allResults.push({
+              place_id: item.place_id,
+              main_text: mainText,
+              secondary_text: secondaryText,
+              description: item.display_name,
+              lat: item.lat,
+              lon: item.lon,
+              source: 'nominatim'
             });
           }
         });
 
-        // Sort by importance and limit to 8 results
+        // Try with شارع prefix if few results
+        if (allResults.length < 5 && !searchQuery.includes('شارع')) {
+          const response2 = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent('شارع ' + searchQuery)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=3&accept-language=ar`
+          );
+          const data2: NominatimPrediction[] = await response2.json();
+          
+          data2.forEach(item => {
+            const mainText = item.display_name.split(',')[0];
+            const secondaryText = item.display_name.split(',').slice(1, 3).join(',');
+            if (!allResults.find(r => r.main_text === mainText)) {
+              allResults.push({
+                place_id: item.place_id,
+                main_text: mainText,
+                secondary_text: secondaryText,
+                description: item.display_name,
+                lat: item.lat,
+                lon: item.lon,
+                source: 'nominatim'
+              });
+            }
+          });
+        }
+
+        // Sort: local first, then by relevance
         const sortedResults = allResults
-          .sort((a, b) => (b.importance || 0) - (a.importance || 0))
+          .sort((a, b) => {
+            if (a.source === 'local' && b.source !== 'local') return -1;
+            if (b.source === 'local' && a.source !== 'local') return 1;
+            return 0;
+          })
           .slice(0, 8);
 
         setPredictions(sortedResults);
@@ -292,7 +353,7 @@ export function LocationPicker({
       } finally {
         setIsLoadingPredictions(false);
       }
-    }, 400); // 400ms debounce for better API rate limiting
+    }, 350);
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -301,24 +362,48 @@ export function LocationPicker({
     };
   }, [searchQuery]);
 
-  // Select a prediction
-  const selectPrediction = useCallback((prediction: SearchPrediction) => {
-    const lat = parseFloat(prediction.lat);
-    const lng = parseFloat(prediction.lon);
-
-    setMapCenter([lat, lng]);
-    setSelectedLocation({
-      lat,
-      lng,
-      address: prediction.display_name,
-      name: prediction.display_name.split(',')[0],
-    });
-    setSearchQuery(prediction.display_name.split(',')[0]);
+  const selectPrediction = useCallback(async (prediction: SearchPrediction) => {
     setShowPredictions(false);
     setPredictions([]);
+    setSearchQuery(prediction.main_text);
+
+    // If we have coordinates, use them directly
+    if (prediction.lat && prediction.lon) {
+      const lat = parseFloat(prediction.lat);
+      const lng = parseFloat(prediction.lon);
+      setMapCenter([lat, lng]);
+      setSelectedLocation({
+        lat,
+        lng,
+        address: prediction.description,
+        name: prediction.main_text,
+      });
+      return;
+    }
+
+    // For Google Places results, get coordinates using Geocoding
+    if (prediction.source === 'google' && GOOGLE_PLACES_API_KEY) {
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?place_id=${prediction.place_id}&key=${GOOGLE_PLACES_API_KEY}`
+        );
+        const data = await response.json();
+        if (data.results?.[0]?.geometry?.location) {
+          const { lat, lng } = data.results[0].geometry.location;
+          setMapCenter([lat, lng]);
+          setSelectedLocation({
+            lat,
+            lng,
+            address: prediction.description,
+            name: prediction.main_text,
+          });
+        }
+      } catch (e) {
+        console.error('Failed to get coordinates:', e);
+      }
+    }
   }, []);
 
-  // Reverse geocode to get address from coordinates
   const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
     try {
       const response = await fetch(
@@ -332,57 +417,49 @@ export function LocationPicker({
     }
   }, []);
 
-  // Search for location by name (Egypt only)
   const searchLocation = useCallback(async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
+    setShowPredictions(false);
+    
     try {
       const query = searchQuery.trim();
       const egyptViewbox = '24.7,22.0,36.9,31.7';
-
-      // Try multiple search strategies
-      let result = null;
-
-      // Strategy 1: Direct search with Egypt bounds
-      const response1 = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=1&accept-language=ar`
+      
+      // Check local areas first
+      const localMatch = EGYPT_AREAS.find(area => 
+        area.name === query || area.name.includes(query) || query.includes(area.name)
       );
-      const data1 = await response1.json();
-      if (data1.length > 0) {
-        result = data1[0];
-      }
-
-      // Strategy 2: Try with "مصر" appended
-      if (!result) {
-        const response2 = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' مصر')}&countrycodes=eg&limit=1&accept-language=ar`
-        );
-        const data2 = await response2.json();
-        if (data2.length > 0) {
-          result = data2[0];
-        }
-      }
-
-      // Strategy 3: Try with "شارع" prefix if might be a street
-      if (!result && !query.includes('شارع')) {
-        const response3 = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent('شارع ' + query + ' مصر')}&countrycodes=eg&limit=1&accept-language=ar`
-        );
-        const data3 = await response3.json();
-        if (data3.length > 0) {
-          result = data3[0];
-        }
-      }
-
-      if (result) {
-        const lat = parseFloat(result.lat);
-        const lng = parseFloat(result.lon);
+      
+      if (localMatch) {
+        const lat = parseFloat(localMatch.lat);
+        const lng = parseFloat(localMatch.lon);
         setMapCenter([lat, lng]);
         setSelectedLocation({
           lat,
           lng,
-          address: result.display_name,
+          address: `${localMatch.name}، ${localMatch.area}، مصر`,
+          name: localMatch.name,
+        });
+        setIsSearching(false);
+        return;
+      }
+
+      // Try Nominatim search
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=1&accept-language=ar`
+      );
+      const data = await response.json();
+      
+      if (data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        setMapCenter([lat, lng]);
+        setSelectedLocation({
+          lat,
+          lng,
+          address: data[0].display_name,
           name: query,
         });
       }
@@ -393,7 +470,6 @@ export function LocationPicker({
     }
   }, [searchQuery]);
 
-  // Get current location using browser geolocation
   const getCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
       alert('المتصفح لا يدعم تحديد الموقع');
@@ -421,48 +497,32 @@ export function LocationPicker({
         console.error('Geolocation error:', error);
         alert('فشل في تحديد الموقع. تأكد من السماح بالوصول للموقع.');
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, [reverseGeocode]);
 
-  // Handle map click
   const handleMapClick = useCallback(async (lat: number, lng: number) => {
     setIsLoadingAddress(true);
     const address = await reverseGeocode(lat, lng);
     setIsLoadingAddress(false);
-
-    setSelectedLocation({
-      lat,
-      lng,
-      address,
-    });
+    setSelectedLocation({ lat, lng, address });
   }, [reverseGeocode]);
 
-  // Confirm selection
   const handleConfirm = useCallback(() => {
     onChange(selectedLocation);
     setIsOpen(false);
   }, [onChange, selectedLocation]);
 
-  // Clear selection
   const handleClear = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onChange(null);
     setSelectedLocation(null);
   }, [onChange]);
 
-  // Open location in Google Maps
   const openInGoogleMaps = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (value) {
-      window.open(
-        `https://www.google.com/maps?q=${value.lat},${value.lng}`,
-        '_blank'
-      );
+      window.open(`https://www.google.com/maps?q=${value.lat},${value.lng}`, '_blank');
     }
   }, [value]);
 
@@ -520,11 +580,10 @@ export function LocationPicker({
           </DialogHeader>
 
           <DialogBody className="space-y-4">
-            {/* Search bar with predictions */}
             <div className="flex gap-2">
               <div className="flex-1 relative" ref={predictionsRef}>
                 <Input
-                  placeholder="ابحث عن مكان (مثل: شارع التحرير، مدينة نصر...)"
+                  placeholder="ابحث عن مكان (مثل: شارع التحرير، مدينة نصر، المعادي...)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -546,14 +605,12 @@ export function LocationPicker({
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 
-                {/* Loading indicator */}
                 {isLoadingPredictions && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                 )}
 
-                {/* Predictions dropdown */}
                 {showPredictions && predictions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-[200px] overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-[250px] overflow-y-auto">
                     {predictions.map((prediction, index) => (
                       <button
                         key={prediction.place_id || index}
@@ -564,21 +621,28 @@ export function LocationPicker({
                         )}
                         onClick={() => selectPrediction(prediction)}
                       >
-                        <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                        <MapPin className={cn(
+                          "h-4 w-4 mt-0.5 shrink-0",
+                          prediction.source === 'local' ? "text-green-500" : "text-primary"
+                        )} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {prediction.display_name.split(',')[0]}
+                            {prediction.main_text}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {prediction.display_name.split(',').slice(1, 3).join(',')}
+                            {prediction.secondary_text}
                           </p>
                         </div>
+                        {prediction.source === 'local' && (
+                          <span className="text-[10px] bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded">
+                            مقترح
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
                 )}
 
-                {/* No results message */}
                 {showPredictions && searchQuery.length >= 2 && predictions.length === 0 && !isLoadingPredictions && (
                   <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg p-3 text-center text-sm text-muted-foreground">
                     لا توجد نتائج لـ "{searchQuery}"
@@ -609,7 +673,6 @@ export function LocationPicker({
               </Button>
             </div>
 
-            {/* Map */}
             <div className="h-[250px] sm:h-[350px] rounded-lg overflow-hidden border relative">
               <LazyMapComponent
                 center={mapCenter}
@@ -631,7 +694,6 @@ export function LocationPicker({
               اضغط على الخريطة لتحديد الموقع، أو استخدم البحث أو موقعك الحالي
             </p>
 
-            {/* Selected location info */}
             {selectedLocation && (
               <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
                 <p className="font-medium flex items-center gap-2">
@@ -660,7 +722,7 @@ export function LocationPicker({
   );
 }
 
-// Simple display component for showing a location (used in cards, lists)
+// Simple display component
 interface LocationDisplayProps {
   location: LocationData;
   compact?: boolean;
@@ -669,10 +731,7 @@ interface LocationDisplayProps {
 
 export function LocationDisplay({ location, compact = false, showOpenButton = true }: LocationDisplayProps) {
   const openInMaps = () => {
-    window.open(
-      `https://www.google.com/maps?q=${location.lat},${location.lng}`,
-      '_blank'
-    );
+    window.open(`https://www.google.com/maps?q=${location.lat},${location.lng}`, '_blank');
   };
 
   if (compact) {
@@ -698,12 +757,7 @@ export function LocationDisplay({ location, compact = false, showOpenButton = tr
         {location.name || location.address?.split(',')[0] || 'موقع محدد'}
       </span>
       {showOpenButton && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs"
-          onClick={openInMaps}
-        >
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={openInMaps}>
           <ExternalLink className="h-3 w-3 ml-1" />
           خريطة
         </Button>
@@ -713,4 +767,4 @@ export function LocationDisplay({ location, compact = false, showOpenButton = tr
 }
 
 export default LocationPicker;
-
+
