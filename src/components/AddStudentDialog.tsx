@@ -83,8 +83,12 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   
   const { checkConflict } = useConflictDetection(students);
 
-  // Get scheduling suggestions based on existing students
-  const schedulingSuggestions = useSchedulingSuggestions(students, sessionType);
+  // Get scheduling suggestions based on existing students and location
+  const schedulingSuggestions = useSchedulingSuggestions(
+    students,
+    sessionType,
+    sessionType === 'onsite' ? location : null
+  );
 
   // Get effective days from daySchedules
   const effectiveDaysFromSchedules = useMemo(() => {
@@ -594,6 +598,59 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
                                 </span>
                               ))}
                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Proximity Suggestions - Nearby Students (only for onsite with location) */}
+              {sessionType === 'onsite' && location && schedulingSuggestions.proximitySuggestions && schedulingSuggestions.proximitySuggestions.length > 0 && (
+                <div className="p-3 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-2 flex-1">
+                      <p className="font-medium text-amber-700 dark:text-amber-300 text-sm">📍 طلاب قريبون - وفر وقت التنقل</p>
+                      <div className="space-y-1.5">
+                        {schedulingSuggestions.proximitySuggestions.slice(0, 2).map((suggestion, i) => (
+                          <div
+                            key={`prox-${i}`}
+                            className="p-2 rounded-md bg-white/50 dark:bg-black/20"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                  {suggestion.nearbyStudent}
+                                </span>
+                                <span className="text-xs text-amber-600 dark:text-amber-400">
+                                  ({suggestion.dayName})
+                                </span>
+                                <span className="text-[10px] bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                                  {suggestion.distanceKm.toFixed(1)} كم
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Add this day and set the suggested time
+                                  const existingSchedule = daySchedules.find(d => d.dayOfWeek === suggestion.dayOfWeek);
+                                  if (!existingSchedule) {
+                                    setDaySchedules(prev => [...prev, { dayOfWeek: suggestion.dayOfWeek, time: suggestion.suggestedTime }].sort((a, b) => a.dayOfWeek - b.dayOfWeek));
+                                  } else if (!existingSchedule.time) {
+                                    updateDayTime(suggestion.dayOfWeek, suggestion.suggestedTime);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70 transition-colors"
+                              >
+                                <Clock className="h-3 w-3" />
+                                {suggestion.suggestedTimeAr}
+                              </button>
+                            </div>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              {suggestion.reason}
+                            </p>
                           </div>
                         ))}
                       </div>

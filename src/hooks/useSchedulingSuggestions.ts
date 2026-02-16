@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Student, SessionType } from '@/types/student';
+import { Student, SessionType, Location as StudentLocation } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 
 // Types for scheduling suggestions
@@ -10,6 +10,20 @@ export type SuggestionType =
   | 'busy_day'           // Day with 5+ sessions - avoid
   | 'same_type_cluster'  // Day has same session type - efficient
   | 'mixed_type';        // Day has both online/onsite - less efficient
+
+// Proximity-based suggestion (nearby students)
+export interface ProximitySuggestion {
+  dayOfWeek: number;
+  dayName: string;
+  nearbyStudent: string;
+  nearbyStudentTime: string;
+  nearbyStudentTimeAr: string;
+  suggestedTime: string;
+  suggestedTimeAr: string;
+  distanceKm: number;
+  placement: 'before' | 'after';
+  reason: string;
+}
 
 export type SuggestionPriority = 'high' | 'medium' | 'low';
 
@@ -40,6 +54,9 @@ export interface DaySuggestion {
   travelConsideration?: string;
   consecutiveWarning?: string;     // Warning about back-to-back sessions
   energyTip?: string;              // Tip about energy levels
+  // Session type dominance
+  onsiteDominant?: boolean;        // Day has 60%+ onsite sessions
+  onlineDominant?: boolean;        // Day has 60%+ online sessions
 }
 
 // Peak hour analysis
@@ -99,9 +116,11 @@ export interface SchedulingSuggestions {
     longestStreak: number;
   };
   smartRecommendations: string[];
-  // NEW: Similar student grouping
+  // Similar student grouping
   similarStudents: SimilarStudentMatch[];
   groupingSuggestions: GroupingSuggestion[];
+  // NEW: Proximity-based suggestions
+  proximitySuggestions: ProximitySuggestion[];
 }
 
 // Threshold for busy day
@@ -152,6 +171,8 @@ interface ScheduledSession {
   duration: number;
   type: SessionType;
   studentName: string;
+  studentId?: string;
+  location?: StudentLocation;
 }
 
 interface DayStats {
@@ -160,6 +181,101 @@ interface DayStats {
   onlineSessions: number;
   onsiteSessions: number;
   scheduledSessions: ScheduledSession[];
+}
+
+/**
+ * Calculate distance between two locations using Haversine formula
+ * Returns distance in kilometers
+ */
+function calculateDistanceKm(loc1: StudentLocation, loc2: StudentLocation): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
+  const dLon = (loc2.lng - loc1.lng) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Find proximity-based suggestions for nearby onsite students
+ */
+function findProximitySuggestions(
+  students: Student[],
+  newLocation: StudentLocation | null | undefined,
+  dayStats: DayStats[]
+): ProximitySuggestion[] {
+  if (!newLocation) return [];
+
+  const suggestions: ProximitySuggestion[] = [];
+  const NEARBY_THRESHOLD_KM = 5; // 5km radius
+
+  // Find onsite students with locations
+  const onsiteStudentsWithLocation = students.filter(s =>
+    s.sessionType === 'onsite' && s.location
+  );
+
+  if (onsiteStudentsWithLocation.length === 0) return [];
+
+  // Check each day for nearby students
+  dayStats.forEach(day => {
+    const onsiteSessions = day.scheduledSessions.filter(s =>
+      s.type === 'onsite' && s.location
+    );
+
+    onsiteSessions.forEach(session => {
+      if (!session.location) return;
+
+      const distance = calculateDistanceKm(newLocation, session.location);
+
+      if (distance <= NEARBY_THRESHOLD_KM) {
+        const sessionTime = timeToMinutes(session.time);
+        const sessionEnd = sessionTime + session.duration;
+
+        // Suggest time before (with 30 min travel buffer)
+        const beforeTime = sessionTime - 90; // 1.5 hours before
+        // Suggest time after (with 30 min travel buffer)
+        const afterTime = sessionEnd + 30; // 30 min after
+
+        // Check which slot is better
+        if (beforeTime >= 8 * 60) { // After 8 AM
+          suggestions.push({
+            dayOfWeek: day.dayOfWeek,
+            dayName: DAY_NAMES_AR[day.dayOfWeek],
+            nearbyStudent: session.studentName,
+            nearbyStudentTime: session.time,
+            nearbyStudentTimeAr: formatTimeAr(session.time),
+            suggestedTime: minutesToTime(beforeTime),
+            suggestedTimeAr: formatTimeAr(minutesToTime(beforeTime)),
+            distanceKm: distance,
+            placement: 'before',
+            reason: `📍 قريب من ${session.studentName} (${distance.toFixed(1)} كم) - قبل جلسته`,
+          });
+        }
+
+        if (afterTime <= 21 * 60) { // Before 9 PM
+          suggestions.push({
+            dayOfWeek: day.dayOfWeek,
+            dayName: DAY_NAMES_AR[day.dayOfWeek],
+            nearbyStudent: session.studentName,
+            nearbyStudentTime: session.time,
+            nearbyStudentTimeAr: formatTimeAr(session.time),
+            suggestedTime: minutesToTime(afterTime),
+            suggestedTimeAr: formatTimeAr(minutesToTime(afterTime)),
+            distanceKm: distance,
+            placement: 'after',
+            reason: `📍 قريب من ${session.studentName} (${distance.toFixed(1)} كم) - بعد جلسته`,
+          });
+        }
+      }
+    });
+  });
+
+  // Sort by distance (closest first) and limit to 2 suggestions
+  return suggestions
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .slice(0, 2);
 }
 
 /**
@@ -420,7 +536,8 @@ function generateGroupingSuggestions(
  */
 export const useSchedulingSuggestions = (
   students: Student[],
-  newSessionType: SessionType | null
+  newSessionType: SessionType | null,
+  newLocation?: StudentLocation | null
 ): SchedulingSuggestions => {
   return useMemo(() => {
     // Analyze each day of the week
@@ -450,6 +567,8 @@ export const useSchedulingSuggestions = (
           duration,
           type: student.sessionType,
           studentName: student.name,
+          studentId: student.id,
+          location: student.location,
         });
       });
     });
@@ -596,6 +715,41 @@ export const useSchedulingSuggestions = (
         }
       }
 
+      // RULE 9: Session type dominance (60% threshold)
+      if (day.totalSessions >= 2) {
+        const onsiteRatio = day.onsiteSessions / day.totalSessions;
+        const onlineRatio = day.onlineSessions / day.totalSessions;
+
+        suggestion.onsiteDominant = onsiteRatio >= 0.6;
+        suggestion.onlineDominant = onlineRatio >= 0.6;
+
+        // Smart warning: adding opposite type to dominant day
+        if (newSessionType === 'onsite' && suggestion.onlineDominant && !suggestion.isWarning) {
+          suggestion.travelConsideration = '💻 يوم أغلبه أونلاين - يفضل إبقاؤه للجلسات الأونلاين';
+          suggestion.isRecommended = false;
+          suggestion.priority = 'low';
+        }
+
+        // Smart recommendation: adding same type to dominant day
+        if (newSessionType === 'onsite' && suggestion.onsiteDominant && !suggestion.isWarning) {
+          suggestion.travelConsideration = '🚗 يوم أغلبه حضوري - مناسب لتقليل التنقل';
+          suggestion.isRecommended = true;
+          suggestion.priority = 'high';
+        }
+
+        if (newSessionType === 'online' && suggestion.onsiteDominant && !suggestion.isWarning) {
+          suggestion.travelConsideration = '🏠 يوم أغلبه حضوري - يفضل إبقاؤه للجلسات الحضورية';
+          suggestion.isRecommended = false;
+          suggestion.priority = 'low';
+        }
+
+        if (newSessionType === 'online' && suggestion.onlineDominant && !suggestion.isWarning) {
+          suggestion.travelConsideration = '💻 يوم أغلبه أونلاين - مناسب للتنظيم';
+          suggestion.isRecommended = true;
+          suggestion.priority = 'high';
+        }
+      }
+
       return suggestion;
     });
 
@@ -696,6 +850,11 @@ export const useSchedulingSuggestions = (
     // Generate grouping suggestions
     const groupingSuggestions = generateGroupingSuggestions(students, newSessionType, dayStats);
 
+    // Generate proximity suggestions for nearby onsite students
+    const proximitySuggestions = newSessionType === 'onsite'
+      ? findProximitySuggestions(students, newLocation, dayStats)
+      : [];
+
     return {
       daySuggestions,
       bestDays,
@@ -713,8 +872,9 @@ export const useSchedulingSuggestions = (
       smartRecommendations,
       similarStudents,
       groupingSuggestions,
+      proximitySuggestions,
     };
-  }, [students, newSessionType]);
+  }, [students, newSessionType, newLocation]);
 };
 
 /**
