@@ -4,12 +4,35 @@
 
 The system automatically sends WhatsApp reminders to students (or their parents) before their scheduled sessions. This works **even when the app is closed** because it runs server-side via Supabase Edge Functions + pg_cron.
 
+**Version 6.0**: 
+- Added **Meta WhatsApp Cloud API** support (FREE - 1000 conversations/month)
+- Multi-provider support: Meta (default) or Twilio
+- More reliable and cost-effective than Twilio sandbox
+
 **Version 5.0**: 
 - Added **GROUP SESSION reminders** - sends to all active group members
 - Changed timezone from Germany to **Egypt (UTC+2)**
 - Improved template handling for group sessions
 
-**Version 3.1**: Fixed template selection bug - now uses specific time windows instead of gap-filling.
+---
+
+## WhatsApp Providers
+
+| Provider | Cost | Setup | Best For |
+|----------|------|-------|----------|
+| **Meta Cloud API** (Default) | FREE (1000 conv/month) | Facebook Developer Account | Production use |
+| **Twilio** | Paid / Sandbox limits | Twilio Account | Legacy/backup |
+
+### Meta WhatsApp Cloud API Setup
+
+1. Go to [Facebook Developers](https://developers.facebook.com/)
+2. Create an App → Select "Business" type
+3. Add WhatsApp product
+4. Get your **Phone Number ID** and **Access Token**
+5. Add to Supabase secrets:
+   - `WHATSAPP_PROVIDER=meta`
+   - `META_WHATSAPP_TOKEN=your_token`
+   - `META_WHATSAPP_PHONE_ID=your_phone_id`
 
 ---
 
@@ -23,7 +46,7 @@ The system automatically sends WhatsApp reminders to students (or their parents)
 │          ├── Finds PRIVATE sessions within reminder window  │
 │          ├── Finds GROUP sessions within reminder window    │
 │          ├── Checks reminder_log for duplicates             │
-│          └── Sends WhatsApp DIRECTLY via Twilio API         │
+│          └── Sends WhatsApp via Meta API or Twilio          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -212,9 +235,38 @@ SELECT * FROM cron.job WHERE jobname = 'auto-session-reminder-job';
 
 ## Requirements
 
-- ✅ Twilio account configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM)
+### For Meta WhatsApp Cloud API (Recommended):
+- ✅ Meta WhatsApp configured (META_WHATSAPP_TOKEN, META_WHATSAPP_PHONE_ID)
+- ✅ WHATSAPP_PROVIDER=meta (or not set, as meta is default)
 - ✅ pg_cron extension enabled
-- ✅ pg_net extension enabled
 - ✅ Edge functions deployed
 - ✅ Cron job scheduled
+
+### For Twilio (Legacy):
+- ✅ Twilio account configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM)
+- ✅ WHATSAPP_PROVIDER=twilio
+- ✅ pg_cron extension enabled
+- ✅ Edge functions deployed
+- ✅ Cron job scheduled
+
+---
+
+## Supabase Secrets Configuration
+
+Add these in **Supabase Dashboard → Settings → Edge Functions → Secrets**:
+
+### Meta (Recommended):
+```
+WHATSAPP_PROVIDER=meta
+META_WHATSAPP_TOKEN=EAAXhmf3dpvwBQ...
+META_WHATSAPP_PHONE_ID=998582473338868
+```
+
+### Twilio (Alternative):
+```
+WHATSAPP_PROVIDER=twilio
+TWILIO_ACCOUNT_SID=ACxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxx
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+```
 

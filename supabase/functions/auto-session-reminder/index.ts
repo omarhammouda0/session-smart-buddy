@@ -1,13 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Auto Session Reminder - v5.0
+// Auto Session Reminder - v6.0
 // Runs on schedule (pg_cron) to send dual WhatsApp reminders at configurable intervals
+// UPDATED v6.0: Multi-provider support - Meta WhatsApp Cloud API (FREE) or Twilio
 // UPDATED v5.0: Added GROUP SESSION reminders - sends to all group members
 // UPDATED v4.0: Supports multiple users - processes each user's settings and sessions separately
 // This ensures reminders work even when the app is closed
 
-// Twilio credentials - must be configured in Supabase secrets
+// ============================================
+// PROVIDER CONFIGURATION
+// ============================================
+// Set WHATSAPP_PROVIDER to 'meta' (default, FREE) or 'twilio'
+const WHATSAPP_PROVIDER = Deno.env.get("WHATSAPP_PROVIDER") || "meta";
+
+// Meta WhatsApp Cloud API credentials (FREE - 1000 conversations/month)
+const META_WHATSAPP_TOKEN = Deno.env.get("META_WHATSAPP_TOKEN");
+const META_WHATSAPP_PHONE_ID = Deno.env.get("META_WHATSAPP_PHONE_ID");
+const META_WHATSAPP_VERSION = "v18.0";
+
+// Twilio credentials (legacy/backup)
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
 const TWILIO_WHATSAPP_FROM = Deno.env.get("TWILIO_WHATSAPP_FROM") || "whatsapp:+14155238886";
@@ -51,23 +63,75 @@ function getEgyptTimeComponents(date: Date): { hours: number; minutes: number; d
   };
 }
 
-// Format phone number for WhatsApp
-function formatPhoneForWhatsApp(phone: string): string {
+// Format phone number for international format
+function formatPhoneNumber(phone: string): string {
   let formatted = phone.replace(/[^\d+]/g, "");
   if (formatted.startsWith("0")) {
     formatted = "20" + formatted.substring(1); // Egypt default
   }
   formatted = formatted.replace("+", "");
-  return `whatsapp:+${formatted}`;
+  return formatted;
 }
 
-// Send WhatsApp message via Twilio directly (not through another edge function)
-async function sendWhatsAppMessage(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
+// ============================================
+// META WHATSAPP CLOUD API (FREE)
+// ============================================
+async function sendViaMeta(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
+  if (!META_WHATSAPP_TOKEN || !META_WHATSAPP_PHONE_ID) {
+    return { success: false, error: "Meta WhatsApp credentials not configured (META_WHATSAPP_TOKEN, META_WHATSAPP_PHONE_ID)" };
+  }
+
+  const formattedPhone = formatPhoneNumber(phone);
+  const metaUrl = `https://graph.facebook.com/${META_WHATSAPP_VERSION}/${META_WHATSAPP_PHONE_ID}/messages`;
+
+  try {
+    console.log(`[Meta] Sending to +${formattedPhone.substring(0, 6)}***`);
+
+    const response = await fetch(metaUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${META_WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: formattedPhone,
+        type: "text",
+        text: {
+          preview_url: false,
+          body: message
+        }
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMsg = data.error?.message || data.error?.error_user_msg || `Meta API error: ${response.status}`;
+      console.error(`[Meta] Error: ${errorMsg}`);
+      return { success: false, error: errorMsg };
+    }
+
+    const messageId = data.messages?.[0]?.id;
+    console.log(`[Meta] Success: ${messageId}`);
+    return { success: true, messageSid: messageId };
+  } catch (err) {
+    console.error(`[Meta] Exception: ${err}`);
+    return { success: false, error: String(err) };
+  }
+}
+
+// ============================================
+// TWILIO (Legacy/Backup)
+// ============================================
+async function sendViaTwilio(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string }> {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
     return { success: false, error: "Twilio credentials not configured" };
   }
 
-  const whatsappTo = formatPhoneForWhatsApp(phone);
+  const formattedPhone = formatPhoneNumber(phone);
+  const whatsappTo = `whatsapp:+${formattedPhone}`;
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
   const authHeader = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
 
@@ -81,7 +145,7 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<{ su
   formData.append("Body", message);
 
   try {
-    console.log(`Sending WhatsApp to ${whatsappTo.substring(0, 15)}...`);
+    console.log(`[Twilio] Sending to ${whatsappTo.substring(0, 15)}***`);
 
     const response = await fetch(twilioUrl, {
       method: "POST",
@@ -108,6 +172,42 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<{ su
     return { success: true, messageSid: data.sid };
   } catch (err) {
     return { success: false, error: String(err) };
+  }
+}
+
+// ============================================
+// UNIFIED SEND FUNCTION
+// ============================================
+async function sendWhatsAppMessage(phone: string, message: string): Promise<{ success: boolean; messageSid?: string; error?: string; provider?: string }> {
+  const provider = WHATSAPP_PROVIDER.toLowerCase();
+
+  console.log(`Using provider: ${provider}`);
+
+  if (provider === "twilio") {
+    const result = await sendViaTwilio(phone, message);
+    return { ...result, provider: "twilio" };
+  } else {
+    // Default to Meta (FREE)
+    const result = await sendViaMeta(phone, message);
+    return { ...result, provider: "meta" };
+  }
+}
+
+// Check if provider is configured
+function isProviderConfigured(): { ok: boolean; provider: string; error?: string } {
+  const provider = WHATSAPP_PROVIDER.toLowerCase();
+
+  if (provider === "twilio") {
+    if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
+      return { ok: true, provider: "twilio" };
+    }
+    return { ok: false, provider: "twilio", error: "TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN required" };
+  } else {
+    // Meta is default
+    if (META_WHATSAPP_TOKEN && META_WHATSAPP_PHONE_ID) {
+      return { ok: true, provider: "meta" };
+    }
+    return { ok: false, provider: "meta", error: "META_WHATSAPP_TOKEN and META_WHATSAPP_PHONE_ID required" };
   }
 }
 
@@ -144,7 +244,7 @@ serve(async (req) => {
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  console.log("=== Auto Session Reminder v5.0 (Multi-User + Group Support) ===");
+  console.log("=== Auto Session Reminder v6.0 (Meta/Twilio + Groups) ===");
 
   try {
     const now = new Date();
@@ -153,15 +253,16 @@ serve(async (req) => {
     console.log(`UTC: ${now.toISOString()}`);
     console.log(`Egypt: ${egyptNow.dateStr} ${String(egyptNow.hours).padStart(2, '0')}:${String(egyptNow.minutes).padStart(2, '0')}`);
 
-    // Check Twilio credentials early
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-      console.error("❌ Twilio credentials not configured - cannot send reminders");
+    // Check WhatsApp provider configuration
+    const providerCheck = isProviderConfigured();
+    if (!providerCheck.ok) {
+      console.error(`❌ ${providerCheck.error}`);
       return new Response(
-        JSON.stringify({ success: false, error: "Twilio credentials not configured" }),
+        JSON.stringify({ success: false, error: providerCheck.error }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    console.log("✓ Twilio credentials configured");
+    console.log(`✓ WhatsApp provider configured: ${providerCheck.provider}`);
 
     // Fetch ALL users' reminder settings (not just 'default')
     const { data: allSettings, error: settingsError } = await supabase
