@@ -313,8 +313,17 @@ export const CalendarView = ({
     let completedSessions = 0;
     let cancelledSessions = 0;
     let scheduledSessions = 0;
+    let vacationSessions = 0;
     let totalMinutes = 0;
-    const studentStats = new Map<string, { name: string; sessions: number; hours: number }>();
+
+    // Separate tracking for groups
+    let groupTotalMembers = 0;
+    let groupCompletedMembers = 0;
+    let groupScheduledMembers = 0;
+    let groupCancelledMembers = 0;
+    let groupVacationMembers = 0;
+
+    const studentStats = new Map<string, { name: string; sessions: number; hours: number; isGroup?: boolean }>();
 
     days.forEach((day) => {
       const dateStr = format(day, "yyyy-MM-dd");
@@ -322,33 +331,83 @@ export const CalendarView = ({
 
       if (isInCurrentPeriod) {
         const daySessions = sessionsByDate.get(dateStr) || [];
-        daySessions.forEach(({ session, student }) => {
-          totalSessions++;
+        daySessions.forEach(({ session, student, isGroup, group }) => {
           const duration = session.duration || student.sessionDuration || 60;
 
-          if (session.status === "completed") {
-            completedSessions++;
-            totalMinutes += duration;
-          } else if (session.status === "cancelled") {
-            cancelledSessions++;
-          } else if (session.status === "scheduled") {
-            scheduledSessions++;
-            totalMinutes += duration;
-          }
+          if (isGroup && group) {
+            // For group sessions, count each active member
+            const activeMembers = group.members.filter(m => m.isActive);
+            const groupSession = group.sessions.find(gs => gs.date === dateStr);
 
-          // Track per-student stats
-          const existing = studentStats.get(student.id) || { name: student.name, sessions: 0, hours: 0 };
-          existing.sessions++;
-          if (session.status !== "cancelled") {
-            existing.hours += duration / 60;
+            activeMembers.forEach(member => {
+              groupTotalMembers++;
+
+              // Check member's individual attendance status
+              const attendance = groupSession?.memberAttendance?.find(
+                a => a.memberId === member.studentId
+              );
+              const memberStatus = attendance?.status || session.status;
+
+              if (memberStatus === "completed") {
+                groupCompletedMembers++;
+                totalMinutes += duration;
+              } else if (memberStatus === "cancelled") {
+                groupCancelledMembers++;
+              } else if (memberStatus === "vacation") {
+                groupVacationMembers++;
+              } else if (memberStatus === "scheduled") {
+                groupScheduledMembers++;
+                totalMinutes += duration;
+              }
+            });
+
+            // Track group stats (as a single entry)
+            const existing = studentStats.get(student.id) || { name: student.name, sessions: 0, hours: 0, isGroup: true };
+            existing.sessions++;
+            if (session.status !== "cancelled" && session.status !== "vacation") {
+              existing.hours += duration / 60;
+            }
+            studentStats.set(student.id, existing);
+          } else {
+            // Individual sessions
+            totalSessions++;
+
+            if (session.status === "completed") {
+              completedSessions++;
+              totalMinutes += duration;
+            } else if (session.status === "cancelled") {
+              cancelledSessions++;
+            } else if (session.status === "vacation") {
+              vacationSessions++;
+            } else if (session.status === "scheduled") {
+              scheduledSessions++;
+              totalMinutes += duration;
+            }
+
+            // Track per-student stats
+            const existing = studentStats.get(student.id) || { name: student.name, sessions: 0, hours: 0 };
+            existing.sessions++;
+            if (session.status !== "cancelled" && session.status !== "vacation") {
+              existing.hours += duration / 60;
+            }
+            studentStats.set(student.id, existing);
           }
-          studentStats.set(student.id, existing);
         });
       }
     });
 
+    // Combined totals (individual + group members)
+    const combinedTotal = totalSessions + groupTotalMembers;
+    const combinedCompleted = completedSessions + groupCompletedMembers;
+    const combinedCancelled = cancelledSessions + groupCancelledMembers;
+    const combinedVacation = vacationSessions + groupVacationMembers;
+    const combinedScheduled = scheduledSessions + groupScheduledMembers;
+
     const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
-    const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+    // Completion rate: completed / (completed + scheduled) - excludes cancelled/vacation for meaningful rate
+    const billableSessions = combinedCompleted + combinedScheduled;
+    const completionRate = billableSessions > 0 ? Math.round((combinedCompleted / billableSessions) * 100) : 0;
 
     // Additional insights
     // Find busiest day
@@ -362,20 +421,33 @@ export const CalendarView = ({
       if (!isInCurrentPeriod) return;
 
       const daySessions = sessionsByDate.get(dateStr) || [];
-      if (daySessions.length > busiestDay.count) {
-        busiestDay = { date: dateStr, count: daySessions.length };
+
+      // Count including group members
+      let daySessionCount = 0;
+      daySessions.forEach(({ isGroup, group }) => {
+        if (isGroup && group) {
+          daySessionCount += group.members.filter(m => m.isActive).length;
+        } else {
+          daySessionCount++;
+        }
+      });
+
+      if (daySessionCount > busiestDay.count) {
+        busiestDay = { date: dateStr, count: daySessionCount };
       }
 
       // Day of week distribution
-      dayOfWeekStats[day.getDay()] += daySessions.length;
+      dayOfWeekStats[day.getDay()] += daySessionCount;
 
       // Time slot distribution
-      daySessions.forEach(({ session, student }) => {
+      daySessions.forEach(({ session, student, isGroup, group }) => {
         const time = session.time || student.sessionTime || "12:00";
         const hour = parseInt(time.split(":")[0]);
-        if (hour < 12) timeSlotStats.morning++;
-        else if (hour < 17) timeSlotStats.afternoon++;
-        else timeSlotStats.evening++;
+        const count = isGroup && group ? group.members.filter(m => m.isActive).length : 1;
+
+        if (hour < 12) timeSlotStats.morning += count;
+        else if (hour < 17) timeSlotStats.afternoon += count;
+        else timeSlotStats.evening += count;
       });
     });
 
@@ -383,11 +455,19 @@ export const CalendarView = ({
     const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
     const busiestDayOfWeek = dayOfWeekStats.indexOf(Math.max(...dayOfWeekStats));
 
+    // Calculate actual days with sessions for better average
+    const daysWithSessions = days.filter(day => {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const isInCurrentPeriod = viewMode === "month" ? isSameMonth(day, currentDate) : true;
+      return isInCurrentPeriod && (sessionsByDate.get(dateStr)?.length || 0) > 0;
+    }).length;
+
     return {
-      totalSessions,
-      completedSessions,
-      cancelledSessions,
-      scheduledSessions,
+      totalSessions: combinedTotal,
+      completedSessions: combinedCompleted,
+      cancelledSessions: combinedCancelled,
+      vacationSessions: combinedVacation,
+      scheduledSessions: combinedScheduled,
       totalHours,
       completionRate,
       studentStats: Array.from(studentStats.values()).sort((a, b) => b.sessions - a.sessions),
@@ -395,7 +475,10 @@ export const CalendarView = ({
       busiestDayOfWeek: dayNames[busiestDayOfWeek],
       busiestDayOfWeekCount: dayOfWeekStats[busiestDayOfWeek],
       timeSlotStats,
-      averageSessionsPerDay: days.length > 0 ? Math.round((totalSessions / days.length) * 10) / 10 : 0,
+      averageSessionsPerDay: daysWithSessions > 0 ? Math.round((combinedTotal / daysWithSessions) * 10) / 10 : 0,
+      // Keep separate counts for display if needed
+      privateSessions: totalSessions,
+      groupMemberSessions: groupTotalMembers,
     };
   }, [days, sessionsByDate, currentDate, viewMode]);
 
@@ -440,11 +523,11 @@ export const CalendarView = ({
       const [newHour, newMin] = newTime.split(":").map(Number);
       const newStartMinutes = newHour * 60 + newMin;
       const newEndMinutes = newStartMinutes + sessionDuration;
-      for (const { session, student } of sessionsOnDate) {
+      for (const { session, student, isGroup } of sessionsOnDate) {
         // Skip the session being edited
         if (session.id === sessionId) continue;
-        // Skip cancelled sessions - they don't block time slots
-        if (session.status === "cancelled") continue;
+        // Skip cancelled and vacation sessions - they don't block time slots
+        if (session.status === "cancelled" || session.status === "vacation") continue;
         const otherTime = session.time || student.sessionTime;
         if (!otherTime) continue;
         const [otherHour, otherMin] = otherTime.split(":").map(Number);
@@ -459,9 +542,10 @@ export const CalendarView = ({
           (newStartMinutes <= otherStartMinutes && newEndMinutes >= otherEndMinutes);
         if (hasOverlap) {
           const isSameStudent = student.id === studentId;
+          const displayName = isGroup ? `👥 ${student.name}` : student.name;
           return {
             hasConflict: true,
-            conflictStudent: isSameStudent ? `${student.name} (نفس الطالب)` : student.name,
+            conflictStudent: isSameStudent ? `${displayName} (نفس الطالب)` : displayName,
             conflictTime: otherTime,
             severity: "error",
           };
@@ -482,9 +566,10 @@ export const CalendarView = ({
         // Warning if gap is less than 30 minutes
         if (gapMinutes < 30 && gapMinutes >= 0) {
           const isSameStudent = student.id === studentId;
+          const displayName = isGroup ? `👥 ${student.name}` : student.name;
           return {
             hasConflict: false,
-            conflictStudent: isSameStudent ? `${student.name} (نفس الطالب)` : student.name,
+            conflictStudent: isSameStudent ? `${displayName} (نفس الطالب)` : displayName,
             conflictTime: otherTime,
             severity: "warning",
             gapMinutes,
@@ -894,6 +979,7 @@ export const CalendarView = ({
     exportText += `• إجمالي الحصص: ${periodSummary.totalSessions}\n`;
     exportText += `• المكتملة: ${periodSummary.completedSessions}\n`;
     exportText += `• الملغاة: ${periodSummary.cancelledSessions}\n`;
+    exportText += `• الإجازات: ${periodSummary.vacationSessions}\n`;
     exportText += `• المجدولة: ${periodSummary.scheduledSessions}\n`;
     exportText += `• إجمالي الساعات: ${periodSummary.totalHours} ساعة\n`;
     exportText += `• نسبة الإنجاز: ${periodSummary.completionRate}%\n\n`;
@@ -1045,15 +1131,30 @@ export const CalendarView = ({
         {/* Weekly Summary Panel - Simplified on mobile */}
         {showWeeklySummary && (
           <div className="space-y-2 p-2 sm:p-4 rounded-lg bg-muted/30 border">
-            {/* Main Stats Row - 2 cols on mobile */}
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
+            {/* Main Stats Row - 4 cols on desktop, wrap on mobile */}
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 sm:gap-3">
               <div className="text-center p-1.5 sm:p-3 rounded-lg bg-primary/10">
                 <p className="text-base sm:text-2xl font-bold text-primary tabular-nums">{periodSummary.totalSessions}</p>
-                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">حصص</p>
+                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">
+                  حصص
+                  {periodSummary.groupMemberSessions > 0 && (
+                    <span className="text-violet-600 block text-[0.5rem]">
+                      ({periodSummary.privateSessions}+{periodSummary.groupMemberSessions}👥)
+                    </span>
+                  )}
+                </p>
               </div>
               <div className="text-center p-1.5 sm:p-3 rounded-lg bg-primary/15">
                 <p className="text-base sm:text-2xl font-bold text-primary tabular-nums">{periodSummary.completedSessions}</p>
                 <p className="text-[0.55rem] sm:text-xs text-muted-foreground">مكتملة</p>
+              </div>
+              <div className="text-center p-1.5 sm:p-3 rounded-lg bg-muted/50 hidden sm:block">
+                <p className="text-base sm:text-2xl font-bold text-muted-foreground tabular-nums">{periodSummary.cancelledSessions}</p>
+                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">ملغاة</p>
+              </div>
+              <div className="text-center p-1.5 sm:p-3 rounded-lg bg-secondary/50 hidden sm:block">
+                <p className="text-base sm:text-2xl font-bold text-secondary-foreground tabular-nums">{periodSummary.vacationSessions}</p>
+                <p className="text-[0.55rem] sm:text-xs text-muted-foreground">إجازة</p>
               </div>
               <div className="text-center p-1.5 sm:p-3 rounded-lg bg-primary/8">
                 <p className="text-base sm:text-2xl font-bold text-primary tabular-nums">{periodSummary.totalHours}</p>
