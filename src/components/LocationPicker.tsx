@@ -11,20 +11,28 @@ import { cn } from '@/lib/utils';
 // Enable: Places API (New), Geocoding API
 const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
 
+// Debug: Log if API key is configured
+console.log('[LocationPicker] Google Places API configured:', !!GOOGLE_PLACES_API_KEY);
+
 // Load Google Maps script dynamically
 let googleMapsLoaded = false;
 let googleMapsLoadPromise: Promise<void> | null = null;
 
 const loadGoogleMapsScript = (): Promise<void> => {
+  console.log('[LocationPicker] Loading Google Maps script...');
+
   if (googleMapsLoaded && window.google?.maps?.places) {
+    console.log('[LocationPicker] Google Maps already loaded');
     return Promise.resolve();
   }
 
   if (googleMapsLoadPromise) {
+    console.log('[LocationPicker] Google Maps load in progress');
     return googleMapsLoadPromise;
   }
 
   if (!GOOGLE_PLACES_API_KEY) {
+    console.log('[LocationPicker] No API key, using fallback search');
     return Promise.reject('No Google Places API key configured');
   }
 
@@ -32,6 +40,7 @@ const loadGoogleMapsScript = (): Promise<void> => {
     // Check if already loaded
     if (window.google?.maps?.places) {
       googleMapsLoaded = true;
+      console.log('[LocationPicker] Google Maps was already in window');
       resolve();
       return;
     }
@@ -43,11 +52,13 @@ const loadGoogleMapsScript = (): Promise<void> => {
 
     script.onload = () => {
       googleMapsLoaded = true;
+      console.log('[LocationPicker] Google Maps script loaded successfully');
       resolve();
     };
 
-    script.onerror = () => {
+    script.onerror = (error) => {
       googleMapsLoadPromise = null;
+      console.error('[LocationPicker] Failed to load Google Maps script:', error);
       reject('Failed to load Google Maps script');
     };
 
