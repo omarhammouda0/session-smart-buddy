@@ -1102,6 +1102,7 @@ export type Database = {
           custom_price_online: number | null
           custom_price_onsite: number | null
           id: string
+          location: Json | null
           name: string
           parent_phone: string | null
           phone: string | null
@@ -1125,6 +1126,7 @@ export type Database = {
           custom_price_online?: number | null
           custom_price_onsite?: number | null
           id?: string
+          location?: Json | null
           name: string
           parent_phone?: string | null
           phone?: string | null
@@ -1148,6 +1150,7 @@ export type Database = {
           custom_price_online?: number | null
           custom_price_onsite?: number | null
           id?: string
+          location?: Json | null
           name?: string
           parent_phone?: string | null
           phone?: string | null
