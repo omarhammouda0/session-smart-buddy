@@ -102,6 +102,7 @@ import { GroupCard } from "@/components/GroupCard";
 import { GroupAttendanceDialog } from "@/components/GroupAttendanceDialog";
 import { GroupPaymentDialog } from "@/components/GroupPaymentDialog";
 import { StudentGroup, GroupSession } from "@/types/student";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -1321,7 +1322,8 @@ const Index = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-5 mb-3 sm:mb-4 h-auto min-h-[2.75rem] sm:h-12 bg-muted/50 p-0.5 sm:p-1 rounded-lg sm:rounded-xl gap-0.5 sm:gap-1">
+          {/* Desktop tabs - hidden on mobile where we use bottom nav */}
+          <TabsList className="hidden sm:grid w-full grid-cols-5 mb-3 sm:mb-4 h-auto min-h-[2.75rem] sm:h-12 bg-muted/50 p-0.5 sm:p-1 rounded-lg sm:rounded-xl gap-0.5 sm:gap-1">
             <TabsTrigger
               value="sessions"
               className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 text-[0.6rem] sm:text-sm rounded-md sm:rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all font-medium py-1.5 sm:py-2 px-1 sm:px-3"
@@ -3031,6 +3033,16 @@ const Index = () => {
           }}
         />
       )}
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        todaySessionsCount={todayStats.total}
+      />
+
+      {/* Bottom spacing for mobile nav */}
+      <div className="sm:hidden h-16" />
     </div>
   );
 };

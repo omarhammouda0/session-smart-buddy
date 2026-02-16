@@ -777,6 +777,8 @@
 
   body {
     overflow-x: hidden !important;
+    /* Add padding for bottom nav */
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   /* =========== REMOVE DECORATIONS =========== */
@@ -812,6 +814,20 @@
 
   header p {
     font-size: 0.65rem !important;
+  }
+
+  /* =========== MOBILE BOTTOM NAV =========== */
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: hsl(var(--background) / 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid hsl(var(--border) / 0.5);
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   /* =========== ALL BUTTONS - CRITICAL FIX =========== */
@@ -884,31 +900,14 @@
     font-size: 0.8rem !important;
   }
 
-  /* =========== TABS =========== */
-  [role="tablist"] {
-    gap: 0.25rem !important;
-    padding: 0.25rem !important;
-    margin-bottom: 0.75rem !important;
-    border-radius: 0.75rem !important;
+  /* =========== TABS - HIDDEN ON MOBILE (Using bottom nav) =========== */
+  [role="tablist"]:not(.mobile-keep) {
+    display: none !important;
   }
 
-  [role="tab"] {
-    flex-direction: column !important;
-    gap: 0.25rem !important;
-    padding: 0.5rem 0.375rem !important;
-    font-size: 0.65rem !important;
-    min-height: 3rem !important;
-    border-radius: 0.5rem !important;
-  }
-
-  [role="tab"] svg {
-    width: 1.125rem !important;
-    height: 1.125rem !important;
-  }
-
-  [role="tab"] span {
-    font-size: 0.6rem !important;
-    line-height: 1.1 !important;
+  /* Tab content adjustments */
+  [role="tabpanel"] {
+    margin-top: 0 !important;
   }
 
   /* =========== CARDS =========== */
@@ -1114,6 +1113,22 @@
     min-height: 2.5rem !important;
     padding: 0.5rem 0.75rem !important;
     font-size: 0.8rem !important;
+  }
+
+  /* =========== SESSION CARDS - SWIPEABLE =========== */
+  .session-card {
+    position: relative;
+    overflow: hidden;
+    touch-action: pan-y;
+  }
+
+  .session-card-content {
+    transition: transform 0.2s ease-out;
+  }
+
+  /* =========== MAIN CONTENT BOTTOM PADDING =========== */
+  main {
+    padding-bottom: 4.5rem !important; /* Space for bottom nav */
   }
 }
 
