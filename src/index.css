@@ -830,38 +830,91 @@
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
-  /* =========== ALL BUTTONS - CRITICAL FIX =========== */
-  button,
-  [role="button"],
-  .btn,
-  [class*="Button"] {
-    min-height: 2.5rem !important;
-    font-size: 0.75rem !important;
-    padding: 0.5rem 0.75rem !important;
-    border-radius: 0.5rem !important;
+  /* =========== ALL BUTTONS - IMPROVED MOBILE FIX =========== */
+  /* Base button styles - ensure minimum touch targets */
+  button:not([class*="h-"]):not([class*="w-"]),
+  [role="button"]:not([class*="h-"]):not([class*="w-"]) {
+    min-height: 2.5rem;
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
   }
 
-  /* Icon buttons */
-  button[class*="icon"],
-  [class*="size-icon"],
-  button.h-8,
-  button.h-9,
-  button.h-10,
-  button.w-8,
-  button.w-9,
-  button.w-10 {
-    width: 2.5rem !important;
-    height: 2.5rem !important;
-    min-width: 2.5rem !important;
-    min-height: 2.5rem !important;
-    padding: 0.5rem !important;
+  /* Specific small icon buttons - preserve intentional small sizes but ensure touch area */
+  button.h-6, button.h-7,
+  [role="button"].h-6, [role="button"].h-7 {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0.25rem;
   }
 
+  button.h-8, button.h-9,
+  [role="button"].h-8, [role="button"].h-9 {
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0.375rem;
+  }
+
+  /* Icon-only buttons */
+  button[class*="size-icon"],
+  button.h-10.w-10,
+  button.h-9.w-9,
+  button.h-8.w-8 {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    width: auto;
+    height: auto;
+    padding: 0.375rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* SVG icons inside buttons - responsive sizing */
   button svg,
   [role="button"] svg {
-    width: 1.125rem !important;
-    height: 1.125rem !important;
-    flex-shrink: 0 !important;
+    flex-shrink: 0;
+  }
+
+  /* Small icons */
+  button.h-6 svg, button.h-7 svg,
+  [role="button"].h-6 svg, [role="button"].h-7 svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  /* Medium icons */
+  button.h-8 svg, button.h-9 svg,
+  [role="button"].h-8 svg, [role="button"].h-9 svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  /* Default icons */
+  button:not([class*="h-"]) svg,
+  [role="button"]:not([class*="h-"]) svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  /* Action button groups - flex layout fix */
+  .flex.items-center.gap-0\.5,
+  .flex.items-center.gap-1 {
+    gap: 0.25rem;
+  }
+
+  /* Ensure buttons in cards don't overflow */
+  [class*="Card"] button,
+  [class*="Card"] [role="button"] {
+    flex-shrink: 0;
+  }
+
+  /* Dialog/Sheet action buttons - full width on mobile */
+  [class*="DialogFooter"] button,
+  [class*="SheetContent"] > button,
+  [class*="AlertDialogFooter"] button {
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+    flex: 1;
   }
 
   /* =========== INPUTS & SEARCH - CRITICAL FIX =========== */
@@ -995,124 +1048,178 @@
   .text-2xl { font-size: 1.15rem !important; }
   .text-3xl { font-size: 1.25rem !important; }
 
-  /* =========== SPACING =========== */
-  .gap-1 { gap: 0.25rem !important; }
-  .gap-2 { gap: 0.375rem !important; }
-  .gap-3 { gap: 0.5rem !important; }
-  .gap-4 { gap: 0.625rem !important; }
-  .gap-5, .gap-6 { gap: 0.75rem !important; }
+  /* =========== SPACING - Less aggressive =========== */
+  .gap-1 { gap: 0.25rem; }
+  .gap-2 { gap: 0.375rem; }
+  .gap-3 { gap: 0.5rem; }
+  .gap-4 { gap: 0.625rem; }
 
-  .space-y-2 > * + * { margin-top: 0.375rem !important; }
-  .space-y-3 > * + * { margin-top: 0.5rem !important; }
-  .space-y-4 > * + * { margin-top: 0.625rem !important; }
-  .space-y-6 > * + * { margin-top: 0.75rem !important; }
+  .space-y-2 > * + * { margin-top: 0.375rem; }
+  .space-y-3 > * + * { margin-top: 0.5rem; }
+  .space-y-4 > * + * { margin-top: 0.625rem; }
 
-  .p-2 { padding: 0.375rem !important; }
-  .p-3 { padding: 0.5rem !important; }
-  .p-4 { padding: 0.625rem !important; }
-  .p-5, .p-6 { padding: 0.75rem !important; }
+  .p-2 { padding: 0.375rem; }
+  .p-3 { padding: 0.5rem; }
+  .p-4 { padding: 0.625rem; }
 
-  .px-2 { padding-left: 0.375rem !important; padding-right: 0.375rem !important; }
-  .px-3 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-  .px-4 { padding-left: 0.625rem !important; padding-right: 0.625rem !important; }
+  /* =========== SESSION CARDS - MOBILE OPTIMIZED =========== */
+  /* Session card container */
+  .session-card,
+  [class*="CardContent"] > .flex.items-center {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
 
-  .py-2 { padding-top: 0.375rem !important; padding-bottom: 0.375rem !important; }
-  .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
-  .py-4 { padding-top: 0.625rem !important; padding-bottom: 0.625rem !important; }
+  /* Session card action buttons container */
+  .session-card .flex.items-center.gap-1,
+  .session-card .flex.items-center.gap-0\.5,
+  [class*="Card"] .flex.items-center.shrink-0 {
+    flex-wrap: nowrap;
+    gap: 0.125rem;
+  }
 
-  /* =========== ICONS & AVATARS =========== */
-  .w-8, .h-8 { width: 2rem !important; height: 2rem !important; }
-  .w-10, .h-10 { width: 2.5rem !important; height: 2.5rem !important; }
-  .w-12, .h-12 { width: 2.75rem !important; height: 2.75rem !important; }
-  .w-14, .h-14 { width: 3rem !important; height: 3rem !important; }
-  .w-16, .h-16 { width: 3.25rem !important; height: 3.25rem !important; }
+  /* Compact action buttons in session cards */
+  .session-card button,
+  [class*="Card"] .flex.shrink-0 button {
+    padding: 0.25rem;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    width: auto;
+    height: auto;
+  }
 
-  /* =========== CALENDAR SPECIFIC =========== */
-  /* Day cells */
+  .session-card button svg,
+  [class*="Card"] .flex.shrink-0 button svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  /* Student name and info - prevent overflow */
+  .session-card .min-w-0,
+  [class*="Card"] .min-w-0 {
+    overflow: hidden;
+  }
+
+  .session-card .truncate,
+  [class*="Card"] .truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* =========== GROUP CARDS =========== */
+  .group-card button,
+  [class*="GroupCard"] button {
+    padding: 0.25rem;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+  }
+
+  /* =========== CALENDAR VIEW - SESSION ITEMS =========== */
+  /* Make calendar session items more compact */
   [data-date] {
-    min-height: 3.5rem !important;
-    padding: 0.25rem !important;
-    font-size: 0.7rem !important;
+    min-height: 3rem;
+    padding: 0.125rem;
   }
 
-  /* Day headers */
-  .grid-cols-7 > div:first-child,
-  .grid.grid-cols-7 > div {
-    font-size: 0.6rem !important;
-    padding: 0.25rem !important;
-  }
-
-  /* Session items in calendar */
   [data-date] > div,
   [data-date] button {
-    font-size: 0.55rem !important;
-    padding: 0.125rem 0.25rem !important;
-    margin-bottom: 0.125rem !important;
-    border-radius: 0.25rem !important;
+    font-size: 0.5rem;
+    padding: 0.125rem;
+    line-height: 1.2;
+  }
+
+  /* Calendar day number */
+  [data-date] > span:first-child {
+    font-size: 0.65rem;
   }
 
   /* =========== PAYMENT DASHBOARD =========== */
-  /* Status filter cards */
   .grid.grid-cols-4 {
-    gap: 0.375rem !important;
+    gap: 0.25rem;
   }
 
   .grid.grid-cols-4 > button,
   .grid.grid-cols-4 > div {
-    padding: 0.5rem !important;
+    padding: 0.375rem;
   }
 
   .grid.grid-cols-4 p {
-    font-size: 0.6rem !important;
+    font-size: 0.55rem;
+    line-height: 1.2;
   }
 
   .grid.grid-cols-4 .text-xl,
   .grid.grid-cols-4 .text-2xl {
-    font-size: 1.1rem !important;
+    font-size: 1rem;
+  }
+
+  /* =========== DROPDOWN & SELECT MENUS =========== */
+  [class*="DropdownMenuContent"],
+  [class*="SelectContent"] {
+    max-height: 60vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [class*="DropdownMenuItem"],
+  [class*="SelectItem"] {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
   }
 
   /* =========== PROGRESS BARS =========== */
   [class*="Progress"],
   [role="progressbar"] {
-    height: 0.5rem !important;
+    height: 0.375rem;
   }
 
   /* =========== SCROLL AREAS =========== */
   [data-radix-scroll-area-viewport] {
-    -webkit-overflow-scrolling: touch !important;
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* =========== STUDENT SEARCH COMBOBOX =========== */
-  [class*="StudentSearchCombobox"],
+  /* =========== COMBOBOX / SEARCH =========== */
   [class*="Combobox"] {
-    width: 100% !important;
+    width: 100%;
   }
 
-  [class*="StudentSearchCombobox"] input,
   [class*="Combobox"] input {
-    width: 100% !important;
-    min-height: 2.75rem !important;
+    width: 100%;
+    min-height: 2.5rem;
+  }
+
+  /* =========== TODAY'S STATS CARDS =========== */
+  .grid.grid-cols-4 [class*="Card"] {
+    padding: 0.375rem;
+  }
+
+  .grid.grid-cols-4 [class*="CardContent"] {
+    padding: 0.25rem;
+  }
+
+  .grid.grid-cols-4 svg {
+    width: 0.875rem;
+    height: 0.875rem;
   }
 
   /* =========== ALERT DIALOGS =========== */
-  [class*="AlertDialog"] button {
-    min-height: 2.5rem !important;
-    font-size: 0.8rem !important;
+  [class*="AlertDialogContent"] {
+    max-width: calc(100vw - 2rem);
+    margin: 1rem;
   }
 
-  /* =========== DROPDOWN MENUS =========== */
-  [class*="DropdownMenu"],
-  [class*="SelectContent"],
-  [role="listbox"] {
-    max-height: 50vh !important;
+  [class*="AlertDialogFooter"] {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  [class*="DropdownMenuItem"],
-  [class*="SelectItem"],
-  [role="option"] {
-    min-height: 2.5rem !important;
-    padding: 0.5rem 0.75rem !important;
-    font-size: 0.8rem !important;
+  [class*="AlertDialogFooter"] button {
+    width: 100%;
+    min-height: 2.75rem;
+    font-size: 0.875rem;
   }
 
   /* =========== SESSION CARDS - SWIPEABLE =========== */
@@ -1126,69 +1233,148 @@
     transition: transform 0.2s ease-out;
   }
 
+  /* =========== HEADER ACTION BUTTONS =========== */
+  header button,
+  header [role="button"] {
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0.375rem;
+  }
+
+  header button svg,
+  header [role="button"] svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  /* =========== NEXT SESSION CARD =========== */
+  .next-session-card .flex.items-center.gap-2 button {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0.25rem;
+  }
+
+  /* =========== STUDENT LIST IN SHEETS =========== */
+  [class*="SheetContent"] .flex.items-center.gap-0\.5 button {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    padding: 0.25rem;
+  }
+
+  [class*="SheetContent"] .flex.items-center.gap-0\.5 button svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
   /* =========== MAIN CONTENT BOTTOM PADDING =========== */
   main {
-    padding-bottom: 4.5rem !important; /* Space for bottom nav */
+    padding-bottom: 4.5rem; /* Space for bottom nav */
   }
 }
 
 /* =========== VERY SMALL SCREENS (< 375px) =========== */
 @media (max-width: 374px) {
   html {
-    font-size: 13px !important;
+    font-size: 12px;
   }
 
-  [role="tab"] {
-    padding: 0.375rem 0.25rem !important;
-    min-height: 2.75rem !important;
+  /* More compact buttons on very small screens */
+  button:not([class*="h-"]),
+  [role="button"]:not([class*="h-"]) {
+    min-height: 2rem;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.7rem;
   }
 
-  [role="tab"] span {
-    font-size: 0.55rem !important;
+  /* Smaller icon buttons */
+  button.h-8, button.h-9, button.h-10,
+  [role="button"].h-8, [role="button"].h-9, [role="button"].h-10 {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0.25rem;
   }
 
-  button,
-  [role="button"] {
-    min-height: 2.25rem !important;
+  button svg,
+  [role="button"] svg {
+    width: 0.75rem;
+    height: 0.75rem;
   }
 
+  /* Compact inputs */
   input,
   textarea,
   select {
-    min-height: 2.5rem !important;
+    min-height: 2.25rem;
+    font-size: 14px; /* Still prevent zoom but smaller */
+  }
+
+  /* Smaller cards */
+  [class*="CardContent"],
+  [class*="CardHeader"] {
+    padding: 0.5rem;
+  }
+
+  /* Smaller badges */
+  [class*="Badge"] {
+    font-size: 0.5rem;
+    padding: 0.0625rem 0.25rem;
+  }
+
+  /* Even more compact stats grid */
+  .grid.grid-cols-4 {
+    gap: 0.125rem;
+  }
+
+  .grid.grid-cols-4 p {
+    font-size: 0.5rem;
+  }
+
+  .grid.grid-cols-4 .text-lg,
+  .grid.grid-cols-4 .text-xl {
+    font-size: 0.875rem;
   }
 }
 
 /* =========== TOUCH DEVICES =========== */
 @media (hover: none) and (pointer: coarse) {
-  button,
-  [role="button"],
-  a,
-  input,
-  select,
-  textarea,
-  [role="option"],
-  [role="menuitem"] {
-    min-height: 44px !important;
+  /* Ensure minimum touch targets - but don't override explicit sizes */
+  button:not([class*="h-"]):not([class*="w-"]),
+  [role="button"]:not([class*="h-"]):not([class*="w-"]),
+  a:not([class*="h-"]):not([class*="w-"]) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Smaller explicit sizes still get reasonable touch area via padding */
+  button.h-6, button.h-7, button.h-8,
+  [role="button"].h-6, [role="button"].h-7, [role="button"].h-8 {
+    /* Use padding to increase touch area without changing visual size */
+    position: relative;
+  }
+
+  button.h-6::before, button.h-7::before, button.h-8::before,
+  [role="button"].h-6::before, [role="button"].h-7::before, [role="button"].h-8::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
   }
 
   /* Active states */
   button:active,
   [role="button"]:active,
   a:active {
-    transform: scale(0.97) !important;
-    opacity: 0.9 !important;
+    transform: scale(0.97);
+    opacity: 0.9;
   }
 
-  /* Disable hover effects */
+  /* Disable hover effects on touch */
   .hover\:scale-105:hover,
   .hover\:scale-\[1\.02\]:hover {
-    transform: none !important;
-  }
-
-  .hover\:shadow-lg:hover,
-  .hover\:shadow-xl:hover {
-    box-shadow: inherit !important;
+    transform: none;
   }
 }
 
@@ -1196,12 +1382,12 @@
 @supports (padding: env(safe-area-inset-bottom)) {
   .fixed.bottom-0,
   [class*="Sheet"][data-state="open"] {
-    padding-bottom: env(safe-area-inset-bottom) !important;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   header,
   .fixed.top-0 {
-    padding-top: env(safe-area-inset-top) !important;
+    padding-top: env(safe-area-inset-top);
   }
 }
 
