@@ -109,26 +109,8 @@ async function sendPushNotification(
   try {
     const projectId = Deno.env.get("FIREBASE_PROJECT_ID") || "session-smart-buddy";
 
-    // Check for duplicate notification (prevent spam)
-    if (alert.conditionKey) {
-      // Payment alerts: deduplicate for 24 hours (only remind once per day)
-      // Session alerts: deduplicate for 1 hour (more time-sensitive)
-      const dedupMs = alert.suggestionType === 'payment'
-        ? 24 * 60 * 60 * 1000   // 24 hours for payment
-        : 60 * 60 * 1000;        // 1 hour for sessions
-      const dedupCutoff = new Date(Date.now() - dedupMs).toISOString();
-      const { data: existing } = await supabase
-          .from('push_notification_log')
-          .select('id')
-          .eq('condition_key', alert.conditionKey)
-          .eq('status', 'sent')
-          .gte('sent_at', dedupCutoff)
-          .maybeSingle();
-
-      if (existing) {
-        return { sent: 0, skipped: true };
-      }
-    }
+    // Dedup is now handled BEFORE alerts are added to the array
+    // No dedup check here - just send the notification
 
     // Get active FCM tokens for the specific user
     let query = supabase
@@ -375,24 +357,41 @@ serve(async (req) => {
         if (currentMinutes > sessionEndMinutes) {
           const conditionKey = `session_unconfirmed:${session.id}`;
 
-          alerts.push({
-            title: '⚠️ حصة محتاجة تأكيد',
-            body: `حصة ${student?.name || 'طالب'} خلصت ومحتاجة تأكيد`,
-            priority: 100,
-            suggestionType: 'end_of_day',
-            actionType: 'confirm_session',
-            conditionKey,
-            userId,
-            studentId: student?.id,
-            sessionId: session.id
-          });
+          // Dedup: check if already sent in last 1 hour
+          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+          const { data: recentUnconfirmed } = await supabase
+              .from('push_notification_log')
+              .select('id')
+              .eq('condition_key', conditionKey)
+              .eq('status', 'sent')
+              .gte('sent_at', oneHourAgo)
+              .maybeSingle();
+
+          if (recentUnconfirmed) {
+            console.log(`⏭️ Skipped unconfirmed session (sent in last 1h): ${conditionKey}`);
+          } else {
+            alerts.push({
+              title: '⚠️ حصة محتاجة تأكيد',
+              body: `حصة ${student?.name || 'طالب'} خلصت ومحتاجة تأكيد`,
+              priority: 100,
+              suggestionType: 'end_of_day',
+              actionType: 'confirm_session',
+              conditionKey,
+              userId,
+              studentId: student?.id,
+              sessionId: session.id
+            });
+          }
         }
 
-        // Check for 30-minute pre-session reminder (25-35 min window)
+        // Check for 30-minute pre-session reminder (15-45 min window for 10-min cron)
         const sessionStartMinutes = hour * 60 + minute;
         const minutesUntilSession = sessionStartMinutes - currentMinutes;
 
-        if (minutesUntilSession >= 25 && minutesUntilSession <= 35) {
+        console.log(`[TIME DEBUG] Current Egypt time: ${currentHour}:${currentMinute}, Session time: ${sessionTime}, Current minutes: ${currentMinutes}, Session start minutes: ${sessionStartMinutes}`);
+        console.log(`[PRE-SESSION] Student: ${student?.name}, Session time: ${sessionTime}, Minutes until: ${minutesUntilSession}, In window: ${minutesUntilSession >= 15 && minutesUntilSession <= 45}`);
+
+        if (minutesUntilSession >= 15 && minutesUntilSession <= 45) {
           const conditionKey = `pre_session_30min:${session.id}:${today}`;
 
           // Get last session notes for this student
@@ -483,17 +482,31 @@ serve(async (req) => {
             if (isActive) {
               const conditionKey = `payment_overdue:${student.id}`;
 
-              alerts.push({
-                title: '💰 تذكير دفع متأخر',
-                body: `⚠️ ${student.name} لم يدفع منذ ${toArabicNumerals(daysSincePayment)} يوم`,
-                priority: 100,
-                suggestionType: 'payment',
-                actionType: 'record_payment',
-                conditionKey,
-                userId: student.user_id,
-                studentId: student.id,
-                studentPhone: student.phone || student.parent_phone
-              });
+              // Dedup: check if already sent in last 24 hours
+              const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+              const { data: recentNotif } = await supabase
+                  .from('push_notification_log')
+                  .select('id')
+                  .eq('condition_key', conditionKey)
+                  .eq('status', 'sent')
+                  .gte('sent_at', twentyFourHoursAgo)
+                  .maybeSingle();
+
+              if (recentNotif) {
+                console.log(`⏭️ Skipped payment alert (sent in last 24h): ${conditionKey}`);
+              } else {
+                alerts.push({
+                  title: '💰 تذكير دفع متأخر',
+                  body: `⚠️ ${student.name} لم يدفع منذ ${toArabicNumerals(daysSincePayment)} يوم`,
+                  priority: 100,
+                  suggestionType: 'payment',
+                  actionType: 'record_payment',
+                  conditionKey,
+                  userId: student.user_id,
+                  studentId: student.id,
+                  studentPhone: student.phone || student.parent_phone
+                });
+              }
             }
           }
         } else {
@@ -515,17 +528,31 @@ serve(async (req) => {
             if (daysSinceFirstSession >= 30) {
               const conditionKey = `payment_never:${student.id}`;
 
-              alerts.push({
-                title: '💰 لم يتم تسجيل أي دفعة',
-                body: `⚠️ ${student.name} لم يدفع أبداً منذ ${toArabicNumerals(daysSinceFirstSession)} يوم`,
-                priority: 100,
-                suggestionType: 'payment',
-                actionType: 'record_payment',
-                conditionKey,
-                userId: student.user_id,
-                studentId: student.id,
-                studentPhone: student.phone || student.parent_phone
-              });
+              // Dedup: check if already sent in last 24 hours
+              const twentyFourHoursAgo2 = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+              const { data: recentNotif2 } = await supabase
+                  .from('push_notification_log')
+                  .select('id')
+                  .eq('condition_key', conditionKey)
+                  .eq('status', 'sent')
+                  .gte('sent_at', twentyFourHoursAgo2)
+                  .maybeSingle();
+
+              if (recentNotif2) {
+                console.log(`⏭️ Skipped payment alert (sent in last 24h): ${conditionKey}`);
+              } else {
+                alerts.push({
+                  title: '💰 لم يتم تسجيل أي دفعة',
+                  body: `⚠️ ${student.name} لم يدفع أبداً منذ ${toArabicNumerals(daysSinceFirstSession)} يوم`,
+                  priority: 100,
+                  suggestionType: 'payment',
+                  actionType: 'record_payment',
+                  conditionKey,
+                  userId: student.user_id,
+                  studentId: student.id,
+                  studentPhone: student.phone || student.parent_phone
+                });
+              }
             }
           }
         }

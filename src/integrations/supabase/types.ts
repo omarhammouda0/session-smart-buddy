@@ -599,6 +599,51 @@ export type Database = {
         }
         Relationships: []
       }
+      push_notification_log: {
+        Row: {
+          body: string
+          condition_key: string | null
+          created_at: string
+          error_message: string | null
+          fcm_response: Json | null
+          id: string
+          priority: number
+          sent_at: string
+          status: string
+          suggestion_type: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          condition_key?: string | null
+          created_at?: string
+          error_message?: string | null
+          fcm_response?: Json | null
+          id?: string
+          priority?: number
+          sent_at?: string
+          status?: string
+          suggestion_type?: string
+          title: string
+          user_id?: string
+        }
+        Update: {
+          body?: string
+          condition_key?: string | null
+          created_at?: string
+          error_message?: string | null
+          fcm_response?: Json | null
+          id?: string
+          priority?: number
+          sent_at?: string
+          status?: string
+          suggestion_type?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           created_at: string
