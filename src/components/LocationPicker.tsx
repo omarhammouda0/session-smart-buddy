@@ -1,15 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogBody } from '@/components/ui/dialog';
 import { MapPin, Search, Navigation, X, ExternalLink, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface LocationData {
   lat: number;
   lng: number;
   address?: string;
   name?: string;
+}
+
+interface SearchPrediction {
+  place_id: string;
+  display_name: string;
+  lat: string;
+  lon: string;
+  type: string;
+  importance: number;
 }
 
 interface LocationPickerProps {
@@ -138,6 +148,13 @@ export function LocationPicker({
     value ? [value.lat, value.lng] : [30.0444, 31.2357] // Default: Cairo, Egypt
   );
 
+  // Search predictions state
+  const [predictions, setPredictions] = useState<SearchPrediction[]>([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const [isLoadingPredictions, setIsLoadingPredictions] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const predictionsRef = useRef<HTMLDivElement>(null);
+
   // Update selected location when value prop changes
   useEffect(() => {
     if (value) {
@@ -145,6 +162,82 @@ export function LocationPicker({
       setMapCenter([value.lat, value.lng]);
     }
   }, [value]);
+
+  // Close predictions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (predictionsRef.current && !predictionsRef.current.contains(event.target as Node)) {
+        setShowPredictions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Debounced search for predictions
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (searchQuery.trim().length < 2) {
+      setPredictions([]);
+      setShowPredictions(false);
+      return;
+    }
+
+    setIsLoadingPredictions(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        // Search with Egypt bias for better local results
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=eg&limit=6&accept-language=ar&addressdetails=1`
+        );
+        const data = await response.json();
+
+        if (data.length === 0) {
+          // Try without country restriction if no results
+          const response2 = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=6&accept-language=ar&addressdetails=1`
+          );
+          const data2 = await response2.json();
+          setPredictions(data2);
+        } else {
+          setPredictions(data);
+        }
+        setShowPredictions(true);
+      } catch (error) {
+        console.error('Search predictions failed:', error);
+        setPredictions([]);
+      } finally {
+        setIsLoadingPredictions(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Select a prediction
+  const selectPrediction = useCallback((prediction: SearchPrediction) => {
+    const lat = parseFloat(prediction.lat);
+    const lng = parseFloat(prediction.lon);
+
+    setMapCenter([lat, lng]);
+    setSelectedLocation({
+      lat,
+      lng,
+      address: prediction.display_name,
+      name: prediction.display_name.split(',')[0],
+    });
+    setSearchQuery(prediction.display_name.split(',')[0]);
+    setShowPredictions(false);
+    setPredictions([]);
+  }, []);
 
   // Reverse geocode to get address from coordinates
   const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
@@ -337,23 +430,78 @@ export function LocationPicker({
           </DialogHeader>
 
           <DialogBody className="space-y-4">
-            {/* Search bar */}
+            {/* Search bar with predictions */}
             <div className="flex gap-2">
-              <div className="flex-1 relative">
+              <div className="flex-1 relative" ref={predictionsRef}>
                 <Input
-                  placeholder="ابحث عن مكان (مثل: مدينة نصر، المعادي...)"
+                  placeholder="ابحث عن مكان (مثل: شارع التحرير، مدينة نصر...)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && searchLocation()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      searchLocation();
+                      setShowPredictions(false);
+                    }
+                    if (e.key === 'Escape') {
+                      setShowPredictions(false);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (predictions.length > 0) {
+                      setShowPredictions(true);
+                    }
+                  }}
                   className="pl-10"
                   dir="rtl"
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
+                {/* Loading indicator */}
+                {isLoadingPredictions && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+
+                {/* Predictions dropdown */}
+                {showPredictions && predictions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-[200px] overflow-y-auto">
+                    {predictions.map((prediction, index) => (
+                      <button
+                        key={prediction.place_id || index}
+                        type="button"
+                        className={cn(
+                          "w-full text-right px-3 py-2.5 hover:bg-accent transition-colors flex items-start gap-2",
+                          index !== predictions.length - 1 && "border-b"
+                        )}
+                        onClick={() => selectPrediction(prediction)}
+                      >
+                        <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {prediction.display_name.split(',')[0]}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {prediction.display_name.split(',').slice(1, 3).join(',')}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* No results message */}
+                {showPredictions && searchQuery.length >= 2 && predictions.length === 0 && !isLoadingPredictions && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg p-3 text-center text-sm text-muted-foreground">
+                    لا توجد نتائج لـ "{searchQuery}"
+                  </div>
+                )}
               </div>
               <Button
                 type="button"
                 variant="secondary"
-                onClick={searchLocation}
+                onClick={() => {
+                  searchLocation();
+                  setShowPredictions(false);
+                }}
                 disabled={isSearching}
                 className="shrink-0"
               >
