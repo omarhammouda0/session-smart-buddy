@@ -5,120 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogBody } from '@/components/ui/dialog';
 import { MapPin, Search, Navigation, X, ExternalLink, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// Google Places API Key
-// Get your API key from: https://console.cloud.google.com/apis/credentials
-// Enable: Places API (New), Geocoding API
-const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
-
-// Debug: Log if API key is configured
-console.log('[LocationPicker] Google Places API configured:', !!GOOGLE_PLACES_API_KEY);
-
-// Load Google Maps script dynamically
-let googleMapsLoaded = false;
-let googleMapsLoadPromise: Promise<void> | null = null;
-
-const loadGoogleMapsScript = (): Promise<void> => {
-  console.log('[LocationPicker] Loading Google Maps script...');
-
-  if (googleMapsLoaded && window.google?.maps?.places) {
-    console.log('[LocationPicker] Google Maps already loaded');
-    return Promise.resolve();
-  }
-
-  if (googleMapsLoadPromise) {
-    console.log('[LocationPicker] Google Maps load in progress');
-    return googleMapsLoadPromise;
-  }
-
-  if (!GOOGLE_PLACES_API_KEY) {
-    console.log('[LocationPicker] No API key, using fallback search');
-    return Promise.reject('No Google Places API key configured');
-  }
-
-  googleMapsLoadPromise = new Promise((resolve, reject) => {
-    // Check if already loaded
-    if (window.google?.maps?.places) {
-      googleMapsLoaded = true;
-      console.log('[LocationPicker] Google Maps was already in window');
-      resolve();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_API_KEY}&libraries=places&language=ar&region=EG`;
-    script.async = true;
-    script.defer = true;
-
-    script.onload = () => {
-      googleMapsLoaded = true;
-      console.log('[LocationPicker] Google Maps script loaded successfully');
-      resolve();
-    };
-
-    script.onerror = (error) => {
-      googleMapsLoadPromise = null;
-      console.error('[LocationPicker] Failed to load Google Maps script:', error);
-      reject('Failed to load Google Maps script');
-    };
-
-    document.head.appendChild(script);
-  });
-
-  return googleMapsLoadPromise;
-};
-
-// Declare google maps types
-declare global {
-  interface Window {
-    google?: {
-      maps?: {
-        places?: {
-          AutocompleteService: new () => {
-            getPlacePredictions: (
-              request: {
-                input: string;
-                componentRestrictions?: { country: string };
-                language?: string;
-                types?: string[];
-              },
-              callback: (predictions: GooglePlacePrediction[] | null, status: string) => void
-            ) => void;
-          };
-          PlacesService: new (attrContainer: HTMLElement) => {
-            getDetails: (
-              request: { placeId: string; fields: string[] },
-              callback: (place: GooglePlaceResult | null, status: string) => void
-            ) => void;
-          };
-          PlacesServiceStatus: {
-            OK: string;
-          };
-        };
-      };
-    };
-  }
-}
-
-interface GooglePlacePrediction {
-  place_id: string;
-  description: string;
-  structured_formatting: {
-    main_text: string;
-    secondary_text: string;
-  };
-}
-
-interface GooglePlaceResult {
-  geometry?: {
-    location?: {
-      lat: () => number;
-      lng: () => number;
-    };
-  };
-  formatted_address?: string;
-  name?: string;
-}
+import { supabase } from '@/integrations/supabase/client';
 
 export interface LocationData {
   lat: number;
@@ -127,33 +14,15 @@ export interface LocationData {
   name?: string;
 }
 
-interface GooglePrediction {
-  place_id: string;
-  description: string;
-  structured_formatting: {
-    main_text: string;
-    secondary_text: string;
-  };
-}
-
-interface NominatimPrediction {
-  place_id: string;
-  display_name: string;
-  lat: string;
-  lon: string;
-  type: string;
-  importance: number;
-}
-
-type SearchPrediction = {
+interface SearchResult {
   place_id: string;
   main_text: string;
   secondary_text: string;
   description: string;
-  lat?: string;
-  lon?: string;
-  source: 'google' | 'nominatim' | 'local';
-};
+  lat: number;
+  lng: number;
+  source: 'local' | 'google' | 'nominatim';
+}
 
 interface LocationPickerProps {
   value?: LocationData | null;
@@ -181,7 +50,7 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
       try {
         await import('leaflet/dist/leaflet.css');
         const L = await import('leaflet');
-        
+
         delete (L.Icon.Default.prototype as any)._getIconUrl;
         L.Icon.Default.mergeOptions({
           iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -254,45 +123,6 @@ function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapCom
   );
 }
 
-// Egyptian areas for local fallback
-const EGYPT_AREAS = [
-  { name: 'القاهرة', lat: '30.0444', lon: '31.2357', area: 'مصر' },
-  { name: 'الجيزة', lat: '30.0131', lon: '31.2089', area: 'مصر' },
-  { name: 'الإسكندرية', lat: '31.2001', lon: '29.9187', area: 'مصر' },
-  { name: 'مدينة نصر', lat: '30.0511', lon: '31.3656', area: 'القاهرة' },
-  { name: 'المعادي', lat: '29.9602', lon: '31.2569', area: 'القاهرة' },
-  { name: 'مصر الجديدة', lat: '30.0875', lon: '31.3428', area: 'القاهرة' },
-  { name: 'الزمالك', lat: '30.0659', lon: '31.2194', area: 'القاهرة' },
-  { name: 'المهندسين', lat: '30.0566', lon: '31.2003', area: 'الجيزة' },
-  { name: 'الدقي', lat: '30.0392', lon: '31.2125', area: 'الجيزة' },
-  { name: '6 أكتوبر', lat: '29.9285', lon: '30.9188', area: 'الجيزة' },
-  { name: 'الشيخ زايد', lat: '30.0394', lon: '30.9444', area: 'الجيزة' },
-  { name: 'التجمع الخامس', lat: '30.0074', lon: '31.4913', area: 'القاهرة الجديدة' },
-  { name: 'الرحاب', lat: '30.0614', lon: '31.4903', area: 'القاهرة الجديدة' },
-  { name: 'العبور', lat: '30.1736', lon: '31.4736', area: 'القليوبية' },
-  { name: 'شبرا', lat: '30.1094', lon: '31.2486', area: 'القاهرة' },
-  { name: 'عين شمس', lat: '30.1314', lon: '31.3283', area: 'القاهرة' },
-  { name: 'حلوان', lat: '29.8419', lon: '31.3342', area: 'القاهرة' },
-  { name: 'المقطم', lat: '30.0108', lon: '31.3019', area: 'القاهرة' },
-  { name: 'العجوزة', lat: '30.0578', lon: '31.2089', area: 'الجيزة' },
-  { name: 'فيصل', lat: '29.9869', lon: '31.1494', area: 'الجيزة' },
-  { name: 'الهرم', lat: '29.9792', lon: '31.1342', area: 'الجيزة' },
-  { name: 'شارع التحرير', lat: '30.0444', lon: '31.2357', area: 'وسط البلد، القاهرة' },
-  { name: 'شارع الهرم', lat: '30.0131', lon: '31.2089', area: 'الجيزة' },
-  { name: 'شارع جامعة الدول العربية', lat: '30.0566', lon: '31.2003', area: 'المهندسين' },
-  { name: 'شارع مصطفى النحاس', lat: '30.0511', lon: '31.3456', area: 'مدينة نصر' },
-  { name: 'شارع عباس العقاد', lat: '30.0561', lon: '31.3456', area: 'مدينة نصر' },
-  { name: 'شارع مكرم عبيد', lat: '30.0611', lon: '31.3456', area: 'مدينة نصر' },
-  { name: 'الكوربة', lat: '30.0875', lon: '31.3428', area: 'مصر الجديدة' },
-  { name: 'روكسي', lat: '30.0875', lon: '31.3250', area: 'مصر الجديدة' },
-  { name: 'ميدان التحرير', lat: '30.0444', lon: '31.2357', area: 'وسط البلد' },
-  { name: 'ميدان رمسيس', lat: '30.0619', lon: '31.2467', area: 'القاهرة' },
-  { name: 'شارع 9', lat: '30.0511', lon: '31.3656', area: 'المعادي' },
-  { name: 'المنيل', lat: '30.0167', lon: '31.2333', area: 'القاهرة' },
-  { name: 'جاردن سيتي', lat: '30.0361', lon: '31.2319', area: 'القاهرة' },
-  { name: 'وسط البلد', lat: '30.0500', lon: '31.2500', area: 'القاهرة' },
-];
-
 export function LocationPicker({
   value,
   onChange,
@@ -306,35 +136,14 @@ export function LocationPicker({
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
-    value ? [value.lat, value.lng] : [30.0444, 31.2357]
+    value ? [value.lat, value.lng] : [30.0444, 31.2357] // Default: Cairo, Egypt
   );
 
-  const [predictions, setPredictions] = useState<SearchPrediction[]>([]);
+  const [predictions, setPredictions] = useState<SearchResult[]>([]);
   const [showPredictions, setShowPredictions] = useState(false);
   const [isLoadingPredictions, setIsLoadingPredictions] = useState(false);
-  const [googleLoaded, setGoogleLoaded] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const predictionsRef = useRef<HTMLDivElement>(null);
-  const placesServiceRef = useRef<HTMLDivElement>(null);
-  const autocompleteServiceRef = useRef<any>(null);
-  const placesServiceInstanceRef = useRef<any>(null);
-
-  // Load Google Maps SDK when dialog opens
-  useEffect(() => {
-    if (isOpen && GOOGLE_PLACES_API_KEY && !googleLoaded) {
-      loadGoogleMapsScript()
-        .then(() => {
-          setGoogleLoaded(true);
-          // Initialize services
-          if (window.google?.maps?.places) {
-            autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-          }
-        })
-        .catch((err) => {
-          console.log('Google Places not available:', err);
-        });
-    }
-  }, [isOpen, googleLoaded]);
 
   useEffect(() => {
     if (value) {
@@ -353,7 +162,7 @@ export function LocationPicker({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Search with Google Places API if available, fallback to Nominatim + local
+  // Search using Supabase Edge Function (avoids CORS)
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -368,127 +177,24 @@ export function LocationPicker({
     setIsLoadingPredictions(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const query = searchQuery.trim().toLowerCase();
-        const allResults: SearchPrediction[] = [];
-
-        // 1. Local Egyptian areas search (fastest, always works)
-        const localMatches = EGYPT_AREAS.filter(area => 
-          area.name.toLowerCase().includes(query) || 
-          query.includes(area.name.toLowerCase()) ||
-          area.name.includes(searchQuery) ||
-          searchQuery.includes(area.name)
-        ).slice(0, 5);
-
-        localMatches.forEach(area => {
-          allResults.push({
-            place_id: `local_${area.name}`,
-            main_text: area.name,
-            secondary_text: area.area + '، مصر',
-            description: `${area.name}، ${area.area}، مصر`,
-            lat: area.lat,
-            lon: area.lon,
-            source: 'local'
-          });
+        console.log('[LocationPicker] Searching for:', searchQuery);
+        
+        const { data, error } = await supabase.functions.invoke('location-search', {
+          body: { action: 'search', query: searchQuery }
         });
 
-        // 2. Try Google Places SDK if loaded
-        if (googleLoaded && autocompleteServiceRef.current) {
-          try {
-            const googlePredictions = await new Promise<GooglePlacePrediction[]>((resolve) => {
-              autocompleteServiceRef.current.getPlacePredictions(
-                {
-                  input: searchQuery,
-                  componentRestrictions: { country: 'eg' },
-                  language: 'ar',
-                },
-                (predictions: GooglePlacePrediction[] | null, status: string) => {
-                  if (status === 'OK' && predictions) {
-                    resolve(predictions);
-                  } else {
-                    resolve([]);
-                  }
-                }
-              );
-            });
-
-            googlePredictions.slice(0, 5).forEach((pred) => {
-              if (!allResults.find(r => r.description === pred.description)) {
-                allResults.push({
-                  place_id: pred.place_id,
-                  main_text: pred.structured_formatting.main_text,
-                  secondary_text: pred.structured_formatting.secondary_text,
-                  description: pred.description,
-                  source: 'google'
-                });
-              }
-            });
-          } catch (e) {
-            console.log('Google Places search failed:', e);
-          }
+        if (error) {
+          console.error('[LocationPicker] Search error:', error);
+          setPredictions([]);
+        } else if (data?.success && data?.results) {
+          console.log('[LocationPicker] Found results:', data.results.length);
+          setPredictions(data.results);
+          setShowPredictions(true);
+        } else {
+          setPredictions([]);
         }
-
-        // 3. Nominatim search for additional results
-        const egyptViewbox = '24.7,22.0,36.9,31.7';
-        
-        // Direct search
-        const response1 = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=5&accept-language=ar&addressdetails=1`
-        );
-        const data1: NominatimPrediction[] = await response1.json();
-        
-        data1.forEach(item => {
-          const mainText = item.display_name.split(',')[0];
-          const secondaryText = item.display_name.split(',').slice(1, 3).join(',');
-          if (!allResults.find(r => r.main_text === mainText)) {
-            allResults.push({
-              place_id: item.place_id,
-              main_text: mainText,
-              secondary_text: secondaryText,
-              description: item.display_name,
-              lat: item.lat,
-              lon: item.lon,
-              source: 'nominatim'
-            });
-          }
-        });
-
-        // Try with شارع prefix if few results
-        if (allResults.length < 5 && !searchQuery.includes('شارع')) {
-          const response2 = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent('شارع ' + searchQuery)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=3&accept-language=ar`
-          );
-          const data2: NominatimPrediction[] = await response2.json();
-          
-          data2.forEach(item => {
-            const mainText = item.display_name.split(',')[0];
-            const secondaryText = item.display_name.split(',').slice(1, 3).join(',');
-            if (!allResults.find(r => r.main_text === mainText)) {
-              allResults.push({
-                place_id: item.place_id,
-                main_text: mainText,
-                secondary_text: secondaryText,
-                description: item.display_name,
-                lat: item.lat,
-                lon: item.lon,
-                source: 'nominatim'
-              });
-            }
-          });
-        }
-
-        // Sort: local first, then by relevance
-        const sortedResults = allResults
-          .sort((a, b) => {
-            if (a.source === 'local' && b.source !== 'local') return -1;
-            if (b.source === 'local' && a.source !== 'local') return 1;
-            return 0;
-          })
-          .slice(0, 8);
-
-        setPredictions(sortedResults);
-        setShowPredictions(true);
       } catch (error) {
-        console.error('Search predictions failed:', error);
+        console.error('[LocationPicker] Search failed:', error);
         setPredictions([]);
       } finally {
         setIsLoadingPredictions(false);
@@ -502,75 +208,34 @@ export function LocationPicker({
     };
   }, [searchQuery]);
 
-  const selectPrediction = useCallback(async (prediction: SearchPrediction) => {
+  const selectPrediction = useCallback((prediction: SearchResult) => {
     setShowPredictions(false);
     setPredictions([]);
     setSearchQuery(prediction.main_text);
 
-    // If we have coordinates, use them directly
-    if (prediction.lat && prediction.lon) {
-      const lat = parseFloat(prediction.lat);
-      const lng = parseFloat(prediction.lon);
-      setMapCenter([lat, lng]);
-      setSelectedLocation({
-        lat,
-        lng,
-        address: prediction.description,
-        name: prediction.main_text,
-      });
-      return;
-    }
-
-    // For Google Places results, get coordinates using PlacesService
-    if (prediction.source === 'google' && googleLoaded && window.google?.maps?.places) {
-      try {
-        // Create a temporary div for PlacesService (required by Google)
-        if (!placesServiceRef.current) {
-          placesServiceRef.current = document.createElement('div');
-        }
-
-        const service = new window.google.maps.places.PlacesService(placesServiceRef.current);
-
-        const place = await new Promise<GooglePlaceResult | null>((resolve) => {
-          service.getDetails(
-            {
-              placeId: prediction.place_id,
-              fields: ['geometry', 'formatted_address', 'name']
-            },
-            (result, status) => {
-              if (status === 'OK' && result) {
-                resolve(result);
-              } else {
-                resolve(null);
-              }
-            }
-          );
-        });
-
-        if (place?.geometry?.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          setMapCenter([lat, lng]);
-          setSelectedLocation({
-            lat,
-            lng,
-            address: place.formatted_address || prediction.description,
-            name: place.name || prediction.main_text,
-          });
-        }
-      } catch (e) {
-        console.error('Failed to get place details:', e);
-      }
-    }
-  }, [googleLoaded]);
+    const lat = prediction.lat;
+    const lng = prediction.lng;
+    
+    setMapCenter([lat, lng]);
+    setSelectedLocation({
+      lat,
+      lng,
+      address: prediction.description,
+      name: prediction.main_text,
+    });
+  }, []);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ar`
-      );
-      const data = await response.json();
-      return data.display_name || '';
+      const { data, error } = await supabase.functions.invoke('location-search', {
+        body: { action: 'reverse', lat, lng }
+      });
+
+      if (error || !data?.success) {
+        return '';
+      }
+
+      return data.address || '';
     } catch (error) {
       console.error('Reverse geocoding failed:', error);
       return '';
@@ -582,45 +247,20 @@ export function LocationPicker({
 
     setIsSearching(true);
     setShowPredictions(false);
-    
-    try {
-      const query = searchQuery.trim();
-      const egyptViewbox = '24.7,22.0,36.9,31.7';
-      
-      // Check local areas first
-      const localMatch = EGYPT_AREAS.find(area => 
-        area.name === query || area.name.includes(query) || query.includes(area.name)
-      );
-      
-      if (localMatch) {
-        const lat = parseFloat(localMatch.lat);
-        const lng = parseFloat(localMatch.lon);
-        setMapCenter([lat, lng]);
-        setSelectedLocation({
-          lat,
-          lng,
-          address: `${localMatch.name}، ${localMatch.area}، مصر`,
-          name: localMatch.name,
-        });
-        setIsSearching(false);
-        return;
-      }
 
-      // Try Nominatim search
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=eg&viewbox=${egyptViewbox}&bounded=1&limit=1&accept-language=ar`
-      );
-      const data = await response.json();
-      
-      if (data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        setMapCenter([lat, lng]);
+    try {
+      const { data, error } = await supabase.functions.invoke('location-search', {
+        body: { action: 'search', query: searchQuery }
+      });
+
+      if (!error && data?.success && data?.results?.length > 0) {
+        const first = data.results[0];
+        setMapCenter([first.lat, first.lng]);
         setSelectedLocation({
-          lat,
-          lng,
-          address: data[0].display_name,
-          name: query,
+          lat: first.lat,
+          lng: first.lng,
+          address: first.description,
+          name: first.main_text,
         });
       }
     } catch (error) {
@@ -783,7 +423,8 @@ export function LocationPicker({
                       >
                         <MapPin className={cn(
                           "h-4 w-4 mt-0.5 shrink-0",
-                          prediction.source === 'local' ? "text-green-500" : "text-primary"
+                          prediction.source === 'local' ? "text-green-500" : 
+                          prediction.source === 'google' ? "text-blue-500" : "text-primary"
                         )} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
@@ -796,6 +437,11 @@ export function LocationPicker({
                         {prediction.source === 'local' && (
                           <span className="text-[10px] bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded">
                             مقترح
+                          </span>
+                        )}
+                        {prediction.source === 'google' && (
+                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">
+                            Google
                           </span>
                         )}
                       </button>
