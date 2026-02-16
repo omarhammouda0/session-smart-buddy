@@ -830,7 +830,7 @@ export const SessionHistoryBar = ({
     if (!selectedStudent) return [];
     const todayStr = format(today, "yyyy-MM-dd");
 
-    // Private sessions
+    // Private sessions - upcoming scheduled sessions
     let sessions = selectedStudent.sessions
       .filter((session) => session.status === "scheduled" && session.date >= todayStr)
       .map((session) => ({
@@ -849,8 +849,12 @@ export const SessionHistoryBar = ({
       group.sessions.forEach(session => {
         if (session.date < todayStr) return;
 
+        // Check member's attendance status - default to session status if no attendance record
         const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
-        if (attendance && attendance.status === "scheduled") {
+        const memberStatus = attendance?.status || session.status;
+
+        // Include only scheduled sessions
+        if (memberStatus === "scheduled") {
           sessions.push({
             id: `group_${session.id}_${member.studentId}`,
             date: session.date,
@@ -879,10 +883,21 @@ export const SessionHistoryBar = ({
 
   const getHistorySessions = () => {
     if (!selectedStudent) return [];
+    const todayStr = format(today, "yyyy-MM-dd");
 
-    // Private sessions
+    // Private sessions - history includes completed, cancelled, vacation, AND past scheduled sessions
     let sessions = selectedStudent.sessions
-      .filter((s) => s.status === "completed" || s.status === "cancelled" || s.status === "vacation")
+      .filter((s) => {
+        // Include completed, cancelled, vacation regardless of date
+        if (s.status === "completed" || s.status === "cancelled" || s.status === "vacation") {
+          return true;
+        }
+        // Include past scheduled sessions (they should be in history)
+        if (s.status === "scheduled" && s.date < todayStr) {
+          return true;
+        }
+        return false;
+      })
       .map((s) => ({
         ...s,
         studentName: selectedStudent.name,
@@ -897,18 +912,40 @@ export const SessionHistoryBar = ({
       if (!member) return;
 
       group.sessions.forEach(session => {
+        // Check member's attendance status - default to session status if no attendance record
         const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
-        if (attendance && (attendance.status === "completed" || attendance.status === "cancelled" || attendance.status === "vacation")) {
+        const memberStatus = attendance?.status || session.status;
+
+        // Include completed, cancelled, vacation
+        if (memberStatus === "completed" || memberStatus === "cancelled" || memberStatus === "vacation") {
           sessions.push({
             id: `group_${session.id}_${member.studentId}`,
             date: session.date,
             time: session.time || group.sessionTime,
             duration: session.duration || group.sessionDuration,
-            status: attendance.status,
-            completed: attendance.status === "completed",
+            status: memberStatus,
+            completed: memberStatus === "completed",
             completedAt: session.completedAt,
             topic: session.topic,
-            notes: attendance.note || session.notes,
+            notes: attendance?.note || session.notes,
+            studentName: selectedStudent.name,
+            studentId: selectedStudent.id,
+            isGroupSession: true,
+            groupName: group.name,
+            history: [],
+          });
+        }
+        // Also include past scheduled group sessions
+        else if (memberStatus === "scheduled" && session.date < todayStr) {
+          sessions.push({
+            id: `group_${session.id}_${member.studentId}`,
+            date: session.date,
+            time: session.time || group.sessionTime,
+            duration: session.duration || group.sessionDuration,
+            status: "scheduled",
+            completed: false,
+            topic: session.topic,
+            notes: attendance?.note || session.notes,
             studentName: selectedStudent.name,
             studentId: selectedStudent.id,
             isGroupSession: true,
@@ -928,7 +965,10 @@ export const SessionHistoryBar = ({
   };
 
   const getHistoryStats = () => {
-    if (!selectedStudent) return { completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0, groupCompleted: 0, groupTotal: 0 };
+    if (!selectedStudent) return {
+      completed: 0, cancelled: 0, vacation: 0, total: 0, completionRate: 0,
+      groupCompleted: 0, groupCancelled: 0, groupVacation: 0, groupTotal: 0
+    };
 
     const { start, end } = getFilterDateRange();
 
@@ -947,6 +987,8 @@ export const SessionHistoryBar = ({
 
     // Group sessions for this student
     let groupCompleted = 0,
+      groupCancelled = 0,
+      groupVacation = 0,
       groupTotal = 0;
 
     groups.forEach(group => {
@@ -956,24 +998,39 @@ export const SessionHistoryBar = ({
       group.sessions.forEach(session => {
         if (session.date < start || session.date > end) return;
 
+        // Check member's attendance status - default to session status if no attendance record
         const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
-        if (attendance) {
+        const memberStatus = attendance?.status || session.status;
+
+        // Only count history statuses (completed, cancelled, vacation)
+        if (memberStatus === "completed" || memberStatus === "cancelled" || memberStatus === "vacation") {
           groupTotal++;
-          if (attendance.status === "completed") groupCompleted++;
+          if (memberStatus === "completed") groupCompleted++;
+          else if (memberStatus === "cancelled") groupCancelled++;
+          else if (memberStatus === "vacation") groupVacation++;
         }
       });
     });
 
     const total = completed + cancelled + vacation;
-    const rateTotal = completed + cancelled;
+
+    // Completion rate: completed / (completed + cancelled) - excludes vacation for meaningful rate
+    const privateRateTotal = completed + cancelled;
+    const groupRateTotal = groupCompleted + groupCancelled;
+    const combinedRateTotal = privateRateTotal + groupRateTotal;
+    const combinedCompleted = completed + groupCompleted;
+
+    const completionRate = combinedRateTotal > 0 ? Math.round((combinedCompleted / combinedRateTotal) * 100) : 0;
 
     return {
       completed,
       cancelled,
       vacation,
       total,
-      completionRate: rateTotal > 0 ? Math.round((completed / rateTotal) * 100) : 0,
+      completionRate,
       groupCompleted,
+      groupCancelled,
+      groupVacation,
       groupTotal,
     };
   };
@@ -998,18 +1055,20 @@ export const SessionHistoryBar = ({
 
       group.sessions.forEach(session => {
         if (session.date < todayStr) return;
+        // Check member's attendance status - default to session status if no attendance record
         const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
-        if (attendance && attendance.status === "scheduled") count++;
+        const memberStatus = attendance?.status || session.status;
+        if (memberStatus === "scheduled") count++;
       });
     });
     return count;
   }, [selectedStudent, groups, todayStr]);
 
-  // Combined counts
+  // Combined counts - include group cancelled and vacation
   const scheduledCount = privateScheduledCount + groupScheduledCount;
   const completedCount = historyStats.completed + historyStats.groupCompleted;
-  const cancelledCount = historyStats.cancelled;
-  const vacationCount = historyStats.vacation;
+  const cancelledCount = historyStats.cancelled + (historyStats.groupCancelled || 0);
+  const vacationCount = historyStats.vacation + (historyStats.groupVacation || 0);
 
   // Check if student has group sessions
   const hasGroupSessions = historyStats.groupTotal > 0 || groupScheduledCount > 0;

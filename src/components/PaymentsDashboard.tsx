@@ -101,17 +101,14 @@ const getStudentGroupMonthStats = (
       const sessionDate = new Date(session.date);
       if (sessionDate.getMonth() !== month || sessionDate.getFullYear() !== year) return;
 
-      // Check member's attendance status
+      // Check member's attendance status - default to session status if no attendance record
       const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
-      if (attendance) {
-        if (attendance.status === 'completed') completed++;
-        else if (attendance.status === 'vacation') vacation++;
-        else if (attendance.status === 'cancelled') cancelled++;
-        else if (attendance.status === 'scheduled') scheduled++;
-      } else if (session.status === 'scheduled') {
-        // If no attendance record but session is scheduled, count as scheduled
-        scheduled++;
-      }
+      const memberStatus = attendance?.status || session.status;
+
+      if (memberStatus === 'completed') completed++;
+      else if (memberStatus === 'vacation') vacation++;
+      else if (memberStatus === 'cancelled') cancelled++;
+      else if (memberStatus === 'scheduled') scheduled++;
     });
   });
 
@@ -205,13 +202,13 @@ const getStudentGroupSessionsDue = (
       const sessionDate = new Date(session.date);
       if (sessionDate.getMonth() !== month || sessionDate.getFullYear() !== year) return;
 
-      // Check if this session is completed or scheduled (billable)
-      if (session.status === 'completed' || session.status === 'scheduled') {
-        // Check member's attendance status
-        const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
-        if (attendance && (attendance.status === 'completed' || attendance.status === 'scheduled')) {
-          total += memberPrice;
-        }
+      // Check member's attendance status - default to session status if no attendance record
+      const attendance = session.memberAttendance.find(a => a.memberId === member.studentId);
+      const memberStatus = attendance?.status || session.status;
+
+      // Only count billable statuses (completed or scheduled)
+      if (memberStatus === 'completed' || memberStatus === 'scheduled') {
+        total += memberPrice;
       }
     });
   });
@@ -623,23 +620,28 @@ export const PaymentsDashboard = ({
 
     setSendingReminder(student.id);
     try {
-      // Calculate student stats for the message
-      const monthSessions = student.sessions.filter((s) => {
-        const d = new Date(s.date);
-        return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
-      });
-      const completedCount = monthSessions.filter((s) => s.status === "completed").length;
-      const scheduledCount = monthSessions.filter((s) => s.status === "scheduled").length;
-      const totalSessions = completedCount + scheduledCount;
+      // Calculate combined stats (private + group) for the message
+      const combinedStats = getStudentCombinedMonthStats(student, groups, selectedMonth, selectedYear);
+      const totalSessions = combinedStats.completed + combinedStats.scheduled;
 
-      // Calculate amount
-      const pricePerSession = student.sessionType === "online"
-        ? (student.customPriceOnline || settings.defaultPriceOnline || 100)
-        : (student.customPriceOnsite || settings.defaultPriceOnsite || 150);
-      const totalAmount = totalSessions * pricePerSession;
+      // Calculate combined amount due
+      const totalAmount = getStudentCombinedTotal(student, groups, selectedMonth, selectedYear, settings);
+      const amountPaid = getAmountPaid(student.id, selectedMonth, selectedYear);
+      const remaining = totalAmount - amountPaid;
 
-      // Build custom message
-      const customMessage = `عزيزي ولي الأمر،\nتذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}\nعدد الجلسات: ${totalSessions}\nالمبلغ المستحق: ${totalAmount} جنيه\nشكراً لتعاونكم`;
+      // Build custom message with group session breakdown if applicable
+      const sessionBreakdown = combinedStats.groupTotal > 0
+        ? ` (${combinedStats.privateCompleted + combinedStats.privateScheduled} فردي + ${combinedStats.groupCompleted + combinedStats.groupScheduled} مجموعة)`
+        : '';
+
+      let customMessage = `عزيزي ولي الأمر،\nتذكير بدفع رسوم شهر ${MONTH_NAMES_AR[selectedMonth]} لـ ${student.name}\nعدد الجلسات: ${totalSessions}${sessionBreakdown}\nالمبلغ المستحق: ${totalAmount} ${CURRENCY}`;
+
+      // Add partial payment info if applicable
+      if (amountPaid > 0 && remaining > 0) {
+        customMessage += `\nالمدفوع: ${amountPaid} ${CURRENCY}\nالمتبقي: ${remaining} ${CURRENCY}`;
+      }
+
+      customMessage += `\nشكراً لتعاونكم`;
 
       const { error } = await supabase.functions.invoke("send-whatsapp-reminder", {
         body: {
