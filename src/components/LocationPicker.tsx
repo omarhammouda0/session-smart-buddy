@@ -1,20 +1,9 @@
-import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogBody } from '@/components/ui/dialog';
-import { MapPin, Search, Navigation, X, ExternalLink } from 'lucide-react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix for default marker icon in Leaflet with bundlers
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+import { MapPin, Search, Navigation, X, ExternalLink, Loader2 } from 'lucide-react';
 
 export interface LocationData {
   lat: number;
@@ -31,23 +20,106 @@ interface LocationPickerProps {
   label?: string;
 }
 
-// Component to handle map clicks
-function MapClickHandler({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click: (e) => {
-      onLocationSelect(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
+// Lazy loaded map component
+interface MapComponentProps {
+  center: [number, number];
+  selectedLocation: LocationData | null;
+  onLocationSelect: (lat: number, lng: number) => void;
 }
 
-// Component to recenter map
-function MapRecenter({ center }: { center: [number, number] }) {
-  const map = useMap();
+function LazyMapComponent({ center, selectedLocation, onLocationSelect }: MapComponentProps) {
+  const [MapComponents, setMapComponents] = useState<any>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Dynamically import Leaflet and react-leaflet
   useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
-  return null;
+    let mounted = true;
+
+    const loadMap = async () => {
+      try {
+        // Import CSS
+        await import('leaflet/dist/leaflet.css');
+
+        // Import Leaflet
+        const L = await import('leaflet');
+
+        // Fix default marker icon
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+        });
+
+        // Import react-leaflet components
+        const RL = await import('react-leaflet');
+
+        if (mounted) {
+          setMapComponents(RL);
+          setIsLoaded(true);
+        }
+      } catch (error) {
+        console.error('Failed to load map:', error);
+      }
+    };
+
+    loadMap();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!isLoaded || !MapComponents) {
+    return (
+      <div className="h-full w-full rounded-lg border bg-muted flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="text-sm">جاري تحميل الخريطة...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const { MapContainer, TileLayer, Marker, useMapEvents, useMap } = MapComponents;
+
+  // Inner component for map events - must be inside MapContainer
+  function MapEventHandler() {
+    useMapEvents({
+      click: (e: any) => {
+        onLocationSelect(e.latlng.lat, e.latlng.lng);
+      },
+    });
+    return null;
+  }
+
+  // Inner component for recentering - must be inside MapContainer
+  function MapRecenter({ position }: { position: [number, number] }) {
+    const map = useMap();
+    useEffect(() => {
+      map.setView(position, map.getZoom());
+    }, [position, map]);
+    return null;
+  }
+
+  return (
+    <MapContainer
+      center={center}
+      zoom={13}
+      style={{ height: '100%', width: '100%' }}
+      scrollWheelZoom={true}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <MapEventHandler />
+      <MapRecenter position={center} />
+      {selectedLocation && (
+        <Marker position={[selectedLocation.lat, selectedLocation.lng]} />
+      )}
+    </MapContainer>
+  );
 }
 
 export function LocationPicker({
@@ -75,7 +147,7 @@ export function LocationPicker({
   }, [value]);
 
   // Reverse geocode to get address from coordinates
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ar`
@@ -86,10 +158,10 @@ export function LocationPicker({
       console.error('Reverse geocoding failed:', error);
       return '';
     }
-  };
+  }, []);
 
   // Search for location by name
-  const searchLocation = async () => {
+  const searchLocation = useCallback(async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
@@ -136,10 +208,10 @@ export function LocationPicker({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [searchQuery]);
 
   // Get current location using browser geolocation
-  const getCurrentLocation = () => {
+  const getCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
       alert('المتصفح لا يدعم تحديد الموقع');
       return;
@@ -172,10 +244,10 @@ export function LocationPicker({
         maximumAge: 0
       }
     );
-  };
+  }, [reverseGeocode]);
 
   // Handle map click
-  const handleMapClick = async (lat: number, lng: number) => {
+  const handleMapClick = useCallback(async (lat: number, lng: number) => {
     setIsLoadingAddress(true);
     const address = await reverseGeocode(lat, lng);
     setIsLoadingAddress(false);
@@ -185,23 +257,23 @@ export function LocationPicker({
       lng,
       address,
     });
-  };
+  }, [reverseGeocode]);
 
   // Confirm selection
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     onChange(selectedLocation);
     setIsOpen(false);
-  };
+  }, [onChange, selectedLocation]);
 
   // Clear selection
-  const handleClear = (e: React.MouseEvent) => {
+  const handleClear = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onChange(null);
     setSelectedLocation(null);
-  };
+  }, [onChange]);
 
   // Open location in Google Maps
-  const openInGoogleMaps = (e: React.MouseEvent) => {
+  const openInGoogleMaps = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (value) {
       window.open(
@@ -209,7 +281,7 @@ export function LocationPicker({
         '_blank'
       );
     }
-  };
+  }, [value]);
 
   return (
     <div className="space-y-2">
@@ -285,7 +357,7 @@ export function LocationPicker({
                 disabled={isSearching}
                 className="shrink-0"
               >
-                {isSearching ? '...' : 'بحث'}
+                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'بحث'}
               </Button>
               <Button
                 type="button"
@@ -301,26 +373,18 @@ export function LocationPicker({
 
             {/* Map */}
             <div className="h-[250px] sm:h-[350px] rounded-lg overflow-hidden border relative">
-              <MapContainer
+              <LazyMapComponent
                 center={mapCenter}
-                zoom={13}
-                style={{ height: '100%', width: '100%' }}
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <MapClickHandler onLocationSelect={handleMapClick} />
-                <MapRecenter center={mapCenter} />
-                {selectedLocation && (
-                  <Marker position={[selectedLocation.lat, selectedLocation.lng]} />
-                )}
-              </MapContainer>
+                selectedLocation={selectedLocation}
+                onLocationSelect={handleMapClick}
+              />
 
               {isLoadingAddress && (
-                <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-                  <div className="text-sm text-muted-foreground">جاري تحديد العنوان...</div>
+                <div className="absolute inset-0 bg-background/50 flex items-center justify-center pointer-events-none">
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    جاري تحديد العنوان...
+                  </div>
                 </div>
               )}
             </div>
