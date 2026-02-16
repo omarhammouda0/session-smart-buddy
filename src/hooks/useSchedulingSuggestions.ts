@@ -715,36 +715,47 @@ export const useSchedulingSuggestions = (
         }
       }
 
-      // RULE 9: Session type dominance (60% threshold)
-      if (day.totalSessions >= 2) {
+      // RULE 9: Session type dominance (60% threshold) - for mixed days
+      // Only apply if day has both types (mixed) and at least 2 sessions
+      if (day.totalSessions >= 2 && day.onlineSessions > 0 && day.onsiteSessions > 0) {
         const onsiteRatio = day.onsiteSessions / day.totalSessions;
         const onlineRatio = day.onlineSessions / day.totalSessions;
 
         suggestion.onsiteDominant = onsiteRatio >= 0.6;
         suggestion.onlineDominant = onlineRatio >= 0.6;
 
-        // Smart warning: adding opposite type to dominant day
+        // Smart warning: adding opposite type to dominant mixed day
         if (newSessionType === 'onsite' && suggestion.onlineDominant && !suggestion.isWarning) {
-          suggestion.travelConsideration = '💻 يوم أغلبه أونلاين - يفضل إبقاؤه للجلسات الأونلاين';
+          suggestion.message = `⚠️ يوم أغلبه أونلاين (${day.onlineSessions}/${day.totalSessions}) - غير مناسب للحضوري`;
+          suggestion.icon = 'alert';
+          suggestion.travelConsideration = '💻 يفضل إبقاء هذا اليوم للجلسات الأونلاين';
           suggestion.isRecommended = false;
+          suggestion.isWarning = true;
           suggestion.priority = 'low';
         }
 
-        // Smart recommendation: adding same type to dominant day
+        // Smart recommendation: adding same type to dominant mixed day
         if (newSessionType === 'onsite' && suggestion.onsiteDominant && !suggestion.isWarning) {
-          suggestion.travelConsideration = '🚗 يوم أغلبه حضوري - مناسب لتقليل التنقل';
+          suggestion.message = `✅ يوم أغلبه حضوري (${day.onsiteSessions}/${day.totalSessions}) - مناسب للحضوري`;
+          suggestion.icon = 'map-pin';
+          suggestion.travelConsideration = '🚗 تقليل التنقل - أضف جلستك الحضورية هنا';
           suggestion.isRecommended = true;
           suggestion.priority = 'high';
         }
 
         if (newSessionType === 'online' && suggestion.onsiteDominant && !suggestion.isWarning) {
-          suggestion.travelConsideration = '🏠 يوم أغلبه حضوري - يفضل إبقاؤه للجلسات الحضورية';
+          suggestion.message = `⚠️ يوم أغلبه حضوري (${day.onsiteSessions}/${day.totalSessions}) - غير مناسب للأونلاين`;
+          suggestion.icon = 'alert';
+          suggestion.travelConsideration = '🏠 يفضل إبقاء هذا اليوم للجلسات الحضورية';
           suggestion.isRecommended = false;
+          suggestion.isWarning = true;
           suggestion.priority = 'low';
         }
 
         if (newSessionType === 'online' && suggestion.onlineDominant && !suggestion.isWarning) {
-          suggestion.travelConsideration = '💻 يوم أغلبه أونلاين - مناسب للتنظيم';
+          suggestion.message = `✅ يوم أغلبه أونلاين (${day.onlineSessions}/${day.totalSessions}) - مناسب للأونلاين`;
+          suggestion.icon = 'monitor';
+          suggestion.travelConsideration = '💻 تنظيم أفضل - أضف جلستك الأونلاين هنا';
           suggestion.isRecommended = true;
           suggestion.priority = 'high';
         }
