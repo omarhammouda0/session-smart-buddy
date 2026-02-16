@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Auto Session Reminder - v4.0
+// Auto Session Reminder - v5.0
 // Runs on schedule (pg_cron) to send dual WhatsApp reminders at configurable intervals
-// UPDATED: Now supports multiple users - processes each user's settings and sessions separately
+// UPDATED v5.0: Added GROUP SESSION reminders - sends to all group members
+// UPDATED v4.0: Supports multiple users - processes each user's settings and sessions separately
 // This ensures reminders work even when the app is closed
 
 // Twilio credentials - must be configured in Supabase secrets
@@ -11,18 +12,9 @@ const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
 const TWILIO_WHATSAPP_FROM = Deno.env.get("TWILIO_WHATSAPP_FROM") || "whatsapp:+14155238886";
 
-// Germany timezone: CET (UTC+1) in winter, CEST (UTC+2) in summer
-function isDaylightSavingTime(date: Date): boolean {
-  const year = date.getUTCFullYear();
-  const marchLast = new Date(Date.UTC(year, 2, 31));
-  const dstStart = new Date(Date.UTC(year, 2, 31 - marchLast.getUTCDay(), 1, 0, 0));
-  const octLast = new Date(Date.UTC(year, 9, 31));
-  const dstEnd = new Date(Date.UTC(year, 9, 31 - octLast.getUTCDay(), 1, 0, 0));
-  return date >= dstStart && date < dstEnd;
-}
-
-function getGermanyTimezoneOffset(date: Date): number {
-  return isDaylightSavingTime(date) ? 2 : 1;
+// Egypt timezone: EET (UTC+2) - no daylight saving time
+function getEgyptTimezoneOffset(): number {
+  return 2; // Egypt is always UTC+2
 }
 
 const corsHeaders = {
@@ -30,20 +22,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Get current time in Germany timezone as components (more reliable than Date manipulation)
-function getGermanyTimeComponents(date: Date): { hours: number; minutes: number; dateStr: string; totalMinutes: number } {
-  const offset = getGermanyTimezoneOffset(date);
+// Get current time in Egypt timezone as components
+function getEgyptTimeComponents(date: Date): { hours: number; minutes: number; dateStr: string; totalMinutes: number } {
+  const offset = getEgyptTimezoneOffset();
   const utcHours = date.getUTCHours();
   const utcMinutes = date.getUTCMinutes();
 
-  let germanyHours = utcHours + offset;
+  let egyptHours = utcHours + offset;
   let dayOffset = 0;
 
-  if (germanyHours >= 24) {
-    germanyHours -= 24;
+  if (egyptHours >= 24) {
+    egyptHours -= 24;
     dayOffset = 1;
-  } else if (germanyHours < 0) {
-    germanyHours += 24;
+  } else if (egyptHours < 0) {
+    egyptHours += 24;
     dayOffset = -1;
   }
 
@@ -52,10 +44,10 @@ function getGermanyTimeComponents(date: Date): { hours: number; minutes: number;
   const dateStr = adjustedDate.toISOString().split('T')[0];
 
   return {
-    hours: germanyHours,
+    hours: egyptHours,
     minutes: utcMinutes,
     dateStr,
-    totalMinutes: germanyHours * 60 + utcMinutes
+    totalMinutes: egyptHours * 60 + utcMinutes
   };
 }
 
@@ -119,23 +111,23 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<{ su
   }
 }
 
-// Calculate minutes until a session from current Germany time
+// Calculate minutes until a session from current Egypt time
 function calculateMinutesUntilSession(
   sessionDate: string,
   sessionTime: string,
-  germanyNow: { dateStr: string; totalMinutes: number }
+  egyptNow: { dateStr: string; totalMinutes: number }
 ): number {
   const [sessionHour, sessionMinute] = sessionTime.split(':').map(Number);
   const sessionMinutesOfDay = sessionHour * 60 + sessionMinute;
 
-  if (sessionDate === germanyNow.dateStr) {
-    return sessionMinutesOfDay - germanyNow.totalMinutes;
-  } else if (sessionDate > germanyNow.dateStr) {
-    const nowDate = new Date(germanyNow.dateStr + 'T00:00:00Z');
+  if (sessionDate === egyptNow.dateStr) {
+    return sessionMinutesOfDay - egyptNow.totalMinutes;
+  } else if (sessionDate > egyptNow.dateStr) {
+    const nowDate = new Date(egyptNow.dateStr + 'T00:00:00Z');
     const sessDate = new Date(sessionDate + 'T00:00:00Z');
     const daysDiff = Math.round((sessDate.getTime() - nowDate.getTime()) / (24 * 60 * 60 * 1000));
 
-    const minutesRemainingToday = 24 * 60 - germanyNow.totalMinutes;
+    const minutesRemainingToday = 24 * 60 - egyptNow.totalMinutes;
     const fullDaysMinutes = (daysDiff - 1) * 24 * 60;
     return minutesRemainingToday + fullDaysMinutes + sessionMinutesOfDay;
   } else {
@@ -152,14 +144,14 @@ serve(async (req) => {
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  console.log("=== Auto Session Reminder v4.0 (Multi-User Support) ===");
+  console.log("=== Auto Session Reminder v5.0 (Multi-User + Group Support) ===");
 
   try {
     const now = new Date();
-    const germanyNow = getGermanyTimeComponents(now);
+    const egyptNow = getEgyptTimeComponents(now);
 
     console.log(`UTC: ${now.toISOString()}`);
-    console.log(`Germany: ${germanyNow.dateStr} ${String(germanyNow.hours).padStart(2, '0')}:${String(germanyNow.minutes).padStart(2, '0')}`);
+    console.log(`Egypt: ${egyptNow.dateStr} ${String(egyptNow.hours).padStart(2, '0')}:${String(egyptNow.minutes).padStart(2, '0')}`);
 
     // Check Twilio credentials early
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
@@ -261,14 +253,14 @@ serve(async (req) => {
       console.log(`Reminder windows: ${reminderIntervals.map(r => `${r.hours}h: (${r.windowMin.toFixed(1)}, ${r.windowMax.toFixed(1)}]`).join(', ')}`);
 
       // Calculate date range
-      const today = germanyNow.dateStr;
+      const today = egyptNow.dateStr;
       const maxLookaheadMs = Math.max(longerHours, 48) * 60 * 60 * 1000;
       const futureDate = new Date(now.getTime() + maxLookaheadMs);
       const endDate = futureDate.toISOString().split('T')[0];
 
       console.log(`Checking sessions from ${today} to ${endDate}`);
 
-      // Fetch sessions for THIS USER's students only
+      // Fetch PRIVATE sessions for THIS USER's students only
       // Join through students table to filter by user_id
       const { data: sessions, error: sessionsError } = await supabase
         .from('sessions')
@@ -321,7 +313,7 @@ serve(async (req) => {
           const studentName = studentData?.name || 'الطالب';
           const studentId = studentData?.id;
 
-          const minutesUntilSession = calculateMinutesUntilSession(session.date, sessionTime, germanyNow);
+          const minutesUntilSession = calculateMinutesUntilSession(session.date, sessionTime, egyptNow);
           const hoursUntilSession = minutesUntilSession / 60;
 
           // Log each session for debugging
@@ -400,6 +392,144 @@ serve(async (req) => {
         userTotalSent += sentCount;
         userTotalSkipped += skippedCount;
         userTotalErrors += errorCount;
+      }
+
+      // ========================================
+      // GROUP SESSIONS REMINDERS
+      // ========================================
+      console.log(`\n--- Processing GROUP sessions for user ${userId} ---`);
+
+      // Fetch group sessions for this user
+      const { data: groupSessions, error: groupSessionsError } = await supabase
+        .from('group_sessions')
+        .select(`
+          id,
+          date,
+          time,
+          status,
+          group_id,
+          student_groups!inner (
+            id,
+            name,
+            user_id,
+            session_time,
+            members
+          )
+        `)
+        .eq('status', 'scheduled')
+        .eq('student_groups.user_id', userId)
+        .gte('date', today)
+        .lte('date', endDate);
+
+      if (groupSessionsError) {
+        console.error(`Error fetching group sessions for user ${userId}:`, groupSessionsError);
+      } else if (groupSessions && groupSessions.length > 0) {
+        console.log(`Found ${groupSessions.length} scheduled GROUP sessions for user ${userId}`);
+
+        // Create group-specific templates
+        const groupTemplate1 = reminderTemplate1
+          .replace('لديك جلسة', 'لديك حصة مجموعة')
+          .replace('جلسة غداً', 'حصة مجموعة غداً');
+        const groupTemplate2 = reminderTemplate2
+          .replace('جلستك', 'حصة المجموعة')
+          .replace('جلسة', 'حصة مجموعة');
+
+        const groupReminderIntervals = [
+          { hours: reminderHours1, interval: 1, template: groupTemplate1, windowMin: reminderIntervals[0].windowMin, windowMax: reminderIntervals[0].windowMax },
+          { hours: reminderHours2, interval: 2, template: groupTemplate2, windowMin: reminderIntervals[1].windowMin, windowMax: reminderIntervals[1].windowMax }
+        ];
+
+        // Process each group session
+        for (const groupSession of groupSessions) {
+          const groupData = Array.isArray(groupSession.student_groups) ? groupSession.student_groups[0] : groupSession.student_groups;
+          if (!groupData) continue;
+
+          const sessionTime = groupSession.time || groupData.session_time || '16:00';
+          const groupName = groupData.name || 'المجموعة';
+          const members = groupData.members || [];
+
+          const minutesUntilSession = calculateMinutesUntilSession(groupSession.date, sessionTime, egyptNow);
+          const hoursUntilSession = minutesUntilSession / 60;
+
+          console.log(`  Group Session ${groupSession.id}: ${groupSession.date} ${sessionTime}, "${groupName}" (${members.length} members), ${hoursUntilSession.toFixed(2)}h away`);
+
+          // Process each reminder interval for groups
+          for (const { hours, interval, template, windowMin, windowMax } of groupReminderIntervals) {
+            if (hoursUntilSession > windowMax || hoursUntilSession <= windowMin || hoursUntilSession < 0) {
+              continue; // Outside window
+            }
+
+            // Send reminder to each active member
+            for (const member of members) {
+              if (!member.isActive) continue;
+
+              const memberPhone = member.phone;
+              const memberName = member.studentName || 'الطالب';
+              const memberId = member.studentId;
+
+              if (!memberPhone) {
+                console.log(`    → Skip member ${memberName} - no phone`);
+                userTotalSkipped++;
+                continue;
+              }
+
+              // Check if reminder already sent for this member + session + interval
+              const logKey = `group_${groupSession.id}_${memberId}_${interval}`;
+              const { data: existingReminder } = await supabase
+                .from('reminder_log')
+                .select('id')
+                .eq('session_id', logKey)
+                .eq('type', 'group_session')
+                .eq('reminder_interval', interval)
+                .eq('status', 'sent')
+                .maybeSingle();
+
+              if (existingReminder) {
+                console.log(`    → Skip ${memberName} - already sent`);
+                userTotalSkipped++;
+                continue;
+              }
+
+              const message = template
+                .replace(/{student_name}/g, memberName)
+                .replace(/{group_name}/g, groupName)
+                .replace(/{date}/g, groupSession.date)
+                .replace(/{time}/g, sessionTime);
+
+              console.log(`    ➤ Sending to ${memberName} for group "${groupName}"`);
+
+              const result = await sendWhatsAppMessage(memberPhone, message);
+
+              // Log the reminder
+              await supabase.from('reminder_log').insert({
+                user_id: userId,
+                type: 'group_session',
+                student_id: memberId,
+                student_name: memberName,
+                phone_number: memberPhone,
+                message_text: message,
+                status: result.success ? 'sent' : 'failed',
+                twilio_message_sid: result.messageSid,
+                error_message: result.error,
+                session_id: logKey,
+                session_date: groupSession.date,
+                reminder_interval: interval,
+              });
+
+              if (result.success) {
+                console.log(`      ✓ Sent to ${memberName}`);
+                userTotalSent++;
+                globalResults.push({ userId, type: 'group', groupId: groupSession.group_id, memberId, interval, status: 'sent' });
+              } else {
+                console.error(`      ✗ Failed for ${memberName}: ${result.error}`);
+                userTotalErrors++;
+                globalResults.push({ userId, type: 'group', groupId: groupSession.group_id, memberId, interval, status: 'failed', error: result.error });
+              }
+            }
+          }
+        }
+      } else {
+        console.log(`No scheduled group sessions for user ${userId}`);
       }
 
       console.log(`User ${userId} totals: ${userTotalSent} sent, ${userTotalSkipped} skipped, ${userTotalErrors} errors`);

@@ -4,6 +4,11 @@
 
 The system automatically sends WhatsApp reminders to students (or their parents) before their scheduled sessions. This works **even when the app is closed** because it runs server-side via Supabase Edge Functions + pg_cron.
 
+**Version 5.0**: 
+- Added **GROUP SESSION reminders** - sends to all active group members
+- Changed timezone from Germany to **Egypt (UTC+2)**
+- Improved template handling for group sessions
+
 **Version 3.1**: Fixed template selection bug - now uses specific time windows instead of gap-filling.
 
 ---
@@ -15,11 +20,21 @@ The system automatically sends WhatsApp reminders to students (or their parents)
 │  pg_cron (every 5 minutes)                                  │
 │    └── auto-session-reminder edge function                  │
 │          ├── Checks reminder_settings table                 │
-│          ├── Finds sessions within reminder window          │
+│          ├── Finds PRIVATE sessions within reminder window  │
+│          ├── Finds GROUP sessions within reminder window    │
 │          ├── Checks reminder_log for duplicates             │
 │          └── Sends WhatsApp DIRECTLY via Twilio API         │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Session Types Supported
+
+| Type | Description | Recipients |
+|------|-------------|------------|
+| **Private Sessions** | Individual student sessions | Student or parent phone |
+| **Group Sessions** | Group class sessions (v5.0+) | All active group members |
 
 ---
 
@@ -131,8 +146,8 @@ Each reminder is tracked in `reminder_log` with:
 
 ## Timezone Handling
 
-- Uses **Germany timezone** (CET/CEST)
-- Automatically adjusts for daylight saving time
+- Uses **Egypt timezone** (EET, UTC+2)
+- Egypt does not observe daylight saving time
 - Sessions are scheduled in local time
 
 ---
