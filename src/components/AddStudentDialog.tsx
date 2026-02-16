@@ -34,7 +34,7 @@ interface DaySchedule {
 }
 
 interface AddStudentDialogProps {
-  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number, materials?: StudentMaterial[], useCustomPrices?: boolean, customPriceOnsite?: number, customPriceOnline?: number, scheduleMode?: ScheduleMode, sessionsPerWeek?: number, daySchedules?: DaySchedule[]) => void;
+  onAdd: (name: string, scheduleDays: number[], sessionTime: string, sessionType: SessionType, phone?: string, parentPhone?: string, customStart?: string, customEnd?: string, sessionDuration?: number, materials?: StudentMaterial[], useCustomPrices?: boolean, customPriceOnsite?: number, customPriceOnline?: number, scheduleMode?: ScheduleMode, sessionsPerWeek?: number, daySchedules?: DaySchedule[], location?: LocationData | null) => void;
   defaultStart: string;
   defaultEnd: string;
   students?: Student[];
@@ -219,7 +219,8 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       useCustomPrices ? customPriceOnline : undefined,
       'days', // Always use 'days' mode now
       undefined, // No sessionsPerWeek
-      daySchedules // Pass the full day schedules with times
+      daySchedules, // Pass the full day schedules with times
+      sessionType === 'onsite' ? location : null // Pass location for onsite sessions
     );
     resetForm();
     setOpen(false);

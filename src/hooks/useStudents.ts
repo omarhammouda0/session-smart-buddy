@@ -41,6 +41,7 @@ interface DbStudent {
   cancellation_monthly_limit: number | null;
   cancellation_alert_tutor: boolean | null;
   cancellation_auto_notify_parent: boolean | null;
+  location: { lat: number; lng: number; address?: string; name?: string } | null; // Geographic location for onsite sessions
   created_at: string;
   updated_at: string;
 }
@@ -154,6 +155,7 @@ const dbStudentToStudent = (dbStudent: DbStudent, sessions: Session[]): Student 
       alertTutor: dbStudent.cancellation_alert_tutor ?? true,
       autoNotifyParent: dbStudent.cancellation_auto_notify_parent ?? true,
     },
+    location: dbStudent.location || undefined,
   };
 };
 
@@ -543,6 +545,7 @@ export const useStudents = () => {
       scheduleMode: ScheduleMode = "days",
       sessionsPerWeek?: number,
       daySchedules?: Array<{ dayOfWeek: number; time: string }>,
+      location?: { lat: number; lng: number; address?: string; name?: string } | null,
     ) => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
@@ -589,6 +592,7 @@ export const useStudents = () => {
           cancellation_monthly_limit: 3,
           cancellation_alert_tutor: true,
           cancellation_auto_notify_parent: true,
+          location: sessionType === "onsite" && location ? location : null,
         })
         .select()
         .single();
