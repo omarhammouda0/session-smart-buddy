@@ -285,6 +285,57 @@ const calculateMonthlyAmountDue = (student: Student, month: number, year: number
   return billableSessions.length * sessionPrice;
 };
 
+// Calculate amount due for a month based on an array of session dates (for new students/schedules)
+const calculateAmountDueFromSessionDates = (
+  sessionDates: string[],
+  month: number,
+  year: number,
+  sessionType: "online" | "onsite",
+  useCustomPrices: boolean,
+  customPriceOnsite: number | undefined,
+
+  customPriceOnline: number | undefined,
+  settings?: AppSettings
+): number => {
+  const defaultOnsite = 150;
+  const defaultOnline = 120;
+
+  let sessionPrice: number;
+  if (useCustomPrices) {
+    if (sessionType === "online") {
+      sessionPrice =
+        typeof customPriceOnline === "number" && customPriceOnline > 0
+          ? customPriceOnline
+          : (settings?.defaultPriceOnline ?? defaultOnline);
+    } else {
+      sessionPrice =
+        typeof customPriceOnsite === "number" && customPriceOnsite > 0
+          ? customPriceOnsite
+          : (settings?.defaultPriceOnsite ?? defaultOnsite);
+    }
+  } else {
+    if (sessionType === "online") {
+      sessionPrice =
+        typeof settings?.defaultPriceOnline === "number" && settings.defaultPriceOnline > 0
+          ? settings.defaultPriceOnline
+          : defaultOnline;
+    } else {
+      sessionPrice =
+        typeof settings?.defaultPriceOnsite === "number" && settings.defaultPriceOnsite > 0
+          ? settings.defaultPriceOnsite
+          : defaultOnsite;
+    }
+  }
+
+  // Count sessions in this month
+  const sessionsInMonth = sessionDates.filter((dateStr) => {
+    const sessionDate = new Date(dateStr);
+    return sessionDate.getMonth() === month && sessionDate.getFullYear() === year;
+  });
+
+  return sessionsInMonth.length * sessionPrice;
+};
+
 // ============================================================================
 // MAIN HOOK
 // ============================================================================
@@ -635,18 +686,33 @@ export const useStudents = () => {
         }
       }
 
-      // Create monthly payment records
+      // Create monthly payment records with calculated amount_due
       const months = getMonthsInSemester(semesterStart, semesterEnd);
-      const paymentsToInsert = months.map(({ month, year }) => ({
-        student_id: studentData.id,
-        user_id: currentUserId,
-        month,
-        year,
-        is_paid: false,
-        amount_due: 0,
-        amount_paid: 0,
-        payment_status: "unpaid",
-      }));
+      const allSessionDates = sessionsToInsert.map(s => s.date);
+
+      const paymentsToInsert = months.map(({ month, year }) => {
+        const amountDue = calculateAmountDueFromSessionDates(
+          allSessionDates,
+          month,
+          year,
+          sessionType,
+          useCustomPrices || false,
+          customPriceOnsite,
+          customPriceOnline,
+          settings
+        );
+
+        return {
+          student_id: studentData.id,
+          user_id: currentUserId,
+          month,
+          year,
+          is_paid: false,
+          amount_due: amountDue,
+          amount_paid: 0,
+          payment_status: "unpaid",
+        };
+      });
 
       if (paymentsToInsert.length > 0) {
         const { error: paymentsError } = await supabase.from("monthly_payments").insert(paymentsToInsert);
@@ -959,19 +1025,39 @@ export const useStudents = () => {
 
         const existingPaymentKeys = new Set((existingPayments || []).map((p: { year: number; month: number }) => `${p.year}-${p.month}`));
 
-        // Add missing payment months
+        // Combine existing sessions with new sessions for amount calculation
+        const existingSessionDates = (existingSessions || [])
+          .filter((s: { status: string }) => s.status === "scheduled" || s.status === "completed")
+          .map((s: { date: string }) => s.date);
+        const newSessionDates = sessionsToAdd.map(s => s.date);
+        const allSessionDates = [...existingSessionDates, ...newSessionDates];
+
+        // Add missing payment months with calculated amount_due
         const paymentsToAdd = months
           .filter(({ month, year }) => !existingPaymentKeys.has(`${year}-${month}`))
-          .map(({ month, year }) => ({
-            student_id: studentId,
-            user_id: currentUserId,
-            month,
-            year,
-            is_paid: false,
-            amount_due: 0,
-            amount_paid: 0,
-            payment_status: "unpaid",
-          }));
+          .map(({ month, year }) => {
+            const amountDue = calculateAmountDueFromSessionDates(
+              allSessionDates,
+              month,
+              year,
+              student.sessionType as "online" | "onsite",
+              student.useCustomSettings || false,
+              student.customPriceOnsite,
+              student.customPriceOnline,
+              settings
+            );
+
+            return {
+              student_id: studentId,
+              user_id: currentUserId,
+              month,
+              year,
+              is_paid: false,
+              amount_due: amountDue,
+              amount_paid: 0,
+              payment_status: "unpaid",
+            };
+          });
 
         if (paymentsToAdd.length > 0) {
           await supabase.from("monthly_payments").insert(paymentsToAdd);
@@ -980,7 +1066,7 @@ export const useStudents = () => {
 
       await loadData();
     },
-    [getUserId, students, loadData],
+    [getUserId, students, settings, loadData],
   );
 
   // ============================================================================
