@@ -52,6 +52,8 @@ import {
   Grid3X3,
   Check,
   Ban,
+  Lightbulb,
+  Navigation2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -73,6 +75,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useConflictDetection } from "@/hooks/useConflictDetection";
+import { useSchedulingSuggestions } from "@/hooks/useSchedulingSuggestions";
 import { useGroups } from "@/hooks/useGroups";
 import { StudentGroup, GroupSession } from "@/types/student";
 import { GroupAttendanceDialog } from "@/components/GroupAttendanceDialog";
@@ -148,6 +151,29 @@ export const CalendarView = ({
 
   // Get available slots from conflict detection hook - now includes groups for proper conflict detection
   const { getSuggestedSlots, checkConflict } = useConflictDetection(students, activeGroups);
+
+  // Get scheduling suggestions based on selected student/group for location and time recommendations
+  const getSchedulingSuggestionsForSelection = useCallback((studentId: string | null, groupId: string | null) => {
+    if (studentId) {
+      const student = students.find(s => s.id === studentId);
+      if (student) {
+        return {
+          sessionType: student.sessionType,
+          location: student.location,
+        };
+      }
+    }
+    if (groupId) {
+      const group = activeGroups.find(g => g.id === groupId);
+      if (group) {
+        return {
+          sessionType: group.sessionType,
+          location: group.location,
+        };
+      }
+    }
+    return null;
+  }, [students, activeGroups]);
 
   // Add Session Dialog State - supports both students and groups
   const [addSessionDialog, setAddSessionDialog] = useState<{
@@ -2594,6 +2620,197 @@ export const CalendarView = ({
                       </Button>
                     ))}
                   </div>
+                </div>
+              );
+            })()}
+
+            {/* Smart Scheduling Suggestions - Location & Proximity Based */}
+            {addSessionDialog && (addSessionDialog.selectedStudentId || addSessionDialog.selectedGroupId) && (() => {
+              const selectedStudent = addSessionDialog.sessionType === 'student'
+                ? students.find((s) => s.id === addSessionDialog.selectedStudentId)
+                : null;
+              const selectedGroup = addSessionDialog.sessionType === 'group'
+                ? activeGroups.find((g) => g.id === addSessionDialog.selectedGroupId)
+                : null;
+
+              const sessionType = selectedStudent?.sessionType || selectedGroup?.sessionType;
+              const location = selectedStudent?.location || selectedGroup?.location;
+              const selectedDate = parseISO(addSessionDialog.date);
+              const dayOfWeek = selectedDate.getDay();
+
+              // Find sessions on the same date
+              const sessionsOnDate = sessionsByDate.get(addSessionDialog.date) || [];
+
+              // Find nearby students (for onsite sessions with location)
+              const nearbyStudentSuggestions: Array<{
+                studentName: string;
+                time: string;
+                timeAr: string;
+                distanceKm: number;
+                suggestedTime: string;
+                suggestedTimeAr: string;
+                placement: 'before' | 'after';
+              }> = [];
+
+              if (sessionType === 'onsite' && location) {
+                // Find onsite sessions on same day with location
+                sessionsOnDate.forEach(({ session, student, isGroup, group }) => {
+                  const otherLocation = isGroup ? group?.location : student.location;
+                  const otherSessionType = isGroup ? group?.sessionType : student.sessionType;
+
+                  if (otherSessionType === 'onsite' && otherLocation && session.status === 'scheduled') {
+                    // Calculate distance
+                    const R = 6371; // Earth's radius in km
+                    const dLat = (otherLocation.lat - location.lat) * Math.PI / 180;
+                    const dLon = (otherLocation.lng - location.lng) * Math.PI / 180;
+                    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                              Math.cos(location.lat * Math.PI / 180) * Math.cos(otherLocation.lat * Math.PI / 180) *
+                              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    const distanceKm = R * c;
+
+                    // If within 10km, suggest scheduling before/after
+                    if (distanceKm <= 10) {
+                      const otherTime = session.time || student.sessionTime || "16:00";
+                      const [h, m] = otherTime.split(':').map(Number);
+                      const otherMinutes = h * 60 + m;
+                      const duration = session.duration || student.sessionDuration || 60;
+
+                      // Suggest 30 min gap for travel
+                      const beforeTime = otherMinutes - duration - 30;
+                      const afterTime = otherMinutes + duration + 30;
+
+                      const formatTime = (mins: number) => {
+                        const hours = Math.floor(mins / 60);
+                        const minutes = mins % 60;
+                        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                      };
+
+                      const formatTimeAr = (time: string) => {
+                        const [hr, min] = time.split(':').map(Number);
+                        const period = hr >= 12 ? 'م' : 'ص';
+                        const hour12 = hr % 12 || 12;
+                        return `${hour12}:${String(min).padStart(2, '0')} ${period}`;
+                      };
+
+                      const displayName = isGroup ? `👥 ${group?.name}` : student.name;
+
+                      if (beforeTime >= 8 * 60) {
+                        nearbyStudentSuggestions.push({
+                          studentName: displayName,
+                          time: otherTime,
+                          timeAr: formatTimeAr(otherTime),
+                          distanceKm,
+                          suggestedTime: formatTime(beforeTime),
+                          suggestedTimeAr: formatTimeAr(formatTime(beforeTime)),
+                          placement: 'before',
+                        });
+                      }
+
+                      if (afterTime <= 22 * 60) {
+                        nearbyStudentSuggestions.push({
+                          studentName: displayName,
+                          time: otherTime,
+                          timeAr: formatTimeAr(otherTime),
+                          distanceKm,
+                          suggestedTime: formatTime(afterTime),
+                          suggestedTimeAr: formatTimeAr(formatTime(afterTime)),
+                          placement: 'after',
+                        });
+                      }
+                    }
+                  }
+                });
+              }
+
+              // Day analysis for smart tips
+              const onsiteCount = sessionsOnDate.filter(s =>
+                (s.isGroup ? s.group?.sessionType : s.student.sessionType) === 'onsite' &&
+                s.session.status === 'scheduled'
+              ).length;
+              const onlineCount = sessionsOnDate.filter(s =>
+                (s.isGroup ? s.group?.sessionType : s.student.sessionType) === 'online' &&
+                s.session.status === 'scheduled'
+              ).length;
+              const totalOnDay = onsiteCount + onlineCount;
+
+              const tips: string[] = [];
+
+              // Day load tips
+              if (totalOnDay >= 5) {
+                tips.push('⚠️ هذا اليوم مزدحم - فكر في يوم آخر');
+              } else if (totalOnDay === 0) {
+                tips.push('✨ هذا اليوم فارغ - خيار ممتاز');
+              }
+
+              // Session type clustering tips
+              if (sessionType === 'onsite') {
+                if (onsiteCount >= 2 && onlineCount === 0) {
+                  tips.push('🚗 يوم حضوري - مناسب لتجميع الجلسات الحضورية');
+                } else if (onlineCount >= 2 && onsiteCount === 0) {
+                  tips.push('💡 معظم الجلسات أونلاين - قد يكون من الأفضل اختيار يوم آخر للحضوري');
+                }
+              } else if (sessionType === 'online') {
+                if (onlineCount >= 2 && onsiteCount === 0) {
+                  tips.push('💻 يوم أونلاين - مناسب لتجميع الجلسات');
+                } else if (onsiteCount >= 2 && onlineCount === 0) {
+                  tips.push('💡 معظم الجلسات حضوري - قد يكون من الأفضل اختيار يوم آخر للأونلاين');
+                }
+              }
+
+              // Location tip
+              if (sessionType === 'onsite' && location) {
+                tips.push(`📍 الموقع: ${location.address || location.name || 'محدد'}`);
+              }
+
+              const hasContent = nearbyStudentSuggestions.length > 0 || tips.length > 0;
+              if (!hasContent) return null;
+
+              return (
+                <div className="space-y-3">
+                  {/* Smart Tips */}
+                  {tips.length > 0 && (
+                    <div className="p-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/50">
+                      <div className="flex items-start gap-2">
+                        <Lightbulb className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          {tips.slice(0, 3).map((tip, i) => (
+                            <p key={i} className="text-xs text-blue-600 dark:text-blue-400">{tip}</p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nearby Students / Location-Based Suggestions */}
+                  {nearbyStudentSuggestions.length > 0 && (
+                    <div className="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50">
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                        <Navigation2 className="h-3.5 w-3.5" />
+                        جلسات قريبة (وفر وقت التنقل)
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {nearbyStudentSuggestions.slice(0, 3).map((suggestion, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setAddSessionDialog({ ...addSessionDialog, time: suggestion.suggestedTime })}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                              addSessionDialog.time === suggestion.suggestedTime
+                                ? "bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200"
+                                : "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70"
+                            )}
+                          >
+                            <span>{suggestion.placement === 'before' ? 'قبل' : 'بعد'} {suggestion.studentName}</span>
+                            <span className="text-amber-500">•</span>
+                            <span>{suggestion.suggestedTimeAr}</span>
+                            <span className="text-[10px] text-amber-500">({suggestion.distanceKm.toFixed(1)} كم)</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
