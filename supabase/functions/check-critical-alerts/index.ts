@@ -394,10 +394,19 @@ serve(async (req) => {
         if (minutesUntilSession >= 15 && minutesUntilSession <= 45) {
           const conditionKey = `pre_session_30min:${session.id}:${today}`;
 
-          // Get last session notes for this student
+          // Get last session notes for this student (content column, not notes)
           const { data: lastNotes } = await supabase
               .from('session_notes')
-              .select('notes, homework_status')
+              .select('content')
+              .eq('student_id', student?.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+          // Get last homework status for this student from homework table
+          const { data: lastHomework } = await supabase
+              .from('homework')
+              .select('status')
               .eq('student_id', student?.id)
               .order('created_at', { ascending: false })
               .limit(1)
@@ -405,20 +414,20 @@ serve(async (req) => {
 
           let bodyText = `📚 حصة ${student?.name || 'طالب'} كمان ${toArabicNumerals(Math.round(minutesUntilSession))} دقيقة`;
 
-          if (lastNotes?.notes) {
-            const truncatedNotes = lastNotes.notes.length > 50
-                ? lastNotes.notes.substring(0, 50) + '...'
-                : lastNotes.notes;
+          if (lastNotes?.content) {
+            const truncatedNotes = lastNotes.content.length > 50
+                ? lastNotes.content.substring(0, 50) + '...'
+                : lastNotes.content;
             bodyText += `\nآخر ملاحظة: ${truncatedNotes}`;
           }
 
-          // Add homework status
-          if (lastNotes?.homework_status === 'assigned') {
+          // Add homework status from homework table
+          if (lastHomework?.status === 'pending') {
             bodyText += '\nالواجب: واجب لم يُراجع';
-          } else if (lastNotes?.homework_status === 'completed') {
+          } else if (lastHomework?.status === 'completed') {
             bodyText += '\nالواجب: واجب مكتمل ✓';
-          } else if (lastNotes?.homework_status === 'incomplete') {
-            bodyText += '\nالواجب: واجب غير مكتمل ✗';
+          } else if (lastHomework?.status === 'overdue') {
+            bodyText += '\nالواجب: واجب متأخر ✗';
           }
 
           alerts.push({
