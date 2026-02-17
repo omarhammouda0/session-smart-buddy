@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Student, Session } from "@/types/student";
+import { Student, Session, StudentGroup, GroupSession } from "@/types/student";
 
 export type ConflictSeverity = "none" | "warning" | "error";
 export type ConflictType = "exact" | "partial" | "close" | "none";
@@ -12,8 +12,8 @@ export interface ConflictResult {
 }
 
 export interface ConflictDetail {
-  session: Session;
-  student: Student;
+  session: Session | GroupSession;
+  student: Student | { name: string; id: string; sessionType?: string };
   type: ConflictType;
   gap?: number; // Gap in minutes for 'close' type
   message: string;
@@ -59,10 +59,10 @@ export const formatTimeAr = (time: string): string => {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 };
 
-export const useConflictDetection = (students: Student[]) => {
+export const useConflictDetection = (students: Student[], groups: StudentGroup[] = []) => {
   /**
    * Check for conflicts when adding/editing a session
-   * Note: We check ALL students including the same student to prevent overlapping sessions
+   * Note: We check ALL students and groups to prevent overlapping sessions
    */
   const checkConflict = useCallback(
     (
@@ -160,11 +160,97 @@ export const useConflictDetection = (students: Student[]) => {
         });
       });
 
+      // Also check GROUP sessions for conflicts
+      groups.forEach((group) => {
+        // Skip if this is the same group being edited (excludeSessionId starts with "group_")
+        const isExcludedGroup = excludeSessionId?.startsWith(`group_${group.id}`);
+
+        group.sessions.forEach((session) => {
+          // Skip excluded session
+          if (excludeSessionId && session.id === excludeSessionId) return;
+          if (isExcludedGroup && session.id === excludeSessionId) return;
+          // Skip cancelled/vacation sessions
+          if (session.status === "cancelled" || session.status === "vacation") return;
+          // Only check same date
+          if (session.date !== date) return;
+
+          const sessionStartTime = session.time || group.sessionTime || "16:00";
+          const otherStartMinutes = timeToMinutes(sessionStartTime);
+          const otherEndMinutes = otherStartMinutes + (session.duration || group.sessionDuration || DEFAULT_SESSION_DURATION);
+
+          // Create a pseudo-student object for the group
+          const groupAsStudent = { name: `مجموعة ${group.name}`, id: group.id, sessionType: group.sessionType };
+
+          // Check exact overlap
+          if (startMinutes === otherStartMinutes) {
+            conflicts.push({
+              session,
+              student: groupAsStudent,
+              type: "exact",
+              message: `Conflicts with group ${group.name}'s session at same time`,
+              messageAr: `تعارض مع جلسة مجموعة ${group.name} في نفس الوقت`,
+            });
+            highestSeverity = "error";
+            highestType = "exact";
+            return;
+          }
+
+          // Check partial overlap
+          const overlaps =
+            (startMinutes >= otherStartMinutes && startMinutes < otherEndMinutes) ||
+            (endMinutes > otherStartMinutes && endMinutes <= otherEndMinutes) ||
+            (startMinutes <= otherStartMinutes && endMinutes >= otherEndMinutes);
+
+          if (overlaps) {
+            conflicts.push({
+              session,
+              student: groupAsStudent,
+              type: "partial",
+              message: `Overlaps with group ${group.name}'s session`,
+              messageAr: `تداخل مع جلسة مجموعة ${group.name}`,
+            });
+            highestSeverity = "error";
+            if (highestType !== "exact") highestType = "partial";
+            return;
+          }
+
+          // Check close sessions (< 30 min gap)
+          const gapBefore = otherStartMinutes - endMinutes;
+          const gapAfter = startMinutes - otherEndMinutes;
+
+          if (gapBefore >= 0 && gapBefore < MIN_GAP_MINUTES) {
+            conflicts.push({
+              session,
+              student: groupAsStudent,
+              type: "close",
+              gap: gapBefore,
+              message: `Only ${gapBefore} min gap before group ${group.name}'s session`,
+              messageAr: `فاصل ${gapBefore} دقيقة فقط قبل جلسة مجموعة ${group.name}`,
+            });
+            if (highestSeverity !== "error") highestSeverity = "warning";
+            if (highestType === "none") highestType = "close";
+          } else if (gapAfter >= 0 && gapAfter < MIN_GAP_MINUTES) {
+            conflicts.push({
+              session,
+              student: groupAsStudent,
+              type: "close",
+              gap: gapAfter,
+              message: `Only ${gapAfter} min gap after group ${group.name}'s session`,
+              messageAr: `فاصل ${gapAfter} دقيقة فقط بعد جلسة مجموعة ${group.name}`,
+            });
+            if (highestSeverity !== "error") highestSeverity = "warning";
+            if (highestType === "none") highestType = "close";
+          }
+        });
+      });
+
       // Generate time suggestions if there are conflicts
       const suggestions: TimeSuggestion[] = [];
       if (highestSeverity !== "none") {
-        // Find all sessions on the same date (including current student)
+        // Find all sessions on the same date (including current student and groups)
         const sessionsOnDate: { start: number; end: number }[] = [];
+
+        // Add individual student sessions
         students.forEach((student) => {
           // Include ALL students' sessions for proper suggestion generation
 
@@ -175,6 +261,18 @@ export const useConflictDetection = (students: Student[]) => {
             const time = session.time || student.sessionTime || "16:00";
             const start = timeToMinutes(time);
             sessionsOnDate.push({ start, end: start + (session.duration || DEFAULT_SESSION_DURATION) });
+          });
+        });
+
+        // Add group sessions
+        groups.forEach((group) => {
+          group.sessions.forEach((session) => {
+            if (session.date !== date) return;
+            if (session.status === "cancelled" || session.status === "vacation") return;
+            if (excludeSessionId && session.id === excludeSessionId) return;
+            const time = session.time || group.sessionTime || "16:00";
+            const start = timeToMinutes(time);
+            sessionsOnDate.push({ start, end: start + (session.duration || group.sessionDuration || DEFAULT_SESSION_DURATION) });
           });
         });
 
@@ -227,7 +325,7 @@ export const useConflictDetection = (students: Student[]) => {
         suggestions,
       };
     },
-    [students],
+    [students, groups],
   );
   /**
    * Check conflicts for restoring a vacation session

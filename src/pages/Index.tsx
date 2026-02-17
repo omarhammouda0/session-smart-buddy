@@ -288,7 +288,6 @@ const Index = () => {
     clearMonthCancellations,
   } = useCancellationTracking(students);
 
-  const { checkConflict, getSuggestedSlots } = useConflictDetection(students);
 
   // Groups
   const {
@@ -310,6 +309,9 @@ const Index = () => {
     recordGroupMemberPayment,
     getGroupMemberPayments,
   } = useGroups();
+
+  // Conflict detection - now includes both students and groups
+  const { checkConflict, getSuggestedSlots } = useConflictDetection(students, activeGroups);
 
   // State for group attendance dialog
   const [groupAttendanceDialog, setGroupAttendanceDialog] = useState<{
