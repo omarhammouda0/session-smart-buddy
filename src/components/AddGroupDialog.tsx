@@ -45,7 +45,8 @@ interface AddGroupDialogProps {
     semesterStart: string,
     semesterEnd: string,
     description?: string,
-    color?: string
+    color?: string,
+    location?: LocationData | null
   ) => void | Promise<StudentGroup | null>;
   students?: Student[];
   settings?: {
@@ -142,8 +143,12 @@ export const AddGroupDialog = ({
   });
 
 
-  // Get scheduling suggestions
-  const schedulingSuggestions = useSchedulingSuggestions(existingStudents, sessionType);
+  // Get scheduling suggestions (with location for proximity suggestions)
+  const schedulingSuggestions = useSchedulingSuggestions(
+    existingStudents,
+    sessionType,
+    sessionType === 'onsite' ? location : null
+  );
 
   // Get students not already in the group
   const availableStudents = useMemo(() => {
@@ -267,7 +272,8 @@ export const AddGroupDialog = ({
         useCustom ? customStart : defaultStart,
         useCustom ? customEnd : defaultEnd,
         description.trim() || undefined,
-        selectedColor
+        selectedColor,
+        sessionType === 'onsite' ? location : null
       );
     }
 
@@ -554,6 +560,33 @@ export const AddGroupDialog = ({
                         <span className="text-teal-500">•</span>
                         <span>{suggestion.suggestedTimeAr}</span>
                         <span className="text-[10px] text-teal-500">({suggestion.existingStudents.length} طالب)</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Proximity Suggestions - Simplified (only for onsite with location) */}
+              {sessionType === 'onsite' && location && schedulingSuggestions.proximitySuggestions && schedulingSuggestions.proximitySuggestions.length > 0 && (
+                <div className="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-2">📍 طلاب قريبون</p>
+                  <div className="flex flex-wrap gap-2">
+                    {schedulingSuggestions.proximitySuggestions.slice(0, 2).map((suggestion, i) => (
+                      <button
+                        key={`prox-${i}`}
+                        type="button"
+                        onClick={() => {
+                          const existingSchedule = daySchedules.find(d => d.dayOfWeek === suggestion.dayOfWeek);
+                          if (!existingSchedule) {
+                            setDaySchedules(prev => [...prev, { dayOfWeek: suggestion.dayOfWeek, time: suggestion.suggestedTime }].sort((a, b) => a.dayOfWeek - b.dayOfWeek));
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70 transition-colors"
+                      >
+                        <span>{suggestion.nearbyStudent}</span>
+                        <span className="text-amber-500">•</span>
+                        <span>{suggestion.dayName}</span>
+                        <span className="text-[10px] text-amber-500">({suggestion.distanceKm.toFixed(1)} كم)</span>
                       </button>
                     ))}
                   </div>

@@ -232,6 +232,14 @@ const Index = () => {
     newTime: string;
   }>({ open: false, student: null, session: null, newTime: "" });
 
+  // Group time edit dialog for quick time changes
+  const [groupTimeEditDialog, setGroupTimeEditDialog] = useState<{
+    open: boolean;
+    group: StudentGroup | null;
+    session: GroupSession | null;
+    newTime: string;
+  }>({ open: false, group: null, session: null, newTime: "" });
+
   // Add session for today dialog
   const [addTodaySessionDialog, setAddTodaySessionDialog] = useState<{
     open: boolean;
@@ -295,6 +303,7 @@ const Index = () => {
     updateMemberAttendance,
     completeGroupSession,
     cancelGroupSession,
+    rescheduleGroupSession,
     addGroupSessionForToday,
     getGroupById,
     getGroupSessionsForDate,
@@ -538,6 +547,53 @@ const Index = () => {
       description: `تم تغيير وقت حصة ${timeEditDialog.student.name} إلى ${timeEditDialog.newTime}`,
     });
     setTimeEditDialog({ open: false, student: null, session: null, newTime: "" });
+  };
+
+  // Group time edit handlers
+  const openGroupTimeEdit = (group: StudentGroup, session: GroupSession) => {
+    const currentTime = session.time || group.sessionTime || "16:00";
+    setGroupTimeEditDialog({
+      open: true,
+      group,
+      session,
+      newTime: currentTime,
+    });
+  };
+
+  const getGroupTimeEditConflict = () => {
+    if (!groupTimeEditDialog.group || !groupTimeEditDialog.session || !groupTimeEditDialog.newTime) return null;
+    return checkConflict(
+      { date: groupTimeEditDialog.session.date, startTime: groupTimeEditDialog.newTime },
+      groupTimeEditDialog.session.id,
+      `group_${groupTimeEditDialog.group.id}`
+    );
+  };
+
+  const confirmGroupTimeEdit = async () => {
+    if (!groupTimeEditDialog.group || !groupTimeEditDialog.session || !groupTimeEditDialog.newTime) return;
+
+    const conflict = getGroupTimeEditConflict();
+    if (conflict?.severity === "error") {
+      const firstConflict = conflict.conflicts[0];
+      toast({
+        title: "⚠️ تعارض في الوقت",
+        description: firstConflict ? `لا يمكن تغيير الوقت - يوجد تعارض مع ${firstConflict.student.name}` : "يوجد تعارض في الوقت",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await rescheduleGroupSession(
+      groupTimeEditDialog.group.id,
+      groupTimeEditDialog.session.id,
+      groupTimeEditDialog.session.date,
+      groupTimeEditDialog.newTime
+    );
+    toast({
+      title: "✓ تم تعديل الوقت",
+      description: `تم تغيير وقت حصة ${groupTimeEditDialog.group.name} إلى ${groupTimeEditDialog.newTime}`,
+    });
+    setGroupTimeEditDialog({ open: false, group: null, session: null, newTime: "" });
   };
 
   // Add session for today handlers
@@ -1686,14 +1742,18 @@ const Index = () => {
                                   isScheduled && !isGroup && "cursor-pointer hover:scale-105 transition-transform",
                                   isGroup && "bg-violet-500 text-white border-violet-600",
                                   isGroup && isCompleted && "bg-violet-600 border-violet-700",
+                                  isGroup && isScheduled && "cursor-pointer hover:scale-105 transition-transform",
                                 )}
                                 onClick={(e) => {
                                   if (!isGroup && isScheduled) {
                                     e.stopPropagation();
                                     handleQuickTimeEdit(student, session);
+                                  } else if (isGroup && isScheduled && group && groupSession) {
+                                    e.stopPropagation();
+                                    openGroupTimeEdit(group, groupSession);
                                   }
                                 }}
-                                title={!isGroup && isScheduled ? "اضغط لتعديل الوقت" : isGroup ? "مجموعة" : undefined}
+                                title={isScheduled ? "اضغط لتعديل الوقت" : undefined}
                               >
                                 {isGroup ? (
                                   <>
@@ -1709,7 +1769,7 @@ const Index = () => {
                                     <span className="text-[9px] opacity-80">{sessionDuration}د</span>
                                   </>
                                 )}
-                                {!isGroup && isScheduled && (
+                                {isScheduled && (
                                   <div className="absolute top-0.5 right-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
                                     <Pencil className="h-2.5 w-2.5" />
                                   </div>
@@ -2563,6 +2623,142 @@ const Index = () => {
                     hasError
                       ? "bg-muted text-muted-foreground cursor-not-allowed"
                       : "bg-gradient-to-r from-primary to-blue-500"
+                  )}
+                >
+                  <Check className="h-4 w-4 ml-2" />
+                  {hasError ? "غير متاح" : "حفظ"}
+                </Button>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Group Time Edit Dialog */}
+      <Dialog
+        open={groupTimeEditDialog.open}
+        onOpenChange={(open) => !open && setGroupTimeEditDialog({ open: false, group: null, session: null, newTime: "" })}
+      >
+        <DialogContent dir="rtl" className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
+                <Clock className="h-5 w-5" />
+              </div>
+              تعديل وقت حصة المجموعة
+            </DialogTitle>
+            <DialogDescription>
+              {groupTimeEditDialog.group?.name} - {groupTimeEditDialog.session && format(parseISO(groupTimeEditDialog.session.date), "dd/MM/yyyy")}
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const conflict = getGroupTimeEditConflict();
+            const hasError = conflict?.severity === "error";
+            const hasWarning = conflict?.severity === "warning";
+
+            return (
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="groupNewTime" className="text-sm font-medium">
+                    الوقت الجديد
+                  </Label>
+                  <Input
+                    id="groupNewTime"
+                    type="time"
+                    value={groupTimeEditDialog.newTime}
+                    onChange={(e) => setGroupTimeEditDialog({ ...groupTimeEditDialog, newTime: e.target.value })}
+                    className="text-lg h-12"
+                  />
+                </div>
+
+                {/* Available Time Slots */}
+                {(() => {
+                  if (!groupTimeEditDialog.session) return null;
+                  const availableSlots = getSuggestedSlots(
+                    groupTimeEditDialog.session.date,
+                    groupTimeEditDialog.group?.sessionDuration || 60,
+                    settings.workingHoursStart || "08:00",
+                    settings.workingHoursEnd || "22:00",
+                    6
+                  );
+                  if (availableSlots.length === 0) return null;
+
+                  return (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-1.5 text-violet-600">
+                        <Sparkles className="h-4 w-4" />
+                        أوقات متاحة
+                      </Label>
+                      <div className="flex flex-wrap gap-2">
+                        {availableSlots.map((slot) => (
+                          <Button
+                            key={slot.time}
+                            type="button"
+                            size="sm"
+                            variant={groupTimeEditDialog.newTime === slot.time ? "default" : "outline"}
+                            className={cn(
+                              "gap-1.5 h-9 text-sm",
+                              groupTimeEditDialog.newTime === slot.time && "ring-2 ring-violet-500 ring-offset-1"
+                            )}
+                            onClick={() => setGroupTimeEditDialog({ ...groupTimeEditDialog, newTime: slot.time })}
+                          >
+                            {slot.type === "morning" && <Sunrise className="h-3.5 w-3.5" />}
+                            {slot.type === "afternoon" && <Sun className="h-3.5 w-3.5" />}
+                            {slot.type === "evening" && <Moon className="h-3.5 w-3.5" />}
+                            {slot.timeAr}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {hasError && conflict && conflict.conflicts[0] && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm">
+                    <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    <span className="text-foreground">
+                      تعارض مع حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span>
+                    </span>
+                  </div>
+                )}
+                {hasWarning && conflict && conflict.conflicts[0] && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30 text-sm">
+                    <Clock className="h-4 w-4 text-warning shrink-0" />
+                    <span className="text-foreground">
+                      قريب من حصة <span className="font-bold">{conflict.conflicts[0].student.name}</span>
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-violet-50 dark:bg-violet-950/30 text-sm">
+                  <Clock className="h-4 w-4 text-violet-500" />
+                  <span className="text-muted-foreground">
+                    الوقت الحالي: <span className="font-bold text-violet-600 dark:text-violet-400">{groupTimeEditDialog.session?.time || groupTimeEditDialog.group?.sessionTime}</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+          {(() => {
+            const conflict = getGroupTimeEditConflict();
+            const hasError = conflict?.severity === "error";
+            return (
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setGroupTimeEditDialog({ open: false, group: null, session: null, newTime: "" })}
+                  className="rounded-xl"
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  onClick={confirmGroupTimeEdit}
+                  disabled={!groupTimeEditDialog.newTime || hasError}
+                  className={cn(
+                    "rounded-xl",
+                    hasError
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : "bg-gradient-to-r from-violet-500 to-purple-600"
                   )}
                 >
                   <Check className="h-4 w-4 ml-2" />

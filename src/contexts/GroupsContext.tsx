@@ -53,7 +53,8 @@ interface GroupsContextType {
     semesterStart: string,
     semesterEnd: string,
     description?: string,
-    color?: string
+    color?: string,
+    location?: { lat: number; lng: number; address?: string; name?: string } | null
   ) => Promise<StudentGroup | null>;
   updateGroup: (groupId: string, updates: Partial<Omit<StudentGroup, 'id' | 'createdAt' | 'sessions'>>) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
@@ -205,6 +206,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           isActive: g.is_active,
           createdAt: g.created_at,
           updatedAt: g.updated_at,
+          location: (g as any).location || undefined,
         };
       });
 
@@ -259,7 +261,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     semesterStart: string,
     semesterEnd: string,
     description?: string,
-    color?: string
+    color?: string,
+    location?: { lat: number; lng: number; address?: string; name?: string } | null
   ): Promise<StudentGroup | null> => {
     if (!currentUserId) {
       toast({ title: "خطأ", description: "يجب تسجيل الدخول أولاً", variant: "destructive" });
@@ -281,6 +284,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           session_time: sessionTime,
           semester_start: semesterStart,
           semester_end: semesterEnd,
+          location: sessionType === 'onsite' && location ? location : null,
         })
         .select()
         .single();
