@@ -143,18 +143,20 @@ export const CalendarView = ({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
 
-  // Get available slots from conflict detection hook
-  const { getSuggestedSlots } = useConflictDetection(students);
-
   // Get groups for calendar display
-  const { activeGroups, getGroupSessionsForDate, updateMemberAttendance, completeGroupSession, rescheduleGroupSession } = useGroups();
+  const { activeGroups, getGroupSessionsForDate, updateMemberAttendance, completeGroupSession, rescheduleGroupSession, addGroupSessionForToday } = useGroups();
 
-  // Add Session Dialog State
+  // Get available slots from conflict detection hook - now includes groups for proper conflict detection
+  const { getSuggestedSlots, checkConflict } = useConflictDetection(students, activeGroups);
+
+  // Add Session Dialog State - supports both students and groups
   const [addSessionDialog, setAddSessionDialog] = useState<{
     open: boolean;
     date: string;
     selectedStudentId: string;
+    selectedGroupId: string;
     time: string;
+    sessionType: 'student' | 'group';
   } | null>(null);
 
   const [touchDragState, setTouchDragState] = useState<{
@@ -927,42 +929,85 @@ export const CalendarView = ({
     });
   };
 
-  // Add new session with conflict check
-  const handleAddNewSession = () => {
-    if (!addSessionDialog || !onAddSession || !addSessionDialog.selectedStudentId) return;
+  // Add new session with conflict check - supports both students and groups
+  const handleAddNewSession = async () => {
+    if (!addSessionDialog) return;
 
-    // Check for conflicts before adding
+    const isGroupSession = addSessionDialog.sessionType === 'group';
+
+    // Validate selection
+    if (isGroupSession) {
+      if (!addSessionDialog.selectedGroupId) {
+        toast({ title: "❌ خطأ", description: "يرجى اختيار مجموعة", variant: "destructive" });
+        return;
+      }
+    } else {
+      if (!addSessionDialog.selectedStudentId || !onAddSession) {
+        toast({ title: "❌ خطأ", description: "يرجى اختيار طالب", variant: "destructive" });
+        return;
+      }
+    }
+
+    // Check for conflicts before adding using the improved checkConflict
     if (addSessionDialog.time) {
-      const conflict = checkTimeConflict(
-        addSessionDialog.selectedStudentId,
-        "",
-        addSessionDialog.date,
-        addSessionDialog.time,
+      const sessionId = isGroupSession ? `group_${addSessionDialog.selectedGroupId}` : addSessionDialog.selectedStudentId;
+
+      const conflict = checkConflict(
+        { date: addSessionDialog.date, startTime: addSessionDialog.time },
+        undefined, // No session to exclude
+        sessionId
       );
 
-      if (conflict.hasConflict) {
+      if (conflict.severity === "error") {
+        const firstConflict = conflict.conflicts[0];
         toast({
           title: "❌ لا يمكن إضافة الحصة",
-          description: `يوجد تعارض مع حصة ${conflict.conflictStudent} في ${conflict.conflictTime}`,
+          description: firstConflict?.messageAr || "يوجد تعارض في الوقت",
           variant: "destructive",
         });
         return;
       }
 
       if (conflict.severity === "warning") {
+        const firstConflict = conflict.conflicts[0];
         toast({
           title: "⚠️ تحذير",
-          description: `الحصة قريبة جداً من حصة ${conflict.conflictStudent} (${conflict.conflictTime})`,
+          description: firstConflict?.messageAr || "الحصة قريبة من حصة أخرى",
         });
       }
     }
 
-    onAddSession(addSessionDialog.selectedStudentId, addSessionDialog.date, addSessionDialog.time || undefined);
+    // Add the session
+    if (isGroupSession) {
+      // Check if group already has a session on this date
+      const group = activeGroups.find(g => g.id === addSessionDialog.selectedGroupId);
+      if (group) {
+        const existingSession = group.sessions.find(s => s.date === addSessionDialog.date);
+        if (existingSession) {
+          toast({
+            title: "❌ لا يمكن إضافة الحصة",
+            description: `يوجد حصة بالفعل لمجموعة ${group.name} في هذا اليوم`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        await addGroupSessionForToday(addSessionDialog.selectedGroupId, addSessionDialog.time || undefined);
+        toast({
+          title: "✓ تمت إضافة حصة المجموعة",
+          description: `تمت إضافة حصة لمجموعة ${group.name} في ${format(parseISO(addSessionDialog.date), "dd/MM/yyyy", { locale: ar })}`,
+        });
+      }
+    } else {
+      onAddSession(addSessionDialog.selectedStudentId, addSessionDialog.date, addSessionDialog.time || undefined);
+      const student = students.find(s => s.id === addSessionDialog.selectedStudentId);
+      toast({
+        title: "✓ تمت إضافة الحصة",
+        description: `تمت إضافة حصة ${student?.name || ''} في ${format(parseISO(addSessionDialog.date), "dd/MM/yyyy", { locale: ar })}`,
+      });
+    }
+
     setAddSessionDialog(null);
-    toast({
-      title: "✓ تمت إضافة الحصة",
-      description: `تمت إضافة حصة جديدة في ${format(parseISO(addSessionDialog.date), "dd/MM/yyyy", { locale: ar })}`,
-    });
   };
 
   // Export to text/clipboard
@@ -1458,7 +1503,9 @@ export const CalendarView = ({
                             open: true,
                             date: dateStr,
                             selectedStudentId: "",
+                            selectedGroupId: "",
                             time: "",
+                            sessionType: 'student',
                           })}
                         >
                           <Plus className="h-4 w-4 ml-1" />
@@ -2135,7 +2182,9 @@ export const CalendarView = ({
                       open: true,
                       date: dayDetailsDialog.date,
                       selectedStudentId: "",
+                      selectedGroupId: "",
                       time: "",
+                      sessionType: 'student',
                     });
                   }}
                   className="h-8 gap-1.5 rounded-lg bg-gradient-to-r from-primary to-purple-500"
@@ -2285,7 +2334,9 @@ export const CalendarView = ({
                       open: true,
                       date: dayDetailsDialog.date,
                       selectedStudentId: "",
+                      selectedGroupId: "",
                       time: "",
+                      sessionType: 'student',
                     });
                   }}
                   className="gap-2 bg-gradient-to-r from-primary to-purple-500"
@@ -2319,38 +2370,152 @@ export const CalendarView = ({
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Student Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">اختر الطالب</Label>
-              <Select
-                value={addSessionDialog?.selectedStudentId || ""}
-                onValueChange={(value) => {
-                  if (addSessionDialog) {
-                    const student = students.find((s) => s.id === value);
-                    setAddSessionDialog({
-                      ...addSessionDialog,
-                      selectedStudentId: value,
-                      time: student?.sessionTime || addSessionDialog.time,
-                    });
-                  }
-                }}
+            {/* Session Type Toggle */}
+            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-full">
+              <button
+                onClick={() => addSessionDialog && setAddSessionDialog({
+                  ...addSessionDialog,
+                  sessionType: 'student',
+                  selectedStudentId: '',
+                  selectedGroupId: '',
+                })}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all",
+                  addSessionDialog?.sessionType === 'student'
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:bg-background/50"
+                )}
               >
-                <SelectTrigger className="h-11 rounded-xl border-2">
-                  <SelectValue placeholder="اختر طالب..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((student) => (
-                    <SelectItem key={student.id} value={student.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5" />
-                        <span>{student.name}</span>
-                        <span className="text-xs text-muted-foreground">({student.sessionTime})</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <User className="h-4 w-4" />
+                طالب
+              </button>
+              <button
+                onClick={() => addSessionDialog && setAddSessionDialog({
+                  ...addSessionDialog,
+                  sessionType: 'group',
+                  selectedStudentId: '',
+                  selectedGroupId: '',
+                })}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all",
+                  addSessionDialog?.sessionType === 'group'
+                    ? "bg-violet-100 text-violet-700 shadow-sm dark:bg-violet-950 dark:text-violet-300"
+                    : "text-muted-foreground hover:bg-background/50"
+                )}
+              >
+                <Users className="h-4 w-4" />
+                مجموعة
+              </button>
             </div>
+
+            {/* Student Selection */}
+            {addSessionDialog?.sessionType === 'student' && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">اختر الطالب</Label>
+                <Select
+                  value={addSessionDialog?.selectedStudentId || ""}
+                  onValueChange={(value) => {
+                    if (addSessionDialog) {
+                      const student = students.find((s) => s.id === value);
+                      setAddSessionDialog({
+                        ...addSessionDialog,
+                        selectedStudentId: value,
+                        time: student?.sessionTime || addSessionDialog.time,
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-2">
+                    <SelectValue placeholder="اختر طالب..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        <div className="flex items-center gap-2">
+                          {student.sessionType === 'online' ? (
+                            <Monitor className="h-3.5 w-3.5 text-blue-500" />
+                          ) : (
+                            <MapPin className="h-3.5 w-3.5 text-emerald-500" />
+                          )}
+                          <span>{student.name}</span>
+                          <span className="text-xs text-muted-foreground">({student.sessionTime})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Group Selection */}
+            {addSessionDialog?.sessionType === 'group' && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4 text-violet-500" />
+                  اختر المجموعة
+                </Label>
+                <Select
+                  value={addSessionDialog?.selectedGroupId || ""}
+                  onValueChange={(value) => {
+                    if (addSessionDialog) {
+                      const group = activeGroups.find((g) => g.id === value);
+                      setAddSessionDialog({
+                        ...addSessionDialog,
+                        selectedGroupId: value,
+                        time: group?.sessionTime || addSessionDialog.time,
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-2 border-violet-200 dark:border-violet-800">
+                    <SelectValue placeholder="اختر مجموعة..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeGroups.length === 0 ? (
+                      <div className="p-3 text-center text-sm text-muted-foreground">
+                        لا توجد مجموعات نشطة
+                      </div>
+                    ) : (
+                      activeGroups.map((group) => {
+                        // Check if group already has session on this date
+                        const hasSessionToday = group.sessions.some(s => s.date === addSessionDialog.date);
+                        return (
+                          <SelectItem
+                            key={group.id}
+                            value={group.id}
+                            disabled={hasSessionToday}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className={cn(
+                                "w-3 h-3 rounded-full",
+                                `bg-${group.color || 'violet'}-500`
+                              )} style={{ backgroundColor: group.color ? undefined : '#8b5cf6' }} />
+                              <span>{group.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({group.members.filter(m => m.isActive).length} طالب)
+                              </span>
+                              {hasSessionToday && (
+                                <span className="text-xs text-amber-500">لديها حصة</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })
+                    )}
+                  </SelectContent>
+                </Select>
+                {addSessionDialog?.selectedGroupId && (() => {
+                  const group = activeGroups.find(g => g.id === addSessionDialog.selectedGroupId);
+                  return group && (
+                    <p className="text-xs text-violet-600 dark:text-violet-400">
+                      👥 {group.members.filter(m => m.isActive).length} طالب •
+                      {group.sessionType === 'online' ? ' 💻 أونلاين' : ' 🏠 حضوري'} •
+                      {group.sessionDuration} دقيقة
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Time Input */}
             <div className="space-y-2">
@@ -2368,20 +2533,34 @@ export const CalendarView = ({
                 }}
                 className="h-11 rounded-xl border-2 text-center text-lg font-bold"
               />
-              {addSessionDialog?.selectedStudentId && (
+              {addSessionDialog?.sessionType === 'student' && addSessionDialog?.selectedStudentId && (
                 <p className="text-xs text-muted-foreground">
                   💡 الوقت الافتراضي للطالب:{" "}
                   {students.find((s) => s.id === addSessionDialog.selectedStudentId)?.sessionTime}
+                </p>
+              )}
+              {addSessionDialog?.sessionType === 'group' && addSessionDialog?.selectedGroupId && (
+                <p className="text-xs text-violet-600">
+                  💡 الوقت الافتراضي للمجموعة:{" "}
+                  {activeGroups.find((g) => g.id === addSessionDialog.selectedGroupId)?.sessionTime}
                 </p>
               )}
             </div>
 
             {/* Available Time Slots */}
             {addSessionDialog && (() => {
-              const selectedStudent = students.find((s) => s.id === addSessionDialog.selectedStudentId);
+              const selectedStudent = addSessionDialog.sessionType === 'student'
+                ? students.find((s) => s.id === addSessionDialog.selectedStudentId)
+                : null;
+              const selectedGroup = addSessionDialog.sessionType === 'group'
+                ? activeGroups.find((g) => g.id === addSessionDialog.selectedGroupId)
+                : null;
+
+              const duration = selectedStudent?.sessionDuration || selectedGroup?.sessionDuration || settings?.defaultSessionDuration || 60;
+
               const availableSlots = getSuggestedSlots(
                 addSessionDialog.date,
-                selectedStudent?.sessionDuration || settings?.defaultSessionDuration || 60,
+                duration,
                 settings?.workingHoursStart || "08:00",
                 settings?.workingHoursEnd || "22:00",
                 8
@@ -2419,29 +2598,34 @@ export const CalendarView = ({
               );
             })()}
 
-            {/* Conflict Warning */}
-            {addSessionDialog?.selectedStudentId &&
-              addSessionDialog?.time &&
+            {/* Conflict Warning - works for both students and groups */}
+            {addSessionDialog?.time && (addSessionDialog.selectedStudentId || addSessionDialog.selectedGroupId) &&
               (() => {
-                const conflict = checkTimeConflict(
-                  addSessionDialog.selectedStudentId,
-                  "",
-                  addSessionDialog.date,
-                  addSessionDialog.time,
+                const sessionId = addSessionDialog.sessionType === 'group'
+                  ? `group_${addSessionDialog.selectedGroupId}`
+                  : addSessionDialog.selectedStudentId;
+
+                const conflict = checkConflict(
+                  { date: addSessionDialog.date, startTime: addSessionDialog.time },
+                  undefined,
+                  sessionId
                 );
-                if (conflict.hasConflict) {
+
+                if (conflict.severity === "error" && conflict.conflicts.length > 0) {
+                  const firstConflict = conflict.conflicts[0];
                   return (
                     <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-600 text-sm flex items-center gap-2">
                       <XCircle className="h-4 w-4" />
-                      تعارض مع {conflict.conflictStudent} في الساعة {conflict.conflictTime}
+                      {firstConflict.messageAr}
                     </div>
                   );
                 }
-                if (conflict.severity === "warning") {
+                if (conflict.severity === "warning" && conflict.conflicts.length > 0) {
+                  const firstConflict = conflict.conflicts[0];
                   return (
                     <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 text-sm flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4" />
-                      قريب من {conflict.conflictStudent} في الساعة {conflict.conflictTime}
+                      {firstConflict.messageAr}
                     </div>
                   );
                 }
@@ -2453,36 +2637,42 @@ export const CalendarView = ({
             <Button variant="outline" onClick={() => setAddSessionDialog(null)} className="rounded-xl">
               إلغاء
             </Button>
-            <Button
-              onClick={handleAddNewSession}
-              disabled={
-                !addSessionDialog?.selectedStudentId ||
-                (addSessionDialog?.time
-                  ? checkTimeConflict(
-                      addSessionDialog.selectedStudentId,
-                      "",
-                      addSessionDialog.date,
-                      addSessionDialog.time,
-                    ).hasConflict
-                  : false)
+            {(() => {
+              const isStudent = addSessionDialog?.sessionType === 'student';
+              const isGroup = addSessionDialog?.sessionType === 'group';
+              const hasSelection = isStudent ? addSessionDialog?.selectedStudentId : addSessionDialog?.selectedGroupId;
+
+              let hasConflict = false;
+              if (addSessionDialog?.time && hasSelection) {
+                const sessionId = isGroup
+                  ? `group_${addSessionDialog.selectedGroupId}`
+                  : addSessionDialog.selectedStudentId;
+                const conflict = checkConflict(
+                  { date: addSessionDialog.date, startTime: addSessionDialog.time },
+                  undefined,
+                  sessionId
+                );
+                hasConflict = conflict.severity === "error";
               }
-              className={cn(
-                "rounded-xl",
-                addSessionDialog?.time &&
-                  addSessionDialog?.selectedStudentId &&
-                  checkTimeConflict(
-                    addSessionDialog.selectedStudentId,
-                    "",
-                    addSessionDialog.date,
-                    addSessionDialog.time,
-                  ).hasConflict
-                  ? "bg-muted text-muted-foreground cursor-not-allowed"
-                  : "bg-gradient-to-r from-primary to-purple-500",
-              )}
-            >
-              <Plus className="h-4 w-4 ml-2" />
-              إضافة الحصة
-            </Button>
+
+              return (
+                <Button
+                  onClick={handleAddNewSession}
+                  disabled={!hasSelection || hasConflict}
+                  className={cn(
+                    "rounded-xl",
+                    hasConflict
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : isGroup
+                        ? "bg-gradient-to-r from-violet-500 to-purple-600"
+                        : "bg-gradient-to-r from-primary to-purple-500",
+                  )}
+                >
+                  {isGroup ? <Users className="h-4 w-4 ml-2" /> : <Plus className="h-4 w-4 ml-2" />}
+                  {isGroup ? "إضافة حصة المجموعة" : "إضافة الحصة"}
+                </Button>
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>
