@@ -1,7 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { StudentGroup, GroupMember, GroupSession, SessionStatus, ScheduleDay, SessionType } from '@/types/student';
+import { StudentGroup, GroupMember, GroupSession, SessionStatus, ScheduleDay, SessionType, Location } from '@/types/student';
 import { toast } from '@/hooks/use-toast';
+
+// Database row type for student_groups
+interface DbGroupRow {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  default_price_per_student: number;
+  session_type: string;
+  session_duration: number;
+  session_time: string;
+  semester_start: string;
+  semester_end: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  location?: Location | null; // Optional until migration is applied
+}
 
 // Generate session dates based on schedule
 const generateGroupSessionDates = (
@@ -137,7 +156,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
         : { data: [] };
 
       // Transform to our types
-      const transformedGroups: StudentGroup[] = groupsData.map(g => {
+      const transformedGroups: StudentGroup[] = groupsData.map((g: DbGroupRow) => {
         const members: GroupMember[] = (membersResult.data || [])
           .filter(m => m.group_id === g.id)
           .map(m => ({
@@ -206,7 +225,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           isActive: g.is_active,
           createdAt: g.created_at,
           updatedAt: g.updated_at,
-          location: (g as any).location || undefined,
+          location: g.location || undefined,
         };
       });
 
@@ -396,6 +415,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           session_duration: updates.sessionDuration,
           session_time: updates.sessionTime,
           is_active: updates.isActive,
+          location: updates.location || null,
         })
         .eq('id', groupId);
 

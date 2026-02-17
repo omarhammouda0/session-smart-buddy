@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,7 +117,7 @@ export const AddGroupDialog = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
   // Initialize form when editing
-  useState(() => {
+  useEffect(() => {
     if (editMode && groupToEdit && open) {
       setGroupName(groupToEdit.name);
       setDescription(groupToEdit.description || '');
@@ -139,8 +139,14 @@ export const AddGroupDialog = ({
         customPrice: m.customPrice,
         useCustomPrice: !!m.customPrice,
       })));
+      // Initialize location if group has one
+      if (groupToEdit.location) {
+        setLocation(groupToEdit.location as LocationData);
+      } else {
+        setLocation(null);
+      }
     }
-  });
+  }, [editMode, groupToEdit, open]);
 
 
   // Get scheduling suggestions (with location for proximity suggestions)
@@ -258,6 +264,7 @@ export const AddGroupDialog = ({
         sessionType,
         sessionDuration,
         sessionTime: primaryTime,
+        location: sessionType === 'onsite' ? location : undefined,
       });
     } else {
       // Add new group
