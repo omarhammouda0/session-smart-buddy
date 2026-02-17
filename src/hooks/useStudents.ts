@@ -1587,10 +1587,19 @@ export const useStudents = () => {
         }
       } else {
         // Mark as paid (simple toggle - prefer recordPayment for actual payments)
+        // First get the student to calculate amount_due
+        const student = students.find((s) => s.id === studentId);
+        const amountDue = student
+          ? calculateMonthlyAmountDue(student, month, year, settings)
+          : 0;
+
         await supabase
           .from("monthly_payments")
           .update({
             is_paid: true,
+            amount_paid: amountDue, // Set amount_paid to full amount_due
+            amount_due: amountDue, // Ensure amount_due is also set correctly
+            payment_status: "paid", // Set status to paid
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -1602,7 +1611,7 @@ export const useStudents = () => {
 
       await loadData();
     },
-    [getUserId, payments, loadData],
+    [getUserId, payments, students, settings, loadData],
   );
 
   const recordPayment = useCallback(
