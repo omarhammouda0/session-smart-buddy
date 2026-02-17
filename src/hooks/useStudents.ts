@@ -1394,8 +1394,21 @@ export const useStudents = () => {
       const session = student?.sessions.find((sess) => sess.id === sessionId);
       if (!session) return;
 
+      // IMPORTANT: Only allow toggling between 'scheduled' and 'completed' states
+      // Cancelled or vacation sessions must be restored first before completing
+      if (session.status !== 'scheduled' && session.status !== 'completed') {
+        console.warn(
+          `Cannot toggle session ${sessionId}: current status is '${session.status}'. ` +
+          `Only 'scheduled' or 'completed' sessions can be toggled. ` +
+          `Restore the session first to change its status.`
+        );
+        return;
+      }
+
       const now = new Date().toISOString();
-      const newCompleted = !session.completed;
+      // Toggle based on current status, not just completed flag
+      const isCurrentlyCompleted = session.status === 'completed';
+      const newCompleted = !isCurrentlyCompleted;
       const newStatus: SessionStatus = newCompleted ? "completed" : "scheduled";
 
       // Optimistic update
