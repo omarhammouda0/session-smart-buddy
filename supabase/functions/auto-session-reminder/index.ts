@@ -575,7 +575,7 @@ serve(async (req) => {
       // ========================================
       console.log(`\n--- Processing GROUP sessions for user ${userId} ---`);
 
-      // Fetch group sessions for this user
+      // Fetch group sessions for this user (without members - we'll query them separately)
       const { data: groupSessions, error: groupSessionsError } = await supabase
         .from('group_sessions')
         .select(`
@@ -588,8 +588,7 @@ serve(async (req) => {
             id,
             name,
             user_id,
-            session_time,
-            members
+            session_time
           )
         `)
         .eq('status', 'scheduled')
@@ -622,12 +621,32 @@ serve(async (req) => {
 
           const sessionTime = groupSession.time || groupData.session_time || '16:00';
           const groupName = groupData.name || 'المجموعة';
-          const members = groupData.members || [];
+
+          // FIXED: Query group_members table instead of reading from denormalized JSON
+          // This ensures we always get the current, up-to-date member list
+          const { data: membersData, error: membersError } = await supabase
+            .from('group_members')
+            .select('id, student_id, student_name, phone, parent_phone, is_active')
+            .eq('group_id', groupData.id)
+            .eq('is_active', true);
+
+          if (membersError) {
+            console.error(`  Error fetching members for group ${groupData.id}:`, membersError);
+            continue;
+          }
+
+          // Transform to expected format (matching the old JSON structure for compatibility)
+          const members = (membersData || []).map(m => ({
+            studentId: m.student_id,
+            studentName: m.student_name,
+            phone: m.phone || m.parent_phone, // Use phone or fall back to parent_phone
+            isActive: m.is_active
+          }));
 
           const minutesUntilSession = calculateMinutesUntilSession(groupSession.date, sessionTime, egyptNow);
           const hoursUntilSession = minutesUntilSession / 60;
 
-          console.log(`  Group Session ${groupSession.id}: ${groupSession.date} ${sessionTime}, "${groupName}" (${members.length} members), ${hoursUntilSession.toFixed(2)}h away`);
+          console.log(`  Group Session ${groupSession.id}: ${groupSession.date} ${sessionTime}, "${groupName}" (${members.length} members from DB), ${hoursUntilSession.toFixed(2)}h away`);
 
           // Process each reminder interval for groups
           for (const { hours, interval, template, windowMin, windowMax } of groupReminderIntervals) {
