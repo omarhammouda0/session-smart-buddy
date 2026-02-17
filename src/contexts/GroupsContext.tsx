@@ -3,24 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { StudentGroup, GroupMember, GroupSession, SessionStatus, ScheduleDay, SessionType, Location } from '@/types/student';
 import { toast } from '@/hooks/use-toast';
 
-// Database row type for student_groups
-interface DbGroupRow {
-  id: string;
-  user_id: string;
-  name: string;
-  description: string | null;
-  color: string | null;
-  default_price_per_student: number;
-  session_type: string;
-  session_duration: number;
-  session_time: string;
-  semester_start: string;
-  semester_end: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  location?: Location | null; // Optional until migration is applied
-}
+// Helper to safely cast Json to Location
+const parseLocation = (loc: unknown): Location | undefined => {
+  if (!loc || typeof loc !== 'object') return undefined;
+  const obj = loc as Record<string, unknown>;
+  if (typeof obj.lat === 'number' && typeof obj.lng === 'number') {
+    return obj as unknown as Location;
+  }
+  return undefined;
+};
 
 // Generate session dates based on schedule
 const generateGroupSessionDates = (
@@ -156,7 +147,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
         : { data: [] };
 
       // Transform to our types
-      const transformedGroups: StudentGroup[] = groupsData.map((g: DbGroupRow) => {
+      const transformedGroups: StudentGroup[] = groupsData.map((g) => {
         const members: GroupMember[] = (membersResult.data || [])
           .filter(m => m.group_id === g.id)
           .map(m => ({
@@ -225,7 +216,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           isActive: g.is_active,
           createdAt: g.created_at,
           updatedAt: g.updated_at,
-          location: g.location || undefined,
+          location: parseLocation(g.location),
         };
       });
 
@@ -415,7 +406,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
           session_duration: updates.sessionDuration,
           session_time: updates.sessionTime,
           is_active: updates.isActive,
-          location: updates.location || null,
+          location: updates.location ? JSON.parse(JSON.stringify(updates.location)) : null,
         })
         .eq('id', groupId);
 
