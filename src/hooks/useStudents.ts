@@ -976,13 +976,14 @@ export const useStudents = () => {
 
       const existingDates = new Map((existingSessions || []).map((s: { date: string }) => [s.date, s]));
 
-      // Sessions to add (new dates)
+      // Sessions to add (new dates) - include time field from student's default session time
       const sessionsToAdd = sessionDates
         .filter((date) => !existingDates.has(date))
         .map((date) => ({
           student_id: studentId,
           user_id: currentUserId,
           date,
+          time: student.sessionTime || "16:00", // Include time field - use student's default time
           duration: student.sessionDuration || 60,
           status: "scheduled",
         }));
