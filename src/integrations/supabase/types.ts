@@ -1005,6 +1005,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          location: Json | null
           name: string
           semester_end: string
           semester_start: string
@@ -1021,6 +1022,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          location?: Json | null
           name: string
           semester_end: string
           semester_start: string
@@ -1037,6 +1039,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          location?: Json | null
           name?: string
           semester_end?: string
           semester_start?: string
