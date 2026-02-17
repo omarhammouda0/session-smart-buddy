@@ -115,6 +115,7 @@ export const AddGroupDialog = ({
   // Members
   const [members, setMembers] = useState<MemberInput[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [selectOpen, setSelectOpen] = useState(false);
 
   // Initialize form when editing
   useEffect(() => {
@@ -163,6 +164,7 @@ export const AddGroupDialog = ({
   }, [existingStudents, members]);
 
   const resetForm = () => {
+    setSelectOpen(false); // Close select dropdown first
     setGroupName('');
     setDescription('');
     setSelectedColor('blue');
@@ -434,11 +436,23 @@ export const AddGroupDialog = ({
               {/* Student Dropdown */}
               {availableStudents.length > 0 ? (
                 <div className="flex gap-2">
-                  <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                  <Select
+                    value={selectedStudentId}
+                    onValueChange={(value) => {
+                      setSelectedStudentId(value);
+                      setSelectOpen(false);
+                    }}
+                    open={selectOpen}
+                    onOpenChange={setSelectOpen}
+                  >
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="اختر طالب لإضافته..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent
+                      position="popper"
+                      sideOffset={4}
+                      className="max-h-[200px] overflow-y-auto"
+                    >
                       {availableStudents.map(student => (
                         <SelectItem key={student.id} value={student.id}>
                           <div className="flex items-center gap-2">
