@@ -449,17 +449,17 @@ serve(async (req) => {
       console.log(`Checking ${students.length} students for overdue payments`);
 
       for (const student of students) {
-        // Get last payment date
+        // Get last payment date from payment_records table
         const { data: lastPayment } = await supabase
-            .from('payments')
-            .select('date')
+            .from('payment_records')
+            .select('paid_at')
             .eq('student_id', student.id)
-            .order('date', { ascending: false })
+            .order('paid_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-        if (lastPayment?.date) {
-          const lastPaymentDate = new Date(lastPayment.date);
+        if (lastPayment?.paid_at) {
+          const lastPaymentDate = new Date(lastPayment.paid_at);
           const daysSincePayment = Math.floor(
               (localNow.getTime() - lastPaymentDate.getTime()) / (1000 * 60 * 60 * 24)
           );
