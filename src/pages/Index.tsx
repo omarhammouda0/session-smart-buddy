@@ -2827,6 +2827,48 @@ const Index = () => {
                       <p className="text-xs text-muted-foreground">
                         الوقت الافتراضي للمجموعة: {selectedGroup.sessionTime}
                       </p>
+
+                      {/* Available Time Slots for Group */}
+                      {(() => {
+                        const availableSlots = getSuggestedSlots(
+                          todayStr,
+                          selectedGroup.sessionDuration || 60,
+                          settings.workingHoursStart || "08:00",
+                          settings.workingHoursEnd || "22:00",
+                          6
+                        );
+
+                        if (availableSlots.length === 0) return null;
+
+                        return (
+                          <div className="mt-3">
+                            <p className="text-xs font-medium text-teal-700 dark:text-teal-300 mb-2 flex items-center gap-1.5">
+                              <Sparkles className="h-3.5 w-3.5" />
+                              أوقات متاحة
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {availableSlots.map((slot) => (
+                                <Button
+                                  key={slot.time}
+                                  type="button"
+                                  size="sm"
+                                  variant={addGroupTodaySessionDialog.time === slot.time ? "default" : "outline"}
+                                  className={cn(
+                                    "gap-1 h-8 text-xs",
+                                    addGroupTodaySessionDialog.time === slot.time && "ring-2 ring-primary ring-offset-1"
+                                  )}
+                                  onClick={() => setAddGroupTodaySessionDialog({ ...addGroupTodaySessionDialog, time: slot.time })}
+                                >
+                                  {slot.type === "morning" && <Sunrise className="h-3 w-3" />}
+                                  {slot.type === "afternoon" && <Sun className="h-3 w-3" />}
+                                  {slot.type === "evening" && <Moon className="h-3 w-3" />}
+                                  {slot.timeAr}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

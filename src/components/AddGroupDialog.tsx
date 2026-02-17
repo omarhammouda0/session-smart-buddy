@@ -516,108 +516,46 @@ export const AddGroupDialog = ({
             <div className="space-y-3">
               <Label>جدول الحصص الأسبوعي</Label>
 
-              {/* Smart Scheduling Tips */}
+              {/* Simplified Smart Scheduling Tips - Max 3 tips total */}
               {sessionType && (schedulingSuggestions.generalTips.length > 0 || schedulingSuggestions.smartRecommendations.length > 0) && (
-                <div className="p-3 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800">
+                <div className="p-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/50">
                   <div className="flex items-start gap-2">
-                    <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <p className="font-medium text-blue-700 dark:text-blue-300 text-sm">اقتراحات ذكية للجدولة</p>
-                      <ul className="space-y-1">
-                        {schedulingSuggestions.generalTips.slice(0, 3).map((tip, i) => (
-                          <li key={`tip-${i}`} className="text-xs text-blue-600 dark:text-blue-400">{tip}</li>
+                    <Lightbulb className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      {/* Show only top 3 most important tips combined */}
+                      {[...schedulingSuggestions.generalTips.slice(0, 2), ...schedulingSuggestions.smartRecommendations.slice(0, 1)]
+                        .slice(0, 3)
+                        .map((tip, i) => (
+                          <p key={`tip-${i}`} className="text-xs text-blue-600 dark:text-blue-400">{tip}</p>
                         ))}
-                        {schedulingSuggestions.smartRecommendations.slice(0, 2).map((rec, i) => (
-                          <li key={`rec-${i}`} className="text-xs text-indigo-600 dark:text-indigo-400">{rec}</li>
-                        ))}
-                      </ul>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Similar Students Section */}
-              {sessionType && schedulingSuggestions.similarStudents.length > 0 && (
-                <div className="p-3 rounded-lg bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border border-violet-200 dark:border-violet-800">
-                  <div className="flex items-start gap-2">
-                    <UserCheck className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
-                    <div className="space-y-2 flex-1">
-                      <p className="font-medium text-violet-700 dark:text-violet-300 text-sm">
-                        👥 طلاب مشابهون ({sessionType === 'online' ? 'أونلاين' : 'حضوري'})
-                      </p>
-                      <div className="space-y-1.5">
-                        {schedulingSuggestions.similarStudents.slice(0, 3).map((student) => (
-                          <div
-                            key={student.studentId}
-                            className="flex items-center justify-between p-2 rounded-md bg-white/50 dark:bg-black/20"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Users className="h-3.5 w-3.5 text-violet-500" />
-                              <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
-                                {student.studentName}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-violet-500 dark:text-violet-400">
-                                {student.matchingDayNames.slice(0, 2).join('، ')}
-                              </span>
-                              <span className="text-xs text-violet-600 dark:text-violet-300 font-medium">
-                                {student.sessionTimeAr}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Grouping Suggestions */}
+              {/* Grouping Suggestions - Show only top 2 most relevant */}
               {sessionType && schedulingSuggestions.groupingSuggestions.length > 0 && (
-                <div className="p-3 rounded-lg bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30 border border-teal-200 dark:border-teal-800">
-                  <div className="flex items-start gap-2">
-                    <Calendar className="h-4 w-4 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
-                    <div className="space-y-2 flex-1">
-                      <p className="font-medium text-teal-700 dark:text-teal-300 text-sm">📅 اقتراحات التجميع</p>
-                      <div className="space-y-2">
-                        {schedulingSuggestions.groupingSuggestions.map((suggestion, i) => (
-                          <div
-                            key={`group-${i}`}
-                            className="p-2 rounded-md bg-white/50 dark:bg-black/20"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-teal-700 dark:text-teal-300">
-                                  {suggestion.dayName}
-                                </span>
-                                <span className="text-xs text-teal-600 dark:text-teal-400">
-                                  ({suggestion.reason})
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const existingSchedule = daySchedules.find(d => d.dayOfWeek === suggestion.dayOfWeek);
-                                  if (!existingSchedule) {
-                                    setDaySchedules(prev => [...prev, { dayOfWeek: suggestion.dayOfWeek, time: suggestion.suggestedTime }].sort((a, b) => a.dayOfWeek - b.dayOfWeek));
-                                  } else if (!existingSchedule.time) {
-                                    updateDayTime(suggestion.dayOfWeek, suggestion.suggestedTime);
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700 hover:bg-teal-200 dark:bg-teal-900/50 dark:text-teal-300 dark:hover:bg-teal-900/70 transition-colors"
-                              >
-                                <Clock className="h-3 w-3" />
-                                {suggestion.suggestedTimeAr}
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs text-teal-600 dark:text-teal-400">
-                              <span>{suggestion.benefit}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                <div className="p-2.5 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/50 dark:border-teal-800/50">
+                  <p className="text-xs font-medium text-teal-700 dark:text-teal-300 mb-2">📅 أيام مقترحة (نفس نوع الجلسات)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {schedulingSuggestions.groupingSuggestions.slice(0, 2).map((suggestion, i) => (
+                      <button
+                        key={`group-${i}`}
+                        type="button"
+                        onClick={() => {
+                          const existingSchedule = daySchedules.find(d => d.dayOfWeek === suggestion.dayOfWeek);
+                          if (!existingSchedule) {
+                            setDaySchedules(prev => [...prev, { dayOfWeek: suggestion.dayOfWeek, time: suggestion.suggestedTime }].sort((a, b) => a.dayOfWeek - b.dayOfWeek));
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-teal-100 text-teal-700 hover:bg-teal-200 dark:bg-teal-900/50 dark:text-teal-300 dark:hover:bg-teal-900/70 transition-colors"
+                      >
+                        <span>{suggestion.dayName}</span>
+                        <span className="text-teal-500">•</span>
+                        <span>{suggestion.suggestedTimeAr}</span>
+                        <span className="text-[10px] text-teal-500">({suggestion.existingStudents.length} طالب)</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
