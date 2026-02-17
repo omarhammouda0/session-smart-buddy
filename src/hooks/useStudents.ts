@@ -1600,27 +1600,77 @@ export const useStudents = () => {
             .eq("user_id", currentUserId);
         }
       } else {
-        // Mark as paid (simple toggle - prefer recordPayment for actual payments)
-        // First get the student to calculate amount_due
+        // Mark as paid - also creates payment_record for audit trail
+        // This ensures check-critical-alerts and reports can see the payment
         const student = students.find((s) => s.id === studentId);
         const amountDue = student
           ? calculateMonthlyAmountDue(student, month, year, settings)
           : 0;
 
-        await supabase
+        const now = new Date().toISOString();
+
+        // First get or create the monthly_payment record to get its ID
+        let { data: mpData } = await supabase
           .from("monthly_payments")
-          .update({
-            is_paid: true,
-            amount_paid: amountDue, // Set amount_paid to full amount_due
-            amount_due: amountDue, // Ensure amount_due is also set correctly
-            payment_status: "paid", // Set status to paid
-            paid_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .select("id")
           .eq("student_id", studentId)
           .eq("user_id", currentUserId)
           .eq("month", month)
-          .eq("year", year);
+          .eq("year", year)
+          .maybeSingle();
+
+        // If no monthly_payment exists, create one
+        if (!mpData) {
+          const { data: newMp } = await supabase
+            .from("monthly_payments")
+            .insert({
+              student_id: studentId,
+              user_id: currentUserId,
+              month,
+              year,
+              is_paid: true,
+              amount_due: amountDue,
+              amount_paid: amountDue,
+              payment_status: "paid",
+              paid_at: now,
+            })
+            .select("id")
+            .single();
+          mpData = newMp;
+        } else {
+          // Update existing monthly_payment
+          await supabase
+            .from("monthly_payments")
+            .update({
+              is_paid: true,
+              amount_paid: amountDue,
+              amount_due: amountDue,
+              payment_status: "paid",
+              paid_at: now,
+              updated_at: now,
+            })
+            .eq("id", mpData.id)
+            .eq("user_id", currentUserId);
+        }
+
+        // CRITICAL FIX: Create payment_record entry for audit trail
+        // This ensures:
+        // 1. Reports (MonthlyReportDialog, etc.) can see this payment
+        // 2. check-critical-alerts finds payment_records.paid_at (prevents false overdue alerts)
+        // 3. Full audit trail of when payment was made
+        if (mpData && amountDue > 0) {
+          await supabase
+            .from("payment_records")
+            .insert({
+              monthly_payment_id: mpData.id,
+              student_id: studentId,
+              user_id: currentUserId,
+              amount: amountDue,
+              method: "cash", // Default to cash for toggle (user can use recordPayment for specific method)
+              paid_at: now,
+              notes: "تم التسجيل عبر التبديل السريع", // "Recorded via quick toggle"
+            });
+        }
       }
 
       await loadData();
