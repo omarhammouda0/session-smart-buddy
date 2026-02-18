@@ -284,7 +284,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     description?: string,
     color?: string,
     location?: { lat: number; lng: number; address?: string; name?: string } | null
-  ): Promise<StudentGroup | null> => {
+  ): Promise<string | null> => {
     if (!currentUserId) {
       toast({ title: "خطأ", description: "يجب تسجيل الدخول أولاً", variant: "destructive" });
       return null;
@@ -828,7 +828,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
   }, [groups, fetchGroups]);
 
   // Add a new session for today for a group
-  const addGroupSessionForToday = useCallback(async (groupId: string, time?: string): Promise<GroupSession | null> => {
+  const addGroupSessionForToday = useCallback(async (groupId: string, time?: string): Promise<string | null> => {
     try {
       const group = groups.find(g => g.id === groupId);
       if (!group) {

@@ -47,7 +47,7 @@ interface AddGroupDialogProps {
     description?: string,
     color?: string,
     location?: LocationData | null
-  ) => void | Promise<StudentGroup | null>;
+  ) => void | Promise<string | null>;
   students?: Student[];
   settings?: {
     defaultPriceOnline?: number;
