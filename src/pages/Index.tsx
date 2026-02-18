@@ -1450,46 +1450,49 @@ const Index = () => {
 
                 {nextSession && (
                   <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent overflow-hidden shadow-lg shadow-primary/5">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="relative">
-                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 shadow-lg">
-                              <Timer className="h-7 w-7 text-primary-foreground" />
+                    <CardContent className="p-3 sm:p-4">
+                      {/* Top row: icon + info + action buttons */}
+                      <div className="flex items-start justify-between gap-2 sm:gap-4">
+                        <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
+                          <div className="relative shrink-0">
+                            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
+                              <Timer className="h-5 w-5 sm:h-7 sm:w-7 text-primary-foreground" />
                             </div>
-                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-white animate-pulse" />
+                            <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-primary rounded-full border-2 border-white animate-pulse" />
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground mb-0.5 font-medium">⏰ الحصة القادمة</p>
-                            <div className="flex items-center gap-2">
-                              <p className="font-display font-bold text-lg truncate">{nextSession.student.name}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 font-medium">⏰ الحصة القادمة</p>
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                              <p className="font-display font-bold text-base sm:text-lg truncate">{nextSession.student.name}</p>
                               {/* Contact Buttons for Next Session */}
                               {nextSession.student.phone && (
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-0.5 shrink-0">
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+                                    className="h-6 w-6 sm:h-7 sm:w-7 text-primary hover:text-primary hover:bg-primary/10"
                                     onClick={() => openWhatsApp(nextSession.student.phone!)}
                                     title="رسالة واتساب"
                                   >
-                                    <WhatsAppIcon className="h-4 w-4" />
+                                    <WhatsAppIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                   </Button>
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+                                    className="h-6 w-6 sm:h-7 sm:w-7 text-primary hover:text-primary hover:bg-primary/10"
                                     onClick={() => window.open(`tel:${nextSession.student.phone}`, "_self")}
                                     title="اتصال هاتفي"
                                   >
-                                    <Phone className="h-4 w-4" />
+                                    <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                   </Button>
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Clock className="h-3.5 w-3.5" />
-                              <span className="font-medium">{nextSession.session.time || nextSession.student.sessionTime}</span>
+                            <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                <span className="font-medium">{nextSession.session.time || nextSession.student.sessionTime}</span>
+                              </span>
                               {timeUntilNext && (
                                 <>
                                   <span>•</span>
@@ -1501,54 +1504,9 @@ const Index = () => {
                                 {nextSession.student.sessionType === "online" ? "أونلاين" : "حضوري"}
                               </span>
                             </div>
-
-                            {/* Last Session Notes for Next Session */}
-                            {(() => {
-                              const todayStr = format(now, "yyyy-MM-dd");
-                              const lastSession = getLastSessionWithNotes(nextSession.student, todayStr);
-
-                              // If no past completed sessions, don't show anything
-                              if (!lastSession) return null;
-
-                              const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
-
-                              return (
-                                <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/20 text-xs space-y-1">
-                                  <div className="flex items-center gap-1.5 text-primary dark:text-primary font-medium">
-                                    <FileText className="h-3 w-3" />
-                                    <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
-                                  </div>
-                                  {!hasContent && (
-                                    <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
-                                  )}
-                                  {lastSession.topic && (
-                                    <p className="text-muted-foreground flex items-center gap-1">
-                                      <BookOpen className="h-3 w-3 text-primary" />
-                                      <span className="font-medium">{lastSession.topic}</span>
-                                    </p>
-                                  )}
-                                  {lastSession.notes && (
-                                    <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
-                                  )}
-                                  {lastSession.homework && (
-                                    <div className="flex items-center gap-1 p-1.5 rounded bg-primary/10 text-primary">
-                                      <BookOpen className="h-3 w-3" />
-                                      <span className="font-medium">واجب:</span>
-                                      <span className="line-clamp-1">{lastSession.homework}</span>
-                                      {lastSession.homeworkStatus === "completed" && (
-                                        <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary">✓</Badge>
-                                      )}
-                                      {lastSession.homeworkStatus === "incomplete" && (
-                                        <Badge className="h-4 px-1 text-[10px] bg-muted text-muted-foreground">✗</Badge>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                           {/* Session Notes for Next Session */}
                           <SessionNotesDialog
                             session={nextSession.session}
@@ -1565,7 +1523,7 @@ const Index = () => {
                               <AlertDialogTrigger asChild>
                                 <Button
                                   size="sm"
-                                  className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 h-9 px-4"
+                                  className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1 h-8 sm:h-9 px-2 sm:px-4"
                                 >
                                   <Check className="h-4 w-4" />
                                   <span className="hidden sm:inline">إكمال</span>
@@ -1594,13 +1552,13 @@ const Index = () => {
                             nextSession.session.time || nextSession.student.sessionTime || "16:00",
                             nextSession.session.duration || nextSession.student.sessionDuration || 60
                           ) ? (
-                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
-                              <Clock className="h-4 w-4 animate-pulse" />
+                            <div className="flex items-center gap-1 h-8 sm:h-9 px-2 sm:px-3 rounded-md bg-primary/10 text-primary text-xs sm:text-sm font-medium">
+                              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
                               <span className="hidden sm:inline">جارية</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
-                              <Clock className="h-4 w-4" />
+                            <div className="flex items-center gap-1 h-8 sm:h-9 px-2 sm:px-3 rounded-md bg-primary/10 text-primary text-xs sm:text-sm font-medium">
+                              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               <span className="hidden sm:inline">مجدولة</span>
                             </div>
                           )}
@@ -1609,7 +1567,7 @@ const Index = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1.5 h-9 px-4"
+                                className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1 h-8 sm:h-9 px-2 sm:px-4"
                               >
                                 <XCircle className="h-4 w-4" />
                                 <span className="hidden sm:inline">إلغاء</span>
@@ -1643,7 +1601,7 @@ const Index = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-1.5 h-9 px-3"
+                            className="gap-1 h-8 sm:h-9 px-2 sm:px-3"
                             onClick={() => setCompletionDialog({ open: true, student: nextSession.student, session: nextSession.session })}
                             title="خيارات الحصة"
                           >
@@ -1651,6 +1609,48 @@ const Index = () => {
                           </Button>
                         </div>
                       </div>
+
+                      {/* Last Session Notes - below the main row for better mobile layout */}
+                      {(() => {
+                        const todayStr = format(now, "yyyy-MM-dd");
+                        const lastSession = getLastSessionWithNotes(nextSession.student, todayStr);
+                        if (!lastSession) return null;
+                        const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
+
+                        return (
+                          <div className="mt-2 sm:mt-3 p-2 rounded-lg bg-primary/10 border border-primary/20 text-xs space-y-1">
+                            <div className="flex items-center gap-1.5 text-primary dark:text-primary font-medium">
+                              <FileText className="h-3 w-3" />
+                              <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
+                            </div>
+                            {!hasContent && (
+                              <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
+                            )}
+                            {lastSession.topic && (
+                              <p className="text-muted-foreground flex items-center gap-1">
+                                <BookOpen className="h-3 w-3 text-primary" />
+                                <span className="font-medium">{lastSession.topic}</span>
+                              </p>
+                            )}
+                            {lastSession.notes && (
+                              <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
+                            )}
+                            {lastSession.homework && (
+                              <div className="flex flex-wrap items-center gap-1 p-1.5 rounded bg-primary/10 text-primary">
+                                <BookOpen className="h-3 w-3" />
+                                <span className="font-medium">واجب:</span>
+                                <span className="line-clamp-1">{lastSession.homework}</span>
+                                {lastSession.homeworkStatus === "completed" && (
+                                  <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary">✓</Badge>
+                                )}
+                                {lastSession.homeworkStatus === "incomplete" && (
+                                  <Badge className="h-4 px-1 text-[10px] bg-muted text-muted-foreground">✗</Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 )}
