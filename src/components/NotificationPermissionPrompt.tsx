@@ -120,7 +120,7 @@ export function NotificationPermissionPrompt({
   return (
     <Card
       className={cn(
-        "fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 p-4 shadow-xl border-2",
+        "fixed bottom-20 sm:bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 p-4 shadow-xl border-2",
         "animate-in slide-in-from-bottom-4 duration-300",
         isSuccess
           ? "bg-gradient-to-r from-green-50 to-green-100 border-green-300 dark:from-green-950/30 dark:to-green-900/30 dark:border-green-800"

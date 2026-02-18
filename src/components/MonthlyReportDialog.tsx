@@ -529,8 +529,8 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
           {/* Step 1: Select Student */}
           {currentStep === 'select' && (
             <ScrollArea className="h-full">
-              <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
@@ -643,7 +643,7 @@ ${recommendations ? `\n💡 التوصيات:\n${recommendations}` : ''}
           {/* Step 2: Edit Assessment */}
           {currentStep === 'edit' && (
             <ScrollArea className="h-full">
-              <div className="p-6 space-y-6 pb-8">
+              <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 pb-8">
                 <p className="text-sm text-muted-foreground">
                   أضف تقييمك ومعلومات التواصل لتظهر في التقرير (اختياري)
                 </p>

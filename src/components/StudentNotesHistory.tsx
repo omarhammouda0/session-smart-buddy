@@ -165,7 +165,7 @@ export function StudentNotesHistory({ studentId, studentName }: StudentNotesHist
           </TabsList>
 
           {/* Search and Filters */}
-          <div className="flex gap-2 mb-3">
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input

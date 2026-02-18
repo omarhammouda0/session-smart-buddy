@@ -160,7 +160,7 @@ export function NotificationSettingsDialog({ settings, onSave }: NotificationSet
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-6 py-4">
           {/* Enable Notifications */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">

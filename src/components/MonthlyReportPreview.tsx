@@ -110,7 +110,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
     return (
       <div 
         ref={ref}
-        className="bg-white text-black p-8 max-w-[800px] mx-auto font-sans print:p-6"
+        className="bg-white text-black p-3 sm:p-8 max-w-[800px] mx-auto font-sans print:p-6"
         dir="rtl"
         style={{ fontFamily: 'Arial, sans-serif' }}
       >
@@ -119,7 +119,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
           <h1 className="text-2xl font-bold mb-1">تقرير التقدم الشهري</h1>
           <p className="text-sm text-gray-600 mb-4">MONTHLY PROGRESS REPORT</p>
           
-          <div className="grid grid-cols-2 gap-4 text-sm mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm mt-4">
             <div className="text-right">
               <p><strong>الطالب:</strong> {student.name}</p>
               <p><strong>الشهر:</strong> {ARABIC_MONTHS[month]} {year}</p>
@@ -158,7 +158,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
             📊 ملخص الحضور / Attendance Summary
           </h2>
           
-          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm mb-4">
             <div className="space-y-1">
               <p>إجمالي الجلسات المجدولة: <strong>{totalScheduled} جلسة</strong></p>
               <p className="text-green-700">الجلسات المكتملة: <strong>{completed} جلسات ✓</strong></p>
@@ -212,7 +212,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
                           session.status === 'scheduled' && "bg-blue-50 border-blue-200"
                         )}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center gap-1 justify-between">
                           <div className="flex items-center gap-2">
                             {session.status === 'completed' && <Check className="h-4 w-4 text-green-600" />}
                             {session.status === 'cancelled' && <X className="h-4 w-4 text-red-600" />}
@@ -309,7 +309,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
             <p className="text-gray-500 text-sm">لم يتم تعيين واجبات منزلية هذا الشهر</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm mb-4">
                 <div>
                   <p>إجمالي الواجبات: <strong>{includedHomework.length}</strong></p>
                   <p className="text-green-700">تم إكماله: <strong>{homeworkCompleted} ✓</strong></p>
@@ -344,7 +344,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
                         hw.status === 'pending' && "bg-yellow-50 border-yellow-200"
                       )}
                     >
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex flex-wrap items-center gap-1 justify-between mb-1">
                         <div className="flex items-center gap-2">
                           {hw.status === 'completed' && <span>✅</span>}
                           {hw.status === 'not_completed' && <span>❌</span>}
@@ -428,7 +428,7 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
             💰 حالة الدفع / Payment Status
           </h2>
           
-          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm mb-4">
             <div>
               <p>الجلسات المكتملة: <strong>{completed} جلسات</strong></p>
               <p>السعر لكل جلسة: <strong>{pricePerSession} جنيه</strong></p>

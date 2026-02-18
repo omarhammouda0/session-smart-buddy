@@ -305,7 +305,7 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
         </Card>
 
         {/* Compact Stats Row */}
-        <div className="flex-1 grid grid-cols-4 gap-1.5 sm:gap-2">
+        <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
           {/* Total Sessions */}
           <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,60%,30%)] to-[hsl(220,55%,40%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />

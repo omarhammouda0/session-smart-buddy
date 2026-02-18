@@ -191,7 +191,7 @@ export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerP
   return (
     <>
       {/* Floating End of Day Button - appears at bottom right after all sessions end */}
-      <div className="fixed bottom-4 left-4 z-40">
+      <div className="fixed bottom-20 sm:bottom-4 left-4 z-40">
         <Button
           onClick={handleEndOfDayCheck}
           className={cn(
@@ -213,7 +213,7 @@ export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerP
 
       {/* Floating Notification Banner */}
       {showNotification && !notificationDismissed && (
-        <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 z-50 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-20 sm:bottom-4 right-4 left-4 sm:left-auto sm:w-96 z-50 animate-in slide-in-from-bottom-4 duration-300">
           <Card className="border-2 border-amber-500 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 shadow-xl">
             <CardHeader className="pb-2 pt-3 px-4">
               <div className="flex items-center justify-between">
@@ -275,7 +275,7 @@ export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerP
 
           <div className="flex-1 overflow-y-auto space-y-4 py-4">
             {/* Summary */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <div className="p-3 rounded-xl bg-emerald-500/10 border-2 border-emerald-500/30 text-center">
                 <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-emerald-600" />
                 <p className="text-2xl font-bold text-emerald-700">{completedCount}</p>

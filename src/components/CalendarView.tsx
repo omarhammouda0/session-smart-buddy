@@ -1209,7 +1209,7 @@ export const CalendarView = ({
                 <p className="text-[0.55rem] sm:text-xs text-muted-foreground">
                   حصص
                   {periodSummary.groupMemberSessions > 0 && (
-                    <span className="text-violet-600 block text-[0.5rem]">
+                    <span className="text-violet-600 block text-[0.55rem]">
                       ({periodSummary.privateSessions}+{periodSummary.groupMemberSessions}👥)
                     </span>
                   )}
@@ -1705,7 +1705,7 @@ export const CalendarView = ({
                               </div>
                               {/* Session type indicator */}
                               {isGroup ? (
-                                <Badge variant="outline" className="text-[8px] h-4 px-1 border-violet-300 text-violet-600 dark:border-violet-700 dark:text-violet-400">
+                                <Badge variant="outline" className="text-[9px] h-4 px-1 border-violet-300 text-violet-600 dark:border-violet-700 dark:text-violet-400">
                                   {memberCount}
                                 </Badge>
                               ) : student.sessionType === "online" ? (

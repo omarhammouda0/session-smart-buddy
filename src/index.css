@@ -768,13 +768,13 @@
 }
 
 /* =====================================================
-   COMPREHENSIVE MOBILE STYLES
+   MOBILE STYLES â€” Minimal overrides, let Tailwind handle layout
    ===================================================== */
 
 /* ============ MOBILE (max-width: 639px) ============ */
 @media (max-width: 639px) {
 
-  /* === ROOT & BODY === */
+  /* === ROOT === */
   html {
     font-size: 14px;
   }
@@ -784,7 +784,7 @@
     -webkit-text-size-adjust: 100%;
   }
 
-  /* === REMOVE DECORATIVE ELEMENTS === */
+  /* === HIDE DECORATIVE BLOBS === */
   .animate-blob,
   .animate-float,
   .animate-pulse-soft,
@@ -793,7 +793,7 @@
     display: none !important;
   }
 
-  /* === LAYOUT CONTAINERS === */
+  /* === LAYOUT === */
   .container,
   main {
     padding-left: 0.75rem;
@@ -801,7 +801,7 @@
   }
 
   main {
-    padding-bottom: 5rem; /* Bottom nav space */
+    padding-bottom: 5rem; /* Space for bottom nav */
   }
 
   /* === HEADER === */
@@ -818,19 +818,7 @@
     font-size: 0.65rem;
   }
 
-  /* Header buttons - compact but touchable */
-  header button {
-    min-width: 2.25rem;
-    min-height: 2.25rem;
-    padding: 0.375rem;
-  }
-
-  header button svg {
-    width: 1rem;
-    height: 1rem;
-  }
-
-  /* === TABS (Hidden on mobile - using bottom nav) === */
+  /* === TABS (hide main page tabs â€” bottom nav used instead) === */
   [role="tablist"]:not(.mobile-keep) {
     display: none !important;
   }
@@ -839,148 +827,35 @@
     margin-top: 0;
   }
 
-  /* === BUTTONS === */
+  /* Visible tabs (mobile-keep) get horizontal scroll */
+  [role="tablist"].mobile-keep {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
 
-  /* Default buttons */
+  [role="tablist"].mobile-keep::-webkit-scrollbar {
+    display: none;
+  }
+
+  [role="tab"] {
+    white-space: nowrap;
+    font-size: 0.8125rem;
+  }
+
+  /* === BUTTONS â€” touch basics only === */
   button,
   [role="button"] {
-    font-size: 0.8125rem;
-    border-radius: 0.5rem;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Standard buttons without explicit size */
-  button:not(.h-6):not(.h-7):not(.h-8):not(.h-9):not(.w-6):not(.w-7):not(.w-8):not(.w-9),
-  [role="button"]:not(.h-6):not(.h-7):not(.h-8):not(.h-9):not(.w-6):not(.w-7):not(.w-8):not(.w-9) {
-    min-height: 2.5rem;
-    padding: 0.5rem 0.875rem;
-  }
-
-  /* Small icon buttons (h-6, h-7) */
-  button.h-6, button.h-7, button.w-6, button.w-7,
-  [role="button"].h-6, [role="button"].h-7 {
-    width: 1.75rem;
-    height: 1.75rem;
-    min-width: 1.75rem;
-    min-height: 1.75rem;
-    padding: 0.25rem;
-  }
-
-  button.h-6 svg, button.h-7 svg,
-  [role="button"].h-6 svg, [role="button"].h-7 svg {
-    width: 0.875rem;
-    height: 0.875rem;
-  }
-
-  /* Medium icon buttons (h-8, h-9) */
-  button.h-8, button.h-9, button.w-8, button.w-9,
-  [role="button"].h-8, [role="button"].h-9 {
-    width: 2rem;
-    height: 2rem;
-    min-width: 2rem;
-    min-height: 2rem;
-    padding: 0.375rem;
-  }
-
-  button.h-8 svg, button.h-9 svg,
-  [role="button"].h-8 svg, [role="button"].h-9 svg {
-    width: 1rem;
-    height: 1rem;
-  }
-
-  /* Large icon buttons (h-10, w-10) */
-  button.h-10, button.w-10,
-  [role="button"].h-10, [role="button"].w-10 {
-    width: 2.5rem;
-    height: 2.5rem;
-    min-width: 2.5rem;
-    min-height: 2.5rem;
-    padding: 0.5rem;
-  }
-
-  button.h-10 svg, button.w-10 svg,
-  [role="button"].h-10 svg, [role="button"].w-10 svg {
-    width: 1.125rem;
-    height: 1.125rem;
-  }
-
-  /* Button SVG icons - base sizing */
-  button svg,
-  [role="button"] svg {
-    flex-shrink: 0;
-  }
-
-  /* Action button groups */
-  .flex.gap-0\.5,
-  .flex.gap-1 {
-    gap: 0.25rem;
-  }
-
-  .flex.gap-1\.5 {
-    gap: 0.375rem;
-  }
-
-  .flex.gap-2 {
-    gap: 0.5rem;
-  }
-
-  /* === INPUTS === */
+  /* === INPUTS â€” prevent iOS zoom === */
   input,
   textarea,
-  select {
-    font-size: 16px !important; /* Prevent iOS zoom */
-    min-height: 2.75rem;
-    padding: 0.625rem 0.75rem;
-    border-radius: 0.5rem;
-  }
-
-  input[type="time"],
-  input[type="date"] {
-    min-height: 2.75rem;
-    padding: 0.5rem 0.625rem;
-  }
-
-  /* Select triggers */
-  [data-radix-select-trigger],
-  button[role="combobox"] {
-    min-height: 2.75rem;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8125rem;
-  }
-
-  /* Combobox/Search inputs */
-  [class*="Combobox"] input {
-    width: 100%;
-    min-height: 2.5rem;
-  }
-
-  /* === CARDS === */
-  [class*="Card"] {
-    border-radius: 0.875rem;
-  }
-
-  [class*="CardHeader"] {
-    padding: 0.875rem;
-  }
-
-  [class*="CardContent"] {
-    padding: 0.875rem;
-  }
-
-  [class*="CardTitle"] {
-    font-size: 0.95rem;
-  }
-
-  [class*="CardDescription"] {
-    font-size: 0.75rem;
-  }
-
-  /* === BADGES === */
-  [class*="Badge"] {
-    font-size: 0.625rem;
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
+  select,
+  [role="combobox"] {
+    font-size: 16px !important; /* Prevents iOS auto-zoom on focus */
   }
 
   /* === DIALOGS === */
@@ -993,28 +868,16 @@
     margin: 0.75rem;
     padding: 1rem;
     border-radius: 1rem;
-  }
-
-  [class*="DialogHeader"] {
-    padding-bottom: 0.75rem;
-  }
-
-  [class*="DialogTitle"] {
-    font-size: 1.0625rem;
-  }
-
-  [class*="DialogDescription"] {
-    font-size: 0.8125rem;
+    overflow-y: auto;
   }
 
   [class*="DialogFooter"] {
-    padding-top: 0.75rem;
+    flex-direction: column-reverse;
     gap: 0.5rem;
   }
 
   [class*="DialogFooter"] button {
-    min-height: 2.75rem;
-    flex: 1;
+    width: 100%;
   }
 
   /* === ALERT DIALOGS === */
@@ -1024,14 +887,6 @@
     padding: 1.25rem;
   }
 
-  [class*="AlertDialogTitle"] {
-    font-size: 1rem;
-  }
-
-  [class*="AlertDialogDescription"] {
-    font-size: 0.8125rem;
-  }
-
   [class*="AlertDialogFooter"] {
     flex-direction: column-reverse;
     gap: 0.5rem;
@@ -1039,15 +894,9 @@
 
   [class*="AlertDialogFooter"] button {
     width: 100%;
-    min-height: 2.75rem;
   }
 
-  /* === SHEETS === */
-  [class*="SheetContent"] {
-    padding: 1rem;
-  }
-
-  /* Bottom sheet behavior */
+  /* === SHEETS â€” Bottom-sheet on mobile === */
   [class*="SheetContent"][data-side="right"],
   [class*="SheetContent"][data-side="left"] {
     position: fixed;
@@ -1059,29 +908,10 @@
     max-height: 85dvh;
     border-radius: 1rem 1rem 0 0;
     margin: 0;
+    padding: 1rem;
   }
 
-  [class*="SheetTitle"] {
-    font-size: 1rem;
-  }
-
-  /* Sheet button items */
-  [class*="SheetContent"] button[class*="outline"],
-  [class*="SheetContent"] button[class*="ghost"] {
-    width: 100%;
-    justify-content: flex-start;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    min-height: 2.75rem;
-    font-size: 0.875rem;
-  }
-
-  [class*="SheetContent"] button svg {
-    width: 1.125rem;
-    height: 1.125rem;
-  }
-
-  /* === DROPDOWNS & SELECT MENUS === */
+  /* === DROPDOWNS â€” touch scroll === */
   [class*="DropdownMenuContent"],
   [class*="SelectContent"] {
     max-height: 60vh;
@@ -1089,173 +919,47 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  [class*="DropdownMenuItem"],
-  [class*="SelectItem"] {
-    min-height: 2.75rem;
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
-  }
-
-  /* === TYPOGRAPHY === */
-  h1 { font-size: 1.25rem; }
-  h2 { font-size: 1.125rem; }
-  h3 { font-size: 1rem; }
-  h4, h5, h6 { font-size: 0.9375rem; }
-
-  .text-xs { font-size: 0.6875rem; }
-  .text-sm { font-size: 0.8125rem; }
-  .text-base { font-size: 0.875rem; }
-  .text-lg { font-size: 0.9375rem; }
-  .text-xl { font-size: 1.0625rem; }
-  .text-2xl { font-size: 1.1875rem; }
-  .text-3xl { font-size: 1.375rem; }
-
-  /* === SPACING ADJUSTMENTS === */
-  .space-y-4 > * + * { margin-top: 0.75rem; }
-  .space-y-3 > * + * { margin-top: 0.625rem; }
-  .space-y-2 > * + * { margin-top: 0.5rem; }
-
-  .gap-4 { gap: 0.75rem; }
-  .gap-3 { gap: 0.625rem; }
-
-  .p-6 { padding: 1rem; }
-  .p-5 { padding: 0.875rem; }
-  .p-4 { padding: 0.75rem; }
-  .p-3 { padding: 0.625rem; }
-
-  /* === SESSION CARDS === */
-  /* Session card layout */
-  .session-card,
-  [class*="CardContent"] > .flex {
-    flex-wrap: nowrap;
-  }
-
-  /* Session card action buttons */
-  .session-card .flex.shrink-0,
-  [class*="Card"] .flex.shrink-0 {
-    flex-wrap: nowrap;
-    gap: 0.25rem;
-  }
-
-  /* Student info truncation */
-  .session-card .min-w-0,
-  [class*="Card"] .min-w-0 {
-    overflow: hidden;
-  }
-
-  .session-card .truncate,
-  [class*="Card"] .truncate {
-    max-width: 100%;
-  }
-
-  /* === TODAY STATS GRID === */
-  .grid.grid-cols-4 {
-    gap: 0.375rem;
-  }
-
-  .grid.grid-cols-4 > * {
-    padding: 0.5rem 0.375rem;
-  }
-
-  .grid.grid-cols-4 p {
-    font-size: 0.625rem;
-    line-height: 1.3;
-  }
-
-  .grid.grid-cols-4 svg {
-    width: 0.875rem;
-    height: 0.875rem;
-  }
-
-  .grid.grid-cols-4 .text-lg,
-  .grid.grid-cols-4 .text-xl,
-  .grid.grid-cols-4 .text-2xl {
-    font-size: 1.125rem;
-  }
-
-  /* === CALENDAR === */
-  /* Calendar grid cells */
-  [data-date] {
-    min-height: 3.5rem;
-    padding: 0.25rem;
-  }
-
-  /* Calendar day headers */
-  .grid-cols-7 > div {
-    font-size: 0.625rem;
-    padding: 0.25rem;
-  }
-
-  /* Calendar session items */
-  [data-date] > div,
-  [data-date] button {
-    font-size: 0.5rem;
-    padding: 0.125rem 0.1875rem;
-    line-height: 1.2;
-    border-radius: 0.1875rem;
-  }
-
-  /* === PROGRESS BARS === */
-  [class*="Progress"],
-  [role="progressbar"] {
-    height: 0.375rem;
-  }
-
   /* === SCROLL AREAS === */
   [data-radix-scroll-area-viewport] {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* === GROUP CARDS === */
-  [class*="GroupCard"] button {
-    min-width: 1.75rem;
-    min-height: 1.75rem;
-    padding: 0.25rem;
+  /* === POPOVER === */
+  [class*="PopoverContent"] {
+    max-width: calc(100vw - 1rem);
+    max-height: 60vh;
+    overflow-y: auto;
   }
 
-  /* === CHARTS === */
-  [class*="recharts-wrapper"],
-  [class*="recharts-surface"] {
-    max-height: 140px;
+  /* === TOOLTIPS â€” hide on touch (use tap for info instead) === */
+  [role="tooltip"] {
+    display: none !important;
   }
 
-  /* === STUDENT LIST (IN SHEETS) === */
-  [class*="SheetContent"] .flex.items-center.justify-between {
-    gap: 0.5rem;
+  /* === CALENDAR GRID â€” tighten cells === */
+  .grid.grid-cols-7 {
+    gap: 0.125rem;
   }
 
-  [class*="SheetContent"] .flex.items-center.gap-0\.5 {
-    gap: 0.25rem;
+  .grid.grid-cols-7 [data-date] {
+    min-height: 3rem;
+    padding: 0.125rem;
+    font-size: 0.625rem;
   }
 
-  [class*="SheetContent"] .flex.items-center.gap-0\.5 button {
-    width: 1.75rem;
-    height: 1.75rem;
-    min-width: 1.75rem;
-    min-height: 1.75rem;
-    padding: 0.25rem;
-  }
-
-  [class*="SheetContent"] .flex.items-center.gap-0\.5 button svg {
-    width: 0.875rem;
-    height: 0.875rem;
-  }
-
-  /* === NEXT SESSION CARD === */
-  .next-session-card button {
-    min-width: 1.875rem;
-    min-height: 1.875rem;
-    padding: 0.3125rem;
+  /* === TOAST NOTIFICATIONS â€” above bottom nav === */
+  [class*="Toaster"],
+  [class*="Toast"] {
+    bottom: calc(4rem + env(safe-area-inset-bottom)) !important;
   }
 }
 
 /* ============ VERY SMALL SCREENS (< 375px) ============ */
 @media (max-width: 374px) {
   html {
-    font-size: 12px;
+    font-size: 13px;
   }
 
-  /* Even more compact header */
   header {
     padding: 0.375rem 0.5rem;
   }
@@ -1263,89 +967,10 @@
   header h1 {
     font-size: 0.875rem;
   }
-
-  header button {
-    min-width: 1.875rem;
-    min-height: 1.875rem;
-    padding: 0.25rem;
-  }
-
-  /* Smaller buttons */
-  button:not(.h-6):not(.h-7):not(.h-8):not(.h-9),
-  [role="button"]:not(.h-6):not(.h-7):not(.h-8):not(.h-9) {
-    min-height: 2.25rem;
-    padding: 0.375rem 0.625rem;
-    font-size: 0.75rem;
-  }
-
-  /* Tiny icon buttons */
-  button.h-6, button.h-7, button.w-6, button.w-7,
-  [role="button"].h-6, [role="button"].h-7 {
-    width: 1.5rem;
-    height: 1.5rem;
-    min-width: 1.5rem;
-    min-height: 1.5rem;
-  }
-
-  button.h-6 svg, button.h-7 svg {
-    width: 0.75rem;
-    height: 0.75rem;
-  }
-
-  /* Compact cards */
-  [class*="CardHeader"],
-  [class*="CardContent"] {
-    padding: 0.625rem;
-  }
-
-  /* Smaller badges */
-  [class*="Badge"] {
-    font-size: 0.5625rem;
-    padding: 0.0625rem 0.25rem;
-  }
-
-  /* Stats grid */
-  .grid.grid-cols-4 {
-    gap: 0.25rem;
-  }
-
-  .grid.grid-cols-4 > * {
-    padding: 0.375rem 0.25rem;
-  }
-
-  .grid.grid-cols-4 p {
-    font-size: 0.5rem;
-  }
-
-  .grid.grid-cols-4 .text-lg,
-  .grid.grid-cols-4 .text-xl,
-  .grid.grid-cols-4 .text-2xl {
-    font-size: 0.9375rem;
-  }
-
-  /* Inputs */
-  input,
-  textarea,
-  select {
-    min-height: 2.5rem;
-    font-size: 14px !important;
-    padding: 0.5rem 0.625rem;
-  }
-
-  /* Dialogs */
-  [role="dialog"],
-  [class*="DialogContent"] {
-    padding: 0.875rem;
-  }
-
-  [class*="DialogTitle"] {
-    font-size: 0.9375rem;
-  }
 }
 
 /* ============ TOUCH DEVICES ============ */
 @media (hover: none) and (pointer: coarse) {
-  /* Ensure touch targets have adequate size */
   button,
   [role="button"],
   a,
@@ -1356,24 +981,12 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Active state feedback */
   button:active,
   [role="button"]:active,
   a:active {
     transform: scale(0.97);
     opacity: 0.92;
     transition: transform 0.1s, opacity 0.1s;
-  }
-
-  /* Disable hover effects */
-  .hover\:scale-105:hover,
-  .hover\:scale-\[1\.02\]:hover {
-    transform: none;
-  }
-
-  .hover\:shadow-lg:hover,
-  .hover\:shadow-xl:hover {
-    box-shadow: inherit;
   }
 }
 
@@ -1418,11 +1031,6 @@
     max-height: 95vh;
     max-height: 95dvh;
   }
-
-  /* Hide non-essential elements when keyboard shows */
-  .hide-on-keyboard {
-    display: none !important;
-  }
 }
 
 /* ============ TABLET (640px - 1023px) ============ */
@@ -1434,11 +1042,6 @@
   .container {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
-  }
-
-  [class*="CardHeader"],
-  [class*="CardContent"] {
-    padding: 1.25rem;
   }
 }
 
@@ -1452,1064 +1055,6 @@
     transition-duration: 0.01ms !important;
   }
 }
-
-/* =====================================================
-   DEEP MOBILE FIXES - COMPONENT SPECIFIC
-   Target specific patterns used in the app
-   ===================================================== */
-@media (max-width: 639px) {
-
-  /* === TODAY'S SCHEDULE HEADER BUTTONS === */
-  /* "إضافة حصة" and "حصة مجموعة" buttons */
-  .bg-gradient-to-r.from-primary.to-blue-500,
-  .bg-gradient-to-r.from-violet-500.to-purple-600 {
-    height: auto !important;
-    min-height: 2rem !important;
-    padding: 0.375rem 0.625rem !important;
-    font-size: 0.6875rem !important;
-  }
-
-  .bg-gradient-to-r.from-primary.to-blue-500 svg,
-  .bg-gradient-to-r.from-violet-500.to-purple-600 svg {
-    width: 0.75rem !important;
-    height: 0.75rem !important;
-  }
-
-  /* === SESSION CARD ACTION BUTTONS (Complete, Cancel, Pay, etc.) === */
-  /* Target buttons with h-9 class in session cards */
-  .flex.items-center.gap-2.flex-wrap button.h-9,
-  .flex.items-center.gap-2 button.h-9 {
-    height: auto !important;
-    min-height: 2.25rem !important;
-    padding: 0.375rem 0.75rem !important;
-    font-size: 0.75rem !important;
-    gap: 0.25rem !important;
-  }
-
-  .flex.items-center.gap-2.flex-wrap button.h-9 svg,
-  .flex.items-center.gap-2 button.h-9 svg {
-    width: 0.875rem !important;
-    height: 0.875rem !important;
-  }
-
-  /* === SESSION STATUS INDICATORS (جارية, مجدولة badges) === */
-  .flex.items-center.gap-1\.5.h-9.px-3.rounded-md {
-    height: auto !important;
-    min-height: 2rem !important;
-    padding: 0.375rem 0.5rem !important;
-    font-size: 0.6875rem !important;
-  }
-
-  .flex.items-center.gap-1\.5.h-9 svg {
-    width: 0.875rem !important;
-    height: 0.875rem !important;
-  }
-
-  /* === TIME BOX IN SESSION CARDS === */
-  /* The 14x14 time display boxes */
-  .w-14.h-14.rounded-xl {
-    width: 3rem !important;
-    height: 3rem !important;
-    min-width: 3rem !important;
-  }
-
-  .w-14.h-14 .text-base.font-bold {
-    font-size: 0.8125rem !important;
-  }
-
-  .w-14.h-14 .text-\[9px\] {
-    font-size: 0.5rem !important;
-  }
-
-  /* === STUDENT INFO IN SESSION CARDS === */
-  /* Icon container (w-8 h-8) */
-  .w-8.h-8.rounded-lg {
-    width: 1.75rem !important;
-    height: 1.75rem !important;
-    min-width: 1.75rem !important;
-  }
-
-  .w-8.h-8.rounded-lg svg {
-    width: 0.875rem !important;
-    height: 0.875rem !important;
-  }
-
-  /* Student name styling */
-  h4.font-bold.text-base.truncate {
-    font-size: 0.875rem !important;
-    max-width: calc(100vw - 10rem) !important;
-  }
-
-  /* === CONTACT BUTTONS (WhatsApp, Phone) === */
-  /* These appear on hover in session cards */
-  .flex.items-center.gap-1.mr-2 button.h-7.w-7,
-  button.h-7.w-7[title*="واتساب"],
-  button.h-7.w-7[title*="اتصال"] {
-    width: 1.75rem !important;
-    height: 1.75rem !important;
-    min-width: 1.75rem !important;
-    padding: 0.25rem !important;
-  }
-
-  .flex.items-center.gap-1.mr-2 button svg {
-    width: 0.875rem !important;
-    height: 0.875rem !important;
-  }
-
-  /* === NOTES SECTION IN SESSION CARDS === */
-  /* Previous session notes */
-  .mt-2.p-2.rounded-lg.bg-primary\/5 {
-    padding: 0.5rem !important;
-    font-size: 0.6875rem !important;
-  }
-
-  .mt-2.p-2.rounded-lg.bg-primary\/5 .flex.items-center.gap-1\.5 {
-    gap: 0.25rem !important;
-  }
-
-  .mt-2.p-2.rounded-lg.bg-primary\/5 svg {
-    width: 0.625rem !important;
-    height: 0.625rem !important;
-  }
-
-  /* === HEADER STATS BADGES === */
-  /* "X مجدولة" and "X مكتملة" badges */
-  .flex.items-center.gap-1\.5.text-xs .bg-primary\/10,
-  .flex.items-center.gap-1\.5.text-xs .bg-primary\/20 {
-    padding: 0.125rem 0.375rem !important;
-    font-size: 0.5625rem !important;
-    height: auto !important;
-  }
-
-  /* === NEXT SESSION CARD === */
-  /* Main next session indicator */
-  .border-2.border-primary\/30.bg-gradient-to-r {
-    padding: 0.75rem !important;
-  }
-
-  .border-2.border-primary\/30 .w-14.h-14,
-  .relative .w-14.h-14 {
-    width: 2.75rem !important;
-    height: 2.75rem !important;
-    min-width: 2.75rem !important;
-  }
-
-  .border-2.border-primary\/30 .w-14.h-14 svg,
-  .relative .w-14.h-14 svg {
-    width: 1.25rem !important;
-    height: 1.25rem !important;
-  }
-
-  /* === GROUP SESSION STYLING === */
-  /* Violet colored group cards and buttons */
-  .bg-violet-600.hover\:bg-violet-700,
-  .border-violet-300.text-violet-600 {
-    min-height: 2.25rem !important;
-    padding: 0.375rem 0.75rem !important;
-    font-size: 0.75rem !important;
-  }
-
-  .bg-violet-600 svg,
-  .border-violet-300 svg {
-    width: 0.875rem !important;
-    height: 0.875rem !important;
-  }
-
-  /* Group member badges */
-  .bg-violet-50.dark\:bg-violet-950\/20 .text-\[9px\] {
-    font-size: 0.5rem !important;
-  }
-
-  /* === PAYMENT DIALOG SPECIFIC === */
-  /* Quick amount buttons */
-  .grid.grid-cols-2 button,
-  .grid.grid-cols-3 button {
-    min-height: 2.5rem !important;
-    font-size: 0.8125rem !important;
-  }
-
-  /* Payment method radio buttons */
-  [role="radiogroup"] > div {
-    padding: 0.75rem !important;
-  }
-
-  [role="radiogroup"] label {
-    font-size: 0.8125rem !important;
-  }
-
-  /* === CALENDAR VIEW FIXES === */
-  /* Day cells in month/week view */
-  .grid.grid-cols-7 [data-date] {
-    min-height: 3rem !important;
-    padding: 0.1875rem !important;
-  }
-
-  /* Sessions inside calendar cells */
-  .grid.grid-cols-7 [data-date] > button,
-  .grid.grid-cols-7 [data-date] > div:not(:first-child) {
-    font-size: 0.4375rem !important;
-    padding: 0.0625rem 0.125rem !important;
-    margin: 0.0625rem 0 !important;
-    line-height: 1.15 !important;
-  }
-
-  /* Calendar navigation buttons */
-  .flex.items-center.gap-1 > button.h-7,
-  .flex.items-center.gap-1 > button.h-9 {
-    width: 2rem !important;
-    height: 2rem !important;
-    min-width: 2rem !important;
-    padding: 0.25rem !important;
-  }
-
-  /* === STUDENT CARD IN LISTS === */
-  /* Student list items in sheets */
-  .rounded-lg.border.bg-card {
-    padding: 0.5rem !important;
-  }
-
-  .rounded-lg.border.bg-card .font-medium.truncate {
-    font-size: 0.75rem !important;
-    max-width: calc(100vw - 8rem) !important;
-  }
-
-  /* === ADD STUDENT DIALOG === */
-  /* Day selection checkboxes/buttons */
-  .grid.grid-cols-7 > button,
-  .grid.grid-cols-7 > div > button {
-    min-width: 2rem !important;
-    min-height: 2rem !important;
-    padding: 0.25rem !important;
-    font-size: 0.625rem !important;
-  }
-
-  /* Time input for each day */
-  input[type="time"] {
-    width: 100% !important;
-    min-height: 2.5rem !important;
-    font-size: 14px !important;
-    padding: 0.375rem 0.5rem !important;
-  }
-
-  /* === SCHEDULE SUGGESTIONS === */
-  /* AI suggestion cards */
-  .bg-primary\/5.border.border-primary\/20 {
-    padding: 0.5rem !important;
-  }
-
-  .bg-primary\/5 .text-xs {
-    font-size: 0.625rem !important;
-  }
-
-  /* === PAYMENTS DASHBOARD === */
-  /* Payment status filter buttons */
-  .grid.grid-cols-4 > button {
-    padding: 0.375rem 0.25rem !important;
-    min-height: auto !important;
-  }
-
-  .grid.grid-cols-4 > button > div {
-    gap: 0.125rem !important;
-  }
-
-  /* Payment list items */
-  .divide-y > div {
-    padding: 0.625rem !important;
-  }
-
-  /* === GROUP MANAGEMENT === */
-  /* Group card headers */
-  .w-12.h-12.rounded-full {
-    width: 2.5rem !important;
-    height: 2.5rem !important;
-  }
-
-  .w-12.h-12 svg {
-    width: 1.25rem !important;
-    height: 1.25rem !important;
-  }
-
-  /* Group member items */
-  .p-2.rounded-lg.bg-muted\/30 {
-    padding: 0.375rem 0.5rem !important;
-  }
-
-  .p-2.rounded-lg .w-8.h-8 {
-    width: 1.5rem !important;
-    height: 1.5rem !important;
-  }
-
-  /* === COLLAPSIBLE SECTIONS === */
-  /* Expand/collapse trigger buttons */
-  [data-state="open"] > button,
-  [data-state="closed"] > button {
-    padding: 0.5rem !important;
-    font-size: 0.8125rem !important;
-  }
-
-  /* === SWITCH/TOGGLE COMPONENTS === */
-  [role="switch"] {
-    width: 2.5rem !important;
-    height: 1.375rem !important;
-  }
-
-  [role="switch"] > span {
-    width: 1.125rem !important;
-    height: 1.125rem !important;
-  }
-
-  /* === CHECKBOX COMPONENTS === */
-  [role="checkbox"] {
-    width: 1.125rem !important;
-    height: 1.125rem !important;
-  }
-
-  /* === TOOLTIP TRIGGERS === */
-  /* Info icons that trigger tooltips */
-  button[data-state="closed"][class*="ghost"] svg.h-4.w-4 {
-    width: 0.875rem !important;
-    height: 0.875rem !important;
-  }
-
-  /* === FORM LABELS === */
-  label {
-    font-size: 0.75rem !important;
-    margin-bottom: 0.25rem !important;
-  }
-
-  /* === BADGE CLOSE BUTTONS (X buttons in tags) === */
-  [class*="Badge"] button,
-  [class*="Badge"] svg {
-    width: 0.625rem !important;
-    height: 0.625rem !important;
-  }
-
-  /* === EMPTY STATE ILLUSTRATIONS === */
-  .w-20.h-20 {
-    width: 4rem !important;
-    height: 4rem !important;
-  }
-
-  .w-20.h-20 svg {
-    width: 2rem !important;
-    height: 2rem !important;
-  }
-
-  /* === DURATION PICKER === */
-  /* Custom duration input buttons */
-  .flex.items-center.gap-2 > button.h-10 {
-    width: 2.25rem !important;
-    height: 2.25rem !important;
-    min-width: 2.25rem !important;
-    padding: 0 !important;
-  }
-
-  .flex.items-center.gap-2 > input {
-    width: 3.5rem !important;
-    text-align: center !important;
-  }
-
-  /* === MONTH SELECTOR === */
-  /* Month/year navigation */
-  .flex.items-center.justify-between > button {
-    min-width: 2rem !important;
-    padding: 0.375rem !important;
-  }
-
-  /* === REPORT DIALOGS === */
-  /* Monthly report preview cards */
-  .overflow-x-auto {
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-  }
-
-  .overflow-x-auto::-webkit-scrollbar {
-    display: none !important;
-  }
-
-  /* Table cells in reports */
-  td, th {
-    padding: 0.375rem 0.5rem !important;
-    font-size: 0.6875rem !important;
-  }
-
-  /* === AI SUGGESTIONS WIDGET === */
-  /* Floating suggestion button */
-  .fixed.bottom-20.right-4 button,
-  .fixed.bottom-24.right-4 button {
-    width: 2.75rem !important;
-    height: 2.75rem !important;
-  }
-
-  /* Suggestion cards */
-  .bg-gradient-to-r.from-amber-50 {
-    padding: 0.625rem !important;
-  }
-
-  /* === NOTIFICATION BANNERS === */
-  /* Session notification at top */
-  .fixed.top-0.left-0.right-0.z-50 {
-    padding: 0.5rem 0.75rem !important;
-  }
-
-  .fixed.top-0 .flex.items-center {
-    gap: 0.5rem !important;
-  }
-
-  /* === SETTINGS/PREFERENCES === */
-  /* Settings items in sheets */
-  .space-y-4 > .flex.items-center.justify-between {
-    padding: 0.5rem 0 !important;
-  }
-
-  /* === SCROLL CONTAINERS FIX === */
-  /* Ensure touch scrolling works */
-  .max-h-\[calc\(100vh-180px\)\],
-  .max-h-\[calc\(100vh-140px\)\],
-  .max-h-60,
-  .max-h-80,
-  [class*="max-h-"] {
-    -webkit-overflow-scrolling: touch !important;
-  }
-
-  /* === LOADING STATES === */
-  /* Spinner size */
-  .animate-spin {
-    width: 1.25rem !important;
-    height: 1.25rem !important;
-  }
-
-  /* === PRICE/AMOUNT DISPLAYS === */
-  /* Currency amounts */
-  .tabular-nums {
-    font-size: inherit !important;
-  }
-
-  /* === GRADIENT BACKGROUNDS === */
-  /* Reduce gradient complexity on mobile for performance */
-  .bg-gradient-to-br,
-  .bg-gradient-to-r,
-  .bg-gradient-to-t {
-    background-size: 100% 100% !important;
-  }
-
-  /* === FOCUS STATES === */
-  /* Ensure focus rings are visible but not too large */
-  button:focus-visible,
-  input:focus-visible,
-  [role="button"]:focus-visible {
-    outline: 2px solid hsl(var(--primary)) !important;
-    outline-offset: 1px !important;
-  }
-
-  /* === HOVER STATES DISABLED ON TOUCH === */
-  /* Already handled in touch devices section */
-
-  /* === FLEX WRAP IMPROVEMENTS === */
-  /* Ensure action button groups don't overflow */
-  .flex.flex-wrap {
-    gap: 0.375rem !important;
-  }
-
-  .flex.items-center.gap-2.flex-wrap {
-    gap: 0.375rem !important;
-  }
-
-  /* === ICON CONSISTENCY === */
-  /* Ensure all icons in buttons scale properly */
-  button > svg:only-child {
-    margin: auto !important;
-  }
-
-  button > svg:not(:only-child) {
-    flex-shrink: 0 !important;
-  }
-}
-
-/* === ADDITIONAL FIXES FOR 320px - 374px SCREENS === */
-@media (max-width: 374px) {
-  /* Session card time boxes even smaller */
-  .w-14.h-14.rounded-xl {
-    width: 2.5rem !important;
-    height: 2.5rem !important;
-  }
-
-  .w-14.h-14 .text-base.font-bold {
-    font-size: 0.6875rem !important;
-  }
-
-  /* Action buttons stack vertically */
-  .flex.items-center.gap-2.flex-wrap {
-    flex-direction: column !important;
-    align-items: stretch !important;
-  }
-
-  .flex.items-center.gap-2.flex-wrap button {
-    width: 100% !important;
-    justify-content: center !important;
-  }
-
-  /* Header buttons smaller */
-  .bg-gradient-to-r.from-primary.to-blue-500,
-  .bg-gradient-to-r.from-violet-500.to-purple-600 {
-    padding: 0.25rem 0.5rem !important;
-    font-size: 0.5625rem !important;
-  }
-
-  /* Student name max width */
-  h4.font-bold.text-base.truncate {
-    max-width: calc(100vw - 7rem) !important;
-    font-size: 0.8125rem !important;
-  }
-
-  /* Calendar cells */
-  .grid.grid-cols-7 [data-date] {
-    min-height: 2.5rem !important;
-  }
-
-  .grid.grid-cols-7 [data-date] > button,
-  .grid.grid-cols-7 [data-date] > div:not(:first-child) {
-    font-size: 0.375rem !important;
-  }
-}
-
-/* =====================================================
-   ENHANCED MOBILE STYLES - COMPREHENSIVE FIX
-   ===================================================== */
-@media (max-width: 639px) {
-
-  /* === GLOBAL BUTTON FIXES === */
-  /* Ensure all buttons have minimum touch target */
-  button,
-  [role="button"],
-  .btn,
-  a[href] {
-    min-height: 2.25rem;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  /* Icon-only buttons - ensure proper sizing */
-  button:has(svg:only-child),
-  [role="button"]:has(svg:only-child) {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 0.375rem !important;
-    min-width: 2rem !important;
-    min-height: 2rem !important;
-  }
-
-  button:has(svg:only-child) svg,
-  [role="button"]:has(svg:only-child) svg {
-    width: 1rem !important;
-    height: 1rem !important;
-    flex-shrink: 0 !important;
-  }
-
-  /* === CARD ACTION BUTTONS === */
-  /* Session card action buttons in flex container */
-  .flex.items-center.shrink-0 button,
-  .flex.shrink-0.items-center button,
-  .card-actions button {
-    min-width: 2rem !important;
-    min-height: 2rem !important;
-    padding: 0.375rem !important;
-  }
-
-  .flex.items-center.shrink-0 button svg,
-  .flex.shrink-0.items-center button svg {
-    width: 0.875rem !important;
-    height: 0.875rem !important;
-  }
-
-  /* Gap between action buttons */
-  .flex.items-center.shrink-0,
-  .flex.shrink-0.items-center {
-    gap: 0.25rem !important;
-  }
-
-  /* === GROUP CARD FIXES === */
-  /* Group card container */
-  .group-card,
-  [class*="GroupCard"] {
-    padding: 0.75rem !important;
-  }
-
-  /* Group card header */
-  .group-card .flex.items-center.justify-between,
-  [class*="GroupCard"] .flex.items-center.justify-between {
-    flex-wrap: wrap !important;
-    gap: 0.5rem !important;
-  }
-
-  /* Group card action buttons */
-  .group-card button.h-8,
-  .group-card button.h-9,
-  [class*="GroupCard"] button.h-8,
-  [class*="GroupCard"] button.h-9 {
-    width: 2rem !important;
-    height: 2rem !important;
-    min-width: 2rem !important;
-    padding: 0.375rem !important;
-  }
-
-  /* Group members list */
-  .group-card .space-y-2 > div,
-  [class*="GroupCard"] .space-y-2 > div {
-    padding: 0.5rem !important;
-  }
-
-  /* === DIALOG/SHEET FIXES === */
-  /* Dialog content */
-  [role="dialog"],
-  [data-state="open"][role="dialog"],
-  .dialog-content,
-  [class*="DialogContent"],
-  [class*="SheetContent"] {
-    max-width: calc(100vw - 1rem) !important;
-    max-height: 90vh !important;
-    margin: 0.5rem !important;
-    padding: 1rem !important;
-    overflow-y: auto !important;
-  }
-
-  /* Dialog header */
-  [class*="DialogHeader"],
-  [class*="SheetHeader"] {
-    padding-bottom: 0.75rem !important;
-  }
-
-  [class*="DialogTitle"],
-  [class*="SheetTitle"] {
-    font-size: 1rem !important;
-  }
-
-  /* Dialog body scrollable */
-  [class*="DialogBody"],
-  .dialog-body {
-    max-height: 60vh !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-
-  /* Dialog footer buttons */
-  [class*="DialogFooter"],
-  [class*="SheetFooter"] {
-    flex-direction: column !important;
-    gap: 0.5rem !important;
-    padding-top: 0.75rem !important;
-  }
-
-  [class*="DialogFooter"] button,
-  [class*="SheetFooter"] button {
-    width: 100% !important;
-    min-height: 2.5rem !important;
-  }
-
-  /* === FORM ELEMENTS === */
-  /* Input fields */
-  input,
-  textarea,
-  select,
-  [role="combobox"] {
-    min-height: 2.5rem !important;
-    font-size: 16px !important; /* Prevents iOS zoom */
-    padding: 0.5rem 0.75rem !important;
-  }
-
-  /* Select triggers */
-  [class*="SelectTrigger"],
-  [data-slot="trigger"] {
-    min-height: 2.5rem !important;
-    padding: 0.5rem 0.75rem !important;
-  }
-
-  /* Checkbox and radio */
-  input[type="checkbox"],
-  input[type="radio"],
-  [role="checkbox"],
-  [role="radio"] {
-    min-width: 1.25rem !important;
-    min-height: 1.25rem !important;
-  }
-
-  /* Switch toggle */
-  [role="switch"] {
-    min-width: 2.5rem !important;
-    min-height: 1.5rem !important;
-  }
-
-  /* === BADGES === */
-  [class*="Badge"],
-  .badge {
-    font-size: 0.625rem !important;
-    padding: 0.125rem 0.375rem !important;
-    min-height: 1.25rem !important;
-  }
-
-  /* === TODAY'S SESSIONS VIEW === */
-  /* Session list item */
-  .session-item,
-  [class*="session-card"] {
-    padding: 0.75rem !important;
-    gap: 0.5rem !important;
-  }
-
-  /* Session time indicator */
-  .session-time-box,
-  .w-14.h-14 {
-    width: 2.75rem !important;
-    height: 2.75rem !important;
-    min-width: 2.75rem !important;
-  }
-
-  .session-time-box .text-lg,
-  .w-14.h-14 .text-lg,
-  .w-14.h-14 .text-base {
-    font-size: 0.75rem !important;
-  }
-
-  /* Session info section */
-  .session-info {
-    min-width: 0 !important;
-    flex: 1 !important;
-  }
-
-  .session-info h4,
-  .session-info .font-bold {
-    font-size: 0.875rem !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-
-  /* Session action buttons row */
-  .session-actions,
-  .flex.flex-wrap.gap-1\.5,
-  .flex.flex-wrap.gap-2 {
-    gap: 0.25rem !important;
-    flex-wrap: wrap !important;
-  }
-
-  .session-actions button {
-    min-height: 1.75rem !important;
-    padding: 0.25rem 0.5rem !important;
-    font-size: 0.6875rem !important;
-  }
-
-  .session-actions button svg {
-    width: 0.75rem !important;
-    height: 0.75rem !important;
-  }
-
-  /* === CALENDAR VIEW === */
-  /* Calendar header */
-  .calendar-header {
-    padding: 0.5rem !important;
-  }
-
-  .calendar-header button {
-    min-width: 2rem !important;
-    min-height: 2rem !important;
-  }
-
-  /* Calendar grid */
-  .calendar-grid,
-  .grid.grid-cols-7 {
-    gap: 0.125rem !important;
-  }
-
-  /* Calendar day cells */
-  .calendar-day,
-  [data-date] {
-    min-height: 3rem !important;
-    padding: 0.125rem !important;
-    font-size: 0.625rem !important;
-  }
-
-  /* Calendar session indicators */
-  .calendar-session-indicator {
-    font-size: 0.5rem !important;
-    padding: 0.0625rem 0.125rem !important;
-    margin: 0.0625rem !important;
-    line-height: 1.1 !important;
-  }
-
-  /* === STUDENT MANAGEMENT VIEW === */
-  /* Student card in list */
-  .student-card {
-    padding: 0.75rem !important;
-  }
-
-  /* Student info header */
-  .student-card .flex.items-start {
-    gap: 0.5rem !important;
-  }
-
-  /* Student avatar */
-  .student-avatar,
-  .w-10.h-10.rounded-full,
-  .w-12.h-12.rounded-full {
-    width: 2.5rem !important;
-    height: 2.5rem !important;
-    min-width: 2.5rem !important;
-  }
-
-  /* Student schedule days */
-  .student-schedule-days {
-    flex-wrap: wrap !important;
-    gap: 0.25rem !important;
-  }
-
-  .student-schedule-days span {
-    font-size: 0.5625rem !important;
-    padding: 0.125rem 0.25rem !important;
-  }
-
-  /* === PAYMENT DASHBOARD === */
-  /* Payment card */
-  .payment-card {
-    padding: 0.75rem !important;
-  }
-
-  /* Payment stats grid */
-  .payment-stats,
-  .grid.grid-cols-2,
-  .grid.grid-cols-3 {
-    gap: 0.5rem !important;
-  }
-
-  .payment-stats > div {
-    padding: 0.5rem !important;
-  }
-
-  /* Payment amount display */
-  .payment-amount {
-    font-size: 1.125rem !important;
-  }
-
-  /* Payment action buttons */
-  .payment-actions button {
-    min-height: 2rem !important;
-    padding: 0.375rem 0.5rem !important;
-    font-size: 0.75rem !important;
-  }
-
-  /* === GROUPS VIEW === */
-  /* Group list item */
-  .group-list-item {
-    padding: 0.75rem !important;
-  }
-
-  /* Group member badge */
-  .group-member-badge {
-    font-size: 0.625rem !important;
-    padding: 0.125rem 0.25rem !important;
-  }
-
-  /* === BOTTOM NAVIGATION === */
-  /* Mobile bottom nav */
-  .bottom-nav,
-  .fixed.bottom-0.left-0.right-0 {
-    padding: 0.5rem !important;
-    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)) !important;
-  }
-
-  .bottom-nav button {
-    min-height: 2.5rem !important;
-    padding: 0.5rem !important;
-  }
-
-  .bottom-nav button svg {
-    width: 1.25rem !important;
-    height: 1.25rem !important;
-  }
-
-  .bottom-nav button span {
-    font-size: 0.625rem !important;
-  }
-
-  /* === STATS CARDS === */
-  /* Stat card grid */
-  .stats-grid,
-  .grid.grid-cols-4 {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.5rem !important;
-  }
-
-  .stats-grid > div,
-  .grid.grid-cols-4 > div {
-    padding: 0.5rem !important;
-  }
-
-  .stats-grid .text-2xl,
-  .stats-grid .text-xl {
-    font-size: 1.125rem !important;
-  }
-
-  .stats-grid p,
-  .grid.grid-cols-4 p {
-    font-size: 0.625rem !important;
-    line-height: 1.2 !important;
-  }
-
-  /* === EMPTY STATES === */
-  .empty-state {
-    padding: 2rem 1rem !important;
-  }
-
-  .empty-state svg {
-    width: 3rem !important;
-    height: 3rem !important;
-  }
-
-  .empty-state p {
-    font-size: 0.875rem !important;
-  }
-
-  /* === ALERT DIALOGS === */
-  [class*="AlertDialog"] [class*="AlertDialogContent"] {
-    max-width: calc(100vw - 2rem) !important;
-    padding: 1rem !important;
-  }
-
-  [class*="AlertDialog"] [class*="AlertDialogFooter"] {
-    flex-direction: column !important;
-    gap: 0.5rem !important;
-  }
-
-  [class*="AlertDialog"] [class*="AlertDialogFooter"] button {
-    width: 100% !important;
-  }
-
-  /* === DROPDOWN MENUS === */
-  [role="menu"],
-  [class*="DropdownMenuContent"] {
-    min-width: 10rem !important;
-    max-width: calc(100vw - 1rem) !important;
-  }
-
-  [role="menuitem"],
-  [class*="DropdownMenuItem"] {
-    min-height: 2.5rem !important;
-    padding: 0.5rem 0.75rem !important;
-  }
-
-  /* === TOOLTIPS DISABLED ON MOBILE === */
-  [role="tooltip"] {
-    display: none !important;
-  }
-
-  /* === SCROLL AREAS === */
-  [class*="ScrollArea"] {
-    -webkit-overflow-scrolling: touch !important;
-  }
-
-  /* === LOADING SPINNERS === */
-  .loading-spinner,
-  .animate-spin {
-    width: 1.5rem !important;
-    height: 1.5rem !important;
-  }
-
-  /* === TOAST NOTIFICATIONS === */
-  [class*="Toaster"],
-  [class*="Toast"] {
-    bottom: calc(4rem + env(safe-area-inset-bottom)) !important;
-    max-width: calc(100vw - 1rem) !important;
-    margin: 0 0.5rem !important;
-  }
-
-  /* === POPOVER CONTENT === */
-  [class*="PopoverContent"] {
-    max-width: calc(100vw - 1rem) !important;
-    max-height: 60vh !important;
-    overflow-y: auto !important;
-  }
-
-  /* === ACCORDION === */
-  [class*="AccordionTrigger"] {
-    min-height: 2.5rem !important;
-    padding: 0.75rem !important;
-  }
-
-  [class*="AccordionContent"] {
-    padding: 0.75rem !important;
-  }
-
-  /* === TABS (when visible) === */
-  [role="tablist"] {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-  }
-
-  [role="tablist"]::-webkit-scrollbar {
-    display: none !important;
-  }
-
-  [role="tab"] {
-    min-height: 2.25rem !important;
-    padding: 0.5rem 0.75rem !important;
-    font-size: 0.75rem !important;
-    white-space: nowrap !important;
-  }
-
-  /* === SEPARATOR/DIVIDER === */
-  [class*="Separator"],
-  hr {
-    margin: 0.5rem 0 !important;
-  }
-
-  /* === AVATAR === */
-  [class*="Avatar"] {
-    width: 2rem !important;
-    height: 2rem !important;
-    min-width: 2rem !important;
-  }
-
-  [class*="AvatarFallback"] {
-    font-size: 0.75rem !important;
-  }
-
-  /* === PROGRESS BAR === */
-  [class*="Progress"],
-  [role="progressbar"] {
-    height: 0.375rem !important;
-  }
-}
-
-/* === ULTRA SMALL SCREENS (320px and below) === */
-@media (max-width: 320px) {
-  html {
-    font-size: 13px !important;
-  }
-
-  /* Stack more elements vertically */
-  .flex.items-center.justify-between {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 0.5rem !important;
-  }
-
-  /* Full width buttons */
-  button:not(.h-6):not(.h-7):not(.w-6):not(.w-7) {
-    width: 100% !important;
-  }
-
-  /* Reduce padding further */
-  .p-4, .p-3 {
-    padding: 0.5rem !important;
-  }
-
-  /* Stats in single column */
-  .grid.grid-cols-4,
-  .grid.grid-cols-2 {
-    grid-template-columns: 1fr !important;
-  }
-}
-
 /* =====================================================
    LEAFLET MAP STYLES
    ===================================================== */

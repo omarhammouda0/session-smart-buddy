@@ -935,15 +935,15 @@ export const PaymentsDashboard = ({
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
             <div className="bg-card rounded-lg p-1.5 sm:p-2">
               <p className="text-sm sm:text-lg font-heading font-bold">{totalExpected.toLocaleString()}</p>
-              <p className="text-[0.5rem] sm:text-[10px] text-muted-foreground">متوقع</p>
+              <p className="text-[0.6rem] sm:text-[10px] text-muted-foreground">متوقع</p>
             </div>
             <div className="bg-success/10 rounded-lg p-1.5 sm:p-2">
               <p className="text-sm sm:text-lg font-heading font-bold text-success">{totalCollected.toLocaleString()}</p>
-              <p className="text-[0.5rem] sm:text-[10px] text-success/80">محصّل</p>
+              <p className="text-[0.6rem] sm:text-[10px] text-success/80">محصّل</p>
             </div>
             <div className="bg-warning/10 rounded-lg p-1.5 sm:p-2">
               <p className="text-sm sm:text-lg font-heading font-bold text-warning">{totalPending.toLocaleString()}</p>
-              <p className="text-[0.5rem] sm:text-[10px] text-warning/80">متبقي</p>
+              <p className="text-[0.6rem] sm:text-[10px] text-warning/80">متبقي</p>
             </div>
           </div>
 
@@ -961,7 +961,7 @@ export const PaymentsDashboard = ({
       </Card>
 
       {/* Status Filter Cards - Compact */}
-      <div className="grid grid-cols-4 gap-1 sm:gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2">
         <button
           onClick={() => setPaymentFilter("all")}
           className={cn("rounded-lg p-1.5 sm:p-3 card-shadow transition-all text-center", paymentFilter === "all" ? "ring-2 ring-primary bg-card" : "bg-card")}

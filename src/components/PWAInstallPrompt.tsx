@@ -127,7 +127,7 @@ export function PWAInstallPrompt() {
       {showPrompt && !showIOSInstructions && (
         <Card
           className={cn(
-            "fixed bottom-4 left-4 right-4 z-50 p-4 shadow-xl border-2",
+            "fixed bottom-20 sm:bottom-4 left-4 right-4 z-50 p-4 shadow-xl border-2",
             "animate-in slide-in-from-bottom-4 duration-300",
             "bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30"
           )}
