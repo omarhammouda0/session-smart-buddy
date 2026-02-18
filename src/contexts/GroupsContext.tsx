@@ -13,6 +13,14 @@ const parseLocation = (loc: unknown): Location | undefined => {
   return undefined;
 };
 
+// Helper to get local YYYY-MM-DD string (avoids UTC shift from toISOString)
+const toLocalDateStr = (d: Date): string => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 // Generate session dates based on schedule
 const generateGroupSessionDates = (
   scheduleDays: ScheduleDay[],
@@ -27,7 +35,7 @@ const generateGroupSessionDates = (
   while (current <= end) {
     const dayOfWeek = current.getDay();
     if (scheduleDays.some(d => d.dayOfWeek === dayOfWeek)) {
-      dates.push(current.toISOString().split('T')[0]);
+      dates.push(toLocalDateStr(current));
     }
     current.setDate(current.getDate() + 1);
   }
@@ -65,7 +73,7 @@ interface GroupsContextType {
     description?: string,
     color?: string,
     location?: { lat: number; lng: number; address?: string; name?: string } | null
-  ) => Promise<StudentGroup | null>;
+  ) => Promise<string | null>;
   updateGroup: (groupId: string, updates: Partial<Omit<StudentGroup, 'id' | 'createdAt' | 'sessions'>>) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   permanentlyDeleteGroup: (groupId: string) => Promise<void>;
@@ -73,10 +81,10 @@ interface GroupsContextType {
   removeMemberFromGroup: (groupId: string, memberId: string) => Promise<void>;
   updateMemberPrice: (groupId: string, memberId: string, customPrice: number | undefined) => Promise<void>;
   updateMemberAttendance: (groupId: string, sessionId: string, memberId: string, status: SessionStatus, note?: string) => Promise<void>;
-  completeGroupSession: (groupId: string, sessionId: string) => Promise<void>;
+  completeGroupSession: (groupId: string, sessionId: string, topic?: string, notes?: string) => Promise<void>;
   cancelGroupSession: (groupId: string, sessionId: string, reason?: string) => Promise<void>;
   rescheduleGroupSession: (groupId: string, sessionId: string, newDate: string, newTime?: string) => Promise<void>;
-  addGroupSessionForToday: (groupId: string, time?: string) => Promise<GroupSession | null>;
+  addGroupSessionForToday: (groupId: string, time?: string) => Promise<string | null>;
   getGroupById: (groupId: string) => StudentGroup | undefined;
   getGroupSessionsForDate: (date: string) => Array<{ group: StudentGroup; session: GroupSession }>;
   calculateGroupEarnings: (groupId: string, month: number, year: number) => number;
@@ -384,13 +392,14 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
 
       toast({ title: "تم إنشاء المجموعة", description: `تم إنشاء مجموعة "${name}" بنجاح` });
       await fetchGroups();
-      return groups.find(g => g.id === groupId) || null;
+      // Note: groups state is stale in this closure after fetchGroups, so return groupId directly
+      return groupId;
     } catch (error) {
       console.error('[Groups] Failed to add group:', error);
       toast({ title: "خطأ", description: "فشل في إنشاء المجموعة", variant: "destructive" });
       return null;
     }
-  }, [currentUserId, fetchGroups, groups]);
+  }, [currentUserId, fetchGroups]);
 
   // Update a group
   const updateGroup = useCallback(async (
@@ -421,10 +430,12 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
       // 2. Update schedule days if provided
       if ('scheduleDays' in updates && updates.scheduleDays) {
         // Delete existing schedule days
-        await supabase
+        const { error: deleteScheduleError } = await supabase
           .from('group_schedule_days')
           .delete()
           .eq('group_id', groupId);
+
+        if (deleteScheduleError) throw deleteScheduleError;
 
         // Insert new schedule days
         if (updates.scheduleDays.length > 0) {
@@ -493,7 +504,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
 
             // Add attendance records for future sessions
             if (memberData) {
-              const today = new Date().toISOString().split('T')[0];
+              const today = toLocalDateStr(new Date());
               const { data: futureSessions } = await supabase
                 .from('group_sessions')
                 .select('id')
@@ -575,7 +586,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
       if (memberError) throw memberError;
 
       // Add attendance records for future sessions
-      const today = new Date().toISOString().split('T')[0];
+      const today = toLocalDateStr(new Date());
       const { data: futureSessions } = await supabase
         .from('group_sessions')
         .select('id')
@@ -675,15 +686,19 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Mark entire group session as completed
-  const completeGroupSession = useCallback(async (groupId: string, sessionId: string) => {
+  const completeGroupSession = useCallback(async (groupId: string, sessionId: string, topic?: string, notes?: string) => {
     try {
-      // Update session status
+      // Update session status (and topic/notes if provided)
+      const updateData: Record<string, unknown> = {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      };
+      if (topic !== undefined) updateData.topic = topic || null;
+      if (notes !== undefined) updateData.notes = notes || null;
+
       const { error: sessionError } = await supabase
         .from('group_sessions')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', sessionId);
 
       if (sessionError) throw sessionError;
@@ -821,7 +836,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = toLocalDateStr(new Date());
 
       // Check if session already exists for today
       const existingSession = group.sessions.find(s => s.date === today);
@@ -877,9 +892,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "✅ تمت إضافة الحصة", description: `تمت إضافة حصة اليوم لمجموعة "${group.name}"` });
       await fetchGroups();
 
-      // Return the created session
-      const updatedGroup = groups.find(g => g.id === groupId);
-      return updatedGroup?.sessions.find(s => s.id === sessionData.id) || null;
+      // Return the session ID directly — groups state is stale in this closure
+      return sessionData.id;
     } catch (error) {
       console.error('[Groups] Failed to add group session for today:', error);
       toast({ title: "خطأ", description: "فشل في إضافة الحصة", variant: "destructive" });

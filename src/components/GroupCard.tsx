@@ -40,13 +40,13 @@ const formatTimeAr = (time: string): string => {
 
 // Get color class based on group color
 const getColorClass = (color: string) => {
-  const colors: Record<string, { bg: string; text: string; border: string }> = {
-    blue: { bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' },
-    green: { bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-300', border: 'border-green-200 dark:border-green-800' },
-    purple: { bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800' },
-    orange: { bg: 'bg-orange-50 dark:bg-orange-950/30', text: 'text-orange-700 dark:text-orange-300', border: 'border-orange-200 dark:border-orange-800' },
-    pink: { bg: 'bg-pink-50 dark:bg-pink-950/30', text: 'text-pink-700 dark:text-pink-300', border: 'border-pink-200 dark:border-pink-800' },
-    teal: { bg: 'bg-teal-50 dark:bg-teal-950/30', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-200 dark:border-teal-800' },
+  const colors: Record<string, { bg: string; text: string; border: string; circle: string }> = {
+    blue: { bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800', circle: 'bg-blue-500' },
+    green: { bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-300', border: 'border-green-200 dark:border-green-800', circle: 'bg-green-500' },
+    purple: { bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800', circle: 'bg-purple-500' },
+    orange: { bg: 'bg-orange-50 dark:bg-orange-950/30', text: 'text-orange-700 dark:text-orange-300', border: 'border-orange-200 dark:border-orange-800', circle: 'bg-orange-500' },
+    pink: { bg: 'bg-pink-50 dark:bg-pink-950/30', text: 'text-pink-700 dark:text-pink-300', border: 'border-pink-200 dark:border-pink-800', circle: 'bg-pink-500' },
+    teal: { bg: 'bg-teal-50 dark:bg-teal-950/30', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-200 dark:border-teal-800', circle: 'bg-teal-500' },
   };
   return colors[color] || colors.blue;
 };
@@ -89,7 +89,7 @@ export const GroupCard = ({
           <div className="flex items-center gap-2">
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center",
-              `bg-${group.color || 'blue'}-500`
+              colorClasses.circle
             )}>
               <Users className="h-4 w-4 text-white" />
             </div>
@@ -113,7 +113,7 @@ export const GroupCard = ({
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-12 h-12 rounded-full flex items-center justify-center",
-              `bg-${group.color || 'blue'}-500`
+              colorClasses.circle
             )}>
               <Users className="h-6 w-6 text-white" />
             </div>

@@ -30,12 +30,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Student, Session } from "@/types/student";
+import { Student, Session, StudentGroup } from "@/types/student";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
 interface EndOfDayCheckerProps {
   students: Student[];
+  groups?: StudentGroup[];
   onToggleComplete?: (studentId: string, sessionId: string) => void;
 }
 
@@ -43,9 +44,11 @@ interface UncompletedSession {
   session: Session;
   student: Student;
   sessionTime: string;
+  isGroupSession?: boolean;
+  groupName?: string;
 }
 
-export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerProps) {
+export function EndOfDayChecker({ students, groups = [], onToggleComplete }: EndOfDayCheckerProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showNotification, setShowNotification] = useState(false);
   const [notificationDismissed, setNotificationDismissed] = useState(false);
@@ -75,9 +78,25 @@ export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerP
         });
     });
 
+    // Group sessions
+    groups.forEach((group) => {
+      group.sessions
+        .filter((s) => s.date === todayStr)
+        .forEach((session) => {
+          const sessionTime = session.time || group.sessionTime || "16:00";
+          const groupProxy = {
+            id: group.id,
+            name: `مجموعة ${group.name}`,
+            sessionTime: group.sessionTime,
+            sessionDuration: group.sessionDuration,
+          } as Student;
+          sessions.push({ session, student: groupProxy, sessionTime, isGroupSession: true, groupName: group.name });
+        });
+    });
+
     // Sort by time
     return sessions.sort((a, b) => a.sessionTime.localeCompare(b.sessionTime));
-  }, [students, todayStr]);
+  }, [students, groups, todayStr]);
 
   // Get uncompleted sessions that have ended
   const uncompletedEndedSessions = useMemo(() => {
@@ -158,12 +177,14 @@ export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerP
 
   const handleCompleteAll = () => {
     if (onToggleComplete) {
-      uncompletedEndedSessions.forEach(({ session, student }) => {
+      const individualSessions = uncompletedEndedSessions.filter(s => !s.isGroupSession);
+      individualSessions.forEach(({ session, student }) => {
         onToggleComplete(student.id, session.id);
       });
+      const groupCount = uncompletedEndedSessions.length - individualSessions.length;
       toast({
         title: "✅ تم إكمال جميع الحصص",
-        description: `تم تسجيل ${uncompletedEndedSessions.length} حصة كمكتملة`,
+        description: `تم تسجيل ${individualSessions.length} حصة كمكتملة${groupCount > 0 ? ` (${groupCount} حصة مجموعة تحتاج تسجيل حضور)` : ""}`,
       });
       setCompleteAllDialog(false);
       setShowEndOfDayDialog(false);
@@ -335,7 +356,7 @@ export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerP
                 </div>
 
                 <div className="space-y-2">
-                  {uncompletedEndedSessions.map(({ session, student, sessionTime }) => (
+                  {uncompletedEndedSessions.map(({ session, student, sessionTime, isGroupSession }) => (
                     <div
                       key={session.id}
                       className="flex items-center justify-between p-3 rounded-xl border-2 border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors"
@@ -352,14 +373,20 @@ export function EndOfDayChecker({ students, onToggleComplete }: EndOfDayCheckerP
                           </p>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
-                        onClick={() => handleCompleteSession(student.id, session.id)}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        إكمال
-                      </Button>
+                      {isGroupSession ? (
+                        <Badge variant="outline" className="border-amber-500/50 text-amber-600 text-xs">
+                          تسجيل حضور
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+                          onClick={() => handleCompleteSession(student.id, session.id)}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          إكمال
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

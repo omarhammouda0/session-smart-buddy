@@ -288,6 +288,15 @@ serve(async (req) => {
   }
 
   try {
+    // Verify the caller is authenticated
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body: RequestBody = await req.json();
 
     console.log("Received request body:", JSON.stringify(body));

@@ -30,11 +30,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// Helper: parse "YYYY-MM-DD" as local midnight (avoids UTC shift)
+const parseLocalDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
 // Helper function to check if a session has ended
 const isSessionEnded = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const sessionDateObj = new Date(sessionDate);
+  const sessionDateObj = parseLocalDate(sessionDate);
 
   // If session is in the past (before today), it has ended
   if (sessionDateObj < today) {
@@ -60,7 +66,7 @@ const isSessionEnded = (sessionDate: string, sessionTime: string, sessionDuratio
 const isSessionInProgress = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const sessionDateObj = new Date(sessionDate);
+  const sessionDateObj = parseLocalDate(sessionDate);
 
   // Session must be today
   if (sessionDateObj.getTime() !== today.getTime()) {
@@ -115,9 +121,9 @@ const formatWhatsAppNumber = (phone: string): string => {
   // Remove all non-digit characters except +
   let cleaned = phone.replace(/[^\d+]/g, "");
 
-  // If starts with 0, assume Saudi Arabia and replace with +966
+  // If starts with 0, assume Egypt and replace with +20
   if (cleaned.startsWith("0")) {
-    cleaned = "+966" + cleaned.substring(1);
+    cleaned = "+20" + cleaned.substring(1);
   }
 
   // If no + prefix, add it

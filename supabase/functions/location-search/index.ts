@@ -204,10 +204,42 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const { action, query, lat, lng } = await req.json();
+  // Verify the caller is authenticated
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-    if (action === 'search' && query) {
+  try {
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { action, query, lat, lng } = body;
+
+    if (!action || !['search', 'reverse'].includes(action)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid action. Must be "search" or "reverse".' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'search') {
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Missing or empty "query" parameter for search action.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       console.log(`[Location Search] Query: "${query}"`);
 
       const allResults: SearchResult[] = [];
@@ -261,7 +293,13 @@ serve(async (req) => {
       );
     }
 
-    if (action === 'reverse' && lat !== undefined && lng !== undefined) {
+    if (action === 'reverse') {
+      if (lat === undefined || lng === undefined || typeof lat !== 'number' || typeof lng !== 'number') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Missing or invalid "lat"/"lng" parameters for reverse action.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       console.log(`[Reverse Geocode] Lat: ${lat}, Lng: ${lng}`);
       const address = await reverseGeocode(lat, lng);
 

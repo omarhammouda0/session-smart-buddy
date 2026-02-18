@@ -16,6 +16,7 @@ import {
   ScheduleMode,
 } from "@/types/student";
 import { generateDefaultSemester, generateSessionsForSchedule, getMonthsInSemester, getDistributedDays } from "@/lib/dateUtils";
+import { toast } from "@/hooks/use-toast";
 
 // ============================================================================
 // TYPES FOR DATABASE ROWS
@@ -140,8 +141,8 @@ const dbStudentToStudent = (dbStudent: DbStudent, sessions: Session[]): Student 
     sessionType: (dbStudent.session_type as "online" | "onsite") || "onsite",
     sessionTime: dbStudent.session_time || "16:00",
     sessionDuration: dbStudent.session_duration || 60,
-    customPriceOnsite: dbStudent.custom_price_onsite || undefined,
-    customPriceOnline: dbStudent.custom_price_online || undefined,
+    customPriceOnsite: dbStudent.custom_price_onsite ?? undefined,
+    customPriceOnline: dbStudent.custom_price_online ?? undefined,
     useCustomSettings: dbStudent.use_custom_settings || false,
     scheduleDays,
     scheduleMode: (dbStudent.schedule_mode as ScheduleMode) || "days",
@@ -392,6 +393,8 @@ export const useStudents = () => {
 
       if (studentsError) {
         console.error("Error loading students:", studentsError);
+        toast({ title: "خطأ في تحميل البيانات", description: "فشل تحميل قائمة الطلاب", variant: "destructive" });
+        setIsLoaded(true);
         return;
       }
 
@@ -404,6 +407,8 @@ export const useStudents = () => {
 
       if (sessionsError) {
         console.error("Error loading sessions:", sessionsError);
+        toast({ title: "خطأ في تحميل البيانات", description: "فشل تحميل الحصص", variant: "destructive" });
+        setIsLoaded(true);
         return;
       }
 
@@ -473,6 +478,7 @@ export const useStudents = () => {
       setIsLoaded(true);
     } catch (error) {
       console.error("Error loading data:", error);
+      toast({ title: "خطأ في تحميل البيانات", description: "حدث خطأ أثناء تحميل البيانات. يرجى إعادة تحميل الصفحة.", variant: "destructive" });
       setIsLoaded(true);
     }
   }, [getUserId]);
@@ -567,6 +573,11 @@ export const useStudents = () => {
 
       if (error) {
         console.error("Error updating settings:", error);
+        toast({
+          title: "خطأ",
+          description: "فشل حفظ الإعدادات. تم إرجاع القيم السابقة.",
+          variant: "destructive",
+        });
         // Reload to get correct state
         loadData();
       }
@@ -683,6 +694,11 @@ export const useStudents = () => {
 
         if (sessionsError) {
           console.error("Error adding sessions:", sessionsError);
+          toast({
+            title: "تحذير",
+            description: "تم إضافة الطالب لكن فشل إنشاء بعض الحصص. يرجى مراجعة الجدول.",
+            variant: "destructive",
+          });
         }
       }
 
@@ -719,11 +735,17 @@ export const useStudents = () => {
 
         if (paymentsError) {
           console.error("Error adding payments:", paymentsError);
+          toast({
+            title: "تحذير",
+            description: "تم إضافة الطالب لكن فشل إنشاء سجلات المدفوعات.",
+            variant: "destructive",
+          });
         }
       }
 
       // Reload data
       await loadData();
+      return studentData.id;
     },
     [getUserId, settings, loadData],
   );
@@ -1327,7 +1349,7 @@ export const useStudents = () => {
         }),
       );
 
-      // Async database update (fire and forget)
+      // Async database update (fire and forget with error recovery)
       (async () => {
         const currentUserId = await getUserId();
         if (!currentUserId) return;
@@ -1347,7 +1369,10 @@ export const useStudents = () => {
           console.error("Error bulk marking as vacation:", error);
           loadData();
         }
-      })();
+      })().catch((err) => {
+        console.error("Unhandled error in bulkMarkAsVacation:", err);
+        loadData();
+      });
 
       return { success: true, updatedCount };
     },
@@ -1516,7 +1541,7 @@ export const useStudents = () => {
         }),
       );
 
-      // Async database update (fire and forget)
+      // Async database update (fire and forget with error recovery)
       (async () => {
         const currentUserId = await getUserId();
         if (!currentUserId) return;
@@ -1534,7 +1559,10 @@ export const useStudents = () => {
           console.error("Error bulk updating session time:", error);
           loadData();
         }
-      })();
+      })().catch((err) => {
+        console.error("Unhandled error in bulkUpdateSessionTime:", err);
+        loadData();
+      });
 
       return { success: true, updatedCount, conflicts: [] };
     },

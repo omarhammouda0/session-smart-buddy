@@ -2514,8 +2514,16 @@ export const CalendarView = ({
                             <div className="flex items-center gap-2">
                               <div className={cn(
                                 "w-3 h-3 rounded-full",
-                                `bg-${group.color || 'violet'}-500`
-                              )} style={{ backgroundColor: group.color ? undefined : '#8b5cf6' }} />
+                                {
+                                  'bg-blue-500': group.color === 'blue',
+                                  'bg-green-500': group.color === 'green',
+                                  'bg-purple-500': group.color === 'purple',
+                                  'bg-orange-500': group.color === 'orange',
+                                  'bg-pink-500': group.color === 'pink',
+                                  'bg-teal-500': group.color === 'teal',
+                                  'bg-violet-500': !group.color,
+                                }
+                              )} />
                               <span>{group.name}</span>
                               <span className="text-xs text-muted-foreground">
                                 ({group.members.filter(m => m.isActive).length} طالب)

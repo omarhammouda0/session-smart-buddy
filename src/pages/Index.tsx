@@ -115,7 +115,7 @@ const openWhatsApp = (phone: string) => {
   if (!phone) return;
   let cleaned = phone.replace(/[^\d+]/g, "");
   if (cleaned.startsWith("0")) {
-    cleaned = "966" + cleaned.substring(1);
+    cleaned = "20" + cleaned.substring(1);
   }
   cleaned = cleaned.replace("+", "");
   window.open(`https://wa.me/${cleaned}`, "_blank");
@@ -130,11 +130,17 @@ interface SessionWithStudent {
   groupSession?: GroupSession;
 }
 
+// Helper: parse "YYYY-MM-DD" as local midnight (avoids UTC shift from new Date("YYYY-MM-DD"))
+const parseLocalDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
 // Helper function to check if a session has ended
 const isSessionEnded = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const sessionDateObj = new Date(sessionDate);
+  const sessionDateObj = parseLocalDate(sessionDate);
 
   // If session is in the past (before today), it has ended
   if (sessionDateObj < today) {
@@ -160,7 +166,7 @@ const isSessionEnded = (sessionDate: string, sessionTime: string, sessionDuratio
 const isSessionInProgress = (sessionDate: string, sessionTime: string, sessionDuration: number = 60): boolean => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const sessionDateObj = new Date(sessionDate);
+  const sessionDateObj = parseLocalDate(sessionDate);
 
   // Session must be today
   if (sessionDateObj.getTime() !== today.getTime()) {
@@ -218,7 +224,13 @@ const getLastGroupSessionWithNotes = (group: StudentGroup, todayStr: string): Gr
 };
 
 const Index = () => {
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+
+  // Refresh 'now' every minute so the UI stays current across midnight
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
   const [activeTab, setActiveTab] = useState("sessions");
   const [allStudentsSearch, setAllStudentsSearch] = useState("");
   const [showAllSessions, setShowAllSessions] = useState(false);
@@ -368,18 +380,16 @@ const Index = () => {
 
   // Function to refresh all group payments
   const refreshAllGroupPayments = async () => {
-    const allPayments: typeof allGroupPayments = [];
-    for (const group of groups) {
-      const payments = await getGroupMemberPayments(group.id);
-      allPayments.push(...payments);
-    }
-    setAllGroupPayments(allPayments);
+    const results = await Promise.all(
+      groups.map(group => getGroupMemberPayments(group.id))
+    );
+    setAllGroupPayments(results.flat());
   };
 
   // Fetch all group payments when groups change
   useEffect(() => {
     if (groups.length > 0) {
-      refreshAllGroupPayments();
+      refreshAllGroupPayments().catch(err => console.error('Failed to refresh group payments:', err));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups]);
@@ -392,7 +402,7 @@ const Index = () => {
     dismissNotification,
     endedSessionNotification,
     dismissEndedNotification,
-  } = useSessionNotifications(students);
+  } = useSessionNotifications(students, activeGroups);
 
   // Student Materials
   const { getMaterials, addMaterials, addMaterial, removeMaterial } = useStudentMaterials();
@@ -435,19 +445,15 @@ const Index = () => {
     location?: { lat: number; lng: number; address?: string; name?: string } | null
   ) => {
     // First add the student to the database
-    await addStudent(name, scheduleDays, sessionTime, sessionType, phone, parentPhone, customStart, customEnd, sessionDuration, materials, useCustomPrices, customPriceOnsite, customPriceOnline, scheduleMode, sessionsPerWeek, daySchedules, location);
+    const newStudentId = await addStudent(name, scheduleDays, sessionTime, sessionType, phone, parentPhone, customStart, customEnd, sessionDuration, materials, useCustomPrices, customPriceOnsite, customPriceOnline, scheduleMode, sessionsPerWeek, daySchedules, location);
 
-    // If materials were added, save them
-    // We need to find the newly created student by name (since we don't have the ID yet)
-    // The student will be in the students array after loadData is called
-    if (materials && materials.length > 0) {
-      // Wait a bit for the students list to update
-      setTimeout(() => {
-        const newStudent = students.find(s => s.name === name);
-        if (newStudent) {
-          addMaterials(newStudent.id, materials);
-        }
-      }, 1000);
+    // If materials were added, save them using the returned student ID
+    if (materials && materials.length > 0 && newStudentId) {
+      try {
+        await addMaterials(newStudentId, materials);
+      } catch (err) {
+        console.error("Failed to add materials:", err);
+      }
     }
   };
 
@@ -740,42 +746,52 @@ const Index = () => {
     setQuickPaymentDialog({ open: true, student, sessionId, sessionDate });
   };
 
-  const handleQuickPaymentConfirm = (amount: number, method: PaymentMethod) => {
+  const handleQuickPaymentConfirm = async (amount: number, method: PaymentMethod) => {
     if (!quickPaymentDialog.student || !quickPaymentDialog.sessionId) return;
-    const sessionDate = new Date(quickPaymentDialog.sessionDate);
-    recordPayment(quickPaymentDialog.student.id, {
-      month: sessionDate.getMonth(),
-      year: sessionDate.getFullYear(),
-      amount,
-      method,
-      paidAt: new Date().toISOString(),
-      notes: `session:${quickPaymentDialog.sessionId}|date:${quickPaymentDialog.sessionDate}`,
-    });
-    // Auto-resolve payment-related AI suggestions
-    resolveAIByEntity("payment", `${quickPaymentDialog.student.id}-${sessionDate.getFullYear()}-${sessionDate.getMonth()}`);
-    const methodLabel = method === "cash" ? "كاش" : method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
-    toast({
-      title: "✅ تم تسجيل الدفعة",
-      description: `${quickPaymentDialog.student.name}: ${amount.toLocaleString()} جنيه (${methodLabel})`,
-    });
+    const sessionDate = parseLocalDate(quickPaymentDialog.sessionDate);
+    try {
+      await recordPayment(quickPaymentDialog.student.id, {
+        month: sessionDate.getMonth(),
+        year: sessionDate.getFullYear(),
+        amount,
+        method,
+        paidAt: new Date().toISOString(),
+        notes: `session:${quickPaymentDialog.sessionId}|date:${quickPaymentDialog.sessionDate}`,
+      });
+      // Auto-resolve payment-related AI suggestions
+      resolveAIByEntity("payment", `${quickPaymentDialog.student.id}-${sessionDate.getFullYear()}-${sessionDate.getMonth()}`);
+      const methodLabel = method === "cash" ? "كاش" : method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
+      toast({
+        title: "✅ تم تسجيل الدفعة",
+        description: `${quickPaymentDialog.student.name}: ${amount.toLocaleString()} جنيه (${methodLabel})`,
+      });
+    } catch (err) {
+      console.error("Payment error:", err);
+      toast({ title: "خطأ", description: "فشل في تسجيل الدفعة", variant: "destructive" });
+    }
     setQuickPaymentDialog({ open: false, student: null, sessionId: "", sessionDate: "" });
   };
 
-  const handleRecordPayment = (
+  const handleRecordPayment = async (
     studentId: string,
     paymentData: { month: number; year: number; amount: number; method: PaymentMethod; paidAt: string; notes?: string },
   ) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
-    recordPayment(studentId, paymentData);
-    // Auto-resolve payment-related AI suggestions
-    resolveAIByEntity("payment", `${studentId}-${paymentData.year}-${paymentData.month}`);
-    const methodLabel =
-      paymentData.method === "cash" ? "كاش" : paymentData.method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
-    toast({
-      title: "✅ تم تسجيل الدفعة",
-      description: `${student.name}: ${paymentData.amount.toLocaleString()} جنيه (${methodLabel})`,
-    });
+    try {
+      await recordPayment(studentId, paymentData);
+      // Auto-resolve payment-related AI suggestions
+      resolveAIByEntity("payment", `${studentId}-${paymentData.year}-${paymentData.month}`);
+      const methodLabel =
+        paymentData.method === "cash" ? "كاش" : paymentData.method === "bank" ? "تحويل بنكي" : "محفظة إلكترونية";
+      toast({
+        title: "✅ تم تسجيل الدفعة",
+        description: `${student.name}: ${paymentData.amount.toLocaleString()} جنيه (${methodLabel})`,
+      });
+    } catch (err) {
+      console.error("Payment error:", err);
+      toast({ title: "خطأ", description: "فشل في تسجيل الدفعة", variant: "destructive" });
+    }
   };
 
   // AI Suggestions Action Handlers
@@ -816,14 +832,19 @@ const Index = () => {
     showCalendar: () => {
       setActiveTab("calendar");
     },
-    markComplete: (studentId: string, sessionId: string) => {
-      toggleSessionComplete(studentId, sessionId);
-      // Auto-resolve AI suggestions related to this session
-      resolveAIByEntity("session", sessionId);
-      toast({
-        title: "✅ تم تحديث الحصة",
-        description: "تم تسجيل الحصة كمكتملة",
-      });
+    markComplete: async (studentId: string, sessionId: string) => {
+      try {
+        await toggleSessionComplete(studentId, sessionId);
+        // Auto-resolve AI suggestions related to this session
+        resolveAIByEntity("session", sessionId);
+        toast({
+          title: "✅ تم تحديث الحصة",
+          description: "تم تسجيل الحصة كمكتملة",
+        });
+      } catch (err) {
+        console.error("Failed to mark complete:", err);
+        toast({ title: "خطأ", description: "فشل في تحديث الحصة", variant: "destructive" });
+      }
     },
     sendWhatsAppReminder: async (studentId: string) => {
       const student = students.find((s) => s.id === studentId);
@@ -1466,7 +1487,7 @@ const Index = () => {
                 />
 
                 {/* End of Day Checker - Floating button that appears after all sessions end */}
-                <EndOfDayChecker students={students} onToggleComplete={handleToggleComplete} />
+                <EndOfDayChecker students={students} groups={activeGroups} onToggleComplete={handleToggleComplete} />
 
                 {nextSession && (
                   <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent overflow-hidden shadow-lg shadow-primary/5">
@@ -1565,7 +1586,13 @@ const Index = () => {
                                 <AlertDialogFooter className="flex-row-reverse gap-2">
                                   <AlertDialogCancel>إلغاء</AlertDialogCancel>
                                   <AlertDialogAction
-                                    onClick={() => handleToggleComplete(nextSession.student.id, nextSession.session.id)}
+                                    onClick={() => {
+                                      if (nextSession.isGroup && nextSession.group) {
+                                        completeGroupSession(nextSession.group.id, nextSession.session.id);
+                                      } else {
+                                        handleToggleComplete(nextSession.student.id, nextSession.session.id);
+                                      }
+                                    }}
                                     className="bg-primary text-primary-foreground hover:bg-primary/90"
                                   >
                                     تأكيد الإكمال
@@ -1611,11 +1638,15 @@ const Index = () => {
                                 <AlertDialogAction
                                   onClick={() => {
                                     const reason = prompt("سبب الإلغاء (اختياري):");
-                                    handleCancelSession(
-                                      nextSession.student.id,
-                                      nextSession.session.id,
-                                      reason || undefined,
-                                    );
+                                    if (nextSession.isGroup && nextSession.group) {
+                                      cancelGroupSession(nextSession.group.id, nextSession.session.id, reason || undefined);
+                                    } else {
+                                      handleCancelSession(
+                                        nextSession.student.id,
+                                        nextSession.session.id,
+                                        reason || undefined,
+                                      );
+                                    }
                                   }}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
@@ -1628,7 +1659,13 @@ const Index = () => {
                             size="sm"
                             variant="outline"
                             className="gap-1 h-8 sm:h-9 px-2 sm:px-3"
-                            onClick={() => setCompletionDialog({ open: true, student: nextSession.student, session: nextSession.session })}
+                            onClick={() => {
+                              if (nextSession.isGroup && nextSession.group && nextSession.groupSession) {
+                                setGroupAttendanceDialog({ open: true, group: nextSession.group, session: nextSession.groupSession });
+                              } else {
+                                setCompletionDialog({ open: true, student: nextSession.student, session: nextSession.session });
+                              }
+                            }}
                             title="خيارات الحصة"
                           >
                             <MoreVertical className="h-4 w-4" />

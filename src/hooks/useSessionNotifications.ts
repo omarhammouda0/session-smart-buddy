@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Student, Session } from "@/types/student";
+import { Student, Session, StudentGroup } from "@/types/student";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
@@ -70,7 +70,7 @@ async function showSafeNotification(title: string, options: NotificationOptions)
 const NOTIFIED_SESSIONS_KEY = "session-notifications-notified";
 const ENDED_SESSIONS_KEY = "session-ended-notified";
 
-export function useSessionNotifications(students: Student[]) {
+export function useSessionNotifications(students: Student[], groups: StudentGroup[] = []) {
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -299,7 +299,7 @@ export function useSessionNotifications(students: Student[]) {
     []
   );
 
-  // Check for upcoming sessions
+  // Check for upcoming sessions (individual + group)
   useEffect(() => {
     if (!settings.enabled || isLoadingSettings) return;
 
@@ -309,6 +309,7 @@ export function useSessionNotifications(students: Student[]) {
 
       const todaySessions: UpcomingSession[] = [];
 
+      // Individual student sessions
       students.forEach((student) => {
         student.sessions
           .filter((s) => s.date === todayStr && s.status === "scheduled")
@@ -326,6 +327,35 @@ export function useSessionNotifications(students: Student[]) {
               !notifiedSessions.has(session.id)
             ) {
               todaySessions.push({ session, student, minutesUntil });
+            }
+          });
+      });
+
+      // Group sessions
+      groups.forEach((group) => {
+        group.sessions
+          .filter((s) => s.date === todayStr && s.status === "scheduled")
+          .forEach((session) => {
+            const sessionTime = session.time || group.sessionTime || "16:00";
+            const [hours, minutes] = sessionTime.split(":").map(Number);
+            const sessionDateTime = new Date(now);
+            sessionDateTime.setHours(hours, minutes, 0, 0);
+
+            const minutesUntil = differenceInMinutes(sessionDateTime, now);
+
+            if (
+              minutesUntil > 0 &&
+              minutesUntil <= settings.minutesBefore &&
+              !notifiedSessions.has(session.id)
+            ) {
+              // Create a pseudo-student for notification display
+              const groupProxy = {
+                id: group.id,
+                name: `مجموعة ${group.name}`,
+                sessionTime: group.sessionTime,
+                sessionDuration: group.sessionDuration,
+              } as Student;
+              todaySessions.push({ session, student: groupProxy, minutesUntil });
             }
           });
       });
@@ -353,6 +383,7 @@ export function useSessionNotifications(students: Student[]) {
     return () => clearInterval(interval);
   }, [
     students,
+    groups,
     settings.enabled,
     settings.minutesBefore,
     isLoadingSettings,
@@ -362,7 +393,7 @@ export function useSessionNotifications(students: Student[]) {
     sendBrowserNotification,
   ]);
 
-  // Check for ended sessions
+  // Check for ended sessions (individual + group)
   useEffect(() => {
     if (!settings.enabled || isLoadingSettings) return;
 
@@ -372,6 +403,7 @@ export function useSessionNotifications(students: Student[]) {
 
       const endedSessions: EndedSession[] = [];
 
+      // Individual student sessions
       students.forEach((student) => {
         student.sessions
           .filter((s) => s.date === todayStr && s.status === "scheduled")
@@ -396,6 +428,46 @@ export function useSessionNotifications(students: Student[]) {
           });
       });
 
+      // Group sessions - fire toast/notification but don't trigger completion dialog
+      groups.forEach((group) => {
+        group.sessions
+          .filter((s) => s.date === todayStr && s.status === "scheduled")
+          .forEach((session) => {
+            const sessionTime = session.time || group.sessionTime || "16:00";
+            const [hours, minutes] = sessionTime.split(":").map(Number);
+            const sessionStartTime = new Date(now);
+            sessionStartTime.setHours(hours, minutes, 0, 0);
+
+            const sessionDuration = session.duration || group.sessionDuration || 60;
+            const sessionEndTime = new Date(sessionStartTime.getTime() + sessionDuration * 60000);
+
+            const minutesSinceEnd = differenceInMinutes(now, sessionEndTime);
+
+            if (
+              minutesSinceEnd >= 0 &&
+              minutesSinceEnd <= 30 &&
+              !endedNotifiedSessions.has(session.id)
+            ) {
+              // For groups, only fire toast + browser notification (no completion dialog)
+              markEndedAsNotified(session.id);
+              const groupName = `مجموعة ${group.name}`;
+
+              showSafeNotification("⏰ انتهت حصة المجموعة", {
+                body: `حصة ${groupName} انتهت. يرجى تسجيل الحضور.`,
+                icon: "/favicon.ico",
+                tag: `session-ended-${session.id}`,
+                requireInteraction: true,
+              });
+
+              toast({
+                title: "⏰ انتهت حصة المجموعة",
+                description: `حصة ${groupName} انتهت. يرجى تسجيل الحضور من قسم المجموعات.`,
+                duration: 15000,
+              });
+            }
+          });
+      });
+
       endedSessions.sort((a, b) => a.minutesSinceEnd - b.minutesSinceEnd);
 
       if (endedSessions.length > 0 && !endedSessionNotification) {
@@ -410,7 +482,6 @@ export function useSessionNotifications(students: Student[]) {
           requireInteraction: true,
         });
 
-
         toast({
           title: "⏰ انتهت الحصة",
           description: `حصة ${ended.student.name} انتهت. يرجى تأكيد حالة الحصة.`,
@@ -424,11 +495,13 @@ export function useSessionNotifications(students: Student[]) {
     return () => clearInterval(interval);
   }, [
     students,
+    groups,
     settings.enabled,
     isLoadingSettings,
     endedNotifiedSessions,
     endedSessionNotification,
     playNotificationSound,
+    markEndedAsNotified,
   ]);
 
   // Request notification permission on mount

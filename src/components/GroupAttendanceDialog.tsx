@@ -31,7 +31,7 @@ interface GroupAttendanceDialogProps {
     status: SessionStatus,
     note?: string
   ) => void | Promise<void>;
-  onCompleteSession: (groupId: string, sessionId: string) => void | Promise<void>;
+  onCompleteSession: (groupId: string, sessionId: string, topic?: string, notes?: string) => void | Promise<void>;
 }
 
 // Format time in Arabic
@@ -127,15 +127,16 @@ export const GroupAttendanceDialog = ({
     });
     setLocalAttendance(newAttendance);
 
-    // Update each pending member
-    const pendingMembers = session.memberAttendance.filter(att => att.status === 'scheduled');
-    pendingMembers.forEach(att => {
-      onUpdateAttendance(group.id, session.id, att.memberId, 'completed');
+    // Update each pending member using local state (avoids stale props)
+    Object.entries(localAttendance).forEach(([memberId, status]) => {
+      if (status === 'scheduled') {
+        onUpdateAttendance(group.id, session.id, memberId, 'completed');
+      }
     });
   };
 
   const handleCompleteSession = () => {
-    onCompleteSession(group.id, session.id);
+    onCompleteSession(group.id, session.id, sessionTopic || undefined, sessionNotes || undefined);
     onOpenChange(false);
   };
 
