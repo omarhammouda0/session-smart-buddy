@@ -437,7 +437,7 @@ export const UpcomingSessionsManager = ({
                                     </p>
                                     {sessionConflict.conflicts.slice(0, 2).map((c, i) => (
                                       <p key={i} className="text-muted-foreground">
-                                        {c.student.name}: {c.session.time || c.student.sessionTime || '16:00'}
+                                        {c.student.name}: {c.session.time || ('sessionTime' in c.student ? c.student.sessionTime : undefined) || '16:00'}
                                         {c.type === 'close' && c.gap !== undefined && ` (${c.gap} دقيقة فاصل)`}
                                       </p>
                                     ))}

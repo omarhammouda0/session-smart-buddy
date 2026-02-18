@@ -85,7 +85,7 @@ export const RestoreConflictDialog = ({
                   >
                     <p className="font-medium">{conflict.student.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {formatTimeAr(conflict.session.time || conflict.student.sessionTime || '16:00')}
+                      {formatTimeAr(conflict.session.time || ('sessionTime' in conflict.student ? conflict.student.sessionTime : undefined) || '16:00')}
                       {conflict.type === 'close' && conflict.gap !== undefined && (
                         <span className="mr-1">(فاصل {conflict.gap} دقيقة فقط)</span>
                       )}

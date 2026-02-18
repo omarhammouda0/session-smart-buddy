@@ -52,7 +52,7 @@ export const ConflictBadge = ({
               <p className="text-muted-foreground">
                 {isError ? 'يتداخل مع جلسة' : 'قريب جداً من جلسة'} {mainConflict.student.name}
                 <br />
-                {formatTimeAr(mainConflict.session.time || mainConflict.student.sessionTime || '16:00')}
+                {formatTimeAr(mainConflict.session.time || ('sessionTime' in mainConflict.student ? mainConflict.student.sessionTime : undefined) || '16:00')}
               </p>
             )}
             {onClick && (
