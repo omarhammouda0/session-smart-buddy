@@ -231,7 +231,7 @@ export const AddGroupDialog = ({
     ));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const hasValidSchedule = daySchedules.length > 0 && daySchedules.every(d => d.time);
@@ -257,8 +257,24 @@ export const AddGroupDialog = ({
     const useCustom = showCustomDates;
 
     if (editMode && groupToEdit && onUpdateGroup) {
-      // Update existing group
-      onUpdateGroup(groupToEdit.id, {
+      // Build members for update — map dialog member IDs back to group_members table IDs
+      const updatedMembers: GroupMember[] = members.map(m => {
+        // Check if this member existed in the original group (by matching group_members table ID)
+        const existingMember = groupToEdit.members.find(gm => gm.studentId === m.id);
+        return {
+          studentId: m.id, // This is the group_members table row ID for existing, or student ID for new
+          linkedStudentId: existingMember?.linkedStudentId,
+          studentName: m.name,
+          phone: m.phone,
+          parentPhone: m.parentPhone,
+          customPrice: m.useCustomPrice ? m.customPrice : undefined,
+          joinedAt: existingMember?.joinedAt || new Date().toISOString(),
+          isActive: true,
+        };
+      });
+
+      // Update existing group with all changes
+      await onUpdateGroup(groupToEdit.id, {
         name: groupName.trim(),
         description: description.trim() || undefined,
         color: selectedColor,
@@ -266,7 +282,9 @@ export const AddGroupDialog = ({
         sessionType,
         sessionDuration,
         sessionTime: primaryTime,
-        location: sessionType === 'onsite' ? location : undefined,
+        location: sessionType === 'onsite' ? location as any : undefined,
+        members: updatedMembers,
+        scheduleDays,
       });
     } else {
       // Add new group

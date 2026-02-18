@@ -397,23 +397,123 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     updates: Partial<Omit<StudentGroup, 'id' | 'createdAt' | 'sessions'>>
   ) => {
     try {
-      const { error } = await supabase
-        .from('student_groups')
-        .update({
-          name: updates.name,
-          description: updates.description,
-          color: updates.color,
-          default_price_per_student: updates.defaultPricePerStudent,
-          session_type: updates.sessionType,
-          session_duration: updates.sessionDuration,
-          session_time: updates.sessionTime,
-          is_active: updates.isActive,
-          location: updates.location ? JSON.parse(JSON.stringify(updates.location)) : null,
-        })
-        .eq('id', groupId);
+      // 1. Build metadata update — only include fields that are actually provided
+      const dbUpdates: Record<string, unknown> = {};
+      if ('name' in updates) dbUpdates.name = updates.name;
+      if ('description' in updates) dbUpdates.description = updates.description;
+      if ('color' in updates) dbUpdates.color = updates.color;
+      if ('defaultPricePerStudent' in updates) dbUpdates.default_price_per_student = updates.defaultPricePerStudent;
+      if ('sessionType' in updates) dbUpdates.session_type = updates.sessionType;
+      if ('sessionDuration' in updates) dbUpdates.session_duration = updates.sessionDuration;
+      if ('sessionTime' in updates) dbUpdates.session_time = updates.sessionTime;
+      if ('isActive' in updates) dbUpdates.is_active = updates.isActive;
+      if ('location' in updates) dbUpdates.location = updates.location ? JSON.parse(JSON.stringify(updates.location)) : null;
 
-      if (error) throw error;
+      if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase
+          .from('student_groups')
+          .update(dbUpdates)
+          .eq('id', groupId);
+        if (error) throw error;
+      }
+
+      // 2. Update schedule days if provided
+      if ('scheduleDays' in updates && updates.scheduleDays) {
+        // Delete existing schedule days
+        await supabase
+          .from('group_schedule_days')
+          .delete()
+          .eq('group_id', groupId);
+
+        // Insert new schedule days
+        if (updates.scheduleDays.length > 0) {
+          const { error: scheduleError } = await supabase
+            .from('group_schedule_days')
+            .insert(updates.scheduleDays.map(d => ({
+              group_id: groupId,
+              day_of_week: d.dayOfWeek,
+              time: d.time || updates.sessionTime || '16:00',
+            })));
+          if (scheduleError) throw scheduleError;
+        }
+      }
+
+      // 3. Update members if provided
+      if ('members' in updates && updates.members) {
+        // Get current members from DB
+        const { data: currentMembers } = await supabase
+          .from('group_members')
+          .select('*')
+          .eq('group_id', groupId)
+          .eq('is_active', true);
+
+        const existingMemberIds = new Set((currentMembers || []).map(m => m.id));
+        const newMemberIds = new Set(updates.members.filter(m => m.isActive !== false).map(m => m.studentId));
+
+        // Remove members that are no longer in the list
+        for (const existing of (currentMembers || [])) {
+          if (!newMemberIds.has(existing.id)) {
+            await supabase
+              .from('group_members')
+              .update({ is_active: false })
+              .eq('id', existing.id);
+          }
+        }
+
+        // Add new members and update existing ones
+        for (const member of updates.members) {
+          if (member.isActive === false) continue;
+          
+          if (existingMemberIds.has(member.studentId)) {
+            // Update existing member (price changes, etc.)
+            await supabase
+              .from('group_members')
+              .update({
+                student_name: member.studentName,
+                phone: member.phone,
+                parent_phone: member.parentPhone,
+                custom_price: member.customPrice ?? null,
+              })
+              .eq('id', member.studentId);
+          } else {
+            // Add new member
+            const { data: memberData } = await supabase
+              .from('group_members')
+              .insert({
+                group_id: groupId,
+                student_id: member.studentId?.startsWith('group_') ? null : (member.linkedStudentId || null),
+                student_name: member.studentName,
+                phone: member.phone,
+                parent_phone: member.parentPhone,
+                custom_price: member.customPrice ?? null,
+              })
+              .select()
+              .single();
+
+            // Add attendance records for future sessions
+            if (memberData) {
+              const today = new Date().toISOString().split('T')[0];
+              const { data: futureSessions } = await supabase
+                .from('group_sessions')
+                .select('id')
+                .eq('group_id', groupId)
+                .gte('date', today);
+
+              if (futureSessions && futureSessions.length > 0) {
+                const attendanceInserts = futureSessions.map(s => ({
+                  session_id: s.id,
+                  member_id: memberData.id,
+                  status: 'scheduled',
+                }));
+                await supabase.from('group_session_attendance').insert(attendanceInserts);
+              }
+            }
+          }
+        }
+      }
+
       await fetchGroups();
+      toast({ title: "تم تحديث المجموعة بنجاح" });
     } catch (error) {
       console.error('[Groups] Failed to update group:', error);
       toast({ title: "خطأ", description: "فشل في تحديث المجموعة", variant: "destructive" });
