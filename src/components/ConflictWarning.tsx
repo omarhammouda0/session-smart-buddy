@@ -57,7 +57,7 @@ export const ConflictWarning = ({
           </p>
           {mainConflict && (
             <p className="text-xs text-muted-foreground mt-0.5">
-              {mainConflict.student.name}: {formatTimeAr(mainConflict.session.time || mainConflict.student.sessionTime || '16:00')}
+              {mainConflict.student.name}: {formatTimeAr(mainConflict.session.time || ('sessionTime' in mainConflict.student ? mainConflict.student.sessionTime : undefined) || '16:00')}
               {mainConflict.type === 'close' && mainConflict.gap !== undefined && (
                 <span className="mr-1">(فاصل {mainConflict.gap} دقيقة فقط)</span>
               )}
@@ -82,7 +82,7 @@ export const ConflictWarning = ({
             <div key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
               <Clock className="h-3 w-3" />
               <span>
-                {conflict.student.name}: {formatTimeAr(conflict.session.time || conflict.student.sessionTime || '16:00')}
+                {conflict.student.name}: {formatTimeAr(conflict.session.time || ('sessionTime' in conflict.student ? conflict.student.sessionTime : undefined) || '16:00')}
                 {conflict.type === 'close' && conflict.gap !== undefined && (
                   <span className="mr-1">(فاصل {conflict.gap} دقيقة)</span>
                 )}

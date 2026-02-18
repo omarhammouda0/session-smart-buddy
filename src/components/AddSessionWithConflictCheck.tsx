@@ -250,7 +250,7 @@ export const AddSessionWithConflictCheck = ({
                   <div key={idx} className="p-3 rounded-lg bg-warning/10 border border-warning/30">
                     <p className="font-medium">{conflict.student.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {formatTimeAr(conflict.session.time || conflict.student.sessionTime || '16:00')}
+                      {formatTimeAr(conflict.session.time || ('sessionTime' in conflict.student ? conflict.student.sessionTime : undefined) || '16:00')}
                       {conflict.gap !== undefined && (
                         <span className="mr-1">(فاصل {conflict.gap} دقيقة فقط)</span>
                       )}
