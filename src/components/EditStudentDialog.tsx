@@ -223,24 +223,25 @@ export const EditStudentDialog = ({
     proceedWithSave();
   };
   
-  const proceedWithSave = () => {
+  const proceedWithSave = async () => {
+    // Serialize updates to avoid race conditions (each calls loadData on error)
     if (name.trim() !== student.name) {
-      onUpdateName(name.trim());
+      await onUpdateName(name.trim());
     }
     if (phone !== (student.phone || '')) {
-      onUpdatePhone(phone);
+      await onUpdatePhone(phone);
     }
     if (parentPhone !== (student.parentPhone || '')) {
-      onUpdateParentPhone?.(parentPhone);
+      await onUpdateParentPhone?.(parentPhone);
     }
     if (sessionTime !== student.sessionTime) {
-      onUpdateTime(sessionTime);
+      await onUpdateTime(sessionTime);
     }
     if (sessionType !== student.sessionType) {
-      onUpdateSessionType(sessionType);
+      await onUpdateSessionType(sessionType);
     }
     if (sessionDuration !== (student.sessionDuration || DEFAULT_DURATION)) {
-      onUpdateDuration?.(sessionDuration);
+      await onUpdateDuration?.(sessionDuration);
     }
     
     // Update custom settings
@@ -252,7 +253,7 @@ export const EditStudentDialog = ({
       ));
     
     if (hasCustomSettingsChange) {
-      onUpdateCustomSettings?.({
+      await onUpdateCustomSettings?.({
         useCustomSettings,
         sessionDuration,
         customPriceOnsite: useCustomSettings && customPriceOnsite ? parseFloat(customPriceOnsite) : undefined,
@@ -263,7 +264,7 @@ export const EditStudentDialog = ({
     const currentDays = student.scheduleDays.map(d => d.dayOfWeek).sort().join(',');
     const newDays = effectiveDays.sort().join(',');
     if (currentDays !== newDays && effectiveDays.length > 0) {
-      onUpdateSchedule(effectiveDays);
+      await onUpdateSchedule(effectiveDays);
     }
     
     setOpen(false);

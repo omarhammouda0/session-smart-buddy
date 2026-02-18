@@ -239,11 +239,13 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     fetchGroups();
   }, [fetchGroups]);
 
-  // Set up realtime subscription
+  // Set up realtime subscription (filtered by user_id to avoid cross-user triggers)
   useEffect(() => {
+    if (!currentUserId) return;
+
     const groupsChannel = supabase
       .channel('groups-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_groups' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_groups', filter: `user_id=eq.${currentUserId}` }, () => {
         fetchGroups();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_sessions' }, () => {
@@ -257,7 +259,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(groupsChannel);
     };
-  }, [fetchGroups]);
+  }, [fetchGroups, currentUserId]);
 
   // Add a new group
   const addGroup = useCallback(async (

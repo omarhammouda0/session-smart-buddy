@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, Trash2, AlertTriangle, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Trash2, AlertTriangle, Clock, BookOpen, FileText, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,18 +9,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Student, Session } from "@/types/student";
+import { Student, Session, HomeworkStatus } from "@/types/student";
 import { formatShortDateAr } from "@/lib/arabicConstants";
 import { cn } from "@/lib/utils";
+
+interface SessionCompletionDetails {
+  topic?: string;
+  notes?: string;
+  homework?: string;
+  homeworkStatus?: HomeworkStatus;
+}
 
 interface SessionCompletionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   student: Student;
   session: Session;
-  onComplete: () => void;
+  onComplete: (details?: SessionCompletionDetails) => void;
   onCancel: (reason?: string) => void;
   onDelete: () => void;
   isAutoTriggered?: boolean; // True when triggered by session end time
@@ -41,14 +49,25 @@ export function SessionCompletionDialog({
   const [action, setAction] = useState<CompletionAction>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [notes, setNotes] = useState("");
+  const [homework, setHomework] = useState("");
 
   const sessionTime = session.time || student.sessionTime || "16:00";
 
   const handleConfirm = () => {
     switch (action) {
-      case "complete":
-        onComplete();
+      case "complete": {
+        const details: SessionCompletionDetails = {};
+        if (topic.trim()) details.topic = topic.trim();
+        if (notes.trim()) details.notes = notes.trim();
+        if (homework.trim()) {
+          details.homework = homework.trim();
+          details.homeworkStatus = "assigned";
+        }
+        onComplete(Object.keys(details).length > 0 ? details : undefined);
         break;
+      }
       case "cancel":
         onCancel(cancelReason || undefined);
         break;
@@ -68,6 +87,9 @@ export function SessionCompletionDialog({
     setAction(null);
     setCancelReason("");
     setConfirmDelete(false);
+    setTopic("");
+    setNotes("");
+    setHomework("");
     onOpenChange(false);
   };
 
@@ -168,6 +190,52 @@ export function SessionCompletionDialog({
           </div>
         ) : (
           <div className="py-4 space-y-4">
+            {action === "complete" && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">يمكنك تسجيل ملاحظات عن الحصة (اختياري)</p>
+                <div className="space-y-2">
+                  <Label htmlFor="completeTopic" className="flex items-center gap-1.5 text-sm">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    الموضوع
+                  </Label>
+                  <Input
+                    id="completeTopic"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="مثال: الجبر - المعادلات التربيعية"
+                    className="text-right"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="completeNotes" className="flex items-center gap-1.5 text-sm">
+                    <FileText className="h-3.5 w-3.5" />
+                    ملاحظات
+                  </Label>
+                  <Textarea
+                    id="completeNotes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="ملاحظات عن أداء الطالب..."
+                    className="resize-none text-right"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="completeHomework" className="flex items-center gap-1.5 text-sm">
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                    واجب منزلي
+                  </Label>
+                  <Input
+                    id="completeHomework"
+                    value={homework}
+                    onChange={(e) => setHomework(e.target.value)}
+                    placeholder="مثال: تمارين 1-10 من الفصل 3"
+                    className="text-right"
+                  />
+                </div>
+              </div>
+            )}
+
             {action === "cancel" && (
               <div className="space-y-2">
                 <Label htmlFor="cancelReason">سبب الإلغاء (اختياري)</Label>

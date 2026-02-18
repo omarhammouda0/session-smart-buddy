@@ -2499,8 +2499,11 @@ const Index = () => {
           onOpenChange={(open) => !open && setCompletionDialog({ open: false, student: null, session: null })}
           student={completionDialog.student}
           session={completionDialog.session}
-          onComplete={() => {
+          onComplete={(details) => {
             handleToggleComplete(completionDialog.student!.id, completionDialog.session!.id);
+            if (details) {
+              updateSessionDetails(completionDialog.student!.id, completionDialog.session!.id, details);
+            }
             setCompletionDialog({ open: false, student: null, session: null });
           }}
           onCancel={(reason) => {
@@ -2525,8 +2528,11 @@ const Index = () => {
           student={endedSessionNotification.student}
           session={endedSessionNotification.session}
           isAutoTriggered={true}
-          onComplete={() => {
+          onComplete={(details) => {
             handleToggleComplete(endedSessionNotification.student.id, endedSessionNotification.session.id);
+            if (details) {
+              updateSessionDetails(endedSessionNotification.student.id, endedSessionNotification.session.id, details);
+            }
             dismissEndedNotification();
           }}
           onCancel={(reason) => {

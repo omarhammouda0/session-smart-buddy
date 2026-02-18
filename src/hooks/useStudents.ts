@@ -988,11 +988,17 @@ export const useStudents = () => {
           status: "scheduled",
         }));
 
-      // Update student record
+      // Update student record - preserve existing per-day time overrides
+      const existingDayTimes = new Map(
+        student.scheduleDays.map((d) => [d.dayOfWeek, d.time])
+      );
       const { error: updateError } = await supabase
         .from("students")
         .update({
-          schedule_days: scheduleDays.map((d) => ({ dayOfWeek: d })),
+          schedule_days: scheduleDays.map((d) => {
+            const existingTime = existingDayTimes.get(d);
+            return existingTime ? { dayOfWeek: d, time: existingTime } : { dayOfWeek: d };
+          }),
           semester_start: newStart,
           semester_end: newEnd,
           updated_at: new Date().toISOString(),
@@ -1010,6 +1016,29 @@ export const useStudents = () => {
 
         if (insertError) {
           console.error("Error adding new sessions:", insertError);
+        }
+      }
+
+      // Remove scheduled sessions that are outside the new semester range or on removed days
+      const validDatesSet = new Set(sessionDates);
+      const orphanedSessionIds = (existingSessions || [])
+        .filter((s: { id: string; date: string; status: string }) => {
+          // Only remove future scheduled sessions - never touch completed/cancelled
+          if (s.status !== "scheduled") return false;
+          // Remove if date is outside the new valid dates
+          return !validDatesSet.has(s.date);
+        })
+        .map((s: { id: string }) => s.id);
+
+      if (orphanedSessionIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("sessions")
+          .delete()
+          .in("id", orphanedSessionIds)
+          .eq("user_id", currentUserId);
+
+        if (deleteError) {
+          console.error("Error removing orphaned sessions:", deleteError);
         }
       }
 
@@ -1148,6 +1177,10 @@ export const useStudents = () => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
 
+      // Get session info before deletion for cancellation cleanup
+      const student = students.find((s) => s.id === studentId);
+      const session = student?.sessions.find((sess) => sess.id === sessionId);
+
       // Optimistic update
       setStudents((prev) =>
         prev.map((s) => {
@@ -1159,6 +1192,16 @@ export const useStudents = () => {
         }),
       );
 
+      // Clean up any cancellation records for this session to keep counts accurate
+      if (session) {
+        await supabase
+          .from("session_cancellations")
+          .delete()
+          .eq("user_id", currentUserId)
+          .eq("student_id", studentId)
+          .eq("session_date", session.date);
+      }
+
       const { error } = await supabase.from("sessions").delete().eq("id", sessionId).eq("user_id", currentUserId);
 
       if (error) {
@@ -1166,7 +1209,7 @@ export const useStudents = () => {
         loadData();
       }
     },
-    [getUserId, loadData],
+    [getUserId, students, loadData],
   );
 
   const restoreSession = useCallback(

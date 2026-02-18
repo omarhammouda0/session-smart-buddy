@@ -203,7 +203,10 @@ export const useCancellationTracking = (students: Student[]) => {
       limit: number | null;
       autoNotificationSent?: boolean;
     }> => {
-      const month = format(new Date(sessionDate), "yyyy-MM");
+      // Parse date as local components to avoid timezone shifts at month boundaries
+      // e.g. "2026-01-01" in UTC+2 would become 2025-12-31 if parsed via new Date()
+      const [yearStr, monthStr] = sessionDate.split("-");
+      const month = `${yearStr}-${monthStr}`;
       const student = students.find((s) => s.id === studentId);
       // Default to 3 cancellations per month and auto-notify if no policy set
       const limit = student?.cancellationPolicy?.monthlyLimit ?? 3;
@@ -269,8 +272,15 @@ export const useCancellationTracking = (students: Student[]) => {
         // Check if we should auto-notify parent
         let autoNotificationSent = false;
         if ((limitReached || limitExceeded) && autoNotifyParent && student?.phone) {
-          // Re-check from backend state after reload
-          const alreadyNotified = wasParentNotified(studentId, month);
+          // Query DB directly for notification status (React state is stale after loadData)
+          const { data: trackingRow } = await supabase
+            .from("student_cancellation_tracking")
+            .select("parent_notified")
+            .eq("student_id", studentId)
+            .eq("month", month)
+            .maybeSingle();
+
+          const alreadyNotified = trackingRow?.parent_notified || false;
 
           if (!alreadyNotified) {
             console.log("Auto-sending parent notification for:", student.name);
@@ -313,14 +323,16 @@ export const useCancellationTracking = (students: Student[]) => {
         return { success: false, newCount: 0, limitReached: false, limitExceeded: false, limit };
       }
     },
-    [students, getCancellationCount, loadData, wasParentNotified, cancellations],
+    [students, getCancellationCount, loadData, cancellations],
   );
 
   // Remove a cancellation (when restoring a session)
   // Important: compute the new count from the backend (never trust local state)
   const removeCancellation = useCallback(
     async (studentId: string, sessionDate: string): Promise<boolean> => {
-      const month = format(new Date(sessionDate), "yyyy-MM");
+      // Parse month directly from date string to avoid timezone shift at month boundaries
+      const [yearStr, monthStr] = sessionDate.split("-");
+      const month = `${yearStr}-${monthStr}`;
 
       try {
         const userId = await getUserId();

@@ -381,11 +381,12 @@ export const useConflictDetection = (students: Student[], groups: StudentGroup[]
 
           const time = session.time || student.sessionTime || "16:00";
           const startMinutes = timeToMinutes(time);
+          const sessionDuration = session.duration || student.sessionDuration || DEFAULT_SESSION_DURATION;
           sessionsOnDate.push({
             session,
             student,
             startMinutes,
-            endMinutes: startMinutes + DEFAULT_SESSION_DURATION,
+            endMinutes: startMinutes + sessionDuration,
           });
         });
       });

@@ -30,11 +30,19 @@ async function getCurrentUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+// Helper to get the current session's access token for authenticated API calls
+async function getAccessToken(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || SUPABASE_KEY;
+}
+
 // Helper to save or reactivate FCM token in database
 async function saveFcmToken(token: string, deviceInfo: object, userId: string): Promise<boolean> {
   try {
     console.log("Saving FCM token for user:", userId);
     console.log("Token (first 30 chars):", token.substring(0, 30));
+
+    const accessToken = await getAccessToken();
 
     // Always update the token first to reactivate it if it exists
     const updateResponse = await fetch(
@@ -44,7 +52,7 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
         headers: {
           "Content-Type": "application/json",
           "apikey": SUPABASE_KEY,
-          "Authorization": `Bearer ${SUPABASE_KEY}`,
+          "Authorization": `Bearer ${accessToken}`,
           "Prefer": "return=representation"
         },
         body: JSON.stringify({
@@ -73,7 +81,7 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
       headers: {
         "Content-Type": "application/json",
         "apikey": SUPABASE_KEY,
-        "Authorization": `Bearer ${SUPABASE_KEY}`,
+        "Authorization": `Bearer ${accessToken}`,
         "Prefer": "return=representation"
       },
       body: JSON.stringify({
@@ -103,7 +111,7 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
           headers: {
             "Content-Type": "application/json",
             "apikey": SUPABASE_KEY,
-            "Authorization": `Bearer ${SUPABASE_KEY}`
+            "Authorization": `Bearer ${accessToken}`
           },
           body: JSON.stringify({
             is_active: true,
@@ -126,6 +134,7 @@ async function saveFcmToken(token: string, deviceInfo: object, userId: string): 
 // Helper to deactivate FCM token
 async function deactivateFcmToken(token: string): Promise<boolean> {
   try {
+    const accessToken = await getAccessToken();
     const response = await fetch(
       `${SUPABASE_URL}/rest/v1/push_subscriptions?fcm_token=eq.${encodeURIComponent(token)}`,
       {
@@ -133,7 +142,7 @@ async function deactivateFcmToken(token: string): Promise<boolean> {
         headers: {
           "Content-Type": "application/json",
           "apikey": SUPABASE_KEY,
-          "Authorization": `Bearer ${SUPABASE_KEY}`
+          "Authorization": `Bearer ${accessToken}`
         },
         body: JSON.stringify({ is_active: false })
       }
@@ -225,14 +234,32 @@ export function usePushNotifications() {
             if (!mounted) return;
             setMessaging(messagingInstance);
 
-            // TEMPORARILY DISABLED: Foreground message handler was causing crashes on mobile
-            // The browser will still show notifications via the service worker
-            // When the app is in foreground, Firebase will handle it automatically
-            //
-            // TODO: Re-enable once root cause is identified
-            // onMessage(messagingInstance, (payload) => { ... });
+            // Foreground message handler - shows notification when app is in foreground
+            // Wrapped in try-catch for mobile stability
+            try {
+              onMessage(messagingInstance, (payload) => {
+                try {
+                  console.log("Foreground push notification received:", payload?.notification?.title);
+                  const { title, body } = payload.notification || {};
+                  if (title && Notification.permission === "granted") {
+                    // Show notification via the Notification API for foreground messages
+                    new Notification(title, {
+                      body: body || "",
+                      icon: "/icons/icon-192x192.png",
+                      dir: "rtl",
+                      lang: "ar",
+                    });
+                  }
+                } catch (handlerErr) {
+                  // Silently ignore handler errors to prevent crashes
+                  console.warn("Error handling foreground notification:", handlerErr);
+                }
+              });
+            } catch (onMsgErr) {
+              console.warn("Could not set up foreground message handler:", onMsgErr);
+            }
 
-            console.log("Firebase messaging initialized (foreground handler disabled for stability)");
+            console.log("Firebase messaging initialized with foreground handler");
 
             // Check if already has permission and token - auto-refresh token
             if (mounted && Notification.permission === "granted") {
