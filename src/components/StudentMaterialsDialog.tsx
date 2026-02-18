@@ -104,6 +104,9 @@ export function StudentMaterialsDialog({
 
       onAddMaterial(newMaterial);
     };
+    reader.onerror = () => {
+      alert("حدث خطأ أثناء قراءة الملف. حاول مرة أخرى.");
+    };
     reader.readAsDataURL(file);
 
     if (fileInputRef.current) {

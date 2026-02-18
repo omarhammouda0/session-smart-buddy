@@ -515,12 +515,12 @@ export const BulkEditSessionsDialog = ({
 
   const categorizedSessions = useMemo((): CategorizedSessions => {
     const result: CategorizedSessions = { safe: [], warnings: [], conflicts: [] };
-    const sessionDuration = 60;
-    const minGap = 15;
+    const minGap = 30;
 
     matchingSessions.forEach((sessionData) => {
       const { session, student, newTime: sessNewTime, newDate: sessNewDate } = sessionData;
       const newStartMinutes = timeToMinutes(sessNewTime);
+      const sessionDuration = session.duration || student.sessionDuration || 60;
       const newEndMinutes = newStartMinutes + sessionDuration;
 
       let conflictType = "none" as "none" | "close" | "overlap";
@@ -534,7 +534,8 @@ export const BulkEditSessionsDialog = ({
 
           const otherTime = otherSession.time || otherStudent.sessionTime || "16:00";
           const otherStartMinutes = timeToMinutes(otherTime);
-          const otherEndMinutes = otherStartMinutes + sessionDuration;
+          const otherDuration = otherSession.duration || otherStudent.sessionDuration || 60;
+          const otherEndMinutes = otherStartMinutes + otherDuration;
 
           if (newStartMinutes === otherStartMinutes) {
             conflictType = "overlap";
@@ -669,16 +670,42 @@ export const BulkEditSessionsDialog = ({
       count: sessionsToApply.length,
       studentName: selectedStudent?.name || "",
     };
-    localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoInfo));
-    setUndoData(undoInfo);
 
-    sessionsToApply.forEach((s) => {
-      if (modType === "day-change" && onUpdateSessionDate) {
-        onUpdateSessionDate(s.student.id, s.session.id, s.newDate, s.newTime);
-      } else {
-        onBulkUpdateTime([s.student.id], [s.session.id], s.newTime);
-      }
-    });
+    const successfulUpdates: typeof undoInfo.sessionUpdates = [];
+
+    try {
+      sessionsToApply.forEach((s) => {
+        if (modType === "day-change" && onUpdateSessionDate) {
+          onUpdateSessionDate(s.student.id, s.session.id, s.newDate, s.newTime);
+        } else {
+          onBulkUpdateTime([s.student.id], [s.session.id], s.newTime);
+        }
+        successfulUpdates.push({
+          sessionId: s.session.id,
+          studentId: s.student.id,
+          originalTime: s.originalTime,
+          originalDate: s.originalDate,
+        });
+      });
+    } catch (error) {
+      console.error("Error applying bulk changes:", error);
+      toast({
+        title: "خطأ",
+        description: `فشل تطبيق بعض التغييرات. تم تعديل ${successfulUpdates.length} من ${sessionsToApply.length} جلسة.`,
+        variant: "destructive",
+      });
+    }
+
+    // Only store undo data for successfully applied changes
+    if (successfulUpdates.length > 0) {
+      const actualUndo: UndoData = {
+        ...undoInfo,
+        sessionUpdates: successfulUpdates,
+        count: successfulUpdates.length,
+      };
+      localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(actualUndo));
+      setUndoData(actualUndo);
+    }
 
     setLastApplyResult({
       safe: categorizedSessions.safe.length,

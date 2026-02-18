@@ -30,6 +30,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
   const [priceOnline, setPriceOnline] = useState<string>((settings.defaultPriceOnline ?? 120).toString());
   const [workStart, setWorkStart] = useState(settings.workingHoursStart || '14:00');
   const [workEnd, setWorkEnd] = useState(settings.workingHoursEnd || '22:00');
+  const [semesterMonths, setSemesterMonths] = useState(settings.defaultSemesterMonths);
 
   const handleSave = () => {
     const onsitePrice = priceOnsite.trim() === ''
@@ -56,6 +57,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
       defaultPriceOnline: onlinePrice,
       workingHoursStart: workStart,
       workingHoursEnd: workEnd,
+      ...(semesterMonths !== undefined && { defaultSemesterMonths: semesterMonths }),
     });
     setOpen(false);
   };
@@ -63,7 +65,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
   const handleMonthsChange = (months: number) => {
     const newEnd = format(addMonths(parseISO(start), months), 'yyyy-MM-dd');
     setEnd(newEnd);
-    onUpdate({ defaultSemesterMonths: months });
+    setSemesterMonths(months);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -75,6 +77,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
       setPriceOnline((settings.defaultPriceOnline ?? 120).toString());
       setWorkStart(settings.workingHoursStart || '14:00');
       setWorkEnd(settings.workingHoursEnd || '22:00');
+      setSemesterMonths(settings.defaultSemesterMonths);
     }
     setOpen(isOpen);
   };
@@ -130,7 +133,7 @@ export const SemesterSettings = ({ settings, onUpdate }: SemesterSettingsProps) 
                   <Button
                     key={m}
                     type="button"
-                    variant={settings.defaultSemesterMonths === m ? "default" : "outline"}
+                    variant={semesterMonths === m ? "default" : "outline"}
                     size="sm"
                     onClick={() => handleMonthsChange(m)}
                   >

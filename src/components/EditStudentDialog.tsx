@@ -261,8 +261,8 @@ export const EditStudentDialog = ({
       });
     }
     
-    const currentDays = student.scheduleDays.map(d => d.dayOfWeek).sort().join(',');
-    const newDays = effectiveDays.sort().join(',');
+    const currentDays = [...student.scheduleDays.map(d => d.dayOfWeek)].sort().join(',');
+    const newDays = [...effectiveDays].sort().join(',');
     if (currentDays !== newDays && effectiveDays.length > 0) {
       await onUpdateSchedule(effectiveDays);
     }
@@ -738,35 +738,6 @@ export const EditStudentDialog = ({
       </AlertDialog>
         </DialogContent>
       </Dialog>
-      
-      {/* Warning Confirmation Dialog */}
-      <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              تحذير: جلسات قريبة جداً
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-right space-y-2">
-              <p>
-                تغيير الوقت إلى {formatTimeAr(sessionTime)} سيجعل {conflictSummary.warningCount} جلسة بفاصل أقل من 30 دقيقة.
-              </p>
-              <p className="text-muted-foreground text-sm">
-                الطلاب المتأثرون: {conflictSummary.conflictingStudents.join('، ')}
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-row-reverse gap-2">
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={proceedWithSave}
-              className="bg-amber-500 hover:bg-amber-600"
-            >
-              نعم، احفظ
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

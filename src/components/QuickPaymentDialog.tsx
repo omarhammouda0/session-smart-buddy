@@ -97,7 +97,7 @@ export const QuickPaymentDialog = ({
           // Sum payments made for this SPECIFIC SESSION ID
           // Notes format: "session:abc123|date:2026-01-10"
           alreadyPaidForSession = monthPayment.paymentRecords
-            .filter((record) => record.notes && record.notes.includes(`session:${sessionId}`))
+            .filter((record) => record.notes && new RegExp(`session:${sessionId}(?:\\||$)`).test(record.notes))
             .reduce((sum, record) => sum + record.amount, 0);
         }
       }

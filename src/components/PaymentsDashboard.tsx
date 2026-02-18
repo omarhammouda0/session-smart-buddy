@@ -217,15 +217,36 @@ const getStudentGroupSessionsDue = (
 };
 
 // Calculate total group payments made by a linked student for a month
+// Uses the session date (not payment date) to determine the correct month
 const getStudentGroupPaymentsMade = (
   studentId: string,
   groupPayments: GroupMemberPayment[],
   month: number,
-  year: number
+  year: number,
+  groups: StudentGroup[] = []
 ): number => {
+  // Build a session date lookup map for quick resolution
+  const sessionDateMap = new Map<string, string>();
+  groups.forEach(group => {
+    group.sessions.forEach(session => {
+      sessionDateMap.set(session.id, session.date);
+    });
+  });
+
   return groupPayments
     .filter(p => {
       if (p.linkedStudentId !== studentId) return false;
+
+      // Prefer session date for month attribution
+      if (p.sessionId) {
+        const sessionDate = sessionDateMap.get(p.sessionId);
+        if (sessionDate) {
+          const d = new Date(sessionDate + 'T00:00:00');
+          return d.getMonth() === month && d.getFullYear() === year;
+        }
+      }
+
+      // Fallback to payment date if session not found
       const paidDate = new Date(p.paidAt);
       return paidDate.getMonth() === month && paidDate.getFullYear() === year;
     })
@@ -387,7 +408,7 @@ export const PaymentsDashboard = ({
     const privatePayments = payment ? (payment.amountPaid || payment.amount || 0) : 0;
 
     // Group payments for this linked student
-    const groupPaymentsAmount = getStudentGroupPaymentsMade(studentId, groupPayments, m, y);
+    const groupPaymentsAmount = getStudentGroupPaymentsMade(studentId, groupPayments, m, y, groups);
 
     return privatePayments + groupPaymentsAmount;
   };

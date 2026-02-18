@@ -57,6 +57,13 @@ export const AddSessionWithConflictCheck = ({
     }
   }, [open, student.sessionTime]);
   
+  // Check for duplicate session on the same date
+  const hasDuplicateSession = useMemo(() => {
+    if (!selectedDate) return false;
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return student.sessions?.some(s => s.date === dateStr && s.status === 'scheduled') ?? false;
+  }, [selectedDate, student.sessions]);
+
   // Check for conflicts
   const conflictResult = useMemo(() => {
     if (!selectedDate) return null;
@@ -110,7 +117,7 @@ export const AddSessionWithConflictCheck = ({
   };
   
   const isFormValid = selectedDate && selectedTime;
-  const canSave = isFormValid && conflictResult?.severity !== 'error';
+  const canSave = isFormValid && conflictResult?.severity !== 'error' && !hasDuplicateSession;
 
   return (
     <>
@@ -214,6 +221,13 @@ export const AddSessionWithConflictCheck = ({
                 result={conflictResult}
                 onSelectSuggestion={handleSuggestionSelect}
               />
+            )}
+
+            {/* Duplicate session warning */}
+            {hasDuplicateSession && (
+              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                ⚠️ يوجد جلسة مجدولة بالفعل لهذا الطالب في نفس اليوم
+              </div>
             )}
           </div>
           

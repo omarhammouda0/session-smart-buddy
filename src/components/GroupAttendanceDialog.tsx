@@ -88,7 +88,7 @@ export const GroupAttendanceDialog = ({
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [sessionTopic, setSessionTopic] = useState(session.topic || '');
   const [sessionNotes, setSessionNotes] = useState(session.notes || '');
-
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
   // Track local attendance state for immediate UI updates
   const [localAttendance, setLocalAttendance] = useState<Record<string, SessionStatus>>(() => {
     const initial: Record<string, SessionStatus> = {};
@@ -118,6 +118,9 @@ export const GroupAttendanceDialog = ({
   };
 
   const handleMarkAllAttended = () => {
+    if (isMarkingAll) return;
+    setIsMarkingAll(true);
+
     // Update local state immediately
     const newAttendance: Record<string, SessionStatus> = { ...localAttendance };
     Object.keys(newAttendance).forEach(memberId => {
@@ -133,6 +136,8 @@ export const GroupAttendanceDialog = ({
         onUpdateAttendance(group.id, session.id, memberId, 'completed');
       }
     });
+
+    setIsMarkingAll(false);
   };
 
   const handleCompleteSession = () => {
@@ -198,6 +203,7 @@ export const GroupAttendanceDialog = ({
                 variant="outline"
                 size="sm"
                 onClick={handleMarkAllAttended}
+                disabled={isMarkingAll}
                 className="w-full"
               >
                 <Check className="h-4 w-4 ml-1" />

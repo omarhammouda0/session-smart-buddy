@@ -105,7 +105,8 @@ export const MonthlyReportPreview = forwardRef<HTMLDivElement, MonthlyReportPrev
     };
 
     const reportDate = new Date();
-    const isPartialMonth = month === reportDate.getMonth() && year === reportDate.getFullYear() && reportDate.getDate() < 28;
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    const isPartialMonth = month === reportDate.getMonth() && year === reportDate.getFullYear() && reportDate.getDate() < lastDayOfMonth;
 
     return (
       <div 

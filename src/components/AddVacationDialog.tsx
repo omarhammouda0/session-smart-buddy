@@ -285,6 +285,14 @@ export const AddVacationDialog = ({
       return;
     }
 
+    // For bulk operations (>3 sessions) without preview, confirm first
+    if (!showPreview && sessionsToMark.length > 3) {
+      const confirmed = window.confirm(
+        `سيتم تحويل ${sessionsToMark.length} جلسة لـ ${affectedStudents} طالب إلى إجازة. هل أنت متأكد؟`
+      );
+      if (!confirmed) return;
+    }
+
     const studentIds = sessionsToMark.map(s => s.studentId);
     const sessionIds = sessionsToMark.map(s => s.session.id);
 

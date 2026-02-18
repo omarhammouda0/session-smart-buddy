@@ -1475,6 +1475,12 @@ export const SessionHistoryBar = ({
                                   </div>
                                 )}
 
+                                {isGroupSession && (
+                                  <p className="text-[10px] sm:text-xs text-violet-500 dark:text-violet-400 mt-2">
+                                    يُدار من صفحة المجموعات
+                                  </p>
+                                )}
+
                                 {/* Notes/Homework buttons */}
                                 <div className="flex items-center gap-1 mt-1.5">
                                   <SessionNotesDialog
@@ -1712,6 +1718,12 @@ export const SessionHistoryBar = ({
                                       studentName={session.studentName}
                                     />
                                   </div>
+                                )}
+
+                                {isGroupSession && (
+                                  <p className="text-[10px] sm:text-xs text-violet-500 dark:text-violet-400 mt-2">
+                                    يُدار من صفحة المجموعات
+                                  </p>
                                 )}
                               </div>
                             </div>
