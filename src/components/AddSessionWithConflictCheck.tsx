@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, AlertTriangle, Clock, Sparkles, Sunrise, Sun, Moon } from 'lucide-react';
-import { Student } from '@/types/student';
+import { Student, StudentGroup, AppSettings } from '@/types/student';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
@@ -26,6 +26,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useConflictDetection, formatTimeAr } from '@/hooks/useConflictDetection';
 import { ConflictWarning } from '@/components/ConflictWarning';
+import { SmartSlotChips } from '@/components/SmartSlotChips';
+import { getSmartRecommendations } from '@/hooks/useSmartTimeRecommendations';
 import { cn } from '@/lib/utils';
 
 interface AddSessionDialogProps {
@@ -33,6 +35,8 @@ interface AddSessionDialogProps {
   onOpenChange: (open: boolean) => void;
   student: Student;
   students: Student[];
+  groups?: StudentGroup[];
+  settings?: AppSettings;
   onAdd: (studentId: string, date: string, time?: string) => void;
 }
 
@@ -41,13 +45,15 @@ export const AddSessionWithConflictCheck = ({
   onOpenChange,
   student,
   students,
+  groups = [],
+  settings,
   onAdd,
 }: AddSessionDialogProps) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string>(student.sessionTime || '16:00');
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   
-  const { checkConflict, getSuggestedSlots } = useConflictDetection(students);
+  const { checkConflict } = useConflictDetection(students, groups);
 
   // Reset when dialog opens
   useEffect(() => {
@@ -72,13 +78,21 @@ export const AddSessionWithConflictCheck = ({
     return checkConflict({ date: dateStr, startTime: selectedTime });
   }, [selectedDate, selectedTime, checkConflict]);
 
-  // Get available slots for selected date
-  const availableSlots = useMemo(() => {
-    if (!selectedDate) return [];
+  // Get smart recommendations for selected date
+  const smartRecs = useMemo(() => {
+    if (!selectedDate) return { slots: [], tips: [] };
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return getSuggestedSlots(dateStr, student.sessionDuration || 60, "08:00", "22:00", 8);
-  }, [selectedDate, getSuggestedSlots, student.sessionDuration]);
+    return getSmartRecommendations({
+      students,
+      groups,
+      date: dateStr,
+      duration: student.sessionDuration || settings?.defaultSessionDuration || 60,
+      newSessionType: student.sessionType,
+      newLocation: student.location,
+      settings,
+    });
+  }, [selectedDate, students, groups, student.sessionDuration, student.sessionType, student.location, settings]);
 
   const handleTimeChange = (time: string) => {
     setSelectedTime(time);
@@ -180,39 +194,14 @@ export const AddSessionWithConflictCheck = ({
               </p>
             </div>
 
-            {/* Available Slots */}
-            {selectedDate && availableSlots.length > 0 && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5 text-green-700">
-                  <Sparkles className="h-4 w-4" />
-                  أوقات متاحة
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                  {availableSlots.map((slot) => (
-                    <Button
-                      key={slot.time}
-                      type="button"
-                      size="sm"
-                      variant={selectedTime === slot.time ? "default" : "outline"}
-                      className={cn(
-                        "gap-1.5 h-8 text-xs",
-                        selectedTime === slot.time && "ring-2 ring-primary ring-offset-1"
-                      )}
-                      onClick={() => handleSuggestionSelect(slot.time)}
-                    >
-                      {slot.type === "morning" && <Sunrise className="h-3 w-3" />}
-                      {slot.type === "afternoon" && <Sun className="h-3 w-3" />}
-                      {slot.type === "evening" && <Moon className="h-3 w-3" />}
-                      {slot.timeAr}
-                    </Button>
-                  ))}
-                </div>
-                {availableSlots.length === 0 && (
-                  <p className="text-xs text-amber-600">
-                    لا توجد أوقات متاحة في هذا اليوم
-                  </p>
-                )}
-              </div>
+            {/* Smart Recommendations */}
+            {selectedDate && (smartRecs.slots.length > 0 || smartRecs.tips.length > 0) && (
+              <SmartSlotChips
+                slots={smartRecs.slots}
+                tips={smartRecs.tips}
+                selectedTime={selectedTime}
+                onSelectTime={handleSuggestionSelect}
+              />
             )}
 
             {/* Conflict Status */}

@@ -103,6 +103,8 @@ import { GroupAttendanceDialog } from "@/components/GroupAttendanceDialog";
 import { GroupPaymentDialog } from "@/components/GroupPaymentDialog";
 import { StudentGroup, GroupSession } from "@/types/student";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { SmartSlotChips } from "@/components/SmartSlotChips";
+import { getSmartRecommendations } from "@/hooks/useSmartTimeRecommendations";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -3025,46 +3027,27 @@ const Index = () => {
                     )}
                   </div>
 
-                  {/* Available Time Slots */}
+                  {/* Smart Recommendations */}
                   {(() => {
-                    const todayStr = format(now, "yyyy-MM-dd");
-                    const availableSlots = getSuggestedSlots(
-                      todayStr,
-                      selectedStudent?.sessionDuration || settings.defaultSessionDuration || 60,
-                      settings.workingHoursStart || "08:00",
-                      settings.workingHoursEnd || "22:00",
-                      8
-                    );
+                    const smartRecs = getSmartRecommendations({
+                      students,
+                      groups: activeGroups,
+                      date: todayStr,
+                      duration: selectedStudent?.sessionDuration || settings.defaultSessionDuration || 60,
+                      newSessionType: selectedStudent?.sessionType,
+                      newLocation: selectedStudent?.location,
+                      settings,
+                    });
 
-                    if (availableSlots.length === 0) return null;
+                    if (smartRecs.slots.length === 0 && smartRecs.tips.length === 0) return null;
 
                     return (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium flex items-center gap-1.5 text-primary">
-                          <Sparkles className="h-4 w-4" />
-                          أوقات متاحة
-                        </Label>
-                        <div className="flex flex-wrap gap-2">
-                          {availableSlots.map((slot) => (
-                            <Button
-                              key={slot.time}
-                              type="button"
-                              size="sm"
-                              variant={addTodaySessionDialog.time === slot.time ? "default" : "outline"}
-                              className={cn(
-                                "gap-1.5 h-9 text-sm",
-                                addTodaySessionDialog.time === slot.time && "ring-2 ring-primary ring-offset-1"
-                              )}
-                              onClick={() => setAddTodaySessionDialog({ ...addTodaySessionDialog, time: slot.time })}
-                            >
-                              {slot.type === "morning" && <Sunrise className="h-3.5 w-3.5" />}
-                              {slot.type === "afternoon" && <Sun className="h-3.5 w-3.5" />}
-                              {slot.type === "evening" && <Moon className="h-3.5 w-3.5" />}
-                              {slot.timeAr}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
+                      <SmartSlotChips
+                        slots={smartRecs.slots}
+                        tips={smartRecs.tips}
+                        selectedTime={addTodaySessionDialog.time}
+                        onSelectTime={(time) => setAddTodaySessionDialog({ ...addTodaySessionDialog, time })}
+                      />
                     );
                   })()}
 
@@ -3202,44 +3185,29 @@ const Index = () => {
                         الوقت الافتراضي للمجموعة: {selectedGroup.sessionTime}
                       </p>
 
-                      {/* Available Time Slots for Group */}
+                      {/* Smart Recommendations for Group */}
                       {(() => {
-                        const availableSlots = getSuggestedSlots(
-                          todayStr,
-                          selectedGroup.sessionDuration || 60,
-                          settings.workingHoursStart || "08:00",
-                          settings.workingHoursEnd || "22:00",
-                          6
-                        );
+                        const smartRecs = getSmartRecommendations({
+                          students,
+                          groups: activeGroups,
+                          date: todayStr,
+                          duration: selectedGroup.sessionDuration || 60,
+                          newSessionType: selectedGroup.sessionType,
+                          newLocation: selectedGroup.location,
+                          settings,
+                        });
 
-                        if (availableSlots.length === 0) return null;
+                        if (smartRecs.slots.length === 0 && smartRecs.tips.length === 0) return null;
 
                         return (
                           <div className="mt-3">
-                            <p className="text-xs font-medium text-teal-700 dark:text-teal-300 mb-2 flex items-center gap-1.5">
-                              <Sparkles className="h-3.5 w-3.5" />
-                              أوقات متاحة
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {availableSlots.map((slot) => (
-                                <Button
-                                  key={slot.time}
-                                  type="button"
-                                  size="sm"
-                                  variant={addGroupTodaySessionDialog.time === slot.time ? "default" : "outline"}
-                                  className={cn(
-                                    "gap-1 h-8 text-xs",
-                                    addGroupTodaySessionDialog.time === slot.time && "ring-2 ring-primary ring-offset-1"
-                                  )}
-                                  onClick={() => setAddGroupTodaySessionDialog({ ...addGroupTodaySessionDialog, time: slot.time })}
-                                >
-                                  {slot.type === "morning" && <Sunrise className="h-3 w-3" />}
-                                  {slot.type === "afternoon" && <Sun className="h-3 w-3" />}
-                                  {slot.type === "evening" && <Moon className="h-3 w-3" />}
-                                  {slot.timeAr}
-                                </Button>
-                              ))}
-                            </div>
+                            <SmartSlotChips
+                              slots={smartRecs.slots}
+                              tips={smartRecs.tips}
+                              selectedTime={addGroupTodaySessionDialog.time}
+                              onSelectTime={(time) => setAddGroupTodaySessionDialog({ ...addGroupTodaySessionDialog, time })}
+                              compact
+                            />
                           </div>
                         );
                       })()}

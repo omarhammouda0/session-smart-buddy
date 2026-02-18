@@ -493,7 +493,7 @@ export const useConflictDetection = (students: Student[], groups: StudentGroup[]
       const workStart = timeToMinutes(workingHoursStart);
       const workEnd = timeToMinutes(workingHoursEnd);
 
-      // Get all sessions on the date
+      // Get all sessions on the date (students + groups)
       const sessionsOnDate: Array<{ start: number; end: number }> = [];
 
       students.forEach((student) => {
@@ -504,6 +504,19 @@ export const useConflictDetection = (students: Student[], groups: StudentGroup[]
           const time = session.time || student.sessionTime || "16:00";
           const start = timeToMinutes(time);
           const sessionDuration = session.duration || DEFAULT_SESSION_DURATION;
+          sessionsOnDate.push({ start, end: start + sessionDuration });
+        });
+      });
+
+      // Include group sessions as well
+      groups.forEach((group) => {
+        group.sessions.forEach((session) => {
+          if (session.date !== date) return;
+          if (session.status === "cancelled" || session.status === "vacation") return;
+
+          const time = session.time || group.sessionTime || "16:00";
+          const start = timeToMinutes(time);
+          const sessionDuration = session.duration || group.sessionDuration || DEFAULT_SESSION_DURATION;
           sessionsOnDate.push({ start, end: start + sessionDuration });
         });
       });
@@ -563,7 +576,7 @@ export const useConflictDetection = (students: Student[], groups: StudentGroup[]
 
       return availableSlots;
     },
-    [students],
+    [students, groups],
   );
 
   /**
