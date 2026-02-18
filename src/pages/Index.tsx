@@ -198,6 +198,25 @@ const getLastSessionWithNotes = (student: Student, todayStr: string): Session | 
   return pastCompletedSessions[0] || null;
 };
 
+// Helper function to get the last group session with notes (excluding today)
+const getLastGroupSessionWithNotes = (group: StudentGroup, todayStr: string): GroupSession | null => {
+  // First, try to find the most recent past session with notes/topic
+  const pastSessionsWithContent = group.sessions
+    .filter(s => s.date < todayStr && (s.notes || s.topic))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  if (pastSessionsWithContent.length > 0) {
+    return pastSessionsWithContent[0];
+  }
+
+  // If no sessions with content, return the most recent completed session
+  const pastCompletedSessions = group.sessions
+    .filter(s => s.date < todayStr && s.status === "completed")
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  return pastCompletedSessions[0] || null;
+};
+
 const Index = () => {
   const now = useMemo(() => new Date(), []);
   const [activeTab, setActiveTab] = useState("sessions");
@@ -308,6 +327,7 @@ const Index = () => {
     getGroupSessionsForDate,
     recordGroupMemberPayment,
     getGroupMemberPayments,
+    updateGroupSessionDetails,
   } = useGroups();
 
   // Conflict detection - now includes both students and groups
@@ -1511,7 +1531,13 @@ const Index = () => {
                           <SessionNotesDialog
                             session={nextSession.session}
                             studentName={nextSession.student.name}
-                            onSave={(details) => updateSessionDetails(nextSession.student.id, nextSession.session.id, details)}
+                            onSave={(details) => {
+                              if (nextSession.isGroup && nextSession.group) {
+                                updateGroupSessionDetails(nextSession.group.id, nextSession.session.id, { topic: details.topic, notes: details.notes });
+                              } else {
+                                updateSessionDetails(nextSession.student.id, nextSession.session.id, details);
+                              }
+                            }}
                           />
                           {/* Complete button - only show if session has ended */}
                           {isSessionEnded(
@@ -1613,6 +1639,43 @@ const Index = () => {
                       {/* Last Session Notes - below the main row for better mobile layout */}
                       {(() => {
                         const todayStr = format(now, "yyyy-MM-dd");
+
+                        // Handle group sessions
+                        if (nextSession.isGroup && nextSession.group) {
+                          const lastGroupSession = getLastGroupSessionWithNotes(nextSession.group, todayStr);
+                          if (!lastGroupSession) return null;
+                          const hasContent = lastGroupSession.notes || lastGroupSession.topic;
+
+                          return (
+                            <div className="mt-2 sm:mt-3 p-2 rounded-lg bg-violet-500/10 border border-violet-500/20 text-xs space-y-1">
+                              <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 font-medium">
+                                <FileText className="h-3 w-3" />
+                                <span>الحصة السابقة ({format(parseISO(lastGroupSession.date), "d/M", { locale: ar })})</span>
+                              </div>
+                              {!hasContent && (
+                                <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
+                              )}
+                              {lastGroupSession.topic && (
+                                <p className="text-muted-foreground flex items-center gap-1">
+                                  <BookOpen className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                  <span className="font-medium">{lastGroupSession.topic}</span>
+                                </p>
+                              )}
+                              {lastGroupSession.notes && (
+                                <p className="text-muted-foreground line-clamp-2">{lastGroupSession.notes}</p>
+                              )}
+                              {/* Show attendance summary from last session */}
+                              {lastGroupSession.memberAttendance && lastGroupSession.memberAttendance.length > 0 && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <Users className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                  <span>حضور: {lastGroupSession.memberAttendance.filter(a => a.status === 'completed').length}/{lastGroupSession.memberAttendance.length}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // Handle individual sessions
                         const lastSession = getLastSessionWithNotes(nextSession.student, todayStr);
                         if (!lastSession) return null;
                         const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
@@ -1858,14 +1921,20 @@ const Index = () => {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                  {/* Session Notes Button - only for individual sessions */}
-                                  {!isGroup && (
+                                  {/* Session Notes Button */}
+                                  {!isGroup ? (
                                     <SessionNotesDialog
                                       session={session}
                                       studentName={student.name}
                                       onSave={(details) => updateSessionDetails(student.id, session.id, details)}
                                     />
-                                  )}
+                                  ) : group ? (
+                                    <SessionNotesDialog
+                                      session={session}
+                                      studentName={group.name}
+                                      onSave={(details) => updateGroupSessionDetails(group.id, session.id, { topic: details.topic, notes: details.notes })}
+                                    />
+                                  ) : null}
                                   <Badge
                                     className={cn(
                                       "shrink-0 text-xs font-semibold gap-1",
@@ -1891,9 +1960,57 @@ const Index = () => {
                                 </div>
                               </div>
 
-                              {/* Last Session Notes - Show notes from the student's previous session (not for groups) */}
-                              {!isGroup && (() => {
+                              {/* Last Session Notes - Show notes from previous session */}
+                              {(() => {
                                 const todayStr = format(now, "yyyy-MM-dd");
+
+                                // Group sessions — show last group session notes
+                                if (isGroup && group) {
+                                  const lastGroupSession = getLastGroupSessionWithNotes(group, todayStr);
+                                  if (!lastGroupSession) return null;
+                                  const hasContent = lastGroupSession.notes || lastGroupSession.topic;
+
+                                  return (
+                                    <details className="mt-2 group/notes">
+                                      <summary className="p-2 rounded-lg bg-violet-500/5 border border-violet-500/20 text-xs cursor-pointer list-none flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 font-medium">
+                                          <FileText className="h-3 w-3" />
+                                          <span>الحصة السابقة ({format(parseISO(lastGroupSession.date), "d/M", { locale: ar })})</span>
+                                          {hasContent && (
+                                            <span className="text-muted-foreground font-normal truncate max-w-[120px] sm:max-w-[200px]">
+                                              — {lastGroupSession.topic || lastGroupSession.notes}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open/notes:rotate-180" />
+                                      </summary>
+                                      <div className="p-2 pt-1 rounded-b-lg bg-violet-500/5 border border-t-0 border-violet-500/20 text-xs space-y-1">
+                                        {!hasContent && (
+                                          <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
+                                        )}
+                                        {lastGroupSession.topic && (
+                                          <p className="text-muted-foreground flex items-center gap-1">
+                                            <BookOpen className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                            <span className="font-medium">{lastGroupSession.topic}</span>
+                                          </p>
+                                        )}
+                                        {lastGroupSession.notes && (
+                                          <p className="text-muted-foreground line-clamp-2">{lastGroupSession.notes}</p>
+                                        )}
+                                        {/* Attendance summary */}
+                                        {lastGroupSession.memberAttendance && lastGroupSession.memberAttendance.length > 0 && (
+                                          <div className="flex items-center gap-1 p-1.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                                            <Users className="h-3 w-3" />
+                                            <span className="font-medium">حضور:</span>
+                                            <span>{lastGroupSession.memberAttendance.filter(a => a.status === 'completed').length}/{lastGroupSession.memberAttendance.length} طالب</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </details>
+                                  );
+                                }
+
+                                // Individual sessions
                                 const lastSession = getLastSessionWithNotes(student, todayStr);
 
                                 // If no past completed sessions, don't show anything

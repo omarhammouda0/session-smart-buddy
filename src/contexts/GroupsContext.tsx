@@ -92,6 +92,7 @@ interface GroupsContextType {
     notes?: string
   ) => Promise<void>;
   getGroupMemberPayments: (groupId: string, memberId?: string) => Promise<GroupMemberPayment[]>;
+  updateGroupSessionDetails: (groupId: string, sessionId: string, details: { topic?: string; notes?: string }) => Promise<void>;
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
@@ -734,6 +735,46 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [fetchGroups]);
 
+  // Update group session details (topic, notes)
+  const updateGroupSessionDetails = useCallback(async (
+    groupId: string,
+    sessionId: string,
+    details: { topic?: string; notes?: string }
+  ) => {
+    try {
+      // Optimistic update
+      setGroups(prev => prev.map(g => {
+        if (g.id !== groupId) return g;
+        return {
+          ...g,
+          sessions: g.sessions.map(s => {
+            if (s.id !== sessionId) return s;
+            return {
+              ...s,
+              topic: details.topic !== undefined ? details.topic : s.topic,
+              notes: details.notes !== undefined ? details.notes : s.notes,
+            };
+          }),
+        };
+      }));
+
+      const updateData: Record<string, unknown> = {};
+      if (details.topic !== undefined) updateData.topic = details.topic || null;
+      if (details.notes !== undefined) updateData.notes = details.notes || null;
+
+      const { error } = await supabase
+        .from('group_sessions')
+        .update(updateData)
+        .eq('id', sessionId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('[Groups] Failed to update group session details:', error);
+      toast({ title: "خطأ", description: "فشل في تحديث ملاحظات الحصة", variant: "destructive" });
+      await fetchGroups();
+    }
+  }, [fetchGroups]);
+
   // Reschedule a group session to a new date/time
   const rescheduleGroupSession = useCallback(async (groupId: string, sessionId: string, newDate: string, newTime?: string) => {
     try {
@@ -1050,6 +1091,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     refreshGroups,
     recordGroupMemberPayment,
     getGroupMemberPayments,
+    updateGroupSessionDetails,
   };
 
   return (
