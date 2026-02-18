@@ -1356,6 +1356,9 @@ export const SessionHistoryBar = ({
                         const conflictType = sessionGapInfo?.conflictType;
                         const isGroupSession = (session as any).isGroupSession;
                         const groupName = (session as any).groupName;
+                        const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
+                        const sessionDuration = session.duration || selectedStudent.sessionDuration || 60;
+                        const sessionEnded = isSessionEnded(session.date, sessionTime, sessionDuration);
 
                         return (
                           <div
@@ -1367,104 +1370,124 @@ export const SessionHistoryBar = ({
                                 (conflictType === "exact" || conflictType === "partial") &&
                                 "border-destructive/50 bg-destructive/5",
                               hasConflict && conflictType === "close" && "border-warning/50 bg-warning/5",
-                              !hasConflict && !isGroupSession && "border-border",
+                              !hasConflict && !isGroupSession && "border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/10",
                             )}
                           >
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="flex gap-3">
+                              {/* Time Box */}
+                              <div
+                                className={cn(
+                                  "w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex flex-col items-center justify-center font-bold text-xs sm:text-sm border-2 shadow-sm shrink-0 cursor-pointer hover:scale-105 transition-transform",
+                                  isGroupSession ? "bg-violet-500 text-white border-violet-600" : "bg-blue-500 text-white border-blue-600",
+                                )}
+                              >
+                                <span className="text-sm sm:text-base font-bold">{sessionTime.substring(0, 5)}</span>
+                                {isGroupSession ? (
+                                  <span className="text-[8px] sm:text-[9px] opacity-90 flex items-center gap-0.5">
+                                    <Users className="h-2 w-2 sm:h-2.5 sm:w-2.5" />
+                                  </span>
+                                ) : (
+                                  <span className="text-[8px] sm:text-[9px] opacity-80">{sessionDuration}د</span>
+                                )}
+                              </div>
+
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <Badge variant="outline" className="text-xs font-semibold">
+                                {/* Date + badges row */}
+                                <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                                  <span className="text-xs sm:text-sm font-bold">
                                     {formatShortDateAr(session.date)}
-                                  </Badge>
-                                  <span className="text-sm font-bold">
-                                    {session.time || selectedStudent.sessionTime}
                                   </span>
                                   {relativeTime && (
-                                    <span className="text-xs text-muted-foreground">{relativeTime}</span>
+                                    <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
+                                      {relativeTime}
+                                    </Badge>
                                   )}
                                   {isGroupSession && groupName && (
-                                    <Badge className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-xs gap-1">
-                                      <Users className="h-3 w-3" />
+                                    <Badge className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-[10px] sm:text-xs gap-0.5 px-1.5">
+                                      <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                                       {groupName}
                                     </Badge>
                                   )}
+                                  <Badge
+                                    className={cn(
+                                      "text-[10px] sm:text-xs font-semibold gap-0.5 px-1.5",
+                                      isGroupSession ? "bg-violet-500 text-white" : "bg-blue-500 text-white",
+                                    )}
+                                  >
+                                    <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                    مجدولة
+                                  </Badge>
                                 </div>
 
                                 {hasConflict && (
-                                  <p className="text-xs text-destructive font-medium mt-1">
+                                  <p className="text-[10px] sm:text-xs text-destructive font-medium mt-0.5">
                                     {conflictType === "exact" || conflictType === "partial"
                                       ? "❌ تعارض في الوقت"
                                       : "⚠️ قريب جداً من جلسة أخرى"}
                                   </p>
                                 )}
-                              </div>
 
-                              <div className="flex items-center gap-1 shrink-0">
-                                <SessionNotesDialog
-                                  session={session}
-                                  studentName={session.studentName}
-                                  onSave={(details) => onUpdateSessionDetails?.(session.studentId, session.id, details)}
-                                />
-                                <SessionHomeworkDialog
-                                  session={session}
-                                  studentId={session.studentId}
-                                  studentName={session.studentName}
-                                />
-                                {/* Hide action buttons for group sessions - managed from the group */}
+                                {/* Action buttons - grid layout like today's sessions */}
                                 {!isGroupSession && (
-                                  <>
-                                    {/* Complete button - only show if session has ended */}
-                                    {isSessionEnded(
-                                      session.date,
-                                      session.time || selectedStudent.sessionTime || "16:00",
-                                      session.duration || selectedStudent.sessionDuration || 60
-                                    ) ? (
+                                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-1 sm:gap-1.5 mt-2">
+                                    {sessionEnded ? (
                                       <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 sm:h-8 sm:w-8 text-success hover:bg-success/10"
+                                        size="sm"
+                                        className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
                                         onClick={() => openCompleteDialog(session.studentId, session.id)}
-                                        title="إكمال"
                                       >
-                                        <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                        <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                        إكمال
                                       </Button>
                                     ) : (
-                                      <div
-                                        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center text-blue-500"
-                                        title="الحصة لم تنتهِ بعد"
-                                      >
-                                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
+                                      <div className="flex items-center justify-center gap-1 h-7 sm:h-8 px-2 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] sm:text-xs font-medium">
+                                        <Clock className="h-3 w-3 animate-pulse" />
+                                        لم تنتهِ
                                       </div>
                                     )}
                                     <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7 sm:h-8 sm:w-8 text-warning hover:bg-warning/10"
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-orange-300 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
                                       onClick={() => handleMarkAsVacation(session.studentId, session.id)}
-                                      title="إجازة"
                                     >
-                                      <Palmtree className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                      <Palmtree className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                      إجازة
                                     </Button>
                                     <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:bg-destructive/10"
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
                                       onClick={() => openCancelDialog(session.studentId, session.id)}
-                                      title="إلغاء"
                                     >
-                                      <Ban className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                      <XCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                      إلغاء
                                     </Button>
                                     <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-destructive"
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-muted-foreground/30 text-muted-foreground hover:text-destructive hover:border-red-300 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
                                       onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                                      title="حذف"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                      <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                      حذف
                                     </Button>
-                                  </>
+                                  </div>
                                 )}
+
+                                {/* Notes/Homework buttons */}
+                                <div className="flex items-center gap-1 mt-1.5">
+                                  <SessionNotesDialog
+                                    session={session}
+                                    studentName={session.studentName}
+                                    onSave={(details) => onUpdateSessionDetails?.(session.studentId, session.id, details)}
+                                  />
+                                  <SessionHomeworkDialog
+                                    session={session}
+                                    studentId={session.studentId}
+                                    studentName={session.studentName}
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1479,13 +1502,13 @@ export const SessionHistoryBar = ({
               <TabsContent value="history" className="mt-3 space-y-3">
                 {historyStats.total > 0 && (
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-success/10 border-2 border-success/30 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-bold text-success">{historyStats.completionRate}%</p>
-                      <p className="text-xs text-muted-foreground mt-1">نسبة الإنجاز</p>
+                    <div className="bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-300 dark:border-emerald-800 rounded-xl p-2 sm:p-3 text-center">
+                      <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{historyStats.completionRate}%</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">نسبة الإنجاز</p>
                     </div>
-                    <div className="bg-muted/50 border-2 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-bold">{historyStats.total}</p>
-                      <p className="text-xs text-muted-foreground mt-1">إجمالي الحصص</p>
+                    <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-300 dark:border-blue-800 rounded-xl p-2 sm:p-3 text-center">
+                      <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{historyStats.total}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">إجمالي الحصص</p>
                     </div>
                   </div>
                 )}
@@ -1520,6 +1543,11 @@ export const SessionHistoryBar = ({
                         const relativeTime = getRelativeTimeLabel(session.date);
                         const isGroupSession = (session as any).isGroupSession;
                         const groupName = (session as any).groupName;
+                        const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
+                        const sessionDuration = session.duration || selectedStudent.sessionDuration || 60;
+                        const isCompleted = session.status === "completed";
+                        const isCancelled = session.status === "cancelled";
+                        const isVacation = session.status === "vacation";
 
                         return (
                           <div
@@ -1527,76 +1555,152 @@ export const SessionHistoryBar = ({
                             className={cn(
                               "rounded-xl border-2 p-3 transition-all hover:shadow-md",
                               isGroupSession && "border-violet-300 dark:border-violet-700",
-                              session.status === "completed" && !isGroupSession && "bg-success/5 border-success/30",
-                              session.status === "completed" && isGroupSession && "bg-violet-50 dark:bg-violet-950/30",
-                              session.status === "vacation" && "bg-warning/5 border-warning/30",
-                              session.status === "cancelled" && "bg-destructive/5 border-destructive/30",
+                              isCompleted && !isGroupSession && "bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-300 dark:border-emerald-800",
+                              isCompleted && isGroupSession && "bg-violet-50 dark:bg-violet-950/30",
+                              isVacation && "bg-orange-50/50 dark:bg-orange-950/10 border-orange-300 dark:border-orange-800",
+                              isCancelled && "bg-red-50/50 dark:bg-red-950/10 border-red-300 dark:border-red-800 opacity-75",
                             )}
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <div
-                                    className={cn(
-                                      "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
-                                      isGroupSession && "bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300",
-                                      session.status === "completed" && !isGroupSession && "bg-success/20 text-success",
-                                      session.status === "vacation" && "bg-warning/20 text-warning",
-                                      session.status === "cancelled" && "bg-destructive/20 text-destructive",
-                                    )}
-                                  >
-                                    {isGroupSession ? (
-                                      <Users className="h-3.5 w-3.5" />
-                                    ) : session.status === "completed" ? (
-                                      <Check className="h-3.5 w-3.5" />
-                                    ) : session.status === "vacation" ? (
-                                      <Palmtree className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <X className="h-3.5 w-3.5" />
-                                    )}
-                                  </div>
-
-                                  <Badge variant="outline" className="text-xs">
-                                    {formatShortDateAr(session.date)}
-                                  </Badge>
-                                  <span className="text-sm font-bold">
-                                    {session.time || selectedStudent.sessionTime}
+                            <div className="flex gap-3">
+                              {/* Time Box */}
+                              <div
+                                className={cn(
+                                  "w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex flex-col items-center justify-center font-bold text-xs sm:text-sm border-2 shadow-sm shrink-0",
+                                  isGroupSession && isCompleted && "bg-violet-600 text-white border-violet-700",
+                                  isGroupSession && !isCompleted && "bg-violet-500 text-white border-violet-600",
+                                  isCompleted && !isGroupSession && "bg-emerald-500 text-white border-emerald-600",
+                                  isVacation && "bg-orange-300 text-orange-800 border-orange-400 dark:bg-orange-700 dark:text-orange-100 dark:border-orange-600",
+                                  isCancelled && "bg-red-200 text-red-700 border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700",
+                                )}
+                              >
+                                <span className="text-sm sm:text-base font-bold">{sessionTime.substring(0, 5)}</span>
+                                {isGroupSession ? (
+                                  <span className="text-[8px] sm:text-[9px] opacity-90 flex items-center gap-0.5">
+                                    <Users className="h-2 w-2 sm:h-2.5 sm:w-2.5" />
                                   </span>
-                                  {relativeTime && (
-                                    <span className="text-xs text-muted-foreground">{relativeTime}</span>
-                                  )}
-                                  {isGroupSession && groupName && (
-                                    <Badge className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-xs gap-1">
-                                      <Users className="h-3 w-3" />
-                                      {groupName}
-                                    </Badge>
-                                  )}
-                                </div>
-
-                                {session.topic && (
-                                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                    <BookOpen className="h-3 w-3" />
-                                    {session.topic}
-                                  </p>
+                                ) : (
+                                  <span className="text-[8px] sm:text-[9px] opacity-80">{sessionDuration}د</span>
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-1 shrink-0">
-                                {/* Hide action buttons for group sessions - they should be managed from the group */}
-                                {!isGroupSession && (
-                                  <>
-                                    <Badge
-                                      className={cn(
-                                        "text-xs",
-                                        session.status === "completed" && "bg-success/20 text-success border-success/30",
-                                        session.status === "vacation" && "bg-warning/20 text-warning border-warning/30",
-                                        session.status === "cancelled" &&
-                                          "bg-destructive/20 text-destructive border-destructive/30",
-                                      )}
-                                    >
-                                      {getStatusLabel(session.status)}
+                              <div className="flex-1 min-w-0">
+                                {/* Date + status badges row */}
+                                <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                                  <span className="text-xs sm:text-sm font-bold">
+                                    {formatShortDateAr(session.date)}
+                                  </span>
+                                  {relativeTime && (
+                                    <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
+                                      {relativeTime}
                                     </Badge>
+                                  )}
+                                  {isGroupSession && groupName && (
+                                    <Badge className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-[10px] sm:text-xs gap-0.5 px-1.5">
+                                      <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                      {groupName}
+                                    </Badge>
+                                  )}
+                                  <Badge
+                                    className={cn(
+                                      "text-[10px] sm:text-xs font-semibold gap-0.5 px-1.5",
+                                      isCompleted && !isGroupSession && "bg-emerald-500 text-white",
+                                      isCompleted && isGroupSession && "bg-violet-600 text-white",
+                                      isVacation && "bg-orange-400 text-white dark:bg-orange-600",
+                                      isCancelled && "bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400",
+                                    )}
+                                  >
+                                    {isCompleted && <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+                                    {isVacation && <Palmtree className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+                                    {isCancelled && <XCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+                                    {getStatusLabel(session.status)}
+                                  </Badge>
+                                </div>
 
+                                {/* Topic if exists */}
+                                {session.topic && (
+                                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                    <BookOpen className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{session.topic}</span>
+                                  </p>
+                                )}
+
+                                {/* Action buttons - grid layout */}
+                                {!isGroupSession && (
+                                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-1 sm:gap-1.5 mt-2">
+                                    {isPastSession ? (
+                                      <>
+                                        {isCompleted && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
+                                            onClick={() => openUndoCompleteDialog(session.studentId, session.id)}
+                                          >
+                                            <X className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                            تراجع
+                                          </Button>
+                                        )}
+                                        {!isCompleted && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-emerald-300 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
+                                            onClick={() => openRestoreDialog(session.studentId, session.id)}
+                                          >
+                                            <RotateCcw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                            استعادة
+                                          </Button>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="border-muted-foreground/30 text-muted-foreground hover:text-destructive hover:border-red-300 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
+                                          onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
+                                        >
+                                          <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                          حذف
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        {isCompleted ? (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
+                                            onClick={() => openUndoCompleteDialog(session.studentId, session.id)}
+                                          >
+                                            <X className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                            تراجع
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-emerald-300 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
+                                            onClick={() => openRestoreDialog(session.studentId, session.id)}
+                                          >
+                                            <RotateCcw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                            استعادة
+                                          </Button>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="border-muted-foreground/30 text-muted-foreground hover:text-destructive hover:border-red-300 gap-1 h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
+                                          onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
+                                        >
+                                          <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                          حذف
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Notes/Homework buttons */}
+                                {!isGroupSession && (
+                                  <div className="flex items-center gap-1 mt-1.5">
                                     <SessionNotesDialog
                                       session={session}
                                       studentName={session.studentName}
@@ -1607,62 +1711,8 @@ export const SessionHistoryBar = ({
                                       studentId={session.studentId}
                                       studentName={session.studentName}
                                     />
-                                  </>
+                                  </div>
                                 )}
-                                {isGroupSession && (
-                                  <Badge
-                                    className="text-xs bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300"
-                                  >
-                                    {getStatusLabel(session.status)}
-                                  </Badge>
-                                )}
-
-                                {!isGroupSession && isPastSession ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                                    title="حذف"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                ) : !isGroupSession ? (
-                                  <>
-                                    {session.status === "completed" ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 px-2 text-warning hover:bg-warning/10"
-                                        onClick={() => openUndoCompleteDialog(session.studentId, session.id)}
-                                        title="تراجع"
-                                      >
-                                        <X className="h-3.5 w-3.5 ml-1" />
-                                        تراجع
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 px-2 text-success hover:bg-success/10"
-                                        onClick={() => openRestoreDialog(session.studentId, session.id)}
-                                        title="استعادة"
-                                      >
-                                        <RotateCcw className="h-3.5 w-3.5 ml-1" />
-                                        استعادة
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                      onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
-                                      title="حذف"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                ) : null}
                               </div>
                             </div>
                           </div>

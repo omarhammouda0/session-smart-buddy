@@ -1719,10 +1719,10 @@ const Index = () => {
                             key={session.id}
                             className={cn(
                               "flex gap-3 sm:gap-4 p-3 sm:p-4 transition-all group/item cursor-pointer",
-                              isCompleted && !isGroup && "bg-primary/5",
-                              isCancelled && "bg-muted/50 opacity-60",
-                              isVacation && "bg-muted/30",
-                              isScheduled && !isNextSession && !isGroup && "hover:bg-muted/50",
+                              isCompleted && !isGroup && "bg-emerald-50 dark:bg-emerald-950/20",
+                              isCancelled && "bg-red-50/50 dark:bg-red-950/10 opacity-70",
+                              isVacation && "bg-orange-50/50 dark:bg-orange-950/10",
+                              isScheduled && !isNextSession && !isGroup && "hover:bg-blue-50/50 dark:hover:bg-blue-950/10",
                               isNextSession && "bg-gradient-to-r from-primary/10 to-transparent ring-1 ring-primary/20",
                               isGroup && "bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/30",
                               isGroup && isCompleted && "bg-violet-100 dark:bg-violet-950/40",
@@ -1737,10 +1737,10 @@ const Index = () => {
                               <div
                                 className={cn(
                                   "w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-sm border-2 shadow-sm relative overflow-hidden",
-                                  isCompleted && !isGroup && "bg-primary text-primary-foreground border-primary",
-                                  isCancelled && "bg-muted text-muted-foreground border-border",
-                                  isVacation && "bg-secondary text-secondary-foreground border-border",
-                                  isScheduled && !isGroup && "bg-primary/90 text-primary-foreground border-primary",
+                                  isCompleted && !isGroup && "bg-emerald-500 text-white border-emerald-600",
+                                  isCancelled && "bg-red-200 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700",
+                                  isVacation && "bg-orange-200 text-orange-700 border-orange-300 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-700",
+                                  isScheduled && !isGroup && "bg-blue-500 text-white border-blue-600",
                                   isScheduled && !isGroup && "cursor-pointer hover:scale-105 transition-transform",
                                   isGroup && "bg-violet-500 text-white border-violet-600",
                                   isGroup && isCompleted && "bg-violet-600 border-violet-700",
@@ -1784,10 +1784,12 @@ const Index = () => {
                                 <div
                                   className={cn(
                                     "w-0.5 flex-1 mt-2 min-h-[16px]",
-                                    isCompleted && "bg-primary/40",
-                                    isCancelled && "bg-muted-foreground/30",
-                                    isVacation && "bg-muted-foreground/30",
-                                    isScheduled && "bg-primary/30",
+                                    isCompleted && !isGroup && "bg-emerald-400/40",
+                                    isCompleted && isGroup && "bg-violet-400/40",
+                                    isCancelled && "bg-red-300/30",
+                                    isVacation && "bg-orange-300/30",
+                                    isScheduled && !isGroup && "bg-blue-400/30",
+                                    isScheduled && isGroup && "bg-violet-400/30",
                                   )}
                                 />
                               )}
@@ -1797,14 +1799,14 @@ const Index = () => {
                                 <div className="flex items-center gap-2 min-w-0">
                                   <div className={cn(
                                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                                    isGroup ? "bg-violet-100 dark:bg-violet-900/30" : isOnline ? "bg-primary/10" : "bg-primary/15"
+                                    isGroup ? "bg-violet-100 dark:bg-violet-900/30" : isOnline ? "bg-blue-100 dark:bg-blue-900/30" : "bg-emerald-100 dark:bg-emerald-900/30"
                                   )}>
                                     {isGroup ? (
                                       <Users className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                                     ) : isOnline ? (
-                                      <Monitor className="h-4 w-4 text-primary" />
+                                      <Monitor className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                     ) : (
-                                      <MapPin className="h-4 w-4 text-primary" />
+                                      <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                     )}
                                   </div>
                                   <div className="min-w-0">
@@ -1866,11 +1868,11 @@ const Index = () => {
                                   )}
                                   <Badge
                                     className={cn(
-                                      "shrink-0 text-xs font-semibold",
-                                      isCompleted && !isGroup && "bg-primary text-primary-foreground",
-                                      isCancelled && "bg-muted text-muted-foreground",
-                                      isVacation && "bg-secondary text-secondary-foreground",
-                                      isScheduled && !isGroup && "bg-primary/80 text-primary-foreground",
+                                      "shrink-0 text-xs font-semibold gap-1",
+                                      isCompleted && !isGroup && "bg-emerald-500 text-white",
+                                      isCancelled && "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+                                      isVacation && "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
+                                      isScheduled && !isGroup && "bg-blue-500 text-white",
                                       isGroup && "bg-violet-500 text-white",
                                       isGroup && isCompleted && "bg-violet-600",
                                     )}
@@ -1879,10 +1881,10 @@ const Index = () => {
                                       isCompleted ? "✓ مكتملة" : "👥 مجموعة"
                                     ) : (
                                       <>
-                                        {isCompleted && "✓ مكتملة"}
-                                        {isCancelled && "✕ ملغاة"}
+                                        {isCompleted && <><CheckCircle2 className="h-3 w-3" /> مكتملة</>}
+                                        {isCancelled && <><XCircle className="h-3 w-3" /> ملغاة</>}
                                         {isVacation && "🏖 إجازة"}
-                                        {isScheduled && "◉ مجدولة"}
+                                        {isScheduled && <><Clock className="h-3 w-3" /> مجدولة</>}
                                       </>
                                     )}
                                   </Badge>
@@ -1945,7 +1947,7 @@ const Index = () => {
                               })()}
 
                               {isScheduled && !isNextSession && !isGroup && (
-                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 mt-2">
                                   {/* Status/Complete button based on session timing */}
                                   {isSessionEnded(
                                     session.date,
@@ -1959,8 +1961,8 @@ const Index = () => {
                                           className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                         >
                                           <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                          <span className="hidden sm:inline">إكمال</span>
-                                          <span className="sm:hidden">✓</span>
+                                          <span className="hidden sm:inline">إكمال الحصة</span>
+                                          <span className="sm:hidden">إكمال</span>
                                         </Button>
                                       </AlertDialogTrigger>
                                       <AlertDialogContent dir="rtl">
@@ -2002,11 +2004,10 @@ const Index = () => {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
+                                        className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/30 gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                       >
                                         <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                        <span className="hidden sm:inline">إلغاء</span>
-                                        <span className="sm:hidden">✕</span>
+                                        إلغاء
                                       </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent dir="rtl">
@@ -2034,21 +2035,11 @@ const Index = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-primary/50 text-primary hover:bg-primary/10 gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
+                                    className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30 gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                     onClick={() => handleQuickPayment(student.id, session.id, session.date)}
                                   >
                                     <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                    <span className="hidden sm:inline">دفع</span>
-                                    <span className="sm:hidden">$</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="gap-1 sm:gap-1.5 h-8 sm:h-9 px-2 sm:px-3"
-                                    onClick={() => setCompletionDialog({ open: true, student, session })}
-                                    title="خيارات الحصة"
-                                  >
-                                    <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                    دفع
                                   </Button>
                                 </div>
                               )}
@@ -2189,12 +2180,15 @@ const Index = () => {
                               )}
 
                               {isCompleted && !isGroup && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-primary font-medium">✓ تم إكمال الحصة</span>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    تم إكمال الحصة
+                                  </span>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-primary/50 text-primary hover:bg-primary/10 gap-1.5 h-8 px-3 text-xs"
+                                    className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 gap-1.5 h-8 px-3 text-xs"
                                     onClick={() => handleQuickPayment(student.id, session.id, session.date)}
                                   >
                                     <DollarSign className="h-3.5 w-3.5" />
@@ -2202,8 +2196,15 @@ const Index = () => {
                                   </Button>
                                 </div>
                               )}
-                              {isCancelled && <span className="text-sm text-muted-foreground">تم إلغاء هذه الحصة</span>}
-                              {isVacation && <span className="text-sm text-muted-foreground">إجازة</span>}
+                              {isCancelled && (
+                                <span className="text-sm text-red-500 dark:text-red-400 font-medium flex items-center gap-1 mt-1">
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  تم إلغاء هذه الحصة
+                                </span>
+                              )}
+                              {isVacation && (
+                                <span className="text-sm text-orange-500 dark:text-orange-400 font-medium mt-1">🏖 إجازة</span>
+                              )}
                             </div>
                           </div>
                         );
