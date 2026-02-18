@@ -59,7 +59,7 @@ export const StatsBar = ({ students, payments, selectedMonth, selectedYear }: St
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-2" dir="rtl">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" dir="rtl">
       {statItems.map((stat, index) => (
         <div
           key={stat.label}
@@ -72,7 +72,7 @@ export const StatsBar = ({ students, payments, selectedMonth, selectedYear }: St
             </div>
             <div className="text-center">
               <p className="text-base font-heading font-bold leading-none">{stat.value}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5">{stat.label}</p>
+              <p className="text-[10px] sm:text-[9px] text-muted-foreground mt-0.5">{stat.label}</p>
             </div>
           </div>
         </div>

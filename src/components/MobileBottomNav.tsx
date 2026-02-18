@@ -58,7 +58,7 @@ export const MobileBottomNav = ({
                 )}
               </div>
               <span className={cn(
-                "text-[0.6rem] font-medium leading-tight transition-all duration-200",
+                "text-[0.65rem] font-medium leading-tight transition-all duration-200",
                 isActive && "font-semibold"
               )}>
                 {tab.label}

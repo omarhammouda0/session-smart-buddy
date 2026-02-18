@@ -172,7 +172,7 @@ export function SessionNotesManager({ session, studentId, studentName, trigger }
             </div>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'notes' | 'homework')} className="flex-1 flex flex-col min-h-0">
-              <TabsList className="w-full grid grid-cols-2">
+              <TabsList className="w-full grid grid-cols-2 mobile-keep">
                 <TabsTrigger value="notes" className="gap-1">
                   <FileText className="h-3.5 w-3.5" />
                   الملاحظات

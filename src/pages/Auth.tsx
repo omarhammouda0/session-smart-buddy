@@ -66,7 +66,7 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 mobile-keep">
               <TabsTrigger value="login">دخول</TabsTrigger>
               <TabsTrigger value="signup">حساب جديد</TabsTrigger>
             </TabsList>

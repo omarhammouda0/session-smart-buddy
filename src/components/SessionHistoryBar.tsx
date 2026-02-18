@@ -1134,7 +1134,7 @@ export const SessionHistoryBar = ({
             )}
 
             {/* Status Cards */}
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 {
                   label: "قادمة",
@@ -1169,36 +1169,36 @@ export const SessionHistoryBar = ({
                   border: "border-amber-500/30",
                 },
               ].map((stat, i) => (
-                <div key={i} className={cn("rounded-xl border-2 p-3 text-center", stat.bg, stat.border)}>
+                <div key={i} className={cn("rounded-xl border-2 p-2.5 sm:p-3 text-center", stat.bg, stat.border)}>
                   <stat.icon className="h-4 w-4 mx-auto mb-1" />
-                  <p className="text-2xl font-bold">{stat.count}</p>
+                  <p className="text-xl sm:text-2xl font-bold">{stat.count}</p>
                   {stat.subtitle && (
                     <p className="text-[10px] text-violet-600 dark:text-violet-400">({stat.subtitle})</p>
                   )}
-                  <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{stat.label}</p>
                 </div>
               ))}
             </div>
             {/* ✅ COMBINED FILTER BAR */}
-            <div className="space-y-3 p-3 rounded-xl border-2 bg-muted/30">
+            <div className="space-y-2 sm:space-y-3 p-2 sm:p-3 rounded-xl border-2 bg-muted/30">
               {/* Row 1: Search + Filter Dropdowns */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {/* Search */}
-                <div className="relative sm:col-span-2">
+                <div className="relative col-span-2 sm:col-span-2">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
                     type="text"
                     placeholder="بحث..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pr-10 h-10 bg-background"
+                    className="pr-10 h-9 sm:h-10 bg-background text-sm"
                   />
                 </div>
 
                 {/* Time Filter Dropdown */}
                 <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
-                  <SelectTrigger className="h-10 bg-background">
-                    <CalendarRange className="h-4 w-4 ml-1" />
+                  <SelectTrigger className="h-9 sm:h-10 bg-background text-xs sm:text-sm">
+                    <CalendarRange className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1217,8 +1217,8 @@ export const SessionHistoryBar = ({
 
                 {/* Sort Dropdown */}
                 <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
-                  <SelectTrigger className="h-10 bg-background">
-                    <TrendingUp className="h-4 w-4 ml-1" />
+                  <SelectTrigger className="h-9 sm:h-10 bg-background text-xs sm:text-sm">
+                    <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1295,7 +1295,7 @@ export const SessionHistoryBar = ({
 
             {/* Tabs */}
             <Tabs value={historyTab} onValueChange={(v) => setHistoryTab(v as "upcoming" | "history")}>
-              <TabsList className="w-full grid grid-cols-2">
+              <TabsList className="w-full grid grid-cols-2 mobile-keep">
                 <TabsTrigger value="upcoming" className="gap-1.5">
                   <CalendarClock className="h-4 w-4" />
                   القادمة ({upcomingSessions.length})
@@ -1422,46 +1422,46 @@ export const SessionHistoryBar = ({
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-success hover:bg-success/10"
+                                        className="h-7 w-7 sm:h-8 sm:w-8 text-success hover:bg-success/10"
                                         onClick={() => openCompleteDialog(session.studentId, session.id)}
                                         title="إكمال"
                                       >
-                                        <Check className="h-4 w-4" />
+                                        <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                       </Button>
                                     ) : (
                                       <div
-                                        className="h-8 w-8 flex items-center justify-center text-blue-500"
+                                        className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center text-blue-500"
                                         title="الحصة لم تنتهِ بعد"
                                       >
-                                        <Clock className="h-4 w-4 animate-pulse" />
+                                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
                                       </div>
                                     )}
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8 text-warning hover:bg-warning/10"
+                                      className="h-7 w-7 sm:h-8 sm:w-8 text-warning hover:bg-warning/10"
                                       onClick={() => handleMarkAsVacation(session.studentId, session.id)}
                                       title="إجازة"
                                     >
-                                      <Palmtree className="h-4 w-4" />
+                                      <Palmtree className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                      className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:bg-destructive/10"
                                       onClick={() => openCancelDialog(session.studentId, session.id)}
                                       title="إلغاء"
                                     >
-                                      <Ban className="h-4 w-4" />
+                                      <Ban className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-destructive"
                                       onClick={() => openDeleteConfirmDialog(session.studentId, session.id)}
                                       title="حذف"
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                     </Button>
                                   </>
                                 )}

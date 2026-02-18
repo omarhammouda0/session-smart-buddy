@@ -285,7 +285,7 @@ export const StudentCard = ({
               />
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <span className="text-sm font-medium px-3 py-1.5 bg-primary/10 text-primary rounded-lg flex items-center gap-1.5 shadow-sm">
                 <Clock className="h-4 w-4" />
                 {student.sessionTime}

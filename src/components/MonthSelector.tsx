@@ -8,8 +8,8 @@ interface MonthSelectorProps {
 }
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
 ];
 
 export const MonthSelector = ({ month, year, onChange }: MonthSelectorProps) => {
@@ -54,7 +54,7 @@ export const MonthSelector = ({ month, year, onChange }: MonthSelectorProps) => 
       </Button>
       {!isCurrentMonth() && (
         <Button variant="ghost" size="sm" onClick={goToToday} className="ml-1 text-xs text-muted-foreground h-7">
-          Today
+          اليوم
         </Button>
       )}
     </div>

@@ -143,7 +143,7 @@ export function StudentNotesHistory({ studentId, studentName }: StudentNotesHist
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'notes' | 'homework')} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid grid-cols-2 mb-3">
+          <TabsList className="grid grid-cols-2 mb-3 mobile-keep">
             <TabsTrigger value="notes" className="gap-1.5">
               <FileText className="h-4 w-4" />
               الملاحظات

@@ -1270,7 +1270,7 @@ const Index = () => {
             </div>
 
             {/* Mobile action buttons - simplified */}
-            <div className="flex sm:hidden items-center gap-0.5">
+            <div className="flex sm:hidden items-center gap-1">
               <AISuggestionsWidget
                 currentSuggestion={aiCurrentSuggestion}
                 pendingCount={aiPendingCount}
@@ -1827,7 +1827,7 @@ const Index = () => {
                                   </div>
                                   {/* Contact Buttons - only for individual sessions */}
                                   {!isGroup && student.phone && (
-                                    <div className="flex items-center gap-1 mr-2 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-1 mr-2 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
                                       <Button
                                         size="icon"
                                         variant="ghost"
@@ -1900,42 +1900,52 @@ const Index = () => {
                                 const hasContent = lastSession.notes || lastSession.homework || lastSession.topic;
 
                                 return (
-                                  <div className="mt-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs space-y-1">
-                                    <div className="flex items-center gap-1.5 text-primary dark:text-primary font-medium">
-                                      <FileText className="h-3 w-3" />
-                                      <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
-                                    </div>
-                                    {!hasContent && (
-                                      <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
-                                    )}
-                                    {lastSession.topic && (
-                                      <p className="text-muted-foreground flex items-center gap-1">
-                                        <BookOpen className="h-3 w-3 text-primary" />
-                                        <span className="font-medium">{lastSession.topic}</span>
-                                      </p>
-                                    )}
-                                    {lastSession.notes && (
-                                      <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
-                                    )}
-                                    {lastSession.homework && (
-                                      <div className="flex items-center gap-1 p-1.5 rounded bg-primary/10 text-primary">
-                                        <BookOpen className="h-3 w-3" />
-                                        <span className="font-medium">واجب:</span>
-                                        <span className="line-clamp-1">{lastSession.homework}</span>
-                                        {lastSession.homeworkStatus === "completed" && (
-                                          <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary">✓</Badge>
-                                        )}
-                                        {lastSession.homeworkStatus === "incomplete" && (
-                                          <Badge className="h-4 px-1 text-[10px] bg-muted text-muted-foreground">✗</Badge>
+                                  <details className="mt-2 group/notes">
+                                    <summary className="p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs cursor-pointer list-none flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5 text-primary dark:text-primary font-medium">
+                                        <FileText className="h-3 w-3" />
+                                        <span>الحصة السابقة ({format(parseISO(lastSession.date), "d/M", { locale: ar })})</span>
+                                        {hasContent && (
+                                          <span className="text-muted-foreground font-normal truncate max-w-[120px] sm:max-w-[200px]">
+                                            — {lastSession.topic || lastSession.notes || lastSession.homework}
+                                          </span>
                                         )}
                                       </div>
-                                    )}
-                                  </div>
+                                      <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open/notes:rotate-180" />
+                                    </summary>
+                                    <div className="p-2 pt-1 rounded-b-lg bg-primary/5 border border-t-0 border-primary/20 text-xs space-y-1">
+                                      {!hasContent && (
+                                        <p className="text-muted-foreground italic">لا توجد ملاحظات مسجلة</p>
+                                      )}
+                                      {lastSession.topic && (
+                                        <p className="text-muted-foreground flex items-center gap-1">
+                                          <BookOpen className="h-3 w-3 text-primary" />
+                                          <span className="font-medium">{lastSession.topic}</span>
+                                        </p>
+                                      )}
+                                      {lastSession.notes && (
+                                        <p className="text-muted-foreground line-clamp-2">{lastSession.notes}</p>
+                                      )}
+                                      {lastSession.homework && (
+                                        <div className="flex items-center gap-1 p-1.5 rounded bg-primary/10 text-primary">
+                                          <BookOpen className="h-3 w-3" />
+                                          <span className="font-medium">واجب:</span>
+                                          <span className="line-clamp-1">{lastSession.homework}</span>
+                                          {lastSession.homeworkStatus === "completed" && (
+                                            <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary">✓</Badge>
+                                          )}
+                                          {lastSession.homeworkStatus === "incomplete" && (
+                                            <Badge className="h-4 px-1 text-[10px] bg-muted text-muted-foreground">✗</Badge>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </details>
                                 );
                               })()}
 
                               {isScheduled && !isNextSession && !isGroup && (
-                                <div className="flex items-center gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                   {/* Status/Complete button based on session timing */}
                                   {isSessionEnded(
                                     session.date,
@@ -1946,10 +1956,11 @@ const Index = () => {
                                       <AlertDialogTrigger asChild>
                                         <Button
                                           size="sm"
-                                          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 h-9 px-4"
+                                          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                         >
-                                          <CheckCircle2 className="h-4 w-4" />
-                                          إكمال
+                                          <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                          <span className="hidden sm:inline">إكمال</span>
+                                          <span className="sm:hidden">✓</span>
                                         </Button>
                                       </AlertDialogTrigger>
                                       <AlertDialogContent dir="rtl">
@@ -1976,13 +1987,13 @@ const Index = () => {
                                     sessionTime,
                                     session.duration || student.sessionDuration || 60
                                   ) ? (
-                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
-                                      <Clock className="h-4 w-4 animate-pulse" />
+                                    <div className="flex items-center gap-1 sm:gap-1.5 h-8 sm:h-9 px-2 sm:px-3 rounded-md bg-primary/10 text-primary text-xs sm:text-sm font-medium">
+                                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
                                       <span>جارية</span>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary/10 text-primary text-sm font-medium">
-                                      <Clock className="h-4 w-4" />
+                                    <div className="flex items-center gap-1 sm:gap-1.5 h-8 sm:h-9 px-2 sm:px-3 rounded-md bg-primary/10 text-primary text-xs sm:text-sm font-medium">
+                                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                       <span>مجدولة</span>
                                     </div>
                                   )}
@@ -1991,10 +2002,11 @@ const Index = () => {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1.5 h-9 px-4"
+                                        className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                       >
-                                        <XCircle className="h-4 w-4" />
-                                        إلغاء
+                                        <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                        <span className="hidden sm:inline">إلغاء</span>
+                                        <span className="sm:hidden">✕</span>
                                       </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent dir="rtl">
@@ -2022,38 +2034,40 @@ const Index = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-primary/50 text-primary hover:bg-primary/10 gap-1.5 h-9 px-4"
+                                    className="border-primary/50 text-primary hover:bg-primary/10 gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                     onClick={() => handleQuickPayment(student.id, session.id, session.date)}
                                   >
-                                    <DollarSign className="h-4 w-4" />
-                                    دفع
+                                    <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                    <span className="hidden sm:inline">دفع</span>
+                                    <span className="sm:hidden">$</span>
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="gap-1.5 h-9 px-3"
+                                    className="gap-1 sm:gap-1.5 h-8 sm:h-9 px-2 sm:px-3"
                                     onClick={() => setCompletionDialog({ open: true, student, session })}
                                     title="خيارات الحصة"
                                   >
-                                    <MoreVertical className="h-4 w-4" />
+                                    <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                   </Button>
                                 </div>
                               )}
 
                               {/* Group Session Actions */}
                               {isGroup && isScheduled && group && groupSession && (
-                                <div className="flex items-center gap-2 flex-wrap mt-2">
+                                <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 mt-2">
                                   {/* Complete/Attendance button */}
                                   <Button
                                     size="sm"
-                                    className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5 h-9 px-4"
+                                    className="bg-violet-600 hover:bg-violet-700 text-white gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setGroupAttendanceDialog({ open: true, group, session: groupSession });
                                     }}
                                   >
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    تسجيل الحضور
+                                    <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                    <span className="hidden sm:inline">تسجيل الحضور</span>
+                                    <span className="sm:hidden">حضور</span>
                                   </Button>
 
                                   {/* Quick Complete All */}
@@ -2062,11 +2076,12 @@ const Index = () => {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30 gap-1.5 h-9 px-4"
+                                        className="border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30 gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        <Check className="h-4 w-4" />
-                                        إكمال الكل
+                                        <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                        <span className="hidden sm:inline">إكمال الكل</span>
+                                        <span className="sm:hidden">إكمال</span>
                                       </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent dir="rtl">
@@ -2096,10 +2111,10 @@ const Index = () => {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1.5 h-9 px-4"
+                                        className="border-muted-foreground/50 text-muted-foreground hover:bg-muted gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        <XCircle className="h-4 w-4" />
+                                        <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                         إلغاء
                                       </Button>
                                     </AlertDialogTrigger>
@@ -2129,13 +2144,13 @@ const Index = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30 gap-1.5 h-9 px-4"
+                                    className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30 gap-1 sm:gap-1.5 h-8 sm:h-9 px-2.5 sm:px-4 text-xs sm:text-sm"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setGroupPaymentDialog({ open: true, group, session: groupSession });
                                     }}
                                   >
-                                    <DollarSign className="h-4 w-4" />
+                                    <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                     دفع
                                   </Button>
                                 </div>

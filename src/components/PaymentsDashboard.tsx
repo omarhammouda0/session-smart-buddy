@@ -1487,7 +1487,7 @@ export const PaymentsDashboard = ({
             value={historyDialog.view}
             onValueChange={(v) => setHistoryDialog({ ...historyDialog, view: v as "student" | "monthly" })}
           >
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 mobile-keep">
               <TabsTrigger value="monthly">📅 شهري لجميع الطلاب</TabsTrigger>
               <TabsTrigger value="student">👤 طالب واحد</TabsTrigger>
             </TabsList>
