@@ -68,6 +68,16 @@ interface CategorizedSessions {
   conflicts: SessionWithStudent[];
 }
 
+interface DayChangeRule {
+  id: string;
+  originalDay: number;
+  originalTime: string;
+  newDay: number;
+  newTime: string;
+  enabled: boolean;
+  sessionCount: number;
+}
+
 interface UndoData {
   sessionUpdates: { sessionId: string; studentId: string; originalTime: string; originalDate: string }[];
   timestamp: number;
@@ -130,7 +140,8 @@ const calculateNewDate = (originalDate: string, originalDay: number, newDay: num
   const date = parseISO(originalDate);
   const currentDay = getDay(date);
   let dayDiff = newDay - currentDay;
-  if (dayDiff <= 0) {
+  if (dayDiff === 0) return originalDate; // same day — keep original date
+  if (dayDiff < 0) {
     dayDiff += 7;
   }
   const newDate = addDays(date, dayDiff);
@@ -226,6 +237,8 @@ export const BulkEditSessionsDialog = ({
   const [originalTime, setOriginalTime] = useState<string>("16:00");
   const [newDay, setNewDay] = useState<number>(5);
   const [newTime, setNewTime] = useState<string>("13:00");
+  const [dayChangeRules, setDayChangeRules] = useState<DayChangeRule[]>([]);
+  const [offsetDayFilter, setOffsetDayFilter] = useState<number[]>([]);
   const [undoData, setUndoData] = useState<UndoData | null>(null);
   const [undoTimeLeft, setUndoTimeLeft] = useState<number>(0);
 
@@ -440,6 +453,58 @@ export const BulkEditSessionsDialog = ({
     }
   }, [availableDaysAndTimes.times, modType]);
 
+  // Detect unique (day, time) combos from scheduled sessions in selected periods
+  const availableDayTimeCombos = useMemo(() => {
+    if (!selectedStudent || !hasSelectedPeriod) return [];
+
+    const comboMap = new Map<string, { day: number; time: string; count: number }>();
+
+    selectedStudent.sessions.forEach((session) => {
+      if (session.status !== "scheduled") return;
+      const { inPeriod } = isDateInSelectedPeriods(session.date);
+      if (!inPeriod) return;
+
+      const sessionDay = getDay(parseISO(session.date));
+      const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
+      const key = `${sessionDay}-${sessionTime}`;
+
+      if (comboMap.has(key)) {
+        comboMap.get(key)!.count++;
+      } else {
+        comboMap.set(key, { day: sessionDay, time: sessionTime, count: 1 });
+      }
+    });
+
+    return Array.from(comboMap.values()).sort((a, b) =>
+      a.day !== b.day ? a.day - b.day : timeToMinutes(a.time) - timeToMinutes(b.time),
+    );
+  }, [selectedStudent, hasSelectedPeriod, selectedPeriods]);
+
+  // Auto-generate day-change rules from detected combos, preserving user edits
+  useEffect(() => {
+    if (modType !== "day-change") return;
+
+    setDayChangeRules((prev) => {
+      return availableDayTimeCombos.map((combo) => {
+        const existing = prev.find(
+          (r) => r.originalDay === combo.day && r.originalTime === combo.time,
+        );
+        if (existing) {
+          return { ...existing, sessionCount: combo.count };
+        }
+        return {
+          id: `rule-${combo.day}-${combo.time}`,
+          originalDay: combo.day,
+          originalTime: combo.time,
+          newDay: combo.day,
+          newTime: combo.time,
+          enabled: true,
+          sessionCount: combo.count,
+        };
+      });
+    });
+  }, [availableDayTimeCombos, modType]);
+
   const matchingSessions = useMemo(() => {
     const sessions: SessionWithStudent[] = [];
 
@@ -453,13 +518,20 @@ export const BulkEditSessionsDialog = ({
 
       const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
 
+      // Offset mode: optional day filter
+      if (modType === "offset" && offsetDayFilter.length > 0) {
+        const sessionDay = getDay(parseISO(session.date));
+        if (!offsetDayFilter.includes(sessionDay)) return;
+      }
+
+      // Day-change mode: match against enabled rules
+      let matchingRule: DayChangeRule | undefined;
       if (modType === "day-change") {
         const sessionDay = getDay(parseISO(session.date));
-        if (sessionDay !== originalDay) return;
-
-        const sessionMinutes = timeToMinutes(sessionTime);
-        const originalMinutes = timeToMinutes(originalTime);
-        if (Math.abs(sessionMinutes - originalMinutes) > 30) return;
+        matchingRule = dayChangeRules.find(
+          (rule) => rule.enabled && rule.originalDay === sessionDay && sessionTime === rule.originalTime,
+        );
+        if (!matchingRule) return;
       }
 
       let calculatedNewTime: string;
@@ -467,9 +539,11 @@ export const BulkEditSessionsDialog = ({
 
       if (modType === "offset") {
         calculatedNewTime = calculateOffsetTime(sessionTime);
+      } else if (matchingRule) {
+        calculatedNewTime = matchingRule.newTime;
+        calculatedNewDate = calculateNewDate(session.date, matchingRule.originalDay, matchingRule.newDay);
       } else {
-        calculatedNewTime = newTime;
-        calculatedNewDate = calculateNewDate(session.date, originalDay, newDay);
+        return;
       }
 
       sessions.push({
@@ -493,6 +567,8 @@ export const BulkEditSessionsDialog = ({
     offsetDirection,
     offsetHours,
     offsetMinutes,
+    offsetDayFilter,
+    dayChangeRules,
     originalDay,
     originalTime,
     newDay,
@@ -517,6 +593,28 @@ export const BulkEditSessionsDialog = ({
     const result: CategorizedSessions = { safe: [], warnings: [], conflicts: [] };
     const minGap = 30;
 
+    // Helper to check overlap between two time ranges
+    const checkOverlap = (
+      startA: number, endA: number,
+      startB: number, endB: number,
+    ): "overlap" | "close" | "none" => {
+      if (startA === startB) return "overlap";
+
+      const overlaps =
+        (startA >= startB && startA < endB) ||
+        (endA > startB && endA <= endB) ||
+        (startA <= startB && endA >= endB);
+
+      if (overlaps) return "overlap";
+
+      const gapBefore = Math.abs(startA - endB);
+      const gapAfter = Math.abs(startB - endA);
+      const gap = Math.min(gapBefore, gapAfter);
+
+      if (gap > 0 && gap < minGap) return "close";
+      return "none";
+    };
+
     matchingSessions.forEach((sessionData) => {
       const { session, student, newTime: sessNewTime, newDate: sessNewDate } = sessionData;
       const newStartMinutes = timeToMinutes(sessNewTime);
@@ -525,6 +623,7 @@ export const BulkEditSessionsDialog = ({
 
       let conflictType = "none" as "none" | "close" | "overlap";
 
+      // 1. Check against OTHER students' sessions
       students.forEach((otherStudent) => {
         if (otherStudent.id === student.id) return;
 
@@ -537,32 +636,48 @@ export const BulkEditSessionsDialog = ({
           const otherDuration = otherSession.duration || otherStudent.sessionDuration || 60;
           const otherEndMinutes = otherStartMinutes + otherDuration;
 
-          if (newStartMinutes === otherStartMinutes) {
-            conflictType = "overlap";
-            return;
-          }
-
-          const overlaps =
-            (newStartMinutes >= otherStartMinutes && newStartMinutes < otherEndMinutes) ||
-            (newEndMinutes > otherStartMinutes && newEndMinutes <= otherEndMinutes) ||
-            (newStartMinutes <= otherStartMinutes && newEndMinutes >= otherEndMinutes);
-
-          if (overlaps) {
-            conflictType = "overlap";
-            return;
-          }
-
-          const gapBefore = Math.abs(newStartMinutes - otherEndMinutes);
-          const gapAfter = Math.abs(otherStartMinutes - newEndMinutes);
-          const gap = Math.min(gapBefore, gapAfter);
-
-          if (gap > 0 && gap < minGap) {
-            if (conflictType !== "overlap") {
-              conflictType = "close";
-            }
-          }
+          const result = checkOverlap(newStartMinutes, newEndMinutes, otherStartMinutes, otherEndMinutes);
+          if (result === "overlap") conflictType = "overlap";
+          else if (result === "close" && conflictType !== "overlap") conflictType = "close";
         });
       });
+
+      // 2. Self-conflict: check same student's sessions that are NOT being modified
+      if (conflictType !== "overlap") {
+        student.sessions.forEach((otherSession) => {
+          if (otherSession.id === session.id) return;
+          // Skip sessions that are also being modified (checked separately below)
+          if (matchingSessions.some((ms) => ms.session.id === otherSession.id)) return;
+          if (otherSession.date !== sessNewDate) return;
+          if (otherSession.status === "cancelled" || otherSession.status === "vacation") return;
+
+          const otherTime = otherSession.time || student.sessionTime || "16:00";
+          const otherStartMinutes = timeToMinutes(otherTime);
+          const otherDuration = otherSession.duration || student.sessionDuration || 60;
+          const otherEndMinutes = otherStartMinutes + otherDuration;
+
+          const res = checkOverlap(newStartMinutes, newEndMinutes, otherStartMinutes, otherEndMinutes);
+          if (res === "overlap") conflictType = "overlap";
+          else if (res === "close" && conflictType !== "overlap") conflictType = "close";
+        });
+      }
+
+      // 3. Self-conflict: check against OTHER modified sessions (same student, different session)
+      if (conflictType !== "overlap") {
+        matchingSessions.forEach((otherMs) => {
+          if (otherMs.session.id === session.id) return;
+          if (otherMs.student.id !== student.id) return;
+          if (otherMs.newDate !== sessNewDate) return;
+
+          const otherNewStart = timeToMinutes(otherMs.newTime);
+          const otherDuration = otherMs.session.duration || otherMs.student.sessionDuration || 60;
+          const otherNewEnd = otherNewStart + otherDuration;
+
+          const res = checkOverlap(newStartMinutes, newEndMinutes, otherNewStart, otherNewEnd);
+          if (res === "overlap") conflictType = "overlap";
+          else if (res === "close" && conflictType !== "overlap") conflictType = "close";
+        });
+      }
 
       if (conflictType === "overlap") {
         result.conflicts.push(sessionData);
@@ -595,29 +710,36 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
-    if (modType === "day-change" && originalDay === newDay) {
-      toast({
-        title: "اليوم متطابق",
-        description: 'اليوم الأصلي والجديد متطابقان. استخدم "تحويل بمقدار زمني" بدلاً من ذلك',
-        variant: "destructive",
-      });
-      return;
+    if (modType === "day-change") {
+      const enabledRules = dayChangeRules.filter((r) => r.enabled);
+      if (enabledRules.length === 0) {
+        toast({
+          title: "لا توجد قواعد مفعّلة",
+          description: "الرجاء تفعيل قاعدة واحدة على الأقل",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const hasChange = enabledRules.some(
+        (r) => r.originalDay !== r.newDay || r.originalTime !== r.newTime,
+      );
+      if (!hasChange) {
+        toast({
+          title: "لا يوجد تغيير",
+          description: "لم تقم بتعديل أي يوم أو وقت",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     if (matchingSessions.length === 0) {
-      if (modType === "day-change") {
-        toast({
-          title: "لا توجد جلسات",
-          description: `لا توجد جلسات لـ ${selectedStudent?.name} في ${DAY_OPTIONS.find((d) => d.value === originalDay)?.label} الساعة ${formatTimeAr(originalTime)} خلال الفترات المختارة`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "لا توجد جلسات",
-          description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || "الطالب"} في الفترات المختارة`,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "لا توجد جلسات",
+        description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || "الطالب"} في الفترات المختارة`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -754,6 +876,8 @@ export const BulkEditSessionsDialog = ({
     setOriginalTime("16:00");
     setNewDay(5);
     setNewTime("13:00");
+    setDayChangeRules([]);
+    setOffsetDayFilter([]);
     setShowPreview(false);
   };
 
@@ -1087,6 +1211,7 @@ export const BulkEditSessionsDialog = ({
                   </Select>
 
                   {modType === "offset" && (
+                    <>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Select value={offsetDirection} onValueChange={(v: "+" | "-") => setOffsetDirection(v)}>
                         <SelectTrigger className="w-16">
@@ -1122,106 +1247,136 @@ export const BulkEditSessionsDialog = ({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Offset day filter */}
+                    {selectedStudent && hasSelectedPeriod && availableDaysAndTimes.days.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">تصفية حسب اليوم (اختياري):</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableDaysAndTimes.days.map(({ day, count }) => (
+                            <Button
+                              key={day}
+                              variant={offsetDayFilter.includes(day) ? "default" : "outline"}
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => {
+                                setOffsetDayFilter((prev) =>
+                                  prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+                                );
+                              }}
+                            >
+                              {DAY_OPTIONS.find((d) => d.value === day)?.label}
+                              <span className="opacity-70">({count})</span>
+                            </Button>
+                          ))}
+                        </div>
+                        {offsetDayFilter.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs"
+                            onClick={() => setOffsetDayFilter([])}
+                          >
+                            عرض الكل
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    </>
                   )}
 
                   {modType === "day-change" && (
                     <div className="space-y-3">
-                      {hasSelectedPeriod && selectedStudentId && availableDaysAndTimes.days.length === 0 && (
+                      {hasSelectedPeriod && selectedStudentId && availableDayTimeCombos.length === 0 && (
                         <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg text-center">
                           لا توجد جلسات مجدولة لـ {selectedStudent?.name} في الفترات المختارة
                         </div>
                       )}
 
-                      {(availableDaysAndTimes.days.length > 0 || !hasSelectedPeriod || !selectedStudentId) && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">من:</p>
-                          <div className="flex gap-2">
-                            <Select
-                              value={String(originalDay)}
-                              onValueChange={(v) => setOriginalDay(Number(v))}
-                              disabled={availableDaysAndTimes.days.length === 0}
-                            >
-                              <SelectTrigger className="flex-1">
-                                <SelectValue>
-                                  {DAY_OPTIONS.find((d) => d.value === originalDay)?.label || "اختر يوم"}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableDaysAndTimes.days.length > 0
-                                  ? availableDaysAndTimes.days.map(({ day, count }) => (
-                                      <SelectItem key={day} value={String(day)}>
-                                        {DAY_OPTIONS.find((d) => d.value === day)?.label} ({count} جلسة)
-                                      </SelectItem>
-                                    ))
-                                  : DAY_OPTIONS.map((d) => (
-                                      <SelectItem key={d.value} value={String(d.value)}>
-                                        {d.label}
-                                      </SelectItem>
-                                    ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-xs text-muted-foreground self-center">في</span>
-                            <Select
-                              value={originalTime}
-                              onValueChange={setOriginalTime}
-                              disabled={availableDaysAndTimes.times.length === 0}
-                            >
-                              <SelectTrigger className="w-28">
-                                <SelectValue>{formatTimeAr(originalTime)}</SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableDaysAndTimes.times.length > 0
-                                  ? availableDaysAndTimes.times.map(({ time, count }) => (
-                                      <SelectItem key={time} value={time}>
-                                        {formatTimeAr(time)} ({count} جلسة)
-                                      </SelectItem>
-                                    ))
-                                  : TIME_OPTIONS.map((t) => (
-                                      <SelectItem key={t} value={t}>
-                                        {formatTimeAr(t)}
-                                      </SelectItem>
-                                    ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      )}
+                      {availableDayTimeCombos.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            الجلسات المكتشفة ({availableDayTimeCombos.length} نوع):
+                          </p>
+                          <div className="space-y-3">
+                            {dayChangeRules.map((rule) => (
+                              <div
+                                key={rule.id}
+                                className={cn(
+                                  "p-3 border rounded-lg space-y-2 transition-opacity",
+                                  !rule.enabled && "opacity-50",
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                                    <Checkbox
+                                      checked={rule.enabled}
+                                      onCheckedChange={(checked) => {
+                                        setDayChangeRules((prev) =>
+                                          prev.map((r) => (r.id === rule.id ? { ...r, enabled: !!checked } : r)),
+                                        );
+                                      }}
+                                    />
+                                    {DAY_OPTIONS.find((d) => d.value === rule.originalDay)?.label}{" "}
+                                    {formatTimeAr(rule.originalTime)}
+                                  </label>
+                                  <Badge variant="secondary" className="text-[10px]">
+                                    {rule.sessionCount} جلسة
+                                  </Badge>
+                                </div>
 
-                      {availableDaysAndTimes.days.length > 0 && (
-                        <div className="flex justify-center">
-                          <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-
-                      {availableDaysAndTimes.days.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">إلى:</p>
-                          <div className="flex gap-2">
-                            <Select value={String(newDay)} onValueChange={(v) => setNewDay(Number(v))}>
-                              <SelectTrigger className="flex-1">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {DAY_OPTIONS.map((d) => (
-                                  <SelectItem key={d.value} value={String(d.value)}>
-                                    {d.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-xs text-muted-foreground self-center">في</span>
-                            <Select value={newTime} onValueChange={setNewTime}>
-                              <SelectTrigger className="w-28">
-                                <SelectValue>{formatTimeAr(newTime)}</SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {TIME_OPTIONS.map((t) => (
-                                  <SelectItem key={t} value={t}>
-                                    {formatTimeAr(t)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                                {rule.enabled && (
+                                  <>
+                                    <div className="flex items-center justify-center">
+                                      <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={String(rule.newDay)}
+                                        onValueChange={(v) => {
+                                          setDayChangeRules((prev) =>
+                                            prev.map((r) =>
+                                              r.id === rule.id ? { ...r, newDay: Number(v) } : r,
+                                            ),
+                                          );
+                                        }}
+                                      >
+                                        <SelectTrigger className="flex-1">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {DAY_OPTIONS.map((d) => (
+                                            <SelectItem key={d.value} value={String(d.value)}>
+                                              {d.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <span className="text-xs text-muted-foreground self-center">في</span>
+                                      <Select
+                                        value={rule.newTime}
+                                        onValueChange={(v) => {
+                                          setDayChangeRules((prev) =>
+                                            prev.map((r) => (r.id === rule.id ? { ...r, newTime: v } : r)),
+                                          );
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-28">
+                                          <SelectValue>{formatTimeAr(rule.newTime)}</SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {TIME_OPTIONS.map((t) => (
+                                            <SelectItem key={t} value={t}>
+                                              {formatTimeAr(t)}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
