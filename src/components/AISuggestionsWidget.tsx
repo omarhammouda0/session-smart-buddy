@@ -246,7 +246,8 @@ export function AISuggestionsWidget({
           {isOpen && (
             <Card
               className={cn(
-                "absolute top-full left-0 mt-2 w-80 sm:w-96 z-50",
+                "fixed left-2 right-2 top-14 z-50",
+                "sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96",
                 "shadow-2xl border-2 animate-in fade-in slide-in-from-top-2 duration-200",
                 "max-h-[80vh] overflow-hidden flex flex-col"
               )}

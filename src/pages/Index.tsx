@@ -1912,10 +1912,10 @@ const Index = () => {
                               )}
                             </div>
                             <div className="flex-1 min-w-0 py-1">
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex items-start justify-between gap-1 sm:gap-2 mb-2">
+                                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                                   <div className={cn(
-                                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                                    "w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0",
                                     isGroup ? "bg-violet-100 dark:bg-violet-900/30" : isOnline ? "bg-blue-100 dark:bg-blue-900/30" : "bg-emerald-100 dark:bg-emerald-900/30"
                                   )}>
                                     {isGroup ? (
@@ -1926,9 +1926,9 @@ const Index = () => {
                                       <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                     )}
                                   </div>
-                                  <div className="min-w-0">
+                                  <div className="min-w-0 flex-1">
                                     <h4 className={cn(
-                                      "font-bold text-base truncate",
+                                      "font-bold text-sm sm:text-base truncate",
                                       isGroup && "text-violet-700 dark:text-violet-300"
                                     )}>
                                       {isGroup ? `👥 ${student.name}` : student.name}
@@ -1946,35 +1946,35 @@ const Index = () => {
                                   </div>
                                   {/* Contact Buttons - only for individual sessions */}
                                   {!isGroup && student.phone && (
-                                    <div className="flex items-center gap-1 mr-2 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
+                                    <div className="flex items-center shrink-0 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+                                        className="h-6 w-6 sm:h-7 sm:w-7 text-primary hover:text-primary hover:bg-primary/10"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           openWhatsApp(student.phone!);
                                         }}
                                         title="رسالة واتساب"
                                       >
-                                        <WhatsAppIcon className="h-4 w-4" />
+                                        <WhatsAppIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                       </Button>
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+                                        className="h-6 w-6 sm:h-7 sm:w-7 text-primary hover:text-primary hover:bg-primary/10"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           window.open(`tel:${student.phone}`, "_self");
                                         }}
                                         title="اتصال هاتفي"
                                       >
-                                        <Phone className="h-4 w-4" />
+                                        <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                       </Button>
                                     </div>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                                   {/* Session Notes Button */}
                                   {!isGroup ? (
                                     <SessionNotesDialog
@@ -1991,7 +1991,7 @@ const Index = () => {
                                   ) : null}
                                   <Badge
                                     className={cn(
-                                      "shrink-0 text-xs font-semibold gap-1",
+                                      "shrink-0 text-[10px] sm:text-xs font-semibold gap-0.5 sm:gap-1 px-1.5 sm:px-2.5",
                                       isCompleted && !isGroup && "bg-emerald-500 text-white",
                                       isCancelled && "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
                                       isVacation && "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
