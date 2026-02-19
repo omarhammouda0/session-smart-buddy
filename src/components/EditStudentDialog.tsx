@@ -145,40 +145,44 @@ export const EditStudentDialog = ({
   useEffect(() => {
     if (!open || effectiveDays.length === 0) {
       setConflictResults(new Map());
+      setIsChecking(false);
       return;
     }
     
     // Only check if time changed
     if (sessionTime === student.sessionTime) {
       setConflictResults(new Map());
+      setIsChecking(false);
       return;
     }
     
     setIsChecking(true);
     const timer = setTimeout(() => {
-      // Get this student's session IDs to exclude from conflict check
-      const studentSessionIds = new Set(student.sessions.map(s => s.id));
-      
-      // Check conflicts for each of the student's existing sessions
-      const results = new Map<string, ConflictResult>();
-      
-      student.sessions.forEach(session => {
-        // Only check scheduled/vacation sessions
-        if (session.status === 'cancelled' || session.status === 'completed') return;
+      try {
+        // Check conflicts for each of the student's existing sessions
+        const results = new Map<string, ConflictResult>();
         
-        const result = checkConflict(
-          { date: session.date, startTime: sessionTime },
-          session.id // Exclude this session from check
-        );
+        // Only check up to 16 upcoming sessions to keep it fast
+        const scheduledSessions = student.sessions.filter(
+          s => s.status !== 'cancelled' && s.status !== 'completed'
+        ).slice(0, 16);
         
-        if (result.severity !== 'none') {
-          results.set(session.date, result);
-        }
-      });
-      
-      setConflictResults(results);
-      setIsChecking(false);
-    }, 300); // 300ms debounce
+        scheduledSessions.forEach(session => {
+          const result = checkConflict(
+            { date: session.date, startTime: sessionTime },
+            session.id // Exclude this session from check
+          );
+          
+          if (result.severity !== 'none') {
+            results.set(session.date, result);
+          }
+        });
+        
+        setConflictResults(results);
+      } finally {
+        setIsChecking(false);
+      }
+    }, 500); // 500ms debounce to reduce re-triggers
     
     return () => clearTimeout(timer);
   }, [open, sessionTime, effectiveDays, student, checkConflict]);

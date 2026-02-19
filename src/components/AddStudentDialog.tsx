@@ -108,34 +108,44 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   useEffect(() => {
     if (!open || daySchedules.length === 0) {
       setConflictResults(new Map());
+      setIsChecking(false);
       return;
     }
     
     setIsChecking(true);
     const timer = setTimeout(() => {
-      const semesterStart = showCustomDates ? customStart : defaultStart;
-      const semesterEnd = showCustomDates ? customEnd : defaultEnd;
-      
-      // Generate session dates and check conflicts for each day with its specific time
-      const results = new Map<string, ConflictResult>();
+      try {
+        const semesterStart = showCustomDates ? customStart : defaultStart;
+        const semesterEnd = showCustomDates ? customEnd : defaultEnd;
+        
+        // Generate session dates and check conflicts for each day with its specific time
+        const results = new Map<string, ConflictResult>();
 
-      daySchedules.forEach(schedule => {
-        if (!schedule.time) return;
+        // Only check the first 8 weeks to keep it fast
+        const maxDatesToCheck = 8;
 
-        // Generate dates for this specific day
-        const sessionDates = generateSessionsForSchedule([schedule.dayOfWeek], semesterStart, semesterEnd);
+        daySchedules.forEach(schedule => {
+          if (!schedule.time) return;
 
-        sessionDates.forEach(date => {
-          const result = checkConflict({ date, startTime: schedule.time });
-          if (result.severity !== 'none') {
-            results.set(`${date}-${schedule.dayOfWeek}`, result);
-          }
+          // Generate dates for this specific day
+          const sessionDates = generateSessionsForSchedule([schedule.dayOfWeek], semesterStart, semesterEnd);
+
+          // Check only the first N occurrences
+          const datesToCheck = sessionDates.slice(0, maxDatesToCheck);
+
+          datesToCheck.forEach(date => {
+            const result = checkConflict({ date, startTime: schedule.time });
+            if (result.severity !== 'none') {
+              results.set(`${date}-${schedule.dayOfWeek}`, result);
+            }
+          });
         });
-      });
-      
-      setConflictResults(results);
-      setIsChecking(false);
-    }, 300); // 300ms debounce
+        
+        setConflictResults(results);
+      } finally {
+        setIsChecking(false);
+      }
+    }, 500); // 500ms debounce to reduce re-triggers
     
     return () => clearTimeout(timer);
   }, [open, daySchedules, showCustomDates, customStart, customEnd, defaultStart, defaultEnd, checkConflict]);
