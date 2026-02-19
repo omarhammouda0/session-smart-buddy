@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Edit2, Phone, Clock, Monitor, MapPin, Calendar, XCircle, AlertTriangle, Check, Loader2, Banknote, RotateCcw, History, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,6 +140,8 @@ export const EditStudentDialog = ({
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   
   const { checkConflict } = useConflictDetection(students);
+  const checkConflictRef = useRef(checkConflict);
+  checkConflictRef.current = checkConflict;
 
   // Check conflicts when time or days change (debounced)
   useEffect(() => {
@@ -168,7 +170,7 @@ export const EditStudentDialog = ({
         ).slice(0, 16);
         
         scheduledSessions.forEach(session => {
-          const result = checkConflict(
+          const result = checkConflictRef.current(
             { date: session.date, startTime: sessionTime },
             session.id // Exclude this session from check
           );
@@ -184,8 +186,11 @@ export const EditStudentDialog = ({
       }
     }, 500); // 500ms debounce to reduce re-triggers
     
-    return () => clearTimeout(timer);
-  }, [open, sessionTime, effectiveDays, student, checkConflict]);
+    return () => {
+      clearTimeout(timer);
+      setIsChecking(false);
+    };
+  }, [open, sessionTime, effectiveDays, student]);
 
   // Summarize conflicts
   const conflictSummary = useMemo(() => {

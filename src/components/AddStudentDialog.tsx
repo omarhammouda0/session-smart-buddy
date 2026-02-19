@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,6 +82,8 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   
   const { checkConflict } = useConflictDetection(students);
+  const checkConflictRef = useRef(checkConflict);
+  checkConflictRef.current = checkConflict;
 
   // Get scheduling suggestions based on existing students and location
   const schedulingSuggestions = useSchedulingSuggestions(
@@ -134,7 +136,7 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
           const datesToCheck = sessionDates.slice(0, maxDatesToCheck);
 
           datesToCheck.forEach(date => {
-            const result = checkConflict({ date, startTime: schedule.time });
+            const result = checkConflictRef.current({ date, startTime: schedule.time });
             if (result.severity !== 'none') {
               results.set(`${date}-${schedule.dayOfWeek}`, result);
             }
@@ -147,8 +149,11 @@ export const AddStudentDialog = ({ onAdd, defaultStart, defaultEnd, students = [
       }
     }, 500); // 500ms debounce to reduce re-triggers
     
-    return () => clearTimeout(timer);
-  }, [open, daySchedules, showCustomDates, customStart, customEnd, defaultStart, defaultEnd, checkConflict]);
+    return () => {
+      clearTimeout(timer);
+      setIsChecking(false);
+    };
+  }, [open, daySchedules, showCustomDates, customStart, customEnd, defaultStart, defaultEnd]);
 
   // Summarize conflicts
   const conflictSummary = useMemo(() => {
