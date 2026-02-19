@@ -273,30 +273,30 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
   return (
     <div className="space-y-2 sm:space-y-3 relative">
       {/* Animated Background Effects - Hidden on mobile */}
-      <div className="hidden sm:block absolute -inset-4 -z-10 overflow-hidden pointer-events-none">
+      <div className="hidden md:block absolute -inset-4 -z-10 overflow-hidden pointer-events-none">
         {/* Gradient orbs - Navy blue theme */}
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 rounded-full blur-3xl animate-blob" />
         <div className="absolute top-20 -left-10 w-32 h-32 bg-gradient-to-tr from-primary/20 via-primary/15 to-primary/10 rounded-full blur-2xl animate-blob animation-delay-2000" />
       </div>
 
       {/* Compact Header: Greeting + Stats - Very compact on mobile */}
-      <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-3">
+      <div className="flex flex-col md:flex-row gap-2 md:gap-3">
         {/* Compact Greeting - Single row on mobile */}
-        <Card className="relative overflow-hidden border-0 shadow-md sm:shadow-lg flex-1 sm:max-w-[280px]">
+        <Card className="relative overflow-hidden border-0 shadow-md md:shadow-lg flex-1 md:max-w-[280px]">
           <div className={cn("absolute inset-0 bg-gradient-to-r", greeting.gradient)} />
-          <CardContent className="relative p-2 sm:p-3.5 text-white">
-            <div className="flex items-center justify-between gap-1.5">
-              <div className="flex items-center gap-1.5 sm:gap-2.5">
-                <span className="text-lg sm:text-3xl drop-shadow-lg">{greeting.emoji}</span>
+          <CardContent className="relative p-2.5 md:p-3.5 text-white">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 md:gap-2.5">
+                <span className="text-2xl md:text-3xl drop-shadow-lg">{greeting.emoji}</span>
                 <div>
-                  <p className="text-sm sm:text-lg font-bold drop-shadow font-display">{greeting.text}!</p>
-                  <p className="text-[0.55rem] sm:text-[11px] text-white/80 font-medium">
+                  <p className="text-base md:text-lg font-bold drop-shadow font-display">{greeting.text}!</p>
+                  <p className="text-[0.6rem] md:text-[11px] text-white/80 font-medium">
                     {format(currentTime, "EEEE، d MMMM", { locale: ar })}
                   </p>
                 </div>
               </div>
-              <div className="text-left bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 sm:py-1.5 shadow-inner">
-                <p className="text-xl sm:text-2xl font-mono font-bold drop-shadow tabular-nums">
+              <div className="text-left bg-white/20 backdrop-blur-sm rounded-xl px-3 py-1.5 shadow-inner">
+                <p className="text-2xl md:text-2xl font-mono font-bold drop-shadow tabular-nums">
                   {format(currentTime, "HH:mm")}
                 </p>
               </div>
@@ -305,15 +305,15 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
         </Card>
 
         {/* Compact Stats Row */}
-        <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
+        <div className="flex-1 grid grid-cols-4 gap-1.5 md:gap-2">
           {/* Total Sessions */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,60%,30%)] to-[hsl(220,55%,40%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,60%,30%)] to-[hsl(220,55%,40%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 md:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
-              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
-              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.total}</p>
-              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">
+            <CardContent className="p-2 md:p-2.5 text-center text-white relative">
+              <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 mx-auto mb-0.5 md:mb-1 opacity-90" />
+              <p className="text-xl md:text-2xl font-bold leading-none tabular-nums">{stats.total}</p>
+              <p className="text-[9px] md:text-[10px] text-white/90 font-medium mt-0.5">
                 {stats.groupTotal > 0 ? (
                   <span className="flex items-center justify-center gap-0.5">
                     حصص
@@ -325,13 +325,13 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
           </Card>
 
           {/* Completed */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,50%,35%)] to-[hsl(220,45%,45%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,50%,35%)] to-[hsl(220,45%,45%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 md:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
-              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
-              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.completed}</p>
-              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">
+            <CardContent className="p-2 md:p-2.5 text-center text-white relative">
+              <CheckCircle2 className="h-3.5 w-3.5 md:h-4 md:w-4 mx-auto mb-0.5 md:mb-1 opacity-90" />
+              <p className="text-xl md:text-2xl font-bold leading-none tabular-nums">{stats.completed}</p>
+              <p className="text-[9px] md:text-[10px] text-white/90 font-medium mt-0.5">
                 {stats.groupCompleted > 0 ? (
                   <span className="flex items-center justify-center gap-0.5">
                     مكتملة
@@ -343,24 +343,24 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
           </Card>
 
           {/* Completion Rate */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,55%,38%)] to-[hsl(220,50%,48%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,55%,38%)] to-[hsl(220,50%,48%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 md:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
-              <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
-              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.completionRate}%</p>
-              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">إنجاز</p>
+            <CardContent className="p-2 md:p-2.5 text-center text-white relative">
+              <Target className="h-3.5 w-3.5 md:h-4 md:w-4 mx-auto mb-0.5 md:mb-1 opacity-90" />
+              <p className="text-xl md:text-2xl font-bold leading-none tabular-nums">{stats.completionRate}%</p>
+              <p className="text-[9px] md:text-[10px] text-white/90 font-medium mt-0.5">إنجاز</p>
             </CardContent>
           </Card>
 
           {/* Today's Earnings - Shows paid / expected */}
-          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,45%,40%)] to-[hsl(220,40%,50%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 sm:hover:scale-105 transition-all duration-300">
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(220,45%,40%)] to-[hsl(220,40%,50%)] shadow-lg shadow-primary/30 hover:shadow-primary/50 md:hover:scale-105 transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-            <CardContent className="p-1.5 sm:p-2.5 text-center text-white relative">
-              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 mx-auto mb-0.5 sm:mb-1 opacity-90" />
-              <p className="text-lg sm:text-2xl font-bold leading-none tabular-nums">{stats.paidAmount}</p>
-              <p className="text-[8px] sm:text-[10px] text-white/90 font-medium mt-0.5">
+            <CardContent className="p-2 md:p-2.5 text-center text-white relative">
+              <DollarSign className="h-3.5 w-3.5 md:h-4 md:w-4 mx-auto mb-0.5 md:mb-1 opacity-90" />
+              <p className="text-xl md:text-2xl font-bold leading-none tabular-nums">{stats.paidAmount}</p>
+              <p className="text-[9px] md:text-[10px] text-white/90 font-medium mt-0.5">
                 {stats.expectedValue > 0 ? `من ${stats.expectedValue}` : "ج.م"}
               </p>
             </CardContent>
@@ -409,9 +409,9 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
         </Card>
       )}
 
-      {/* Next Session Countdown - Compact */}
+      {/* Next Session Countdown - Hidden on mobile since Index.tsx has a more detailed card */}
       {stats.nextSession && !stats.currentSession && (
-        <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-[hsl(220,50%,15%)] to-[hsl(220,55%,20%)]">
+        <Card className="hidden md:block relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-[hsl(220,50%,15%)] to-[hsl(220,55%,20%)]">
           <CardContent className="relative p-4 text-white">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">

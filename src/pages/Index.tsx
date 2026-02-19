@@ -1509,11 +1509,11 @@ const Index = () => {
                 {nextSession && (
                   <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent overflow-hidden shadow-lg shadow-primary/5">
                     <CardContent className="p-3 sm:p-4">
-                      {/* Top row: icon + info + action buttons */}
-                      <div className="flex items-start justify-between gap-2 sm:gap-4">
-                        <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
+                      {/* Top row: icon + info + countdown */}
+                      <div className="flex items-center justify-between gap-3 sm:gap-4">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                           <div className="relative shrink-0">
-                            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
+                            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
                               <Timer className="h-5 w-5 sm:h-7 sm:w-7 text-primary-foreground" />
                             </div>
                             <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-primary rounded-full border-2 border-white animate-pulse" />
@@ -1524,7 +1524,7 @@ const Index = () => {
                               <p className="font-display font-bold text-base sm:text-lg truncate">{nextSession.student.name}</p>
                               {/* Contact Buttons for Next Session */}
                               {nextSession.student.phone && (
-                                <div className="flex items-center gap-0.5 shrink-0">
+                                <div className="flex items-center shrink-0">
                                   <Button
                                     size="icon"
                                     variant="ghost"
@@ -1551,12 +1551,6 @@ const Index = () => {
                                 <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                                 <span className="font-medium">{nextSession.session.time || nextSession.student.sessionTime}</span>
                               </span>
-                              {timeUntilNext && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-primary font-bold">{timeUntilNext}</span>
-                                </>
-                              )}
                               <span>•</span>
                               <span className={nextSession.student.sessionType === "online" ? "text-primary" : "text-primary/80"}>
                                 {nextSession.student.sessionType === "online" ? "أونلاين" : "حضوري"}
@@ -1564,7 +1558,15 @@ const Index = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                        {/* Countdown + actions */}
+                        <div className="flex flex-col items-center gap-1.5 shrink-0">
+                          {timeUntilNext && (
+                            <div className="text-center bg-primary/10 rounded-xl px-3 py-1.5">
+                              <p className="text-lg sm:text-xl font-bold text-primary tabular-nums leading-tight">{timeUntilNext}</p>
+                              <p className="text-[9px] sm:text-[10px] text-muted-foreground font-medium">حتى البدء</p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
                           {/* Session Notes for Next Session */}
                           <SessionNotesDialog
                             session={nextSession.session}
@@ -1687,6 +1689,7 @@ const Index = () => {
                           >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
+                          </div>
                         </div>
                       </div>
 
