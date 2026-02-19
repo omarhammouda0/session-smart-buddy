@@ -1915,41 +1915,65 @@ const Index = () => {
                               )}
                             </div>
                             <div className="flex-1 min-w-0 py-1">
-                              <div className="flex items-start justify-between gap-1 sm:gap-2 mb-2">
-                                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-                                  <div className={cn(
-                                    "w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0",
-                                    isGroup ? "bg-violet-100 dark:bg-violet-900/30" : isOnline ? "bg-blue-100 dark:bg-blue-900/30" : "bg-emerald-100 dark:bg-emerald-900/30"
-                                  )}>
-                                    {isGroup ? (
-                                      <Users className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                                    ) : isOnline ? (
-                                      <Monitor className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                    ) : (
-                                      <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                                    )}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className={cn(
-                                      "font-bold text-sm sm:text-base truncate",
-                                      isGroup && "text-violet-700 dark:text-violet-300"
-                                    )}>
-                                      {isGroup ? `👥 ${student.name}` : student.name}
-                                    </h4>
-                                    <p className={cn(
-                                      "text-xs",
-                                      isGroup ? "text-violet-600 dark:text-violet-400" : "text-muted-foreground"
-                                    )}>
-                                      {isGroup ? (
-                                        <>مجموعة • {memberCount} طالب • {sessionTime}</>
-                                      ) : (
-                                        <>{isOnline ? "أونلاين" : "حضوري"} • {sessionDuration} دقيقة</>
-                                      )}
-                                    </p>
-                                  </div>
+                              {/* Row 1: Type icon + Student name + Status badge */}
+                              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                                <div className={cn(
+                                  "w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0",
+                                  isGroup ? "bg-violet-100 dark:bg-violet-900/30" : isOnline ? "bg-blue-100 dark:bg-blue-900/30" : "bg-emerald-100 dark:bg-emerald-900/30"
+                                )}>
+                                  {isGroup ? (
+                                    <Users className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                  ) : isOnline ? (
+                                    <Monitor className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                  ) : (
+                                    <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                  )}
+                                </div>
+                                <h4 className={cn(
+                                  "font-bold text-sm sm:text-base truncate flex-1 min-w-0",
+                                  isGroup && "text-violet-700 dark:text-violet-300"
+                                )}>
+                                  {isGroup ? `👥 ${student.name}` : student.name}
+                                </h4>
+                                <Badge
+                                  className={cn(
+                                    "shrink-0 text-[10px] sm:text-xs font-semibold gap-0.5 sm:gap-1 px-1.5 sm:px-2.5",
+                                    isCompleted && !isGroup && "bg-emerald-500 text-white",
+                                    isCancelled && "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+                                    isVacation && "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
+                                    isScheduled && !isGroup && "bg-blue-500 text-white",
+                                    isGroup && "bg-violet-500 text-white",
+                                    isGroup && isCompleted && "bg-violet-600",
+                                  )}
+                                >
+                                  {isGroup ? (
+                                    isCompleted ? "✓ مكتملة" : "👥 مجموعة"
+                                  ) : (
+                                    <>
+                                      {isCompleted && <><CheckCircle2 className="h-3 w-3" /> مكتملة</>}
+                                      {isCancelled && <><XCircle className="h-3 w-3" /> ملغاة</>}
+                                      {isVacation && "🏖 إجازة"}
+                                      {isScheduled && <><Clock className="h-3 w-3" /> مجدولة</>}
+                                    </>
+                                  )}
+                                </Badge>
+                              </div>
+                              {/* Row 2: Subtitle + Contact buttons + Notes */}
+                              <div className="flex items-center justify-between gap-1.5 mb-2">
+                                <p className={cn(
+                                  "text-xs",
+                                  isGroup ? "text-violet-600 dark:text-violet-400" : "text-muted-foreground"
+                                )}>
+                                  {isGroup ? (
+                                    <>مجموعة • {memberCount} طالب • {sessionTime}</>
+                                  ) : (
+                                    <>{isOnline ? "أونلاين" : "حضوري"} • {sessionDuration} دقيقة</>
+                                  )}
+                                </p>
+                                <div className="flex items-center gap-0.5 shrink-0">
                                   {/* Contact Buttons - only for individual sessions */}
                                   {!isGroup && student.phone && (
-                                    <div className="flex items-center shrink-0 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
+                                    <>
                                       <Button
                                         size="icon"
                                         variant="ghost"
@@ -1974,10 +1998,8 @@ const Index = () => {
                                       >
                                         <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                       </Button>
-                                    </div>
+                                    </>
                                   )}
-                                </div>
-                                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                                   {/* Session Notes Button */}
                                   {!isGroup ? (
                                     <SessionNotesDialog
@@ -1992,28 +2014,6 @@ const Index = () => {
                                       onSave={(details) => updateGroupSessionDetails(group.id, session.id, { topic: details.topic, notes: details.notes })}
                                     />
                                   ) : null}
-                                  <Badge
-                                    className={cn(
-                                      "shrink-0 text-[10px] sm:text-xs font-semibold gap-0.5 sm:gap-1 px-1.5 sm:px-2.5",
-                                      isCompleted && !isGroup && "bg-emerald-500 text-white",
-                                      isCancelled && "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
-                                      isVacation && "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
-                                      isScheduled && !isGroup && "bg-blue-500 text-white",
-                                      isGroup && "bg-violet-500 text-white",
-                                      isGroup && isCompleted && "bg-violet-600",
-                                    )}
-                                  >
-                                    {isGroup ? (
-                                      isCompleted ? "✓ مكتملة" : "👥 مجموعة"
-                                    ) : (
-                                      <>
-                                        {isCompleted && <><CheckCircle2 className="h-3 w-3" /> مكتملة</>}
-                                        {isCancelled && <><XCircle className="h-3 w-3" /> ملغاة</>}
-                                        {isVacation && "🏖 إجازة"}
-                                        {isScheduled && <><Clock className="h-3 w-3" /> مجدولة</>}
-                                      </>
-                                    )}
-                                  </Badge>
                                 </div>
                               </div>
 
