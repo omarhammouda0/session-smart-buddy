@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -152,9 +152,17 @@ export const QuickPaymentDialog = ({
     return null;
   }
 
+  const isSubmittingRef = useRef(false);
+
   const handleConfirm = () => {
+    if (isSubmittingRef.current) return;
     if (amount > 0 && amount <= sessionPaymentInfo.remainingForSession) {
-      onConfirm(amount, method);
+      isSubmittingRef.current = true;
+      try {
+        onConfirm(amount, method);
+      } finally {
+        isSubmittingRef.current = false;
+      }
     }
   };
 

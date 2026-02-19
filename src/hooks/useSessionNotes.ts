@@ -206,7 +206,11 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
         duration: params.duration,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Clean up orphaned file in storage
+        await supabase.storage.from('session-attachments').remove([fileName]);
+        throw error;
+      }
       toast.success('تم حفظ التسجيل الصوتي');
       fetchNotes();
       return true;
@@ -262,7 +266,11 @@ export function useSessionNotes(studentId?: string, sessionId?: string) {
         file_type: params.file.type,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Clean up orphaned file in storage
+        await supabase.storage.from('session-attachments').remove([fileName]);
+        throw error;
+      }
       toast.success('تم رفع الملف');
       fetchNotes();
       return true;

@@ -69,11 +69,11 @@ export function TodaySessionsStats({ students, settings, payments, groups = [], 
     TEACHING_TIPS[Math.floor(Math.random() * TEACHING_TIPS.length)]
   );
 
-  // Update time every second for live countdown
+  // Update time every 30 seconds (countdown shows ~minute precision anyway)
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000);
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

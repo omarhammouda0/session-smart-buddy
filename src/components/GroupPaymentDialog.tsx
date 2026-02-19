@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,17 +91,19 @@ export const GroupPaymentDialog = ({
   const [paidMembers, setPaidMembers] = useState<Set<string>>(new Set());
   // Store fetched payments for this session
   const [sessionPayments, setSessionPayments] = useState<GroupMemberPayment[]>(existingPayments || []);
+  const onFetchPaymentsRef = useRef(onFetchPayments);
+  onFetchPaymentsRef.current = onFetchPayments;
 
   // Fetch payments when dialog opens
   useEffect(() => {
-    if (open && onFetchPayments) {
-      onFetchPayments(group.id).then(payments => {
+    if (open && onFetchPaymentsRef.current) {
+      onFetchPaymentsRef.current(group.id).then(payments => {
         // Filter payments for this specific session
         const paymentsForSession = payments.filter(p => p.sessionId === session.id);
         setSessionPayments(paymentsForSession);
       });
     }
-  }, [open, group.id, session.id, onFetchPayments]);
+  }, [open, group.id, session.id]);
 
   // Calculate paid amounts per member for THIS SESSION
   const memberPaidAmounts = useMemo(() => {
@@ -171,7 +173,12 @@ export const GroupPaymentDialog = ({
     setSelectedMembers(new Set());
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handlePayment = () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    try {
     const newPayments: GroupMemberPayment[] = [];
 
     selectedMembers.forEach(memberId => {
@@ -217,6 +224,9 @@ export const GroupPaymentDialog = ({
     // Clear selection and custom amounts after payment
     setSelectedMembers(new Set());
     setCustomAmounts({});
+    } finally {
+      isSubmittingRef.current = false;
+    }
   };
 
   const handleClose = () => {

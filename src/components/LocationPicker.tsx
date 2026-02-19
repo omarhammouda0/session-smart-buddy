@@ -174,6 +174,7 @@ export function LocationPicker({
       return;
     }
 
+    let cancelled = false;
     setIsLoadingPredictions(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
@@ -182,6 +183,8 @@ export function LocationPicker({
         const { data, error } = await supabase.functions.invoke('location-search', {
           body: { action: 'search', query: searchQuery }
         });
+
+        if (cancelled) return;
 
         if (error) {
           console.error('[LocationPicker] Search error:', error);
@@ -194,14 +197,16 @@ export function LocationPicker({
           setPredictions([]);
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('[LocationPicker] Search failed:', error);
         setPredictions([]);
       } finally {
-        setIsLoadingPredictions(false);
+        if (!cancelled) setIsLoadingPredictions(false);
       }
     }, 350);
 
     return () => {
+      cancelled = true;
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }

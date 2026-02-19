@@ -173,6 +173,7 @@ function playNotificationSound() {
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
+    oscillator.onended = () => audioContext.close();
   } catch (e) {
     console.warn("Could not play notification sound:", e);
   }
@@ -192,7 +193,8 @@ export function usePushNotifications() {
   // Check if push notifications are supported and Firebase is configured
   useEffect(() => {
     let mounted = true;
-
+    let unsubscribeOnMessage: (() => void) | null = null;
+    
     const checkSupport = async () => {
       try {
         const browserSupported =
@@ -237,7 +239,7 @@ export function usePushNotifications() {
             // Foreground message handler - shows notification when app is in foreground
             // Wrapped in try-catch for mobile stability
             try {
-              onMessage(messagingInstance, (payload) => {
+              unsubscribeOnMessage = onMessage(messagingInstance, (payload) => {
                 try {
                   console.log("Foreground push notification received:", payload?.notification?.title);
                   const { title, body } = payload.notification || {};
@@ -343,6 +345,7 @@ export function usePushNotifications() {
 
     return () => {
       mounted = false;
+      if (unsubscribeOnMessage) unsubscribeOnMessage();
     };
   }, []);
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { StudentGroup, GroupMember, GroupSession, SessionStatus, ScheduleDay, SessionType, Location } from '@/types/student';
 import { toast } from '@/hooks/use-toast';
@@ -252,20 +252,28 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!currentUserId) return;
 
+    // Debounce realtime reloads to prevent rapid-fire refetches
+    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => fetchGroups(), 300);
+    };
+
     const groupsChannel = supabase
       .channel('groups-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'student_groups', filter: `user_id=eq.${currentUserId}` }, () => {
-        fetchGroups();
+        debouncedFetch();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_sessions' }, () => {
-        fetchGroups();
+        debouncedFetch();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_session_attendance' }, () => {
-        fetchGroups();
+        debouncedFetch();
       })
       .subscribe();
 
     return () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
       supabase.removeChannel(groupsChannel);
     };
   }, [fetchGroups, currentUserId]);

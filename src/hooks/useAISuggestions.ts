@@ -29,6 +29,7 @@ const playNotificationSound = () => {
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
+    oscillator.onended = () => audioContext.close();
   } catch (e) {
     console.warn("Could not play notification sound:", e);
   }
@@ -202,12 +203,18 @@ export function useAISuggestions(
   // Subscribe to queue changes
   useEffect(() => {
     queueManagerRef.current.onChange(syncFromQueue);
+    return () => {
+      queueManagerRef.current.onChange(() => {}); // Clear callback on unmount
+    };
   }, [syncFromQueue]);
 
-  // Initial load and data change trigger
+  // Initial load and data change trigger (debounced to avoid cascade from realtime updates)
   useEffect(() => {
-    refreshSuggestions();
-  }, [students, payments, refreshSuggestions]);
+    const timer = setTimeout(() => {
+      refreshSuggestions();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [students.length, payments.length, refreshSuggestions]);
 
   // Periodic refresh every 1 hour
   useEffect(() => {

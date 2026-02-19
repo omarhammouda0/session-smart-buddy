@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { format, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check, Monitor, MapPin, AlertTriangle, XCircle } from 'lucide-react';
 import { Student, DAY_NAMES_SHORT } from '@/types/student';
@@ -47,9 +47,12 @@ export const UpcomingSessionsManager = ({
 
   // Conflict detection
   const { getSessionsWithGaps, scanAllConflicts } = useConflictDetection(students);
+  const scanAllConflictsRef = useRef(scanAllConflicts);
+  scanAllConflictsRef.current = scanAllConflicts;
   
-  // Scan all conflicts once (memoized)
-  const allConflicts = useMemo(() => scanAllConflicts(), [scanAllConflicts]);
+  // Scan all conflicts once (memoized by students length + IDs to avoid O(n²) on every realtime update)
+  const studentsKey = useMemo(() => students.map(s => s.id).join(','), [students]);
+  const allConflicts = useMemo(() => scanAllConflictsRef.current(), [studentsKey]);
 
   // Week view dates
   const currentWeekStart = startOfWeek(addWeeks(now, weekOffset), { weekStartsOn: 1 });

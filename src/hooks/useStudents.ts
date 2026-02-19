@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Student,
@@ -357,6 +357,11 @@ export const useStudents = () => {
   });
   const [isLoaded, setIsLoaded] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // Refs for stable access in callbacks
+  const studentsRef = useRef(students);
+  studentsRef.current = students;
+  const isTogglingPaymentRef = useRef(false);
 
   // Get current user ID
   const getUserId = useCallback(async (): Promise<string | null> => {
@@ -492,17 +497,24 @@ export const useStudents = () => {
   useEffect(() => {
     if (!userId) return;
 
+    // Debounce realtime reloads to prevent rapid-fire refetches during bulk operations
+    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => loadData(), 300);
+    };
+
     const studentsChannel = supabase
       .channel("students-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "students", filter: `user_id=eq.${userId}` }, () =>
-        loadData(),
+        debouncedReload(),
       )
       .subscribe();
 
     const sessionsChannel = supabase
       .channel("sessions-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "sessions", filter: `user_id=eq.${userId}` }, () =>
-        loadData(),
+        debouncedReload(),
       )
       .subscribe();
 
@@ -511,7 +523,7 @@ export const useStudents = () => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "monthly_payments", filter: `user_id=eq.${userId}` },
-        () => loadData(),
+        () => debouncedReload(),
       )
       .subscribe();
 
@@ -520,11 +532,12 @@ export const useStudents = () => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "app_settings", filter: `user_id=eq.${userId}` },
-        () => loadData(),
+        () => debouncedReload(),
       )
       .subscribe();
 
     return () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
       supabase.removeChannel(studentsChannel);
       supabase.removeChannel(sessionsChannel);
       supabase.removeChannel(paymentsChannel);
@@ -982,7 +995,7 @@ export const useStudents = () => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
 
-      const student = students.find((s) => s.id === studentId);
+      const student = studentsRef.current.find((s) => s.id === studentId);
       if (!student) return;
 
       const newStart = semesterStart || student.semesterStart;
@@ -1118,7 +1131,7 @@ export const useStudents = () => {
 
       await loadData();
     },
-    [getUserId, students, settings, loadData],
+    [getUserId, settings, loadData],
   );
 
   // ============================================================================
@@ -1130,7 +1143,7 @@ export const useStudents = () => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
 
-      const student = students.find((s) => s.id === studentId);
+      const student = studentsRef.current.find((s) => s.id === studentId);
       if (!student) return;
 
       const now = new Date().toISOString();
@@ -1153,7 +1166,7 @@ export const useStudents = () => {
         await loadData();
       }
     },
-    [getUserId, students, loadData],
+    [getUserId, loadData],
   );
 
   const removeSession = useCallback(
@@ -1200,7 +1213,7 @@ export const useStudents = () => {
       if (!currentUserId) return;
 
       // Get session info before deletion for cancellation cleanup
-      const student = students.find((s) => s.id === studentId);
+      const student = studentsRef.current.find((s) => s.id === studentId);
       const session = student?.sessions.find((sess) => sess.id === sessionId);
 
       // Optimistic update
@@ -1231,7 +1244,7 @@ export const useStudents = () => {
         loadData();
       }
     },
-    [getUserId, students, loadData],
+    [getUserId, loadData],
   );
 
   const restoreSession = useCallback(
@@ -1459,7 +1472,7 @@ export const useStudents = () => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
 
-      const student = students.find((s) => s.id === studentId);
+      const student = studentsRef.current.find((s) => s.id === studentId);
       const session = student?.sessions.find((sess) => sess.id === sessionId);
       if (!session) return;
 
@@ -1515,7 +1528,7 @@ export const useStudents = () => {
         loadData();
       }
     },
-    [getUserId, students, loadData],
+    [getUserId, loadData],
   );
 
   const bulkUpdateSessionTime = useCallback(
@@ -1544,7 +1557,11 @@ export const useStudents = () => {
       // Async database update (fire and forget with error recovery)
       (async () => {
         const currentUserId = await getUserId();
-        if (!currentUserId) return;
+        if (!currentUserId) {
+          // Session expired — revert optimistic update
+          loadData();
+          return;
+        }
 
         const { error } = await supabase
           .from("sessions")
@@ -1629,6 +1646,11 @@ export const useStudents = () => {
 
   const togglePaymentStatus = useCallback(
     async (studentId: string, month: number, year: number) => {
+      // Prevent double-click / concurrent toggle
+      if (isTogglingPaymentRef.current) return;
+      isTogglingPaymentRef.current = true;
+      
+      try {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
 
@@ -1673,7 +1695,7 @@ export const useStudents = () => {
       } else {
         // Mark as paid - also creates payment_record for audit trail
         // This ensures check-critical-alerts and reports can see the payment
-        const student = students.find((s) => s.id === studentId);
+        const student = studentsRef.current.find((s) => s.id === studentId);
         const amountDue = student
           ? calculateMonthlyAmountDue(student, month, year, settings)
           : 0;
@@ -1745,8 +1767,11 @@ export const useStudents = () => {
       }
 
       await loadData();
+      } finally {
+        isTogglingPaymentRef.current = false;
+      }
     },
-    [getUserId, payments, students, settings, loadData],
+    [getUserId, payments, settings, loadData],
   );
 
   const recordPayment = useCallback(
@@ -1764,7 +1789,7 @@ export const useStudents = () => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
 
-      const student = students.find((s) => s.id === studentId);
+      const student = studentsRef.current.find((s) => s.id === studentId);
       if (!student) {
         console.error("Student not found:", studentId);
         return;
@@ -1849,7 +1874,7 @@ export const useStudents = () => {
 
       await loadData();
     },
-    [getUserId, students, settings, loadData],
+    [getUserId, settings, loadData],
   );
 
   const addPartialPayment = useCallback(

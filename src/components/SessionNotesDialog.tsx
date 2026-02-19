@@ -54,7 +54,7 @@ export const SessionNotesDialog = ({
       setHomework(session.homework || '');
       setHomeworkStatus(session.homeworkStatus || 'none');
     }
-  }, [open, session]);
+  }, [open, session.id]);
 
   const handleSave = () => {
     onSave({

@@ -141,7 +141,7 @@ export const useCancellationTracking = (students: Student[]) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [getUserId]);
 
   useEffect(() => {
     loadData();

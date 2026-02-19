@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   GraduationCap,
   BookOpen,
@@ -494,7 +494,13 @@ const Index = () => {
     setAddConflictDialog(null);
   };
 
+  const isCancellingRef = useRef(false);
+  const isDeletingRef = useRef(false);
+
   const handleCancelSession = async (studentId: string, sessionId: string, reason?: string) => {
+    if (isCancellingRef.current) return;
+    isCancellingRef.current = true;
+    try {
     const student = students.find((s) => s.id === studentId);
     const session = student?.sessions.find((s) => s.id === sessionId);
     if (session) {
@@ -524,11 +530,20 @@ const Index = () => {
     } else {
       toast({ title: "تم إلغاء الحصة", description: reason ? `السبب: ${reason}` : "تم إلغاء الحصة بنجاح" });
     }
+    } finally {
+      isCancellingRef.current = false;
+    }
   };
 
   const handleDeleteSession = (studentId: string, sessionId: string) => {
-    deleteSession(studentId, sessionId);
-    toast({ title: "تم حذف الحصة", description: "تم حذف الحصة نهائياً" });
+    if (isDeletingRef.current) return;
+    isDeletingRef.current = true;
+    try {
+      deleteSession(studentId, sessionId);
+      toast({ title: "تم حذف الحصة", description: "تم حذف الحصة نهائياً" });
+    } finally {
+      isDeletingRef.current = false;
+    }
   };
 
   // Handle quick time edit

@@ -1,7 +1,7 @@
 // Session Notifications Hook - Database Synced Version
 // Handles in-app session notifications with settings stored in database
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Student, Session, StudentGroup } from "@/types/student";
 import { format, differenceInMinutes } from "date-fns";
@@ -279,6 +279,7 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
 
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
+        oscillator.onended = () => audioContext.close();
       } catch (e) {
         console.log("Could not play notification sound:", e);
       }
@@ -299,6 +300,29 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
     []
   );
 
+  // Keep refs for values used inside intervals (avoids dependency instability)
+  const studentsRef = useRef(students);
+  const groupsRef = useRef(groups);
+  const notifiedSessionsRef = useRef(notifiedSessions);
+  const endedNotifiedSessionsRef = useRef(endedNotifiedSessions);
+  const upcomingNotificationRef = useRef(upcomingNotification);
+  const endedSessionNotificationRef = useRef(endedSessionNotification);
+  const playNotificationSoundRef = useRef(playNotificationSound);
+  const sendBrowserNotificationRef = useRef(sendBrowserNotification);
+  const markEndedAsNotifiedRef = useRef(markEndedAsNotified);
+  const settingsRef = useRef(settings);
+
+  useEffect(() => { studentsRef.current = students; }, [students]);
+  useEffect(() => { groupsRef.current = groups; }, [groups]);
+  useEffect(() => { notifiedSessionsRef.current = notifiedSessions; }, [notifiedSessions]);
+  useEffect(() => { endedNotifiedSessionsRef.current = endedNotifiedSessions; }, [endedNotifiedSessions]);
+  useEffect(() => { upcomingNotificationRef.current = upcomingNotification; }, [upcomingNotification]);
+  useEffect(() => { endedSessionNotificationRef.current = endedSessionNotification; }, [endedSessionNotification]);
+  useEffect(() => { playNotificationSoundRef.current = playNotificationSound; }, [playNotificationSound]);
+  useEffect(() => { sendBrowserNotificationRef.current = sendBrowserNotification; }, [sendBrowserNotification]);
+  useEffect(() => { markEndedAsNotifiedRef.current = markEndedAsNotified; }, [markEndedAsNotified]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+
   // Check for upcoming sessions (individual + group)
   useEffect(() => {
     if (!settings.enabled || isLoadingSettings) return;
@@ -306,11 +330,12 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
     const checkUpcomingSessions = () => {
       const now = new Date();
       const todayStr = format(now, "yyyy-MM-dd");
+      const currentSettings = settingsRef.current;
 
       const todaySessions: UpcomingSession[] = [];
 
       // Individual student sessions
-      students.forEach((student) => {
+      studentsRef.current.forEach((student) => {
         student.sessions
           .filter((s) => s.date === todayStr && s.status === "scheduled")
           .forEach((session) => {
@@ -323,8 +348,8 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
 
             if (
               minutesUntil > 0 &&
-              minutesUntil <= settings.minutesBefore &&
-              !notifiedSessions.has(session.id)
+              minutesUntil <= currentSettings.minutesBefore &&
+              !notifiedSessionsRef.current.has(session.id)
             ) {
               todaySessions.push({ session, student, minutesUntil });
             }
@@ -332,7 +357,7 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
       });
 
       // Group sessions
-      groups.forEach((group) => {
+      groupsRef.current.forEach((group) => {
         group.sessions
           .filter((s) => s.date === todayStr && s.status === "scheduled")
           .forEach((session) => {
@@ -345,8 +370,8 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
 
             if (
               minutesUntil > 0 &&
-              minutesUntil <= settings.minutesBefore &&
-              !notifiedSessions.has(session.id)
+              minutesUntil <= currentSettings.minutesBefore &&
+              !notifiedSessionsRef.current.has(session.id)
             ) {
               // Create a pseudo-student for notification display
               const groupProxy = {
@@ -362,11 +387,11 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
 
       todaySessions.sort((a, b) => a.minutesUntil - b.minutesUntil);
 
-      if (todaySessions.length > 0 && !upcomingNotification) {
+      if (todaySessions.length > 0 && !upcomingNotificationRef.current) {
         const closest = todaySessions[0];
         setUpcomingNotification(closest);
-        playNotificationSound();
-        sendBrowserNotification(closest.student, closest.session, closest.minutesUntil);
+        playNotificationSoundRef.current();
+        sendBrowserNotificationRef.current(closest.student, closest.session, closest.minutesUntil);
 
         toast({
           title: "🔔 تذكير بالحصة القادمة",
@@ -382,15 +407,9 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
     const interval = setInterval(checkUpcomingSessions, 60000);
     return () => clearInterval(interval);
   }, [
-    students,
-    groups,
     settings.enabled,
     settings.minutesBefore,
     isLoadingSettings,
-    notifiedSessions,
-    upcomingNotification,
-    playNotificationSound,
-    sendBrowserNotification,
   ]);
 
   // Check for ended sessions (individual + group)
@@ -404,7 +423,7 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
       const endedSessions: EndedSession[] = [];
 
       // Individual student sessions
-      students.forEach((student) => {
+      studentsRef.current.forEach((student) => {
         student.sessions
           .filter((s) => s.date === todayStr && s.status === "scheduled")
           .forEach((session) => {
@@ -421,7 +440,7 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
             if (
               minutesSinceEnd >= 0 &&
               minutesSinceEnd <= 30 &&
-              !endedNotifiedSessions.has(session.id)
+              !endedNotifiedSessionsRef.current.has(session.id)
             ) {
               endedSessions.push({ session, student, minutesSinceEnd });
             }
@@ -429,7 +448,7 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
       });
 
       // Group sessions - fire toast/notification but don't trigger completion dialog
-      groups.forEach((group) => {
+      groupsRef.current.forEach((group) => {
         group.sessions
           .filter((s) => s.date === todayStr && s.status === "scheduled")
           .forEach((session) => {
@@ -446,10 +465,10 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
             if (
               minutesSinceEnd >= 0 &&
               minutesSinceEnd <= 30 &&
-              !endedNotifiedSessions.has(session.id)
+              !endedNotifiedSessionsRef.current.has(session.id)
             ) {
               // For groups, only fire toast + browser notification (no completion dialog)
-              markEndedAsNotified(session.id);
+              markEndedAsNotifiedRef.current(session.id);
               const groupName = `مجموعة ${group.name}`;
 
               showSafeNotification("⏰ انتهت حصة المجموعة", {
@@ -470,10 +489,10 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
 
       endedSessions.sort((a, b) => a.minutesSinceEnd - b.minutesSinceEnd);
 
-      if (endedSessions.length > 0 && !endedSessionNotification) {
+      if (endedSessions.length > 0 && !endedSessionNotificationRef.current) {
         const ended = endedSessions[0];
         setEndedSessionNotification(ended);
-        playNotificationSound();
+        playNotificationSoundRef.current();
 
         showSafeNotification("⏰ انتهت الحصة", {
           body: `حصة ${ended.student.name} انتهت. هل تريد تأكيد حالة الحصة؟`,
@@ -494,14 +513,8 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
     const interval = setInterval(checkEndedSessions, 60000);
     return () => clearInterval(interval);
   }, [
-    students,
-    groups,
     settings.enabled,
     isLoadingSettings,
-    endedNotifiedSessions,
-    endedSessionNotification,
-    playNotificationSound,
-    markEndedAsNotified,
   ]);
 
   // Request notification permission on mount

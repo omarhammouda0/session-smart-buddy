@@ -59,7 +59,7 @@ export function EndOfDayChecker({ students, groups = [], onToggleComplete }: End
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Check every minute
+    }, 300000); // Check every 5 minutes
     return () => clearInterval(interval);
   }, []);
 

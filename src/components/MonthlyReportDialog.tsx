@@ -90,18 +90,21 @@ export const MonthlyReportDialog = ({
 
   // Fetch tutor profile on dialog open
   useEffect(() => {
+    let cancelled = false;
     const fetchProfile = async () => {
       if (!open || profileLoaded) return;
       
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user || cancelled) return;
 
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('user_id', user.id)
           .single();
+
+        if (cancelled) return;
 
         if (profile) {
           setTutorName(profile.name || '');
@@ -122,6 +125,7 @@ export const MonthlyReportDialog = ({
     };
 
     fetchProfile();
+    return () => { cancelled = true; };
   }, [open, profileLoaded]);
 
   // Save profile when tutor info changes
@@ -193,6 +197,7 @@ export const MonthlyReportDialog = ({
 
   // Fetch notes and homework for selected student and month
   useEffect(() => {
+    let cancelled = false;
     const fetchNotesAndHomework = async () => {
       if (!selectedStudentId) {
         setStudentNotes([]);
@@ -228,6 +233,8 @@ export const MonthlyReportDialog = ({
         
         if (homeworkError) throw homeworkError;
         
+        if (cancelled) return;
+        
         setStudentNotes((notesData || []).map(n => ({
           ...n,
           include_in_report: n.include_in_report ?? true
@@ -241,11 +248,12 @@ export const MonthlyReportDialog = ({
       } catch (error) {
         console.error('Error fetching notes/homework:', error);
       } finally {
-        setIsLoadingData(false);
+        if (!cancelled) setIsLoadingData(false);
       }
     };
     
     fetchNotesAndHomework();
+    return () => { cancelled = true; };
   }, [selectedStudentId, selectedMonth, selectedYear]);
 
   // Generate available months (last 6 months + current)
