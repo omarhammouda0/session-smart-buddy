@@ -391,6 +391,24 @@ export const useConflictDetection = (students: Student[], groups: StudentGroup[]
         });
       });
 
+      // Include group sessions as well
+      groups.forEach((group) => {
+        group.sessions.forEach((session) => {
+          if (session.date !== date) return;
+          if (session.status === "cancelled" || session.status === "vacation") return;
+
+          const time = session.time || group.sessionTime || "16:00";
+          const startMinutes = timeToMinutes(time);
+          const sessionDuration = session.duration || group.sessionDuration || DEFAULT_SESSION_DURATION;
+          sessionsOnDate.push({
+            session: session as unknown as Session,
+            student: { name: group.name, id: group.id, sessionType: group.sessionType } as Student,
+            startMinutes,
+            endMinutes: startMinutes + sessionDuration,
+          });
+        });
+      });
+
       // Sort by start time
       sessionsOnDate.sort((a, b) => a.startMinutes - b.startMinutes);
 
@@ -445,7 +463,7 @@ export const useConflictDetection = (students: Student[], groups: StudentGroup[]
         };
       });
     },
-    [students],
+    [students, groups],
   );
 
   /**
@@ -467,8 +485,22 @@ export const useConflictDetection = (students: Student[], groups: StudentGroup[]
       });
     });
 
+    // Scan group sessions as well
+    groups.forEach((group) => {
+      group.sessions.forEach((session) => {
+        if (session.status === "cancelled" || session.status === "vacation") return;
+
+        const sessionTime = session.time || group.sessionTime || "16:00";
+        const result = checkConflict({ date: session.date, startTime: sessionTime }, session.id);
+
+        if (result.severity !== "none") {
+          results.set(session.id, result);
+        }
+      });
+    });
+
     return results;
-  }, [students, checkConflict]);
+  }, [students, groups, checkConflict]);
 
   /**
    * Get all available time slots for a given date

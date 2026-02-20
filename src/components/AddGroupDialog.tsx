@@ -1,18 +1,30 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Users, Clock, Monitor, MapPin, DollarSign, X, ChevronDown, ChevronUp, Lightbulb, Sparkles, AlertTriangle, Check, Calendar, UserCheck } from 'lucide-react';
+import { Users, Clock, Monitor, MapPin, DollarSign, X, ChevronDown, ChevronUp, Lightbulb, Sparkles, AlertTriangle, Check, Calendar, UserCheck, XCircle, Loader2 } from 'lucide-react';
 import { SessionType, Student, ScheduleDay, GroupMember, StudentGroup, Location } from '@/types/student';
 import { DAY_NAMES_AR } from '@/lib/arabicConstants';
 import { DurationPicker } from '@/components/DurationPicker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSchedulingSuggestions } from '@/hooks/useSchedulingSuggestions';
+import { useConflictDetection, formatTimeAr as formatTimeArConflict, ConflictResult } from '@/hooks/useConflictDetection';
+import { generateSessionsForSchedule } from '@/lib/dateUtils';
 import { LocationPicker, LocationData } from '@/components/LocationPicker';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 
 // Type for day schedule with time
@@ -49,6 +61,7 @@ interface AddGroupDialogProps {
     location?: LocationData | null
   ) => void | Promise<StudentGroup | null>;
   students?: Student[];
+  groups?: StudentGroup[];
   settings?: {
     defaultPriceOnline?: number;
     defaultPriceOnsite?: number;
@@ -85,6 +98,7 @@ export const AddGroupDialog = ({
   onOpenChange,
   onAddGroup,
   students: existingStudents = [],
+  groups: existingGroups = [],
   settings = {},
   editMode = false,
   groupToEdit = null,
@@ -116,6 +130,15 @@ export const AddGroupDialog = ({
   const [members, setMembers] = useState<MemberInput[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [selectOpen, setSelectOpen] = useState(false);
+
+  // Conflict detection state
+  const [isChecking, setIsChecking] = useState(false);
+  const [conflictResults, setConflictResults] = useState<Map<string, ConflictResult>>(new Map());
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
+
+  const { checkConflict } = useConflictDetection(existingStudents, existingGroups);
+  const checkConflictRef = useRef(checkConflict);
+  checkConflictRef.current = checkConflict;
 
   // Initialize form when editing
   useEffect(() => {
@@ -157,6 +180,80 @@ export const AddGroupDialog = ({
     sessionType === 'onsite' ? location : null
   );
 
+  // Check conflicts when schedule changes (debounced)
+  useEffect(() => {
+    if (!open || daySchedules.length === 0) {
+      setConflictResults(new Map());
+      setIsChecking(false);
+      return;
+    }
+
+    setIsChecking(true);
+    const timer = setTimeout(() => {
+      try {
+        const semesterStart = showCustomDates ? customStart : defaultStart;
+        const semesterEnd = showCustomDates ? customEnd : defaultEnd;
+
+        const results = new Map<string, ConflictResult>();
+        const maxDatesToCheck = 8; // Check first 8 weeks for performance
+
+        daySchedules.forEach(schedule => {
+          if (!schedule.time) return;
+
+          const sessionDates = generateSessionsForSchedule([schedule.dayOfWeek], semesterStart, semesterEnd);
+          const datesToCheck = sessionDates.slice(0, maxDatesToCheck);
+
+          datesToCheck.forEach(date => {
+            const result = checkConflictRef.current({ date, startTime: schedule.time, duration: sessionDuration });
+            if (result.severity !== 'none') {
+              results.set(`${date}-${schedule.dayOfWeek}`, result);
+            }
+          });
+        });
+
+        setConflictResults(results);
+      } finally {
+        setIsChecking(false);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      setIsChecking(false);
+    };
+  }, [open, daySchedules, sessionDuration, showCustomDates, customStart, customEnd, defaultStart, defaultEnd]);
+
+  // Summarize conflicts
+  const conflictSummary = useMemo(() => {
+    let errorCount = 0;
+    let warningCount = 0;
+    const errorDates: string[] = [];
+    const warningDates: string[] = [];
+    const conflictingNames = new Set<string>();
+
+    conflictResults.forEach((result, key) => {
+      if (result.severity === 'error') {
+        errorCount++;
+        errorDates.push(key);
+        result.conflicts.forEach(c => conflictingNames.add(c.student.name));
+      } else if (result.severity === 'warning') {
+        warningCount++;
+        warningDates.push(key);
+        result.conflicts.forEach(c => conflictingNames.add(c.student.name));
+      }
+    });
+
+    return {
+      errorCount,
+      warningCount,
+      errorDates,
+      warningDates,
+      conflictingNames: Array.from(conflictingNames),
+      hasErrors: errorCount > 0,
+      hasWarnings: warningCount > 0,
+    };
+  }, [conflictResults]);
+
   // Get students not already in the group
   const availableStudents = useMemo(() => {
     const memberIds = new Set(members.map(m => m.id));
@@ -178,6 +275,9 @@ export const AddGroupDialog = ({
     setMembers([]);
     setSelectedStudentId('');
     setLocation(null);
+    setConflictResults(new Map());
+    setIsChecking(false);
+    setShowWarningDialog(false);
   };
 
   const toggleDaySchedule = (day: number) => {
@@ -239,6 +339,23 @@ export const AddGroupDialog = ({
       return;
     }
 
+    // If there are error conflicts, block submission
+    if (conflictSummary.hasErrors) {
+      return;
+    }
+
+    // If there are warnings, show confirmation dialog
+    if (conflictSummary.hasWarnings) {
+      setShowWarningDialog(true);
+      return;
+    }
+
+    // No conflicts - proceed
+    await proceedWithSubmit();
+  };
+
+  const proceedWithSubmit = async () => {
+    if (!sessionType) return;
     const primaryTime = daySchedules[0]?.time || '16:00';
 
     const groupMembers: Omit<GroupMember, 'joinedAt' | 'isActive'>[] = members.map(m => ({
@@ -306,15 +423,19 @@ export const AddGroupDialog = ({
 
     resetForm();
     onOpenChange(false);
+    setShowWarningDialog(false);
   };
 
   const isValid = groupName.trim() &&
     sessionType &&
     daySchedules.length > 0 &&
     daySchedules.every(d => d.time) &&
-    (editMode || members.length > 0);
+    (editMode || members.length > 0) &&
+    !conflictSummary.hasErrors &&
+    !isChecking;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetForm(); }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" dir="rtl">
         <DialogHeader>
@@ -441,6 +562,53 @@ export const AddGroupDialog = ({
               showEndTime={false}
               placeholder="اختر مدة الحصة"
             />
+
+            {/* Conflict Warning Box */}
+            {!isChecking && conflictSummary.hasErrors && (
+              <div className="p-3 rounded-lg bg-destructive/10 border-2 border-destructive">
+                <div className="flex items-start gap-2">
+                  <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-destructive text-sm">
+                      ❌ تعارض مع {conflictSummary.errorCount} جلسة موجودة
+                    </p>
+                    <p className="text-xs text-destructive/80">
+                      يتعارض الوقت مع: {conflictSummary.conflictingNames.slice(0, 3).join('، ')}
+                      {conflictSummary.conflictingNames.length > 3 && ` (+${conflictSummary.conflictingNames.length - 3})`}
+                    </p>
+                    <p className="text-xs text-destructive/70">
+                      الرجاء اختيار وقت مختلف
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!isChecking && !conflictSummary.hasErrors && conflictSummary.hasWarnings && (
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-500">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-amber-700 dark:text-amber-400 text-sm">
+                      ⚠️ قريب من {conflictSummary.warningCount} جلسة
+                    </p>
+                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                      فاصل أقل من 30 دقيقة مع: {conflictSummary.conflictingNames.slice(0, 3).join('، ')}
+                    </p>
+                    <p className="text-xs text-amber-500 dark:text-amber-600">
+                      يمكنك الاستمرار، لكن ننصح بفاصل أكبر
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!isChecking && !conflictSummary.hasErrors && !conflictSummary.hasWarnings && daySchedules.length > 0 && daySchedules.every(d => d.time) && (
+              <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-500">
+                <Check className="h-4 w-4" />
+                <span>✓ الأوقات متاحة</span>
+              </div>
+            )}
 
             {/* Members Section - Dropdown Only */}
             <div className="space-y-3">
@@ -839,8 +1007,17 @@ export const AddGroupDialog = ({
             className="w-full sm:flex-1 gradient-primary"
             disabled={!isValid}
           >
-            <Users className="h-4 w-4 ml-2" />
-            {editMode ? 'حفظ التغييرات' : 'إنشاء المجموعة'}
+            {isChecking ? (
+              <>
+                <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                جاري التحقق...
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4 ml-2" />
+                {editMode ? 'حفظ التغييرات' : 'إنشاء المجموعة'}
+              </>
+            )}
           </Button>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:flex-1">
             إلغاء
@@ -848,6 +1025,39 @@ export const AddGroupDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Warning Confirmation Dialog */}
+    <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+      <AlertDialogContent dir="rtl">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            تحذير: جلسات قريبة جداً
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-right space-y-2">
+            <p>
+              سيتم إنشاء {conflictSummary.warningCount} جلسة بفاصل أقل من 30 دقيقة عن جلسات أخرى.
+            </p>
+            <p className="text-muted-foreground text-sm">
+              المتأثرون: {conflictSummary.conflictingNames.join('، ')}
+            </p>
+            <p className="text-muted-foreground text-sm">
+              قد لا يكون لديك وقت كافٍ للتحضير أو الراحة بين الحصص.
+            </p>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-row-reverse gap-2">
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => proceedWithSubmit()}
+            className="bg-amber-500 hover:bg-amber-600"
+          >
+            نعم، {editMode ? 'احفظ التغييرات' : 'أنشئ المجموعة'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
 

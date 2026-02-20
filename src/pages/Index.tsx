@@ -3322,6 +3322,7 @@ const Index = () => {
         onOpenChange={(open) => setAddGroupDialog({ open })}
         onAddGroup={addGroup}
         students={students}
+        groups={activeGroups}
         settings={settings}
       />
 
@@ -3332,6 +3333,7 @@ const Index = () => {
           onOpenChange={(open) => !open && setEditGroupDialog({ open: false, group: null })}
           onAddGroup={addGroup}
           students={students}
+          groups={activeGroups}
           settings={settings}
           editMode
           groupToEdit={editGroupDialog.group}
