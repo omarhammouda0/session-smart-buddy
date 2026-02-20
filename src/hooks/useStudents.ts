@@ -275,7 +275,8 @@ const calculateMonthlyAmountDue = (student: Student, month: number, year: number
   }
 
   const billableSessions = student.sessions.filter((s) => {
-    const sessionDate = new Date(s.date);
+    const [y, m, d] = s.date.split('-').map(Number);
+    const sessionDate = new Date(y, m - 1, d);
     return (
       sessionDate.getMonth() === month &&
       sessionDate.getFullYear() === year &&
@@ -330,7 +331,8 @@ const calculateAmountDueFromSessionDates = (
 
   // Count sessions in this month
   const sessionsInMonth = sessionDates.filter((dateStr) => {
-    const sessionDate = new Date(dateStr);
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const sessionDate = new Date(y, m - 1, d);
     return sessionDate.getMonth() === month && sessionDate.getFullYear() === year;
   });
 
@@ -554,18 +556,24 @@ export const useStudents = () => {
       const currentUserId = await getUserId();
       if (!currentUserId) return;
 
-      const updatedSettings = { ...settings, ...newSettings };
+      // Use functional update to avoid stale closure over `settings`
+      let updatedSettings: AppSettings | undefined;
+      setSettings(prev => {
+        const merged = { ...prev, ...newSettings };
 
-      // Validate prices
-      const onsite = Number(updatedSettings.defaultPriceOnsite);
-      const online = Number(updatedSettings.defaultPriceOnline);
-      updatedSettings.defaultPriceOnsite = Number.isFinite(onsite) && onsite > 0 ? onsite : 150;
-      updatedSettings.defaultPriceOnline = Number.isFinite(online) && online > 0 ? online : 120;
+        // Validate prices
+        const onsite = Number(merged.defaultPriceOnsite);
+        const online = Number(merged.defaultPriceOnline);
+        merged.defaultPriceOnsite = Number.isFinite(onsite) && onsite > 0 ? onsite : 150;
+        merged.defaultPriceOnline = Number.isFinite(online) && online > 0 ? online : 120;
 
-      // Optimistic update
-      setSettings(updatedSettings);
+        updatedSettings = merged;
+        return merged;
+      });
 
-      // Upsert to database
+      // Wait a tick for state to settle, then upsert
+      if (!updatedSettings) return;
+
       const { error } = await supabase.from("app_settings").upsert(
         {
           user_id: currentUserId,
@@ -595,7 +603,7 @@ export const useStudents = () => {
         loadData();
       }
     },
-    [getUserId, settings, loadData],
+    [getUserId, loadData],
   );
 
   // ============================================================================
@@ -1878,8 +1886,8 @@ export const useStudents = () => {
   );
 
   const addPartialPayment = useCallback(
-    (studentId: string, month: number, year: number, amount: number, method: PaymentMethod, notes?: string) => {
-      recordPayment(studentId, {
+    async (studentId: string, month: number, year: number, amount: number, method: PaymentMethod, notes?: string) => {
+      await recordPayment(studentId, {
         month,
         year,
         amount,

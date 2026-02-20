@@ -786,13 +786,14 @@ export const SessionHistoryBar = ({
 
   const sortSessions = <T extends Session & { studentName: string; studentId: string }>(sessions: T[]): T[] => {
     return sessions.sort((a, b) => {
-      const student = students.find((s) => s.id === a.studentId);
+      const studentA = students.find((s) => s.id === a.studentId);
+      const studentB = students.find((s) => s.id === b.studentId);
       const dateCompare = sortOrder === "date-desc" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
 
       if (dateCompare !== 0) return dateCompare;
 
-      const timeA = a.time || student?.sessionTime || "";
-      const timeB = b.time || student?.sessionTime || "";
+      const timeA = a.time || studentA?.sessionTime || "";
+      const timeB = b.time || studentB?.sessionTime || "";
 
       if (sortOrder === "time-asc") {
         return timeA.localeCompare(timeB);

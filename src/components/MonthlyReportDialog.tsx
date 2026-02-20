@@ -275,6 +275,10 @@ export const MonthlyReportDialog = ({
   useEffect(() => {
     if (!open) {
       setCurrentStep('select');
+      setStrengths('');
+      setImprovements('');
+      setRecommendations('');
+      setNextMonthGoal('');
     }
   }, [open]);
 

@@ -305,7 +305,7 @@ export const useCancellationTracking = (students: Student[]) => {
 
             const result = await sendParentNotificationInternal(
               studentId,
-              student.phone,
+              student.parentPhone || student.phone,
               student.name,
               newCount,
               limit,
@@ -460,6 +460,8 @@ export const useCancellationTracking = (students: Student[]) => {
   const markParentNotified = useCallback(
     async (studentId: string, month?: string): Promise<boolean> => {
       const targetMonth = month || getCurrentMonth();
+      const currentUserId = await getUserId();
+      if (!currentUserId) return false;
 
       try {
         const { error } = await supabase
@@ -469,7 +471,8 @@ export const useCancellationTracking = (students: Student[]) => {
             parent_notified_at: new Date().toISOString(),
           })
           .eq("student_id", studentId)
-          .eq("month", targetMonth);
+          .eq("month", targetMonth)
+          .eq("user_id", currentUserId);
 
         if (error) {
           console.error("Error marking parent notified:", error);

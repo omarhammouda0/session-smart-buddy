@@ -127,11 +127,13 @@ const getTimeBoxColor = (status: SessionStatus, sessionType: string) => {
   return sessionType === 'online' ? 'bg-blue-500' : 'bg-violet-500';
 };
 
-const isSessionEnded = (session: GroupSession, duration: number): boolean => {
-  if (!session.time) return false;
+const isSessionEnded = (session: GroupSession, duration: number, groupDefaultTime?: string): boolean => {
+  const resolvedTime = session.time || groupDefaultTime;
+  if (!resolvedTime) return false;
   const now = new Date();
-  const [h, m] = session.time.split(':').map(Number);
-  const sessionDate = new Date(session.date);
+  const [h, m] = resolvedTime.split(':').map(Number);
+  const [y, mo, d] = session.date.split('-').map(Number);
+  const sessionDate = new Date(y, mo - 1, d);
   sessionDate.setHours(h, m + duration, 0, 0);
   return now >= sessionDate;
 };
@@ -181,12 +183,12 @@ const getDateRange = (filter: TimeFilter, customStart: string, customEnd: string
     }
     case 'last-2-months': {
       const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
       return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
     }
     case 'last-3-months': {
       const start = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
       return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
     }
     case 'custom': return { start: customStart, end: customEnd };
@@ -379,7 +381,8 @@ export const GroupSessionManager = ({
   };
 
   const cycleAttendanceStatus = (current: SessionStatus): SessionStatus => {
-    if (current === 'scheduled' || current === 'completed') return 'cancelled';
+    if (current === 'scheduled') return 'completed';
+    if (current === 'completed') return 'cancelled';
     if (current === 'cancelled') return 'vacation';
     return 'completed';
   };
@@ -410,7 +413,7 @@ export const GroupSessionManager = ({
     const statusBadge = getStatusBadge(session.status);
     const relativeLabel = getRelativeLabel(session.date);
     const timeBoxColor = getTimeBoxColor(session.status, group.sessionType);
-    const canComplete = isUpcoming && session.status === 'scheduled' && isSessionEnded(session, duration);
+    const canComplete = isUpcoming && session.status === 'scheduled' && isSessionEnded(session, duration, group.sessionTime);
     const isExpanded = expandedAttendance.has(session.id);
 
     // Attendance summary

@@ -21,6 +21,12 @@ const toLocalDateStr = (d: Date): string => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// Parse "YYYY-MM-DD" as local midnight (avoids UTC offset issues)
+const parseLocalDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
 // Generate session dates based on schedule
 const generateGroupSessionDates = (
   scheduleDays: ScheduleDay[],
@@ -28,8 +34,8 @@ const generateGroupSessionDates = (
   endDate: string
 ): string[] => {
   const dates: string[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
 
   const current = new Date(start);
   while (current <= end) {
@@ -269,6 +275,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'student_groups', filter: `user_id=eq.${currentUserId}` }, () => {
         debouncedFetch();
       })
+      // group_sessions and group_session_attendance lack user_id columns,
+      // so we listen unfiltered; the refetch query itself filters by user ownership.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_sessions' }, () => {
         debouncedFetch();
       })
@@ -297,7 +305,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     description?: string,
     color?: string,
     location?: { lat: number; lng: number; address?: string; name?: string } | null
-  ): Promise<StudentGroup | null> => {
+  ): Promise<string | null> => {
     if (!currentUserId) {
       toast({ title: "خطأ", description: "يجب تسجيل الدخول أولاً", variant: "destructive" });
       return null;
@@ -365,7 +373,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
 
       if (sessionDates.length > 0) {
         const sessionInserts = sessionDates.map(date => {
-          const dayOfWeek = new Date(date).getDay();
+          const dayOfWeek = parseLocalDate(date).getDay();
           const scheduleDay = scheduleDays.find(d => d.dayOfWeek === dayOfWeek);
           return {
             group_id: groupId,
@@ -695,8 +703,10 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('[Groups] Failed to update member attendance:', error);
       toast({ title: "خطأ", description: "فشل في تحديث الحضور", variant: "destructive" });
+      // Rollback optimistic update by re-fetching from DB
+      await fetchGroups();
     }
-  }, []);
+  }, [fetchGroups]);
 
   // Mark entire group session as completed
   const completeGroupSession = useCallback(async (groupId: string, sessionId: string, topic?: string, notes?: string) => {
@@ -911,7 +921,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
 
-      const dayOfWeek = new Date(date).getDay();
+      const dayOfWeek = parseLocalDate(date).getDay();
       const scheduleDay = group.scheduleDays.find(d => d.dayOfWeek === dayOfWeek);
       const sessionTime = time || scheduleDay?.time || group.sessionTime;
 
@@ -1000,7 +1010,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
   }, [groups, fetchGroups]);
 
   // Add a new session for today for a group
-  const addGroupSessionForToday = useCallback(async (groupId: string, time?: string): Promise<GroupSession | null> => {
+  const addGroupSessionForToday = useCallback(async (groupId: string, time?: string): Promise<string | null> => {
     try {
       const group = groups.find(g => g.id === groupId);
       if (!group) {
@@ -1105,7 +1115,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     let total = 0;
 
     group.sessions.forEach(session => {
-      const sessionDate = new Date(session.date);
+      const sessionDate = parseLocalDate(session.date);
       if (sessionDate.getMonth() === month && sessionDate.getFullYear() === year) {
         if (session.status === 'completed') {
           session.memberAttendance.forEach(att => {

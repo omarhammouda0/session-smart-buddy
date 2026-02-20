@@ -173,8 +173,13 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
 
   // Update settings (save to database)
   const updateSettings = useCallback(async (newSettings: Partial<NotificationSettings>) => {
-    const updated = { ...settings, ...newSettings };
-    setSettings(updated);
+    let updated: NotificationSettings | undefined;
+    setSettings(prev => {
+      updated = { ...prev, ...newSettings };
+      return updated;
+    });
+
+    if (!updated) return;
 
     // Save to database if we have userId
     const currentUserId = userId || await getUserId();
@@ -209,7 +214,7 @@ export function useSessionNotifications(students: Student[], groups: StudentGrou
         });
       }
     }
-  }, [settings, userId, getUserId]);
+  }, [userId, getUserId]);
 
   // Mark session as notified (stays in localStorage)
   const markAsNotified = useCallback((sessionId: string) => {

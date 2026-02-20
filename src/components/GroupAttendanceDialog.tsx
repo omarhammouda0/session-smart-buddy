@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,6 +100,19 @@ export const GroupAttendanceDialog = ({
 
   const activeMembers = group.members.filter(m => m.isActive);
   const sessionDate = new Date(session.date);
+
+  // Re-sync local state when the session prop changes (e.g. switching sessions)
+  useEffect(() => {
+    setSessionTopic(session.topic || '');
+    setSessionNotes(session.notes || '');
+    const initial: Record<string, SessionStatus> = {};
+    session.memberAttendance.forEach(a => {
+      initial[a.memberId] = a.status;
+    });
+    setLocalAttendance(initial);
+    setNotes({});
+    setIsMarkingAll(false);
+  }, [session.id]);
 
   // Count attendance stats using local state
   const stats = {

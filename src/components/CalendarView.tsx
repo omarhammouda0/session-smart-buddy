@@ -152,7 +152,7 @@ export const CalendarView = ({
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
 
   // Get groups for calendar display
-  const { activeGroups, getGroupSessionsForDate, updateMemberAttendance, completeGroupSession, rescheduleGroupSession, addGroupSessionForToday } = useGroups();
+  const { activeGroups, getGroupSessionsForDate, updateMemberAttendance, completeGroupSession, rescheduleGroupSession, addGroupSession } = useGroups();
 
   // Get available slots from conflict detection hook - now includes groups for proper conflict detection
   const { getSuggestedSlots, checkConflict } = useConflictDetection(students, activeGroups);
@@ -228,6 +228,7 @@ export const CalendarView = ({
     open: boolean;
     session: Session;
     student: Student;
+    reason?: string;
   } | null>(null);
   const [completeConfirmDialog, setCompleteConfirmDialog] = useState<{
     open: boolean;
@@ -345,14 +346,26 @@ export const CalendarView = ({
     }
   }, [currentDate, viewMode]);
 
-  // Auto-scroll to today when in day view
+  // Auto-scroll to today only when switching to day view mode (not on every navigation)
+  const prevViewMode = React.useRef(viewMode);
   useEffect(() => {
-    if (viewMode === "day" && todayScrollRef.current) {
+    if (viewMode === "day" && (prevViewMode.current !== "day" || !prevViewMode.current) && todayScrollRef.current) {
       setTimeout(() => {
         todayScrollRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 100);
     }
-  }, [viewMode, currentDate]);
+    prevViewMode.current = viewMode;
+  }, [viewMode]);
+
+  // Clean up longPressTimer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    };
+  }, []);
 
   // Weekly/Monthly Summary Calculation
   const periodSummary = useMemo(() => {
@@ -857,8 +870,7 @@ export const CalendarView = ({
 
   const confirmCancel = () => {
     if (!cancelConfirmDialog || !onCancelSession) return;
-    const reason = prompt("سبب الإلغاء (اختياري):");
-    onCancelSession(cancelConfirmDialog.student.id, cancelConfirmDialog.session.id, reason || undefined);
+    onCancelSession(cancelConfirmDialog.student.id, cancelConfirmDialog.session.id, cancelConfirmDialog.reason?.trim() || undefined);
     setCancelConfirmDialog(null);
   };
 
@@ -1039,7 +1051,7 @@ export const CalendarView = ({
           return;
         }
 
-        await addGroupSessionForToday(addSessionDialog.selectedGroupId, addSessionDialog.time || undefined);
+        await addGroupSession(addSessionDialog.selectedGroupId, addSessionDialog.date, addSessionDialog.time || undefined);
         toast({
           title: "✓ تمت إضافة حصة المجموعة",
           description: `تمت إضافة حصة لمجموعة ${group.name} في ${format(parseISO(addSessionDialog.date), "dd/MM/yyyy", { locale: ar })}`,
@@ -2034,9 +2046,21 @@ export const CalendarView = ({
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
             <AlertDialogTitle>تأكيد إلغاء الحصة</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل تريد إلغاء حصة <strong>{cancelConfirmDialog?.student.name}</strong> في{" "}
-              <strong>{cancelConfirmDialog?.session.time || cancelConfirmDialog?.student.sessionTime}</strong>؟
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  هل تريد إلغاء حصة <strong>{cancelConfirmDialog?.student.name}</strong> في{" "}
+                  <strong>{cancelConfirmDialog?.session.time || cancelConfirmDialog?.student.sessionTime}</strong>؟
+                </p>
+                <input
+                  type="text"
+                  placeholder="سبب الإلغاء (اختياري)"
+                  value={cancelConfirmDialog?.reason || ''}
+                  onChange={(e) => cancelConfirmDialog && setCancelConfirmDialog({ ...cancelConfirmDialog, reason: e.target.value })}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  dir="rtl"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
