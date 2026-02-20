@@ -13,8 +13,8 @@ import {
   addDays,
   isWithinInterval,
 } from "date-fns";
-import { Calendar, Clock, User, Undo2, CheckCircle2, XCircle, AlertCircle, ArrowDown, Plus, X } from "lucide-react";
-import { Student, Session } from "@/types/student";
+import { Calendar, Clock, User, Users, Undo2, CheckCircle2, XCircle, AlertCircle, ArrowDown, Plus, X } from "lucide-react";
+import { Student, Session, StudentGroup } from "@/types/student";
 import { formatShortDateAr, MONTH_NAMES_AR } from "@/lib/arabicConstants";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface BulkEditSessionsDialogProps {
   students: Student[];
+  groups?: StudentGroup[];
   onBulkUpdateTime: (
     studentIds: string[],
     sessionIds: string[],
@@ -39,11 +40,14 @@ interface BulkEditSessionsDialogProps {
   ) => { success: boolean; updatedCount: number; conflicts: ConflictInfo[] };
   onUpdateSessionDate?: (studentId: string, sessionId: string, newDate: string, newTime: string) => void;
   onBulkMarkAsVacation?: (studentIds: string[], sessionIds: string[]) => { success: boolean; updatedCount: number };
+  onUpdateGroupSessionDateTime?: (groupId: string, sessionId: string, newDate: string, newTime: string) => void;
 }
 
 interface SessionWithStudent {
   session: Session;
   student: Student;
+  group?: StudentGroup;
+  isGroup?: boolean;
   originalTime: string;
   newTime: string;
   originalDate: string;
@@ -79,7 +83,7 @@ interface DayChangeRule {
 }
 
 interface UndoData {
-  sessionUpdates: { sessionId: string; studentId: string; originalTime: string; originalDate: string }[];
+  sessionUpdates: { sessionId: string; studentId: string; groupId?: string; isGroup?: boolean; originalTime: string; originalDate: string }[];
   timestamp: number;
   count: number;
   studentName: string;
@@ -205,8 +209,10 @@ const generateMonthOptions = (today: Date): PeriodOption[] => {
 
 export const BulkEditSessionsDialog = ({
   students,
+  groups = [],
   onBulkUpdateTime,
   onUpdateSessionDate,
+  onUpdateGroupSessionDateTime,
 }: BulkEditSessionsDialogProps) => {
   const [open, setOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -219,6 +225,7 @@ export const BulkEditSessionsDialog = ({
 
   const today = startOfDay(new Date());
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+  const [selectedType, setSelectedType] = useState<"student" | "group">("student");
   const [selectedPeriods, setSelectedPeriods] = useState<PeriodOption[]>([]);
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
   const [checkedPeriodIds, setCheckedPeriodIds] = useState<Set<string>>(new Set());
@@ -398,8 +405,16 @@ export const BulkEditSessionsDialog = ({
   };
 
   const selectedStudent = useMemo(() => {
+    if (selectedType !== "student") return undefined;
     return students.find((s) => s.id === selectedStudentId);
-  }, [students, selectedStudentId]);
+  }, [students, selectedStudentId, selectedType]);
+
+  const selectedGroup = useMemo(() => {
+    if (selectedType !== "group") return undefined;
+    return groups.find((g) => g.id === selectedStudentId);
+  }, [groups, selectedStudentId, selectedType]);
+
+  const selectedName = selectedType === "group" ? selectedGroup?.name : selectedStudent?.name;
 
   const hasSelectedPeriod = selectedPeriods.length > 0;
 
@@ -407,18 +422,25 @@ export const BulkEditSessionsDialog = ({
     const dayCount: { [key: number]: number } = {};
     const timeCount: { [key: string]: number } = {};
 
-    if (!selectedStudent || !hasSelectedPeriod) {
+    if ((!selectedStudent && !selectedGroup) || !hasSelectedPeriod) {
       return { days: [], times: [] };
     }
 
-    selectedStudent.sessions.forEach((session) => {
+    const sessions = selectedType === "group" && selectedGroup
+      ? selectedGroup.sessions
+      : selectedStudent?.sessions || [];
+    const defaultTime = selectedType === "group" && selectedGroup
+      ? selectedGroup.sessionTime || "16:00"
+      : selectedStudent?.sessionTime || "16:00";
+
+    sessions.forEach((session) => {
       if (session.status !== "scheduled") return;
 
       const { inPeriod } = isDateInSelectedPeriods(session.date);
       if (!inPeriod) return;
 
       const sessionDay = getDay(parseISO(session.date));
-      const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
+      const sessionTime = session.time || defaultTime;
 
       dayCount[sessionDay] = (dayCount[sessionDay] || 0) + 1;
       timeCount[sessionTime] = (timeCount[sessionTime] || 0) + 1;
@@ -433,7 +455,7 @@ export const BulkEditSessionsDialog = ({
       .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
     return { days, times };
-  }, [selectedStudent, hasSelectedPeriod, selectedPeriods]);
+  }, [selectedStudent, selectedGroup, selectedType, hasSelectedPeriod, selectedPeriods]);
 
   useEffect(() => {
     if (modType === "day-change" && availableDaysAndTimes.days.length > 0) {
@@ -455,17 +477,24 @@ export const BulkEditSessionsDialog = ({
 
   // Detect unique (day, time) combos from scheduled sessions in selected periods
   const availableDayTimeCombos = useMemo(() => {
-    if (!selectedStudent || !hasSelectedPeriod) return [];
+    if ((!selectedStudent && !selectedGroup) || !hasSelectedPeriod) return [];
 
     const comboMap = new Map<string, { day: number; time: string; count: number }>();
 
-    selectedStudent.sessions.forEach((session) => {
+    const sessions = selectedType === "group" && selectedGroup
+      ? selectedGroup.sessions
+      : selectedStudent?.sessions || [];
+    const defaultTime = selectedType === "group" && selectedGroup
+      ? selectedGroup.sessionTime || "16:00"
+      : selectedStudent?.sessionTime || "16:00";
+
+    sessions.forEach((session) => {
       if (session.status !== "scheduled") return;
       const { inPeriod } = isDateInSelectedPeriods(session.date);
       if (!inPeriod) return;
 
       const sessionDay = getDay(parseISO(session.date));
-      const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
+      const sessionTime = session.time || defaultTime;
       const key = `${sessionDay}-${sessionTime}`;
 
       if (comboMap.has(key)) {
@@ -478,7 +507,7 @@ export const BulkEditSessionsDialog = ({
     return Array.from(comboMap.values()).sort((a, b) =>
       a.day !== b.day ? a.day - b.day : timeToMinutes(a.time) - timeToMinutes(b.time),
     );
-  }, [selectedStudent, hasSelectedPeriod, selectedPeriods]);
+  }, [selectedStudent, selectedGroup, selectedType, hasSelectedPeriod, selectedPeriods]);
 
   // Auto-generate day-change rules from detected combos, preserving user edits
   useEffect(() => {
@@ -508,15 +537,40 @@ export const BulkEditSessionsDialog = ({
   const matchingSessions = useMemo(() => {
     const sessions: SessionWithStudent[] = [];
 
-    if (!selectedStudentId || !selectedStudent || !hasSelectedPeriod) return sessions;
+    if (!selectedStudentId || (!selectedStudent && !selectedGroup) || !hasSelectedPeriod) return sessions;
 
-    selectedStudent.sessions.forEach((session) => {
+    const isGroupMode = selectedType === "group" && !!selectedGroup;
+    const sourceSessions = isGroupMode ? selectedGroup!.sessions : selectedStudent?.sessions || [];
+    const defaultTime = isGroupMode ? selectedGroup!.sessionTime || "16:00" : selectedStudent?.sessionTime || "16:00";
+    const defaultDuration = isGroupMode ? selectedGroup!.sessionDuration || 60 : selectedStudent?.sessionDuration || 60;
+
+    // Create a dummy student object for groups to keep the data structure consistent
+    const entityAsStudent: Student = isGroupMode
+      ? {
+          id: selectedGroup!.id,
+          name: selectedGroup!.name,
+          phone: "",
+          sessionTime: defaultTime,
+          sessionDuration: defaultDuration,
+          scheduleDays: selectedGroup!.scheduleDays,
+          sessionType: selectedGroup!.sessionType,
+          sessions: sourceSessions as Session[],
+          sempiternityStart: "",
+          semesterEnd: "",
+          monthlyPrice: selectedGroup!.defaultPricePerStudent,
+          isActive: selectedGroup!.isActive,
+          createdAt: selectedGroup!.createdAt,
+          updatedAt: selectedGroup!.updatedAt,
+        } as Student
+      : selectedStudent!;
+
+    sourceSessions.forEach((session) => {
       if (session.status !== "scheduled") return;
 
       const { inPeriod, weekLabel } = isDateInSelectedPeriods(session.date);
       if (!inPeriod) return;
 
-      const sessionTime = session.time || selectedStudent.sessionTime || "16:00";
+      const sessionTime = session.time || defaultTime;
 
       // Offset mode: optional day filter
       if (modType === "offset" && offsetDayFilter.length > 0) {
@@ -548,7 +602,9 @@ export const BulkEditSessionsDialog = ({
 
       sessions.push({
         session,
-        student: selectedStudent,
+        student: entityAsStudent,
+        group: isGroupMode ? selectedGroup : undefined,
+        isGroup: isGroupMode,
         originalTime: sessionTime,
         newTime: calculatedNewTime,
         originalDate: session.date,
@@ -642,6 +698,27 @@ export const BulkEditSessionsDialog = ({
         });
       });
 
+      // 1b. Check against groups' sessions (cross-entity conflicts)
+      if (conflictType !== "overlap") {
+        groups.forEach((otherGroup) => {
+          if (sessionData.isGroup && otherGroup.id === sessionData.group?.id) return;
+
+          otherGroup.sessions.forEach((otherSession) => {
+            if (otherSession.date !== sessNewDate) return;
+            if (otherSession.status === "cancelled" || otherSession.status === "vacation") return;
+
+            const otherTime = otherSession.time || otherGroup.sessionTime || "16:00";
+            const otherStartMinutes = timeToMinutes(otherTime);
+            const otherDuration = otherSession.duration || otherGroup.sessionDuration || 60;
+            const otherEndMinutes = otherStartMinutes + otherDuration;
+
+            const res = checkOverlap(newStartMinutes, newEndMinutes, otherStartMinutes, otherEndMinutes);
+            if (res === "overlap") conflictType = "overlap";
+            else if (res === "close" && conflictType !== "overlap") conflictType = "close";
+          });
+        });
+      }
+
       // 2. Self-conflict: check same student's sessions that are NOT being modified
       if (conflictType !== "overlap") {
         student.sessions.forEach((otherSession) => {
@@ -689,13 +766,13 @@ export const BulkEditSessionsDialog = ({
     });
 
     return result;
-  }, [matchingSessions, students]);
+  }, [matchingSessions, students, groups]);
 
   const handleShowPreview = () => {
     if (!selectedStudentId) {
       toast({
-        title: "اختر طالب",
-        description: "الرجاء اختيار طالب أولاً",
+        title: "اختر طالب أو مجموعة",
+        description: "الرجاء اختيار طالب أو مجموعة أولاً",
         variant: "destructive",
       });
       return;
@@ -737,7 +814,7 @@ export const BulkEditSessionsDialog = ({
     if (matchingSessions.length === 0) {
       toast({
         title: "لا توجد جلسات",
-        description: `لا توجد جلسات مجدولة لـ ${selectedStudent?.name || "الطالب"} في الفترات المختارة`,
+        description: `لا توجد جلسات مجدولة لـ ${selectedName || "الطالب"} في الفترات المختارة`,
         variant: "destructive",
       });
       return;
@@ -781,23 +858,30 @@ export const BulkEditSessionsDialog = ({
       return;
     }
 
+    const isGroupMode = selectedType === "group";
+
     const undoInfo: UndoData = {
       sessionUpdates: sessionsToApply.map((s) => ({
         sessionId: s.session.id,
         studentId: s.student.id,
+        groupId: s.group?.id,
+        isGroup: s.isGroup,
         originalTime: s.originalTime,
         originalDate: s.originalDate,
       })),
       timestamp: Date.now(),
       count: sessionsToApply.length,
-      studentName: selectedStudent?.name || "",
+      studentName: selectedName || "",
     };
 
     const successfulUpdates: typeof undoInfo.sessionUpdates = [];
 
     try {
       sessionsToApply.forEach((s) => {
-        if (modType === "day-change" && onUpdateSessionDate) {
+        if (isGroupMode && s.group && onUpdateGroupSessionDateTime) {
+          // Group session update
+          onUpdateGroupSessionDateTime(s.group.id, s.session.id, s.newDate, s.newTime);
+        } else if (modType === "day-change" && onUpdateSessionDate) {
           onUpdateSessionDate(s.student.id, s.session.id, s.newDate, s.newTime);
         } else {
           onBulkUpdateTime([s.student.id], [s.session.id], s.newTime);
@@ -805,6 +889,8 @@ export const BulkEditSessionsDialog = ({
         successfulUpdates.push({
           sessionId: s.session.id,
           studentId: s.student.id,
+          groupId: s.group?.id,
+          isGroup: s.isGroup,
           originalTime: s.originalTime,
           originalDate: s.originalDate,
         });
@@ -843,7 +929,9 @@ export const BulkEditSessionsDialog = ({
     if (!undoData) return;
 
     undoData.sessionUpdates.forEach((update) => {
-      if (onUpdateSessionDate) {
+      if (update.isGroup && update.groupId && onUpdateGroupSessionDateTime) {
+        onUpdateGroupSessionDateTime(update.groupId, update.sessionId, update.originalDate, update.originalTime);
+      } else if (onUpdateSessionDate) {
         onUpdateSessionDate(update.studentId, update.sessionId, update.originalDate, update.originalTime);
       } else {
         onBulkUpdateTime([update.studentId], [update.sessionId], update.originalTime);
@@ -862,6 +950,7 @@ export const BulkEditSessionsDialog = ({
 
   const resetForm = () => {
     setSelectedStudentId("");
+    setSelectedType("student");
     setSelectedPeriods([]);
     setShowPeriodPicker(false);
     setCheckedPeriodIds(new Set());
@@ -947,18 +1036,44 @@ export const BulkEditSessionsDialog = ({
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5 text-sm">
                     <User className="h-4 w-4" />
-                    اختر الطالب
+                    اختر الطالب أو المجموعة
                   </Label>
-                  <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                  <Select
+                    value={selectedStudentId ? `${selectedType}:${selectedStudentId}` : ""}
+                    onValueChange={(v) => {
+                      const [type, id] = v.split(":");
+                      setSelectedType(type as "student" | "group");
+                      setSelectedStudentId(id);
+                    }}
+                  >
                     <SelectTrigger className={cn(!selectedStudentId && "text-muted-foreground")}>
-                      <SelectValue placeholder="اختر طالب..." />
+                      <SelectValue placeholder="اختر طالب أو مجموعة..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.name} ({formatTimeAr(student.sessionTime || "16:00")})
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        <SelectLabel className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5" />
+                          الطلبة
+                        </SelectLabel>
+                        {students.map((student) => (
+                          <SelectItem key={`student:${student.id}`} value={`student:${student.id}`}>
+                            {student.name} ({formatTimeAr(student.sessionTime || "16:00")})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      {groups.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5" />
+                            المجموعات
+                          </SelectLabel>
+                          {groups.filter(g => g.isActive).map((group) => (
+                            <SelectItem key={`group:${group.id}`} value={`group:${group.id}`}>
+                              👥 {group.name} ({formatTimeAr(group.sessionTime || "16:00")} • {group.members.filter(m => m.isActive).length} طالب)
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1289,7 +1404,7 @@ export const BulkEditSessionsDialog = ({
                     <div className="space-y-3">
                       {hasSelectedPeriod && selectedStudentId && availableDayTimeCombos.length === 0 && (
                         <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg text-center">
-                          لا توجد جلسات مجدولة لـ {selectedStudent?.name} في الفترات المختارة
+                          لا توجد جلسات مجدولة لـ {selectedName} في الفترات المختارة
                         </div>
                       )}
 
@@ -1539,7 +1654,7 @@ export const BulkEditSessionsDialog = ({
                 <h3 className="text-lg font-medium">
                   ✓ تم تحديث {lastApplyResult.safe + lastApplyResult.warnings} جلسة
                 </h3>
-                <p className="text-sm text-muted-foreground mt-1">لـ {selectedStudent?.name}</p>
+                <p className="text-sm text-muted-foreground mt-1">لـ {selectedName}</p>
               </div>
 
               {undoData && undoTimeLeft > 0 && (

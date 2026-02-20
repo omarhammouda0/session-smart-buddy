@@ -342,6 +342,7 @@ const Index = () => {
     recordGroupMemberPayment,
     getGroupMemberPayments,
     updateGroupSessionDetails,
+    updateGroupSessionDateTime,
   } = useGroups();
 
   // Conflict detection - now includes both students and groups
@@ -1319,7 +1320,7 @@ const Index = () => {
               </Sheet>
               <AddStudentDialog onAdd={handleAddStudent} defaultStart={settings.defaultSemesterStart} defaultEnd={settings.defaultSemesterEnd} students={students} settings={settings} defaultDuration={settings.defaultSessionDuration} defaultPriceOnsite={settings.defaultPriceOnsite} defaultPriceOnline={settings.defaultPriceOnline} />
               <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
-              <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
+              <BulkEditSessionsDialog students={students} groups={activeGroups} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} onUpdateGroupSessionDateTime={updateGroupSessionDateTime} />
               <MonthlyReportDialog students={students} payments={payments} settings={settings} />
               <ReminderHistoryDialog />
               <ReminderSettingsDialog />
@@ -1385,7 +1386,7 @@ const Index = () => {
                     {/* Each menu item as a full-width button with visible label */}
                     <div className="flex flex-col gap-2">
                       <AddVacationDialog students={students} onBulkMarkAsVacation={bulkMarkAsVacation} />
-                      <BulkEditSessionsDialog students={students} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} />
+                      <BulkEditSessionsDialog students={students} groups={activeGroups} onBulkUpdateTime={bulkUpdateSessionTime as (studentIds: string[], sessionIds: string[], newTime: string) => { success: boolean; updatedCount: number; conflicts: [] }} onUpdateSessionDate={updateSessionDateTime} onBulkMarkAsVacation={bulkMarkAsVacation} onUpdateGroupSessionDateTime={updateGroupSessionDateTime} />
                       <MonthlyReportDialog students={students} payments={payments} settings={settings} />
                       <ReminderHistoryDialog />
                       <ReminderSettingsDialog />

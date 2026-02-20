@@ -101,6 +101,7 @@ interface GroupsContextType {
   ) => Promise<void>;
   getGroupMemberPayments: (groupId: string, memberId?: string) => Promise<GroupMemberPayment[]>;
   updateGroupSessionDetails: (groupId: string, sessionId: string, details: { topic?: string; notes?: string }) => Promise<void>;
+  updateGroupSessionDateTime: (groupId: string, sessionId: string, newDate: string, newTime: string) => Promise<void>;
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
@@ -1091,6 +1092,35 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentUserId]);
 
+  // Simple date+time update for bulk editing (no existence check, no toast)
+  const updateGroupSessionDateTime = useCallback(async (groupId: string, sessionId: string, newDate: string, newTime: string) => {
+    try {
+      // Optimistic update
+      setGroups(prev => prev.map(g => {
+        if (g.id !== groupId) return g;
+        return {
+          ...g,
+          sessions: g.sessions.map(s =>
+            s.id === sessionId ? { ...s, date: newDate, time: newTime } : s
+          ).sort((a, b) => a.date.localeCompare(b.date)),
+        };
+      }));
+
+      const { error } = await supabase
+        .from('group_sessions')
+        .update({ date: newDate, time: newTime, updated_at: new Date().toISOString() })
+        .eq('id', sessionId);
+
+      if (error) {
+        console.error('[Groups] Failed to update group session date/time:', error);
+        await fetchGroups();
+      }
+    } catch (error) {
+      console.error('[Groups] Failed to update group session date/time:', error);
+      await fetchGroups();
+    }
+  }, [fetchGroups]);
+
   const value: GroupsContextType = {
     groups,
     activeGroups,
@@ -1114,6 +1144,7 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     recordGroupMemberPayment,
     getGroupMemberPayments,
     updateGroupSessionDetails,
+    updateGroupSessionDateTime,
   };
 
   return (
