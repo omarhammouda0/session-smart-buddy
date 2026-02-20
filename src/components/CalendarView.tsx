@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   format,
   startOfWeek,
@@ -12,6 +12,8 @@ import {
   subWeeks,
   addMonths,
   subMonths,
+  addDays,
+  subDays,
   parseISO,
 } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -141,7 +143,8 @@ export const CalendarView = ({
   onAddSession,
 }: CalendarViewProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("day");
+  const todayScrollRef = useRef<HTMLDivElement>(null);
   const [mobileViewMode, setMobileViewMode] = useState<"grid" | "agenda">("agenda"); // Mobile-specific view
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>("all");
   const [showWeeklySummary, setShowWeeklySummary] = useState(false);
@@ -311,7 +314,12 @@ export const CalendarView = ({
   }, [filteredStudents, selectedStudentFilter, activeGroups]);
 
   const days = useMemo(() => {
-    if (viewMode === "week") {
+    if (viewMode === "day") {
+      // Show 15 days before and 15 days after current date
+      const start = subDays(currentDate, 15);
+      const end = addDays(currentDate, 15);
+      return eachDayOfInterval({ start, end });
+    } else if (viewMode === "week") {
       const start = startOfWeek(currentDate, { weekStartsOn: 0 });
       const end = endOfWeek(currentDate, { weekStartsOn: 0 });
       return eachDayOfInterval({ start, end });
@@ -336,6 +344,15 @@ export const CalendarView = ({
       return [...paddingStart, ...monthDays, ...paddingEnd];
     }
   }, [currentDate, viewMode]);
+
+  // Auto-scroll to today when in day view
+  useEffect(() => {
+    if (viewMode === "day" && todayScrollRef.current) {
+      setTimeout(() => {
+        todayScrollRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [viewMode, currentDate]);
 
   // Weekly/Monthly Summary Calculation
   const periodSummary = useMemo(() => {
@@ -622,11 +639,13 @@ export const CalendarView = ({
   );
 
   const goToPrev = () => {
-    if (viewMode === "week") setCurrentDate(subWeeks(currentDate, 1));
+    if (viewMode === "day") setCurrentDate(subDays(currentDate, 7));
+    else if (viewMode === "week") setCurrentDate(subWeeks(currentDate, 1));
     else setCurrentDate(subMonths(currentDate, 1));
   };
   const goToNext = () => {
-    if (viewMode === "week") setCurrentDate(addWeeks(currentDate, 1));
+    if (viewMode === "day") setCurrentDate(addDays(currentDate, 7));
+    else if (viewMode === "week") setCurrentDate(addWeeks(currentDate, 1));
     else setCurrentDate(addMonths(currentDate, 1));
   };
   const goToToday = () => {
@@ -1249,12 +1268,13 @@ export const CalendarView = ({
         {/* View Mode Toggle - Compact */}
         <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-fit">
           {[
+            { value: "day", label: "يوم" },
             { value: "week", label: "أسبوع" },
             { value: "month", label: "شهر" },
           ].map(({ value, label }) => (
             <button
               key={value}
-              onClick={() => setViewMode(value as "week" | "month")}
+              onClick={() => setViewMode(value as "day" | "week" | "month")}
               className={cn(
                 "px-2 sm:px-4 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-all",
                 viewMode === value ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:bg-background/50"
@@ -1276,7 +1296,9 @@ export const CalendarView = ({
             </Button>
           </div>
           <h3 className="font-display font-bold text-xs sm:text-base text-center px-2 py-1 bg-primary/5 rounded-lg">
-            {viewMode === "week"
+            {viewMode === "day"
+              ? format(currentDate, "d MMMM yyyy", { locale: ar })
+              : viewMode === "week"
               ? `${format(days[0], "dd/MM", { locale: ar })} - ${format(days[days.length - 1], "dd/MM", { locale: ar })}`
               : format(currentDate, "MMM yyyy", { locale: ar })}
           </h3>
@@ -1299,8 +1321,8 @@ export const CalendarView = ({
           </div>
         )}
 
-        {/* Mobile View Toggle - Only visible on mobile */}
-        <div className="flex sm:hidden items-center justify-between mb-3">
+        {/* Mobile View Toggle - Only visible on mobile, hidden in day view */}
+        <div className={cn("flex sm:hidden items-center justify-between mb-3", viewMode === 'day' && "hidden")}>
           <div className="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg">
             <button
               onClick={() => setMobileViewMode('agenda')}
@@ -1328,8 +1350,11 @@ export const CalendarView = ({
           </span>
         </div>
 
-        {/* Mobile Agenda View - Better for small screens */}
-        <div className={cn("sm:hidden", mobileViewMode === 'agenda' ? "block" : "hidden")}>
+        {/* Agenda View - Day view on all screens, agenda mode on mobile */}
+        <div className={cn(
+          viewMode === 'day' ? "block" : "sm:hidden",
+          viewMode !== 'day' && mobileViewMode === 'agenda' ? "block" : viewMode !== 'day' ? "hidden" : ""
+        )}>
           <div className="space-y-3">
             {days.map((day) => {
               const dateStr = format(day, "yyyy-MM-dd");
@@ -1337,13 +1362,14 @@ export const CalendarView = ({
               const isToday = isSameDay(day, today);
               const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
 
-              // Skip days with no sessions in agenda view (except today)
-              if (daySessions.length === 0 && !isToday) return null;
-              if (!isCurrentMonth) return null;
+              // In day view show all days; in agenda view skip empty non-today days
+              if (viewMode !== "day" && daySessions.length === 0 && !isToday) return null;
+              if (viewMode !== "day" && !isCurrentMonth) return null;
 
               return (
                 <div
                   key={dateStr}
+                  ref={isToday ? todayScrollRef : undefined}
                   className={cn(
                     "rounded-xl border-2 overflow-hidden transition-all",
                     isToday && "ring-2 ring-primary border-primary shadow-lg"
@@ -1562,8 +1588,11 @@ export const CalendarView = ({
           </div>
         </div>
 
-        {/* Desktop Grid View & Mobile Grid View (when selected) */}
-        <div className={cn("sm:block", mobileViewMode === 'grid' ? "block" : "hidden sm:block")}>
+        {/* Desktop Grid View & Mobile Grid View (when selected) - hidden in day view */}
+        <div className={cn(
+          viewMode === 'day' ? "hidden" : "sm:block",
+          mobileViewMode === 'grid' ? "block" : "hidden sm:block"
+        )}>
           <div className="grid gap-0.5 sm:gap-2 grid-cols-7">
             {DAY_NAMES_SHORT_AR.map((day, i) => (
               <div key={i} className="text-center text-[0.55rem] sm:text-xs font-bold text-muted-foreground py-1 sm:py-2 bg-muted/30 rounded-md">
