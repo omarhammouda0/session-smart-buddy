@@ -101,6 +101,7 @@ import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { GroupCard } from "@/components/GroupCard";
 import { GroupAttendanceDialog } from "@/components/GroupAttendanceDialog";
 import { GroupPaymentDialog } from "@/components/GroupPaymentDialog";
+import { GroupSessionManager } from "@/components/GroupSessionManager";
 import { StudentGroup, GroupSession } from "@/types/student";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SmartSlotChips } from "@/components/SmartSlotChips";
@@ -343,6 +344,10 @@ const Index = () => {
     getGroupMemberPayments,
     updateGroupSessionDetails,
     updateGroupSessionDateTime,
+    restoreGroupSession,
+    markGroupSessionAsVacation,
+    deleteGroupSession,
+    addGroupSession,
   } = useGroups();
 
   // Conflict detection - now includes both students and groups
@@ -360,6 +365,19 @@ const Index = () => {
   const [editGroupDialog, setEditGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
   const [deleteGroupDialog, setDeleteGroupDialog] = useState<{ open: boolean; group: StudentGroup | null }>({ open: false, group: null });
   const [groupPaymentDialog, setGroupPaymentDialog] = useState<{ open: boolean; group: StudentGroup | null; session: GroupSession | null }>({ open: false, group: null, session: null });
+  const [selectedGroupForManagement, setSelectedGroupForManagement] = useState<StudentGroup | null>(null);
+
+  // Keep selected group in sync with context data (sessions may update)
+  useEffect(() => {
+    if (selectedGroupForManagement) {
+      const updated = groups.find(g => g.id === selectedGroupForManagement.id);
+      if (updated) {
+        setSelectedGroupForManagement(updated);
+      } else {
+        setSelectedGroupForManagement(null);
+      }
+    }
+  }, [groups]);
 
   // State for adding group session for today
   const [addGroupTodaySessionDialog, setAddGroupTodaySessionDialog] = useState<{
@@ -2467,6 +2485,22 @@ const Index = () => {
 
           {/* Groups Tab */}
           <TabsContent value="groups" className="mt-0 space-y-4">
+            {selectedGroupForManagement ? (
+              <GroupSessionManager
+                group={selectedGroupForManagement}
+                onBack={() => setSelectedGroupForManagement(null)}
+                onEdit={() => setEditGroupDialog({ open: true, group: selectedGroupForManagement })}
+                onCompleteSession={completeGroupSession}
+                onCancelSession={cancelGroupSession}
+                onRestoreSession={restoreGroupSession}
+                onVacationSession={markGroupSessionAsVacation}
+                onDeleteSession={deleteGroupSession}
+                onRescheduleSession={rescheduleGroupSession}
+                onAddSession={addGroupSession}
+                onUpdateSessionDetails={updateGroupSessionDetails}
+                onUpdateAttendance={updateMemberAttendance}
+              />
+            ) : (
             <Card className="border overflow-hidden">
               <CardHeader className="pb-3 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
                 <div className="flex items-center justify-between">
@@ -2514,9 +2548,10 @@ const Index = () => {
                         <div
                           key={group.id}
                           className={cn(
-                            "p-4 transition-all hover:bg-violet-50/50 dark:hover:bg-violet-950/20",
+                            "p-4 transition-all hover:bg-violet-50/50 dark:hover:bg-violet-950/20 cursor-pointer",
                             !group.isActive && "opacity-50 bg-muted/30"
                           )}
+                          onClick={() => group.isActive && setSelectedGroupForManagement(group)}
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -2583,7 +2618,7 @@ const Index = () => {
                             </div>
 
                             {/* Actions */}
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                               {group.isActive ? (
                                 <>
                                   <Button
@@ -2606,6 +2641,12 @@ const Index = () => {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-48">
+                                      <DropdownMenuItem
+                                        onClick={() => setSelectedGroupForManagement(group)}
+                                      >
+                                        <History className="h-4 w-4 ml-2" />
+                                        إدارة الحصص
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem
                                         onClick={() => {
                                           const todaySession = group.sessions.find(s => s.date === todayStr);
@@ -2653,6 +2694,7 @@ const Index = () => {
                 )}
               </CardContent>
             </Card>
+            )}
           </TabsContent>
         </Tabs>
 

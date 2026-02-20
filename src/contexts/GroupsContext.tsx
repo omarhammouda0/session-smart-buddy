@@ -100,8 +100,12 @@ interface GroupsContextType {
     notes?: string
   ) => Promise<void>;
   getGroupMemberPayments: (groupId: string, memberId?: string) => Promise<GroupMemberPayment[]>;
-  updateGroupSessionDetails: (groupId: string, sessionId: string, details: { topic?: string; notes?: string }) => Promise<void>;
+  updateGroupSessionDetails: (groupId: string, sessionId: string, details: { topic?: string; notes?: string; homework?: string; homeworkStatus?: string }) => Promise<void>;
   updateGroupSessionDateTime: (groupId: string, sessionId: string, newDate: string, newTime: string) => Promise<void>;
+  restoreGroupSession: (groupId: string, sessionId: string) => Promise<void>;
+  markGroupSessionAsVacation: (groupId: string, sessionId: string) => Promise<void>;
+  deleteGroupSession: (groupId: string, sessionId: string) => Promise<void>;
+  addGroupSession: (groupId: string, date: string, time?: string) => Promise<string | null>;
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
@@ -759,11 +763,11 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [fetchGroups]);
 
-  // Update group session details (topic, notes)
+  // Update group session details (topic, notes, homework)
   const updateGroupSessionDetails = useCallback(async (
     groupId: string,
     sessionId: string,
-    details: { topic?: string; notes?: string }
+    details: { topic?: string; notes?: string; homework?: string; homeworkStatus?: string }
   ) => {
     try {
       // Optimistic update
@@ -777,6 +781,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
               ...s,
               topic: details.topic !== undefined ? details.topic : s.topic,
               notes: details.notes !== undefined ? details.notes : s.notes,
+              homework: details.homework !== undefined ? details.homework : s.homework,
+              homeworkStatus: details.homeworkStatus !== undefined ? details.homeworkStatus as any : s.homeworkStatus,
             };
           }),
         };
@@ -785,6 +791,8 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
       const updateData: Record<string, unknown> = {};
       if (details.topic !== undefined) updateData.topic = details.topic || null;
       if (details.notes !== undefined) updateData.notes = details.notes || null;
+      if (details.homework !== undefined) updateData.homework = details.homework || null;
+      if (details.homeworkStatus !== undefined) updateData.homework_status = details.homeworkStatus || null;
 
       const { error } = await supabase
         .from('group_sessions')
@@ -798,6 +806,161 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
       await fetchGroups();
     }
   }, [fetchGroups]);
+
+  // Restore a group session (undo complete/cancel/vacation)
+  const restoreGroupSession = useCallback(async (groupId: string, sessionId: string) => {
+    try {
+      const { error: sessionError } = await supabase
+        .from('group_sessions')
+        .update({
+          status: 'scheduled',
+          completed_at: null,
+          cancelled_at: null,
+          vacation_at: null,
+        })
+        .eq('id', sessionId);
+
+      if (sessionError) throw sessionError;
+
+      // Reset all attendance to scheduled
+      const { error: attendanceError } = await supabase
+        .from('group_session_attendance')
+        .update({ status: 'scheduled' })
+        .eq('session_id', sessionId);
+
+      if (attendanceError) throw attendanceError;
+
+      toast({ title: "تم استعادة الحصة" });
+      await fetchGroups();
+    } catch (error) {
+      console.error('[Groups] Failed to restore group session:', error);
+      toast({ title: "خطأ", description: "فشل في استعادة الحصة", variant: "destructive" });
+    }
+  }, [fetchGroups]);
+
+  // Mark group session as vacation
+  const markGroupSessionAsVacation = useCallback(async (groupId: string, sessionId: string) => {
+    try {
+      const { error: sessionError } = await supabase
+        .from('group_sessions')
+        .update({
+          status: 'vacation',
+          vacation_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId);
+
+      if (sessionError) throw sessionError;
+
+      // Update all attendance to vacation
+      const { error: attendanceError } = await supabase
+        .from('group_session_attendance')
+        .update({ status: 'vacation' })
+        .eq('session_id', sessionId);
+
+      if (attendanceError) throw attendanceError;
+
+      toast({ title: "تم تسجيل الإجازة" });
+      await fetchGroups();
+    } catch (error) {
+      console.error('[Groups] Failed to mark group session as vacation:', error);
+      toast({ title: "خطأ", description: "فشل في تسجيل الإجازة", variant: "destructive" });
+    }
+  }, [fetchGroups]);
+
+  // Delete a group session permanently
+  const deleteGroupSession = useCallback(async (groupId: string, sessionId: string) => {
+    try {
+      // Attendance records cascade on delete
+      const { error } = await supabase
+        .from('group_sessions')
+        .delete()
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      // Optimistic removal
+      setGroups(prev => prev.map(g => {
+        if (g.id !== groupId) return g;
+        return {
+          ...g,
+          sessions: g.sessions.filter(s => s.id !== sessionId),
+        };
+      }));
+
+      toast({ title: "تم حذف الحصة" });
+    } catch (error) {
+      console.error('[Groups] Failed to delete group session:', error);
+      toast({ title: "خطأ", description: "فشل في حذف الحصة", variant: "destructive" });
+      await fetchGroups();
+    }
+  }, [fetchGroups]);
+
+  // Add a new session for any date for a group
+  const addGroupSession = useCallback(async (groupId: string, date: string, time?: string): Promise<string | null> => {
+    try {
+      const group = groups.find(g => g.id === groupId);
+      if (!group) {
+        toast({ title: "خطأ", description: "المجموعة غير موجودة", variant: "destructive" });
+        return null;
+      }
+
+      // Check if session already exists for this date
+      const existingSession = group.sessions.find(s => s.date === date);
+      if (existingSession) {
+        toast({ title: "تنبيه", description: "يوجد حصة بالفعل لهذه المجموعة في هذا التاريخ", variant: "destructive" });
+        return null;
+      }
+
+      const dayOfWeek = new Date(date).getDay();
+      const scheduleDay = group.scheduleDays.find(d => d.dayOfWeek === dayOfWeek);
+      const sessionTime = time || scheduleDay?.time || group.sessionTime;
+
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('group_sessions')
+        .insert({
+          group_id: groupId,
+          date,
+          time: sessionTime,
+          duration: group.sessionDuration,
+          status: 'scheduled',
+        })
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      // Create attendance records for all active members
+      const { data: membersData, error: membersError } = await supabase
+        .from('group_members')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('is_active', true);
+
+      if (membersError) throw membersError;
+
+      if (membersData && membersData.length > 0) {
+        const attendanceInserts = membersData.map(member => ({
+          session_id: sessionData.id,
+          member_id: member.id,
+          status: 'scheduled',
+        }));
+
+        const { error: attendanceError } = await supabase
+          .from('group_session_attendance')
+          .insert(attendanceInserts);
+
+        if (attendanceError) throw attendanceError;
+      }
+
+      toast({ title: "✅ تمت إضافة الحصة" });
+      await fetchGroups();
+      return sessionData.id;
+    } catch (error) {
+      console.error('[Groups] Failed to add group session:', error);
+      toast({ title: "خطأ", description: "فشل في إضافة الحصة", variant: "destructive" });
+      return null;
+    }
+  }, [groups, fetchGroups]);
 
   // Reschedule a group session to a new date/time
   const rescheduleGroupSession = useCallback(async (groupId: string, sessionId: string, newDate: string, newTime?: string) => {
@@ -1145,6 +1308,10 @@ export const GroupsProvider = ({ children }: { children: ReactNode }) => {
     getGroupMemberPayments,
     updateGroupSessionDetails,
     updateGroupSessionDateTime,
+    restoreGroupSession,
+    markGroupSessionAsVacation,
+    deleteGroupSession,
+    addGroupSession,
   };
 
   return (
